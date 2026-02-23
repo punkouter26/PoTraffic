@@ -13,8 +13,8 @@
             <RadzenArcGauge Style="width: 200px; height: 160px;">
                 <RadzenArcGaugeScale Step="2" Min="0" Max="@QuotaConstants.DefaultDailyQuota" MinorStep="1" Radius="1.5" TickPosition="GaugeTickPosition.Outside">
                     <RadzenArcGaugeScaleValue Value="@_quotaConsumed" ShowValue="true">
-                        <Template Context="value">
-                            <RadzenText TextStyle="TextStyle.H4" class="rz-m-0">@value</RadzenText>
+                        <Template Context="scaleValue">
+                            <RadzenText TextStyle="TextStyle.H4" class="rz-m-0">@scaleValue.Value</RadzenText>
                             <RadzenText TextStyle="TextStyle.Caption" class="rz-m-0">/ @QuotaConstants.DefaultDailyQuota</RadzenText>
                         </Template>
                     </RadzenArcGaugeScaleValue>

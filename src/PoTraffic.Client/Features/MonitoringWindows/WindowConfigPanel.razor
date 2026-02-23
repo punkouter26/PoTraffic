@@ -39,8 +39,8 @@
         }
         else
         {
-            <RadzenAlert AlertStyle="AlertStyle.Warning" ShowIcon="true" class="rz-mb-2">
-                Monitoring is not active. Click <strong>Start Monitoring</strong> to begin polling.
+            <RadzenAlert AlertStyle="AlertStyle.Info" ShowIcon="true" class="rz-mb-2">
+                Monitoring is not active yet. It starts automatically when you open this page and a window is active.
             </RadzenAlert>
         }
 
@@ -50,18 +50,11 @@
         }
 
         <div class="rz-display-flex rz-gap-2">
-            @if (_activeSession is null)
-            {
-                <RadzenButton Text="Start Monitoring" ButtonStyle="ButtonStyle.Success" Icon="play_arrow"
-                              Click="@StartMonitoringAsync" IsBusy="_saving" />
-            }
-            else
+            @if (_activeSession is not null)
             {
                 <RadzenButton Text="Stop Monitoring" ButtonStyle="ButtonStyle.Warning" Icon="stop"
                               Click="@StopMonitoringAsync" IsBusy="_saving" />
             }
-            <RadzenButton Text="Delete Window" ButtonStyle="ButtonStyle.Danger" Icon="delete"
-                          Click="@DeleteWindowAsync" IsBusy="_saving" Disabled="_activeSession is not null" />
         </div>
     }
     else
@@ -123,7 +116,15 @@
         ["Thu"] = true, ["Fri"] = true, ["Sat"] = false, ["Sun"] = false
     };
 
-    protected override async Task OnParametersSetAsync() => await LoadWindowAsync();
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadWindowAsync();
+
+        if (_activeWindow is not null && _activeSession is null)
+        {
+            await StartMonitoringAsync();
+        }
+    }
 
     private async Task LoadWindowAsync()
     {
@@ -233,25 +234,4 @@
         finally { _saving = false; }
     }
 
-    private async Task DeleteWindowAsync()
-    {
-        if (_activeWindow is null) return;
-        _saving = true;
-        _error = "";
-        try
-        {
-            HttpResponseMessage resp = await Http.DeleteAsync(
-                $"/api/routes/{RouteId}/windows/{_activeWindow.Id}");
-
-            if (resp.IsSuccessStatusCode)
-            {
-                await LoadWindowAsync();
-                await OnSaved.InvokeAsync();
-            }
-            else
-                _error = "Failed to delete window. Please try again.";
-        }
-        catch { _error = "Unable to connect. Please try again."; }
-        finally { _saving = false; }
-    }
 }

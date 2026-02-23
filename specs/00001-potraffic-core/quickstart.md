@@ -206,8 +206,8 @@ dotnet test tests/PoTraffic.E2ETests
 2. Call `POST /api/auth/login` → receive JWT bearer token
 3. Call `POST /api/routes` to create a commute route (provider: GoogleMaps)
 4. Call `POST /api/routes/{id}/windows` to set a monitoring window (08:00–09:00, Mon–Fri)
-5. Call `POST /api/routes/{id}/windows/{windowId}/start` → returns `quotaRemaining`
-6. The Hangfire polling chain begins. Observe poll records at `GET /api/routes/{id}/poll-history`
+5. Open Route Detail (`/routes/{id}`) — the client auto-starts monitoring when an active window exists and no active session exists.
+6. The client invokes `POST /api/routes/{id}/windows/{windowId}/start` (returns `quotaRemaining`) and the Hangfire polling chain begins. Observe poll records at `GET /api/routes/{id}/poll-history`
 7. After ≥3 same-weekday sessions, `GET /api/routes/{id}/baseline` returns mean + σ values
 
 ### Scenario B — Reroute Detection
