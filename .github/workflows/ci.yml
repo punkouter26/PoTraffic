@@ -1,4 +1,4 @@
-name: CI
+name: CI-CD
 
 on:
   push:
@@ -60,3 +60,33 @@ jobs:
         with:
           name: test-results
           path: "**/*.trx"
+
+      - name: Publish API
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: dotnet publish src/PoTraffic.Api/PoTraffic.Api.csproj --configuration Release --output ./publish
+
+      - name: Upload publish artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-publish
+          path: ./publish
+
+  deploy:
+    needs: build-and-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download publish artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: api-publish
+          path: ./publish
+
+      - name: Deploy to Azure App Service (PoTraffic RG)
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: potraffic-shared-22602
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: ./publish
