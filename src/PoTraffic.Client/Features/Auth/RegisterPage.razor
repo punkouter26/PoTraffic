@@ -1,0 +1,93 @@
+@page "/register"
+@using System.Net.Http.Json
+@using PoTraffic.Shared.DTOs.Auth
+@inject HttpClient Http
+@inject NavigationManager Nav
+
+<RadzenCard Style="max-width:480px;margin:auto;margin-top:80px;">
+    <RadzenText TextStyle="TextStyle.H5" class="rz-mb-4">Create Account</RadzenText>
+
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Danger" class="rz-mb-3">@_error</RadzenAlert>
+    }
+
+    @if (_success)
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Success" class="rz-mb-3">
+            Account created! Check your email for the verification link.
+        </RadzenAlert>
+    }
+
+    <RadzenFormField Text="Email" class="rz-w-100 rz-mb-3">
+        <RadzenTextBox @bind-Value="_email" InputAttributes="@(new Dictionary<string,object>{{"type","email"}})" />
+    </RadzenFormField>
+
+    <RadzenFormField Text="Password" class="rz-w-100 rz-mb-3">
+        <RadzenPassword @bind-Value="_password" />
+    </RadzenFormField>
+
+    <RadzenFormField Text="Confirm Password" class="rz-w-100 rz-mb-3">
+        <RadzenPassword @bind-Value="_confirmPassword" />
+    </RadzenFormField>
+
+    <RadzenFormField Text="Timezone (e.g. Europe/London)" class="rz-w-100 rz-mb-4">
+        <RadzenTextBox @bind-Value="_locale" />
+    </RadzenFormField>
+
+    <RadzenButton Text="Register" ButtonStyle="ButtonStyle.Primary" class="rz-w-100"
+                  Click="@RegisterAsync" IsBusy="_loading" Disabled="_success" />
+
+    <RadzenText class="rz-mt-3">
+        Already have an account? <a href="/login">Sign in</a>
+    </RadzenText>
+</RadzenCard>
+
+@code {
+    private string _email = "admin@potraffic.dev";
+    private string _password = "Admin123!";
+    private string _confirmPassword = "Admin123!";
+    private string _locale = "Europe/London";
+    private string _error = "";
+    private bool _loading;
+    private bool _success;
+
+    private async Task RegisterAsync()
+    {
+        _error = "";
+
+        if (_password != _confirmPassword)
+        {
+            _error = "Passwords do not match.";
+            return;
+        }
+
+        _loading = true;
+        try
+        {
+            HttpResponseMessage response = await Http.PostAsJsonAsync(
+                "/api/auth/register",
+                new RegisterRequest(_email, _password, _locale));
+
+            if (response.IsSuccessStatusCode)
+            {
+                _success = true;
+            }
+            else
+            {
+                string body = await response.Content.ReadAsStringAsync();
+                _error = response.StatusCode == System.Net.HttpStatusCode.Conflict
+                    ? "Email is already registered."
+                    : "Registration failed. Please try again.";
+            }
+        }
+        catch
+        {
+            _error = "Unable to connect. Please try again.";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

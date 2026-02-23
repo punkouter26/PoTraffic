@@ -1,0 +1,54 @@
+@page "/admin"
+@attribute [Authorize(Roles = "Administrator")]
+@inject HttpClient Http
+@inject NavigationManager Nav
+
+<PageTitle>Admin — User Usage</PageTitle>
+
+<RadzenCard class="rz-p-6 rz-mt-4">
+    <RadzenText TextStyle="TextStyle.H5" class="rz-mb-4">Admin Dashboard — Daily Usage</RadzenText>
+
+    <LoadingErrorCard IsLoading="_loading" Error="@_error">
+        <RadzenDataGrid Data="_users" TItem="UserDailyUsageDto" AllowSorting="true" AllowFiltering="true"
+                        PageSize="25" AllowPaging="true" class="rz-mt-2">
+            <Columns>
+                <RadzenDataGridColumn TItem="UserDailyUsageDto" Property="Email" Title="Email" />
+                <RadzenDataGridColumn TItem="UserDailyUsageDto" Property="Locale" Title="Locale" Width="80px" />
+                <RadzenDataGridColumn TItem="UserDailyUsageDto" Property="TodayPollCount" Title="Polls Today" Width="110px" />
+                <RadzenDataGridColumn TItem="UserDailyUsageDto" Property="TodayEstimatedCostUsd" Title="Est. Cost (USD)" Width="130px">
+                    <Template Context="u">
+                        @u.TodayEstimatedCostUsd.ToString("C4")
+                    </Template>
+                </RadzenDataGridColumn>
+                <RadzenDataGridColumn TItem="UserDailyUsageDto" Property="LastLoginAt" Title="Last Login">
+                    <Template Context="u">
+                        @(u.LastLoginAt?.ToString("yyyy-MM-dd HH:mm") ?? "—")
+                    </Template>
+                </RadzenDataGridColumn>
+            </Columns>
+        </RadzenDataGrid>
+    </LoadingErrorCard>
+</RadzenCard>
+
+@code {
+    private List<UserDailyUsageDto> _users = [];
+    private bool _loading = true;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _users = await Http.GetFromJsonAsync<List<UserDailyUsageDto>>("/api/admin/users")
+                     ?? [];
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load usage data: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

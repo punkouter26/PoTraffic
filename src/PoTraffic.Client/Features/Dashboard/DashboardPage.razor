@@ -1,0 +1,130 @@
+@page "/dashboard"
+@using PoTraffic.Shared.DTOs.Routes
+@using PoTraffic.Shared.Enums
+@inherits PollingComponentBase
+@inject HttpClient Http
+@inject NavigationManager Nav
+
+@using PoTraffic.Shared.Constants
+<RadzenRow class="rz-mb-6">
+    <RadzenColumn Size="12" SizeMD="4">
+        <RadzenCard class="rz-display-flex rz-flex-column rz-align-items-center rz-justify-content-center" Style="height: 100%; min-height: 280px;">
+            <RadzenText TextStyle="TextStyle.H6" class="rz-mb-4">Daily Quota Usage</RadzenText>
+            <RadzenArcGauge Style="width: 200px; height: 160px;">
+                <RadzenArcGaugeScale Step="2" Min="0" Max="@QuotaConstants.DefaultDailyQuota" MinorStep="1" Radius="1.5" TickPosition="GaugeTickPosition.Outside">
+                    <RadzenArcGaugeScaleValue Value="@_quotaConsumed" ShowValue="true">
+                        <Template Context="value">
+                            <RadzenText TextStyle="TextStyle.H4" class="rz-m-0">@value</RadzenText>
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-m-0">/ @QuotaConstants.DefaultDailyQuota</RadzenText>
+                        </Template>
+                    </RadzenArcGaugeScaleValue>
+                </RadzenArcGaugeScale>
+            </RadzenArcGauge>
+            <RadzenText TextStyle="TextStyle.Body2" class="rz-mt-2">Sessions used today</RadzenText>
+        </RadzenCard>
+    </RadzenColumn>
+    <RadzenColumn Size="12" SizeMD="8">
+        <RadzenCard Style="height: 100%;">
+            <RadzenText TextStyle="TextStyle.H4" class="rz-mb-2">Welcome Back</RadzenText>
+            <RadzenText TextStyle="TextStyle.Body1" class="rz-color-on-surface-variant">
+                Your commute monitoring is active. You have <strong>@_routes.Count</strong> routes being tracked for volatility.
+            </RadzenText>
+            @if (_quotaConsumed >= QuotaConstants.DefaultDailyQuota - 2)
+            {
+                <RadzenAlert AlertStyle="AlertStyle.Warning" ShowIcon="true" class="rz-mt-4">
+                    Daily quota almost reached. Monitoring will pause once limit is hit.
+                </RadzenAlert>
+            }
+        </RadzenCard>
+    </RadzenColumn>
+</RadzenRow>
+
+@if (_loading)
+{
+    <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+}
+else if (_routes.Count == 0)
+{
+    <RadzenAlert AlertStyle="AlertStyle.Info" class="rz-mt-4">
+        No routes configured. <a href="/routes/create">Add a route</a> to start monitoring.
+    </RadzenAlert>
+}
+else
+{
+    <RadzenText TextStyle="TextStyle.H5" class="rz-mb-3 rz-mt-4">Active Monitoring</RadzenText>
+    <RadzenDataGrid Data="_routes" TItem="RouteDto" AllowSorting="true" AllowPaging="true" PageSize="10"
+                    ColumnWidth="200px" class="rz-shadow-2 rz-border-radius-2">
+        <Columns>
+            <RadzenDataGridColumn TItem="RouteDto" Property="OriginAddress" Title="Origin">
+                <Template Context="route">
+                    <RadzenText TextStyle="TextStyle.Body2" class="rz-text-truncate" style="max-width: 250px;">
+                        <strong>@route.OriginAddress.Split(',')[0]</strong><br/>
+                        <small class="rz-color-on-surface-variant">@string.Join(',', route.OriginAddress.Split(',').Skip(1))</small>
+                    </RadzenText>
+                </Template>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="RouteDto" Property="DestinationAddress" Title="Destination">
+                <Template Context="route">
+                    <RadzenText TextStyle="TextStyle.Body2" class="rz-text-truncate" style="max-width: 250px;">
+                        <strong>@route.DestinationAddress.Split(',')[0]</strong><br/>
+                        <small class="rz-color-on-surface-variant">@string.Join(',', route.DestinationAddress.Split(',').Skip(1))</small>
+                    </RadzenText>
+                </Template>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="RouteDto" Property="Provider" Title="Provider" Width="120px">
+                <Template Context="route">
+                    <RadzenBadge BadgeStyle="@(route.Provider == RouteProvider.GoogleMaps ? BadgeStyle.Primary : BadgeStyle.Secondary)"
+                                 Text="@route.Provider.ToString()" IsPill="true" />
+                </Template>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="RouteDto" Property="MonitoringStatus" Title="Status" Width="120px">
+                <Template Context="route">
+                    <RadzenBadge BadgeStyle="@(route.MonitoringStatus == MonitoringStatus.Active ? BadgeStyle.Success : BadgeStyle.Warning)"
+                                 Text="@route.MonitoringStatus.ToString()" />
+                </Template>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="RouteDto" Title="Actions" Width="100px" TextAlign="TextAlign.Center">
+                <Template Context="route">
+                    <RadzenButton Icon="analytics" Size="ButtonSize.Medium" ButtonStyle="ButtonStyle.Light"
+                                  Click="@(() => Nav.NavigateTo($"/routes/{route.Id}"))" />
+                </Template>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+}
+
+@code {
+    private List<RouteDto> _routes = [];
+    private int _quotaConsumed;
+    private bool _loading = true;
+
+    // Observer pattern — PollingComponentBase base handles the timer loop
+    protected override TimeSpan PollingInterval => TimeSpan.FromSeconds(60);
+
+    protected override async Task LoadDataAsync()
+    {
+        _loading = true;
+        try
+        {
+            var result = await Http.GetFromJsonAsync<PagedResult<RouteDto>>("/api/routes?page=1&pageSize=100");
+            if (result is not null)
+            {
+                _routes = [.. result.Items];
+            }
+
+            var quota = await Http.GetFromJsonAsync<QuotaDto>("/api/account/quota");
+            if (quota is not null)
+            {
+                _quotaConsumed = quota.UsedToday;
+            }
+        }
+        catch
+        {
+            // Silently handled — loading state remains
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

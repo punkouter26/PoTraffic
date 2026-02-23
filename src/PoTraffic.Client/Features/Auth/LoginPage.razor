@@ -1,0 +1,78 @@
+@page "/login"
+@using System.Net.Http.Json
+@using Microsoft.AspNetCore.Components.Authorization
+@using PoTraffic.Client.Infrastructure.Auth
+@using PoTraffic.Shared.DTOs.Auth
+@inject HttpClient Http
+@inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthStateProvider
+
+<RadzenCard Style="max-width:440px;margin:auto;margin-top:80px;">
+    <RadzenText TextStyle="TextStyle.H5" class="rz-mb-4">Sign In</RadzenText>
+
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Danger" class="rz-mb-3">@_error</RadzenAlert>
+    }
+
+    <RadzenFormField Text="Email" class="rz-w-100 rz-mb-3">
+        <RadzenTextBox @bind-Value="_email" InputAttributes="@(new Dictionary<string,object>{{"type","email"}})" />
+    </RadzenFormField>
+
+    <RadzenFormField Text="Password" class="rz-w-100 rz-mb-4">
+        <RadzenPassword @bind-Value="_password" />
+    </RadzenFormField>
+
+    <RadzenButton Text="Sign In" ButtonStyle="ButtonStyle.Primary" class="rz-w-100"
+                  Click="@LoginAsync" IsBusy="_loading" />
+
+    <RadzenText class="rz-mt-3">
+        No account? <a href="/register">Register</a>
+    </RadzenText>
+</RadzenCard>
+
+@code {
+    private string _email = "admin@potraffic.dev";
+    private string _password = "Admin123!";
+    private string _error = "";
+    private bool _loading;
+
+    private async Task LoginAsync()
+    {
+        _error = "";
+        _loading = true;
+
+        try
+        {
+            HttpResponseMessage response = await Http.PostAsJsonAsync(
+                "/api/auth/login",
+                new LoginRequest(_email, _password));
+
+            if (response.IsSuccessStatusCode)
+            {
+                AuthResponse? auth = await response.Content.ReadFromJsonAsync<AuthResponse>();
+                if (auth is not null)
+                {
+                    // Store JWT via the auth state provider and navigate to dashboard
+                    if (AuthStateProvider is JwtAuthenticationStateProvider jwtProvider)
+                    {
+                        await jwtProvider.LoginAsync(auth.AccessToken);
+                    }
+                    Nav.NavigateTo("/dashboard");
+                }
+            }
+            else
+            {
+                _error = "Invalid email or password.";
+            }
+        }
+        catch
+        {
+            _error = "Unable to connect. Please try again.";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

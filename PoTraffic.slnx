@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/PoTraffic.Api/PoTraffic.Api.csproj" />
+    <Project Path="src/PoTraffic.AppHost/PoTraffic.AppHost.csproj" />
+    <Project Path="src/PoTraffic.Client/PoTraffic.Client.csproj" />
+    <Project Path="src/PoTraffic.ServiceDefaults/PoTraffic.ServiceDefaults.csproj" />
+    <Project Path="src/PoTraffic.Shared/PoTraffic.Shared.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/PoTraffic.E2ETests/PoTraffic.E2ETests.csproj" />
+    <Project Path="tests/PoTraffic.IntegrationTests/PoTraffic.IntegrationTests.csproj" />
+    <Project Path="tests/PoTraffic.UnitTests/PoTraffic.UnitTests.csproj" />
+  </Folder>
+</Solution>

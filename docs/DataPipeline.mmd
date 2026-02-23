@@ -1,0 +1,24 @@
+graph LR
+    subgraph Input [User Input]
+        UI[Create Route / Window]
+    end
+
+    subgraph Processing [Engine]
+        HF[Hangfire Job]
+        Prov[ITrafficProvider]
+    end
+
+    subgraph Storage [Persistence]
+        DB[(SQL Database)]
+    end
+
+    subgraph Output [Visualization]
+        Chart[Radzen Analytics Chart]
+    end
+
+    UI --> DB
+    HF -- 'Poll every X min' --> UI
+    HF --> Prov
+    Prov -- 'External API (Google/TomTom)' --> Prov
+    Prov --> DB
+    DB --> Chart

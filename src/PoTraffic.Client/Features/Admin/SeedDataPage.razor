@@ -1,0 +1,171 @@
+@page "/admin/seed"
+@attribute [Authorize(Roles = "Administrator")]
+@inject HttpClient Http
+@inject NotificationService NotificationService
+@inject DialogService DialogService
+
+<PageTitle>Seed Database — Admin</PageTitle>
+
+<div class="rz-mb-4">
+    <RadzenText Style="display:inline;" Text="Admin" Icon="settings" />
+    <RadzenText Style="display:inline;" Text=" > " />
+    <RadzenText Style="display:inline;" Text="Seed Database" Icon="database" />
+</div>
+
+<div class="row rz-mb-6">
+    <div class="col-md-6">
+        <RadzenText TextStyle="TextStyle.H4" Text="Seed Database" />
+        <RadzenText TextStyle="TextStyle.Body1" class="rz-mt-2">
+            This diagnostic tool populates the system with synthetic users, routes, and historical 
+            poll records (commute samples). This is primarily used for testing, demos, and validating 
+            the volatility visualization engine.
+        </RadzenText>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-5">
+        <RadzenCard>
+            <RadzenText TextStyle="TextStyle.H6" Text="Configuration" class="rz-mb-4" />
+            
+            <RadzenStack Orientation="Orientation.Vertical" Gap="1rem" class="rz-mb-6">
+                <RadzenFormField Text="Routes to Create (per user)" FullWidth="true">
+                    <RadzenNumeric @bind-Value="_routeCount" Min="1" Max="10" />
+                </RadzenFormField>
+                
+                <RadzenFormField Text="Days of History to Simulate" FullWidth="true">
+                    <RadzenNumeric @bind-Value="_daysOfHistory" Min="1" Max="60" />
+                </RadzenFormField>
+                
+                <RadzenAlert Title="Note" AlertStyle="AlertStyle.Info" Variant="Variant.Flat" Shade="Shade.Lighter">
+                    This operation will create database records. It will skip weekends for historical pollution. 
+                    Already existing routes for sample users will not be duplicated.
+                </RadzenAlert>
+            </RadzenStack>
+
+            <RadzenButton Text="Seed Data" 
+                          Icon="save" 
+                          ButtonStyle="ButtonStyle.Primary" 
+                          Click="@OnSeedClicked" 
+                          IsBusy="@_isBusy" 
+                          FullWidth="true" />
+        </RadzenCard>
+    </div>
+    
+    @if (_lastResult != null)
+    {
+        <div class="col-md-7">
+            <RadzenCard Variant="Variant.Outlined">
+                <RadzenText TextStyle="TextStyle.H6" Text="Last Seed Results" class="rz-mb-4" />
+                
+                <div class="rz-p-4" style="background-color: var(--rz-base-background-color); border-radius: var(--rz-border-radius); border: 1px solid var(--rz-divider);">
+                    <RadzenStack Orientation="Orientation.Vertical" Gap="1rem">
+                        <RadzenText TextStyle="TextStyle.Subtitle1">
+                            <b>Users Created:</b> @_lastResult.UsersCreated
+                        </RadzenText>
+                        <RadzenText TextStyle="TextStyle.Subtitle1">
+                            <b>Routes Created:</b> @_lastResult.RoutesCreated
+                        </RadzenText>
+                        <RadzenText TextStyle="TextStyle.Subtitle1">
+                            <b>Poll Records Inserted:</b> @_lastResult.PollsCreated
+                        </RadzenText>
+                    </RadzenStack>
+                </div>
+                
+                <RadzenAlert AlertStyle="AlertStyle.Success" class="rz-mt-4" AllowClose="false" Variant="Variant.Flat" Shade="Shade.Lighter">
+                    The database has been updated successfully.
+                </RadzenAlert>
+            </RadzenCard>
+        </div>
+    }
+</div>
+
+<div class="row rz-mt-10">
+    <div class="col-md-5">
+        <RadzenCard Variant="Variant.Outlined" style="border: 1px solid var(--rz-danger-light);">
+            <RadzenText TextStyle="TextStyle.H6" Text="Destructive Operations" class="rz-mb-4" Style="color: var(--rz-danger-color);" />
+            <RadzenText TextStyle="TextStyle.Body2" class="rz-mb-6">
+                Clear all users (except Administrators), routes, monitoring sessions, and poll records. 
+                This action is irreversible.
+            </RadzenText>
+            
+            <RadzenButton Text="CLEAR ALL DATA" 
+                          Icon="delete_forever" 
+                          ButtonStyle="ButtonStyle.Danger" 
+                          Click="@OnClearDataClicked" 
+                          IsBusy="@_isClearing" 
+                          FullWidth="true" />
+        </RadzenCard>
+    </div>
+</div>
+
+@code {
+    private bool _isBusy;
+    private bool _isClearing;
+    private int _routeCount = 3;
+    private int _daysOfHistory = 14;
+    private SeedResult? _lastResult;
+
+    private async Task OnSeedClicked()
+    {
+        _isBusy = true;
+        _lastResult = null;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("/api/admin/seed-data", new { RouteCount = _routeCount, DaysOfHistory = _daysOfHistory });
+            if (response.IsSuccessStatusCode)
+            {
+                _lastResult = await response.Content.ReadFromJsonAsync<SeedResult>();
+                NotificationService.Notify(new NotificationMessage { Severity = NotificationSeverity.Success, Summary = "Database Seeded", Detail = "Sample data has been successfully generated." });
+            }
+            else
+            {
+                NotificationService.Notify(new NotificationMessage { Severity = NotificationSeverity.Error, Summary = "Error", Detail = "Failed to seed database." });
+            }
+        }
+        catch (Exception)
+        {
+            NotificationService.Notify(new NotificationMessage { Severity = NotificationSeverity.Error, Summary = "Error", Detail = "An unexpected error occurred during seeding." });
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    private async Task OnClearDataClicked()
+    {
+        var confirmed = await DialogService.Confirm("Are you sure you want to clear ALL user data? This will keep only Administrators.", "Confirm Destruction", new ConfirmOptions { OkButtonText = "CLEAR ALL", CancelButtonText = "CANCEL" });
+        if (confirmed != true) return;
+
+        _isClearing = true;
+        try
+        {
+            var response = await Http.PostAsync("/api/admin/clear-data", null);
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<ClearResult>();
+                _lastResult = null; // Reset seed result UI
+                if (result != null)
+                {
+                    NotificationService.Notify(new NotificationMessage { Severity = NotificationSeverity.Warning, Summary = "Database Wiped", Detail = $"Wiped {result.UsersDeleted} users and {result.RoutesDeleted} routes." });
+                }
+            }
+            else
+            {
+                NotificationService.Notify(new NotificationMessage { Severity = NotificationSeverity.Error, Summary = "Error", Detail = "Failed to clear database." });
+            }
+        }
+        catch (Exception)
+        {
+            NotificationService.Notify(new NotificationMessage { Severity = NotificationSeverity.Error, Summary = "Error", Detail = "An unexpected error occurred during data purge." });
+        }
+        finally
+        {
+            _isClearing = false;
+        }
+    }
+
+    private sealed record SeedResult(int UsersCreated, int RoutesCreated, int PollsCreated);
+    private sealed record ClearResult(int UsersDeleted, int RoutesDeleted, int PollsDeleted);
+}

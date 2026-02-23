@@ -1,0 +1,28 @@
+graph TD
+    subgraph Client [Client Side (Blazor WASM)]
+        WASM[PoTraffic.Client]
+        Radzen[Radzen Blazor Components]
+        WASM --> Radzen
+    end
+
+    subgraph Server [Server Side (ASP.NET Core 10)]
+        API[PoTraffic.Api (Minimal API)]
+        MediatR[MediatR (Vertical Slices)]
+        EF[EF Core (PoTrafficDbContext)]
+        Hangfire[Hangfire (Job Scheduler)]
+        Serilog[Serilog (Structured Logging)]
+        
+        API --> MediatR
+        MediatR --> EF
+        MediatR --> Hangfire
+    end
+
+    subgraph Persistence [Data & External Services]
+        SQL[Azure SQL Edge / SQL Server]
+        Maps[Traffic Providers (Google/TomTom)]
+        EF --> SQL
+        Hangfire --> Maps
+    end
+
+    WASM -- 'HTTPS / JSON / JWT' --> API
+    API -- 'Static Files' --> WASM

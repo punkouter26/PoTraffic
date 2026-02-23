@@ -1,0 +1,12 @@
+@page "/"
+@using Microsoft.AspNetCore.Components.Authorization
+@inject NavigationManager Nav
+
+<AuthorizeView>
+    <Authorized>
+        @{ Nav.NavigateTo("/dashboard", forceLoad: false); }
+    </Authorized>
+    <NotAuthorized>
+        @{ Nav.NavigateTo("/login", forceLoad: false); }
+    </NotAuthorized>
+</AuthorizeView>

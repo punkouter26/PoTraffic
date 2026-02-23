@@ -1,0 +1,63 @@
+@page "/admin/volatility"
+@attribute [Authorize(Roles = "Administrator")]
+@inject HttpClient Http
+
+<PageTitle>Global Traffic Volatility</PageTitle>
+
+<RadzenCard class="rz-p-6 rz-mt-4">
+    <RadzenText TextStyle="TextStyle.H5" class="rz-mb-4">Global Traffic Volatility</RadzenText>
+
+    <LoadingErrorCard IsLoading="_loading" Error="@_error">
+        @if (_slots.Count == 0)
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Info" Text="No volatility data available yet." />
+        }
+        else
+        {
+            @foreach (string day in _days)
+            {
+                var daySlots = _slots.Where(s => s.DayOfWeek == day).ToList();
+                if (daySlots.Count == 0) continue;
+
+                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-mt-4 rz-mb-2">@day</RadzenText>
+                <RadzenChart Style="height:200px">
+                    <RadzenAreaSeries Data="daySlots" CategoryProperty="TimeSlotBucket"
+                                      ValueProperty="MeanDurationSeconds"
+                                      Title="Mean Duration (s)" Smooth="true">
+                        <RadzenSeriesDataLabels Visible="false" />
+                    </RadzenAreaSeries>
+                    <RadzenCategoryAxis />
+                    <RadzenValueAxis>
+                        <RadzenAxisTitle Text="Duration (s)" />
+                    </RadzenValueAxis>
+                    <RadzenLegend Visible="false" />
+                </RadzenChart>
+            }
+        }
+    </LoadingErrorCard>
+</RadzenCard>
+
+@code {
+    private List<GlobalVolatilitySlotDto> _slots = [];
+    private bool _loading = true;
+    private string? _error;
+
+    private static readonly string[] _days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _slots = await Http.GetFromJsonAsync<List<GlobalVolatilitySlotDto>>("/api/admin/global-volatility")
+                     ?? [];
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load volatility data: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

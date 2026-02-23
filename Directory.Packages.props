@@ -1,0 +1,85 @@
+<Project>
+
+  <!--
+    Directory.Packages.props — Central Package Management (CPM).
+    All NuGet package versions are declared here; individual .csproj files
+    must use <PackageReference Include="..." /> WITHOUT a Version attribute.
+    Override per-project only when absolutely necessary via VersionOverride="...".
+  -->
+
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <!-- Allow floating versions (e.g. 10.*, 1.*) in PackageVersion entries -->
+    <CentralPackageFloatingVersionsEnabled>true</CentralPackageFloatingVersionsEnabled>
+  </PropertyGroup>
+
+  <ItemGroup Label="MediatR / FluentValidation">
+    <PackageVersion Include="MediatR" Version="12.*" />
+    <PackageVersion Include="FluentValidation.AspNetCore" Version="11.*" />
+  </ItemGroup>
+
+  <ItemGroup Label="ASP.NET Core / Blazor">
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.*" />
+    <PackageVersion Include="Microsoft.AspNetCore.Components.Authorization" Version="10.0.3" />
+    <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.3" />
+    <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.3" />
+    <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.*-*" />
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.*" />
+  </ItemGroup>
+
+  <ItemGroup Label="Entity Framework Core">
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.*" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.*" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.*" />
+  </ItemGroup>
+
+  <ItemGroup Label="Hangfire">
+    <PackageVersion Include="Hangfire.AspNetCore" Version="1.8.*" />
+    <PackageVersion Include="Hangfire.SqlServer" Version="1.8.*" />
+  </ItemGroup>
+
+  <ItemGroup Label="Serilog">
+    <PackageVersion Include="Serilog.AspNetCore" Version="8.*" />
+    <PackageVersion Include="Serilog.Sinks.Console" Version="6.*" />
+    <PackageVersion Include="Serilog.Sinks.File" Version="5.*" />
+  </ItemGroup>
+
+  <ItemGroup Label="Azure">
+    <PackageVersion Include="Aspire.Hosting.AppHost" Version="13.1.*" />
+    <PackageVersion Include="Aspire.Hosting.SqlServer" Version="13.1.*" />
+    <PackageVersion Include="Azure.Extensions.AspNetCore.Configuration.Secrets" Version="1.*" />
+    <PackageVersion Include="Azure.Identity" Version="1.14.*" />
+    <PackageVersion Include="Azure.Monitor.OpenTelemetry.Exporter" Version="1.*" />
+  </ItemGroup>
+
+  <ItemGroup Label="OpenTelemetry">
+    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.*" />
+    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.*" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.*" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.*" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.*" />
+  </ItemGroup>
+
+  <ItemGroup Label="Microsoft Extensions">
+    <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.*" />
+    <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="10.*" />
+  </ItemGroup>
+
+  <ItemGroup Label="Other">
+    <PackageVersion Include="BCrypt.Net-Next" Version="4.*" />
+    <PackageVersion Include="Radzen.Blazor" Version="*" />
+    <PackageVersion Include="System.IdentityModel.Tokens.Jwt" Version="8.16.0" />
+  </ItemGroup>
+
+  <ItemGroup Label="Testing">
+    <PackageVersion Include="coverlet.collector" Version="6.0.4" />
+    <PackageVersion Include="FluentAssertions" Version="6.*" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageVersion Include="Microsoft.Playwright" Version="1.44.*" />
+    <PackageVersion Include="NSubstitute" Version="5.*" />
+    <PackageVersion Include="Testcontainers.MsSql" Version="3.*" />
+    <PackageVersion Include="xunit" Version="2.9.3" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+</Project>

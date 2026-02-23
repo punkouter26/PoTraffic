@@ -1,0 +1,41 @@
+erDiagram
+    USER ||--o{ ROUTE : owns
+    ROUTE ||--|{ MONITORING_WINDOW : defines
+    ROUTE ||--o{ POLL_RECORD : contains
+    ROUTE ||--o{ MONITORING_SESSION : executes
+
+    USER {
+        Guid Id
+        string Email
+        string PasswordHash
+        string Role
+    }
+
+    ROUTE {
+        Guid Id
+        string Name
+        string Origin
+        string Destination
+        string ProviderType
+    }
+
+    MONITORING_WINDOW {
+        Guid Id
+        TimeSpan StartTime
+        TimeSpan EndTime
+        bool IsEnabled
+    }
+
+    POLL_RECORD {
+        Guid Id
+        DateTime Timestamp
+        int DurationSeconds
+        int DistanceMeters
+        string Status
+    }
+
+    MONITORING_SESSION {
+        Guid Id
+        DateTime ExecutionDate
+        string Status
+    }

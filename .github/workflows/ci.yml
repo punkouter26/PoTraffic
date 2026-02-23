@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/azure-sql-edge:latest
+        env:
+          ACCEPT_EULA: '1'
+          MSSQL_SA_PASSWORD: 'CI!P@ssw0rd'
+        ports:
+          - 1433:1433
+        options: >-
+          --health-cmd "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P CI!P@ssw0rd -Q 'SELECT 1'"
+          --health-interval 15s
+          --health-timeout 10s
+          --health-retries 10
+          --health-start-period 90s
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.x'
+
+      - name: Restore
+        run: dotnet restore PoTraffic.slnx
+
+      - name: Build
+        run: dotnet build PoTraffic.slnx --no-restore --configuration Release
+
+      - name: Unit tests
+        run: dotnet test tests/PoTraffic.UnitTests --no-build --configuration Release --logger "trx;LogFileName=unit-results.trx"
+
+      - name: Integration tests
+        env:
+          ConnectionStrings__Default: "Server=localhost,1433;Database=PoTraffic_CI;User=sa;Password=CI!P@ssw0rd;TrustServerCertificate=true"
+        run: dotnet test tests/PoTraffic.IntegrationTests --no-build --configuration Release --logger "trx;LogFileName=integration-results.trx"
+
+      - name: Install Playwright browsers
+        run: pwsh tests/PoTraffic.E2ETests/playwright.ps1 install --with-deps chromium
+        continue-on-error: true
+
+      - name: E2E tests
+        run: dotnet test tests/PoTraffic.E2ETests --no-build --configuration Release --logger "trx;LogFileName=e2e-results.trx"
+        continue-on-error: true
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: "**/*.trx"

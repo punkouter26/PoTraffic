@@ -1,0 +1,16 @@
+# Build and intermediate output — not relevant to Copilot context
+bin/
+obj/
+
+# Third-party dependencies
+node_modules/
+
+# Logs and test output
+logs/
+*.log
+TestResults/
+coverage/
+e2e-test-output*.txt
+
+# NuGet package cache
+packages/

@@ -1,0 +1,68 @@
+@page "/diag"
+@attribute [Authorize(Roles = "Administrator")]
+@inject HttpClient Http
+
+<PageTitle>Diagnostics — System Configuration</PageTitle>
+
+<RadzenCard class="rz-p-6 rz-mt-4">
+    <RadzenText TextStyle="TextStyle.H5" class="rz-mb-4">System Configuration</RadzenText>
+    <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-mb-4" style="color:var(--rz-text-tertiary-color)">
+        Sensitive values are masked. Values can be updated by administrators.
+    </RadzenText>
+
+    <LoadingErrorCard IsLoading="_loading" Error="@_error">
+        <RadzenDataGrid Data="_configs" TItem="SystemConfigDto" AllowSorting="true" class="rz-mt-2">
+            <Columns>
+                <RadzenDataGridColumn TItem="SystemConfigDto" Property="Key" Title="Key" Width="220px" />
+                <RadzenDataGridColumn TItem="SystemConfigDto" Property="Value" Title="Value" Width="200px">
+                    <Template Context="c">
+                        @if (c.IsSensitive)
+                        {
+                            <span style="font-style:italic;color:var(--rz-text-tertiary-color)">@c.Value</span>
+                        }
+                        else
+                        {
+                            @c.Value
+                        }
+                    </Template>
+                </RadzenDataGridColumn>
+                <RadzenDataGridColumn TItem="SystemConfigDto" Property="Description" Title="Description" />
+                <RadzenDataGridColumn TItem="SystemConfigDto" Title="Sensitive" Width="90px">
+                    <Template Context="c">
+                        @if (c.IsSensitive)
+                        {
+                            <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="Yes" />
+                        }
+                        else
+                        {
+                            <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="No" />
+                        }
+                    </Template>
+                </RadzenDataGridColumn>
+            </Columns>
+        </RadzenDataGrid>
+    </LoadingErrorCard>
+</RadzenCard>
+
+@code {
+    private List<SystemConfigDto> _configs = [];
+    private bool _loading = true;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _configs = await Http.GetFromJsonAsync<List<SystemConfigDto>>("/api/admin/configuration")
+                       ?? [];
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load configuration: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

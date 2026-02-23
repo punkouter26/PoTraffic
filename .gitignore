@@ -1,0 +1,43 @@
+# Build outputs
+bin/
+obj/
+
+# Visual Studio / JetBrains
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.idea/
+
+# NuGet
+*.nupkg
+*.snupkg
+packages/
+!**/packages/build/
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# Serilog rolling file logs
+logs/
+*.log
+
+# Test results
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+
+# OS artefacts
+.DS_Store
+Thumbs.db
+
+# Secrets / environment
+.env
+.env.*
+appsettings.*.local.json
+
+# dotnet publish output
+publish/

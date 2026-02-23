@@ -1,0 +1,193 @@
+@page "/routes"
+@using System.Net.Http.Json
+@using PoTraffic.Shared.DTOs.Routes
+@using PoTraffic.Shared.Enums
+@implements IAsyncDisposable
+@inject HttpClient Http
+@inject NavigationManager Nav
+@inject DialogService DialogService
+@inject NotificationService NotificationService
+@inject IJSRuntime JS
+
+<RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" class="rz-mb-4">
+    <RadzenText TextStyle="TextStyle.H4" class="rz-m-0">Route Command Center</RadzenText>
+    <RadzenButton Text="Add Route" ButtonStyle="ButtonStyle.Primary" Icon="add"
+                  Click="@ShowAddRoute" />
+</RadzenStack>
+
+@if (_loading)
+{
+    <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+}
+else
+{
+    <RadzenDataGrid Data="_routes" TItem="RouteDto" AllowPaging="true" PageSize="10"
+                    AllowSorting="true" class="rz-shadow-3 rz-border-radius-2" Responsive="true">
+        <Columns>
+            <RadzenDataGridColumn TItem="RouteDto" Property="OriginAddress" Title="Origin">
+                <Template Context="route">
+                    <RadzenText TextStyle="TextStyle.Body2">
+                        <strong>@route.OriginAddress.Split(',')[0]</strong><br/>
+                        <span class="rz-color-on-surface-variant">@string.Join(',', route.OriginAddress.Split(',').Skip(1))</span>
+                    </RadzenText>
+                </Template>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="RouteDto" Property="DestinationAddress" Title="Destination">
+                <Template Context="route">
+                    <RadzenText TextStyle="TextStyle.Body2">
+                        <strong>@route.DestinationAddress.Split(',')[0]</strong><br/>
+                        <span class="rz-color-on-surface-variant">@string.Join(',', route.DestinationAddress.Split(',').Skip(1))</span>
+                    </RadzenText>
+                </Template>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="RouteDto" Property="Provider" Title="Provider" Width="120px">
+                <Template Context="route">
+                    <RadzenBadge BadgeStyle="@(route.Provider == RouteProvider.GoogleMaps ? BadgeStyle.Primary : BadgeStyle.Secondary)"
+                                 Text="@route.Provider.ToString()" IsPill="true" />
+                </Template>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="RouteDto" Title="Execution" Width="220px" TextAlign="TextAlign.Center">
+                <Template Context="route">
+                    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" JustifyContent="JustifyContent.Center">
+                        <RadzenButton Icon="search" ButtonStyle="ButtonStyle.Info" Size="ButtonSize.Small"
+                                      Click="@(() => CheckNowAsync(route))" Tooltip="Check travel time now" />
+                        <RadzenButton Icon="analytics" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small"
+                                      Click="@(() => Nav.NavigateTo($"/routes/{route.Id}"))" Tooltip="View details" />
+                        <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.Small"
+                                      Click="@(() => DeleteRouteAsync(route))" Tooltip="Delete route" />
+                    </RadzenStack>
+                </Template>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+}
+
+@* Inline add/edit panel (FR-018) *@
+@if (_showAddPanel)
+{
+    <RadzenCard class="rz-mb-3">
+        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">New Route</RadzenText>
+        <RadzenFormField Text="Origin Address" class="rz-w-100 rz-mb-2">
+            <RadzenTextBox @bind-Value="_newOrigin" />
+        </RadzenFormField>
+        <RadzenFormField Text="Destination Address" class="rz-w-100 rz-mb-2">
+            <RadzenTextBox @bind-Value="_newDestination" />
+        </RadzenFormField>
+        <RadzenFormField Text="Provider" class="rz-w-100 rz-mb-3">
+            <RadzenDropDown @bind-Value="_newProvider"
+                            Data="@(new[] { "GoogleMaps", "TomTom" })"
+                            Style="width:100%" />
+        </RadzenFormField>
+        <div class="rz-display-flex rz-gap-4 rz-mb-3">
+            <RadzenFormField Text="Start Time">
+                <RadzenDatePicker @bind-Value="_newStartTime" ShowTime="true" TimeOnly="true" DateFormat="HH:mm" />
+            </RadzenFormField>
+            <RadzenFormField Text="End Time">
+                <RadzenDatePicker @bind-Value="_newEndTime" ShowTime="true" TimeOnly="true" DateFormat="HH:mm" />
+            </RadzenFormField>
+        </div>
+        <RadzenButton Text="Save" ButtonStyle="ButtonStyle.Primary" Click="@SaveRouteAsync" />
+        <RadzenButton Text="Cancel" ButtonStyle="ButtonStyle.Light" Click="@CancelAdd" class="rz-ml-2" />
+    </RadzenCard>
+}
+
+@code {
+    private bool _loading = true;
+    private bool _showAddPanel;
+    private List<RouteDto> _routes = [];
+    private string _newOrigin = "4451 Telfair Blvd, Camp Springs, MD 20746";
+    private string _newDestination = "251 Admiral Cochrane Dr, Annapolis, MD 21401";
+    private string _newProvider = "GoogleMaps";
+    private DateTime? _newStartTime = DateTime.Now.AddMinutes(1);
+    private DateTime? _newEndTime = DateTime.Now.AddMinutes(16);
+
+    protected override async Task OnInitializedAsync() => await LoadRoutesAsync();
+
+    private async Task LoadRoutesAsync()
+    {
+        _loading = true;
+        try
+        {
+            var result = await Http.GetFromJsonAsync<PagedResult<RouteDto>>("/api/routes?page=1&pageSize=100");
+            _routes = result?.Items.ToList() ?? [];
+        }
+        catch { /* silently handled */ }
+        finally { _loading = false; }
+    }
+
+    private void ShowAddRoute() => _showAddPanel = true;
+    private void CancelAdd()
+    {
+        _showAddPanel = false;
+        _newOrigin = "4451 Telfair Blvd, Camp Springs, MD 20746";
+        _newDestination = "251 Admiral Cochrane Dr, Annapolis, MD 21401";
+        _newStartTime = DateTime.Now.AddMinutes(1);
+        _newEndTime = DateTime.Now.AddMinutes(16);
+    }
+
+    private async Task SaveRouteAsync()
+    {
+        await Http.PostAsJsonAsync("/api/routes", new
+        {
+            originAddress = _newOrigin,
+            destinationAddress = _newDestination,
+            provider = _newProvider == "GoogleMaps" ? 0 : 1,
+            startTime = (_newStartTime ?? DateTime.Today.AddHours(7)).ToString("HH:mm"),
+            endTime = (_newEndTime ?? DateTime.Today.AddHours(9)).ToString("HH:mm")
+        });
+        _showAddPanel = false;
+        await LoadRoutesAsync();
+    }
+
+    private async Task CheckNowAsync(RouteDto route)
+    {
+        HttpResponseMessage resp = await Http.PostAsync($"/api/routes/{route.Id}/check-now", null);
+        if (resp.IsSuccessStatusCode)
+        {
+            CheckNowResponse? data = await resp.Content.ReadFromJsonAsync<CheckNowResponse>();
+            string detail = data is not null
+                ? $"{data.DurationSeconds / 60} min — {data.DistanceMetres / 1000.0:F1} km"
+                : "Live travel time retrieved";
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Info,
+                Summary = "Current travel time",
+                Detail = detail,
+                Duration = 6000
+            });
+            StateHasChanged();
+        }
+        else
+        {
+            string errorDetail = resp.StatusCode == System.Net.HttpStatusCode.ServiceUnavailable
+                ? "Traffic provider unavailable — try again later."
+                : $"Request failed ({(int)resp.StatusCode}).";
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Check Now failed",
+                Detail = errorDetail,
+                Duration = 5000
+            });
+            StateHasChanged();
+        }
+    }
+
+    private sealed record CheckNowResponse(int DurationSeconds, int DistanceMetres);
+
+    private async Task DeleteRouteAsync(RouteDto route)
+    {
+        bool? confirmed = await DialogService.Confirm(
+            $"Delete route from {route.OriginAddress} to {route.DestinationAddress}?",
+            "Confirm Delete",
+            new ConfirmOptions { OkButtonText = "Delete", CancelButtonText = "Cancel" });
+
+        if (confirmed == true)
+        {
+            await Http.DeleteAsync($"/api/routes/{route.Id}");
+            await LoadRoutesAsync();
+        }
+    }
+
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+}

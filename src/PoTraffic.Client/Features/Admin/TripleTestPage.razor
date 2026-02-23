@@ -1,0 +1,463 @@
+@page "/admin/triple-test"
+@attribute [Authorize(Roles = "Administrator")]
+@using System.Net.Http.Json
+@using System.Text.Json
+@using PoTraffic.Shared.DTOs.Admin
+@using PoTraffic.Shared.Enums
+@inject HttpClient Http
+@inject NotificationService NotificationService
+@implements IAsyncDisposable
+
+<PageTitle>Triple Test</PageTitle>
+
+<RadzenCard class="rz-p-6 rz-mt-4" Style="max-width:800px;">
+    <RadzenText TextStyle="TextStyle.H5" class="rz-mb-1">Triple Test</RadzenText>
+    <RadzenText TextStyle="TextStyle.Body2" class="rz-mb-4" style="color:var(--rz-text-secondary-color)">
+        Fires 3 live travel-time queries at t=0 s, t+20 s, t+40 s via Hangfire and reports which departure was fastest.
+    </RadzenText>
+
+    @if (_session is null && !_running)
+    {
+        @* ── Form ── *@
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Danger" class="rz-mb-3">@_error</RadzenAlert>
+        }
+
+        <RadzenFormField Text="Origin Address" class="rz-w-100 rz-mb-3">
+            <RadzenTextBox @bind-Value="_origin" Placeholder="e.g. 1 Apple Park Way, Cupertino, CA" Style="width:100%" />
+        </RadzenFormField>
+
+        <RadzenFormField Text="Destination Address" class="rz-w-100 rz-mb-3">
+            <RadzenTextBox @bind-Value="_destination" Placeholder="e.g. 1 Infinite Loop, Cupertino, CA" Style="width:100%" />
+        </RadzenFormField>
+
+        <RadzenFormField Text="Provider" class="rz-w-100 rz-mb-3">
+            <RadzenDropDown @bind-Value="_provider"
+                            Data="@_providers"
+                            TextProperty="Label" ValueProperty="Value"
+                            Style="width:100%" />
+        </RadzenFormField>
+
+        <RadzenFormField Text="Start At (leave empty to start immediately)" class="rz-w-100 rz-mb-4">
+            <RadzenDatePicker @bind-Value="_startAt"
+                              ShowTime="true"
+                              DateFormat="yyyy-MM-dd HH:mm"
+                              Placeholder="Now"
+                              AllowClear="true"
+                              Style="width:100%" />
+        </RadzenFormField>
+
+        <RadzenButton Text="Run Triple Test"
+                      ButtonStyle="ButtonStyle.Primary"
+                      Icon="science"
+                      class="rz-w-100"
+                      Click="@StartAsync"
+                      IsBusy="_submitting"
+                      Disabled="@(string.IsNullOrWhiteSpace(_origin) || string.IsNullOrWhiteSpace(_destination))" />
+    }
+    else if (_running && _session is null)
+    {
+        @* ── Waiting for first poll ── *@
+        <div class="rz-display-flex rz-align-items-center rz-gap-3 rz-mb-3">
+            <RadzenProgressBarCircular Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Small" />
+            <RadzenText>Waiting for first poll…</RadzenText>
+        </div>
+
+        @* ── Scheduled shot times ── *@
+        @if (_startAt.HasValue)
+        {
+            var first = _startAt.Value;
+            <RadzenCard class="rz-p-3 rz-mb-3" style="background:var(--rz-base-200,#f8f9fa);border:1px solid var(--rz-base-300,#dee2e6)">
+                <RadzenText TextStyle="TextStyle.Caption" style="font-weight:600">SCHEDULED SHOTS</RadzenText>
+                <div style="font-size:0.85rem;margin-top:4px;line-height:1.8">
+                    <div>Shot 1 (+0 s) — fires at <strong>@first.ToString("HH:mm:ss")</strong> @CountdownLabel(first)</div>
+                    <div>Shot 2 (+20 s) — fires at <strong>@first.AddSeconds(20).ToString("HH:mm:ss")</strong> @CountdownLabel(first.AddSeconds(20))</div>
+                    <div>Shot 3 (+40 s) — fires at <strong>@first.AddSeconds(40).ToString("HH:mm:ss")</strong> @CountdownLabel(first.AddSeconds(40))</div>
+                </div>
+                <div style="font-size:0.78rem;color:var(--rz-text-secondary-color);margin-top:6px">
+                    Session ID: <code>@_sessionId</code>
+                </div>
+            </RadzenCard>
+        }
+        <RadzenButton Text="Refresh Now" Icon="refresh" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small"
+                      Click="@(async () => await PollSessionAsync())" />
+    }
+    else if (_session is not null)
+    {
+        @* ── In-progress or complete progress bar ── *@
+        @if (_completedShots < 3)
+        {
+            <div class="rz-display-flex rz-align-items-center rz-gap-3 rz-mb-2">
+                <RadzenProgressBarCircular Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Small" />
+                <RadzenText>@_completedShots / 3 shots complete — polling every 3 s (@_pollCount polls, last @_lastPollAge)</RadzenText>
+            </div>
+            <RadzenButton Text="Refresh Now" Icon="refresh" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small"
+                          Click="@(async () => await PollSessionAsync())" class="rz-mb-3" />
+        }
+
+        @* ── Debug info ── *@
+        <details style="font-size:0.8rem;color:var(--rz-text-secondary-color);margin-bottom:12px">
+            <summary style="cursor:pointer">Session debug info</summary>
+            <div style="padding:8px 0;line-height:1.9">
+                <div><strong>Session ID:</strong> <code>@_session.SessionId</code></div>
+                <div><strong>Origin:</strong> @_session.OriginAddress</div>
+                <div><strong>Destination:</strong> @_session.DestinationAddress</div>
+                <div><strong>Provider:</strong> @_session.Provider</div>
+                <div><strong>Scheduled At:</strong> @_session.ScheduledAt.ToLocalTime().ToString("HH:mm:ss")</div>
+                <div><strong>Shot 1 expected:</strong> @_session.ScheduledAt.ToLocalTime().ToString("HH:mm:ss")</div>
+                <div><strong>Shot 2 expected:</strong> @_session.ScheduledAt.ToLocalTime().AddSeconds(20).ToString("HH:mm:ss")</div>
+                <div><strong>Shot 3 expected:</strong> @_session.ScheduledAt.ToLocalTime().AddSeconds(40).ToString("HH:mm:ss")</div>
+                <div><strong>Polls fired:</strong> @_pollCount</div>
+            </div>
+        </details>
+
+        @* ── Summary alert (once complete) ── *@
+        @if (_allDone && _session.IdealShotIndex.HasValue)
+        {
+            var winner = _session.Shots.First(s => s.ShotIndex == _session.IdealShotIndex.Value);
+            <RadzenAlert AlertStyle="AlertStyle.Success" class="rz-mb-3" AllowClose="false">
+                <strong>Shot #@(winner.ShotIndex + 1) (+@winner.OffsetSeconds s)</strong> was fastest:
+                <strong>@FormatDuration(winner.DurationSeconds)</strong> — @FormatDistance(winner.DistanceMetres)
+                @if (_session.AverageDurationSeconds.HasValue)
+                {
+                    <span> | Average: <strong>@FormatDuration((int?)_session.AverageDurationSeconds)</strong></span>
+                }
+            </RadzenAlert>
+        }
+        else if (_allDone)
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Warning" class="rz-mb-3" AllowClose="false">
+                All 3 shots failed — no travel time data available.
+            </RadzenAlert>
+        }
+
+        @* ── Results grid ── *@
+        <RadzenDataGrid Data="@GetDisplayRows()" TItem="ShotDisplayRow"
+                        AllowSorting="false" AllowFiltering="false"
+                        RowRender="@HighlightWinner"
+                        class="rz-mb-4">
+            <Columns>
+                <RadzenDataGridColumn TItem="ShotDisplayRow" Property="Label" Title="Shot" Width="70px" />
+                <RadzenDataGridColumn TItem="ShotDisplayRow" Property="Offset" Title="Offset" Width="70px" />
+                <RadzenDataGridColumn TItem="ShotDisplayRow" Title="Expected At" Width="110px">
+                    <Template Context="row">@(row.ExpectedAt?.ToString("HH:mm:ss") ?? "—")</Template>
+                </RadzenDataGridColumn>
+                <RadzenDataGridColumn TItem="ShotDisplayRow" Property="FiredAt" Title="Fired At" Width="110px">
+                    <Template Context="row">
+                        @if (row.FiredAt.HasValue)
+                        {
+                            <span style="color:var(--rz-success)">@row.FiredAt.Value.ToLocalTime().ToString("HH:mm:ss")</span>
+                        }
+                        else if (!row.IsAverage)
+                        {
+                            <span style="color:var(--rz-text-secondary-color)">pending…</span>
+                        }
+                        else { <span>—</span> }
+                    </Template>
+                </RadzenDataGridColumn>
+                <RadzenDataGridColumn TItem="ShotDisplayRow" Property="Duration" Title="Duration" Width="110px" />
+                <RadzenDataGridColumn TItem="ShotDisplayRow" Property="Distance" Title="Distance" Width="100px" />
+                <RadzenDataGridColumn TItem="ShotDisplayRow" Property="Status" Title="Status" Width="90px">
+                    <Template Context="row">
+                        @if (row.IsAverage)
+                        {
+                            <RadzenBadge BadgeStyle="BadgeStyle.Light" Text="avg" />
+                        }
+                        else if (row.IsSuccess == true)
+                        {
+                            <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="OK" />
+                        }
+                        else if (row.IsSuccess == false)
+                        {
+                            <RadzenBadge BadgeStyle="BadgeStyle.Danger" Text="@(row.ErrorCode ?? "ERR")" />
+                        }
+                        else
+                        {
+                            <RadzenBadge BadgeStyle="BadgeStyle.Light" Text="pending" />
+                        }
+                    </Template>
+                </RadzenDataGridColumn>
+            </Columns>
+        </RadzenDataGrid>
+
+        @if (_allDone)
+        {
+            <RadzenButton Text="Run Another"
+                          ButtonStyle="ButtonStyle.Light"
+                          Icon="refresh"
+                          Click="@Reset" />
+        }
+    }
+</RadzenCard>
+
+@code {
+    // ── Form state ───────────────────────────────────────────────────────────
+    private string _origin = "501 Sylview Dr, Pasadena, CA 91107";
+    private string _destination = "456 S Fair Oaks Ave, Pasadena, CA 91105";
+    private int _provider = 0; // GoogleMaps
+    private DateTime? _startAt = DateTime.Now.AddMinutes(1);
+    private bool _submitting;
+    private bool _running;
+    private string? _error;
+
+    private readonly List<object> _providers =
+    [
+        new { Label = "Google Maps", Value = 0 },
+        new { Label = "TomTom", Value = 1 }
+    ];
+
+    // ── Session state ─────────────────────────────────────────────────────────
+    private Guid? _sessionId;
+    private TripleTestSessionDto? _session;
+
+    // ── Polling timer (Observer pattern — PeriodicTimer drives UI refresh) ───
+    private PeriodicTimer? _timer;
+    private Task? _timerLoop;
+    private readonly CancellationTokenSource _cts = new();
+
+    // ── Countdown / debug tracking ────────────────────────────────────────────
+    private PeriodicTimer? _countdownTimer;
+    private Task? _countdownLoop;
+    private int _pollCount;
+    private DateTime? _lastPollAt;
+    private string _lastPollAge => _lastPollAt.HasValue
+        ? $"{(int)(DateTime.Now - _lastPollAt.Value).TotalSeconds}s ago"
+        : "never";
+
+    // ── Computed helpers ───────────────────────────────────────────────
+    private int _completedShots => _session?.Shots.Count(s => s.IsSuccess.HasValue) ?? 0;
+    private bool _allDone => _completedShots == 3;
+
+    private string CountdownLabel(DateTime target)
+    {
+        double secs = (target - DateTime.Now).TotalSeconds;
+        if (secs <= 0) return "✓ due";
+        return $"(in {(int)secs}s)";
+    }
+
+    // ── Submit ────────────────────────────────────────────────────────────────
+    private async Task StartAsync()
+    {
+        _error = null;
+        _submitting = true;
+        StateHasChanged();
+
+        try
+        {
+            var request = new TripleTestRequest(
+                _origin.Trim(),
+                _destination.Trim(),
+                (RouteProvider)_provider,
+                _startAt.HasValue ? new DateTimeOffset(_startAt.Value, TimeZoneInfo.Local.GetUtcOffset(_startAt.Value)) : null);
+
+            HttpResponseMessage resp = await Http.PostAsJsonAsync("/api/admin/triple-test", request);
+
+            if (!resp.IsSuccessStatusCode)
+            {
+                var err = await resp.Content.ReadFromJsonAsync<JsonElement>();
+                _error = err.TryGetProperty("error", out var e) ? e.GetString() : "Failed to start test.";
+                return;
+            }
+
+            var body = await resp.Content.ReadFromJsonAsync<JsonElement>();
+            _sessionId = body.GetProperty("sessionId").GetGuid();
+            _running = true;
+            _pollCount = 0;
+            _lastPollAt = null;
+
+            // Start 1-second countdown timer for live display refresh
+            _countdownTimer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+            _countdownLoop = CountdownLoopAsync();
+
+            // Start 3-second polling loop
+            _timer = new PeriodicTimer(TimeSpan.FromSeconds(3));
+            _timerLoop = PollLoopAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            _submitting = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task PollLoopAsync()
+    {
+        try
+        {
+            while (await _timer!.WaitForNextTickAsync(_cts.Token))
+            {
+                await PollSessionAsync();
+
+                if (_session is not null && _session.Shots.All(s => s.IsSuccess.HasValue))
+                {
+                    // All 3 shots complete — stop polling
+                    _timer.Dispose();
+                    _timer = null;
+                    break;
+                }
+            }
+        }
+        catch (OperationCanceledException) { /* disposed */ }
+    }
+
+    private async Task CountdownLoopAsync()
+    {
+        try
+        {
+            while (await _countdownTimer!.WaitForNextTickAsync(_cts.Token))
+            {
+                await InvokeAsync(StateHasChanged);
+                // Stop once all shots complete
+                if (_allDone) break;
+            }
+        }
+        catch (OperationCanceledException) { /* disposed */ }
+    }
+
+    private async Task PollSessionAsync()
+    {
+        if (_sessionId is null) return;
+
+        try
+        {
+            HttpResponseMessage resp = await Http.GetAsync($"/api/admin/triple-test/{_sessionId}");
+            _lastPollAt = DateTime.Now;
+            _pollCount++;
+
+            if (resp.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                _error = "Session expired — please sign in again.";
+                _running = false;
+                _timer?.Dispose();
+                _timer = null;
+                await InvokeAsync(StateHasChanged);
+                return;
+            }
+
+            if (!resp.IsSuccessStatusCode)
+            {
+                _error = $"Poll failed ({(int)resp.StatusCode}). Retrying…";
+                await InvokeAsync(StateHasChanged);
+                return;
+            }
+
+            _session = await resp.Content.ReadFromJsonAsync<TripleTestSessionDto>();
+            _error = null; // clear any transient poll error on success
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _error = $"Poll error: {ex.Message}";
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    // ── Reset ─────────────────────────────────────────────────────────────────
+    private void Reset()
+    {
+        _session = null;
+        _sessionId = null;
+        _running = false;
+        _error = null;
+        _pollCount = 0;
+        _lastPollAt = null;
+        _origin = "501 Sylview Dr, Pasadena, CA 91107";
+        _destination = "456 S Fair Oaks Ave, Pasadena, CA 91105";
+        _startAt = DateTime.Now.AddMinutes(1);
+        _timer?.Dispose();
+        _timer = null;
+        _countdownTimer?.Dispose();
+        _countdownTimer = null;
+    }
+
+    // ── Grid helpers ─────────────────────────────────────────────────────────
+    private sealed record ShotDisplayRow(
+        string Label,
+        string Offset,
+        DateTime? ExpectedAt,
+        DateTimeOffset? FiredAt,
+        string Duration,
+        string Distance,
+        bool? IsSuccess,
+        string? ErrorCode,
+        int ShotIndex,
+        bool IsAverage,
+        bool IsWinner);
+
+    private List<ShotDisplayRow> GetDisplayRows()
+    {
+        if (_session is null) return [];
+
+        DateTime scheduledLocal = _session.ScheduledAt.ToLocalTime().DateTime;
+
+        var rows = _session.Shots
+            .OrderBy(s => s.ShotIndex)
+            .Select(s => new ShotDisplayRow(
+                Label: $"Shot {s.ShotIndex + 1}",
+                Offset: $"+{s.OffsetSeconds}s",
+                ExpectedAt: scheduledLocal.AddSeconds(s.OffsetSeconds),
+                FiredAt: s.FiredAt,
+                Duration: FormatDuration(s.DurationSeconds),
+                Distance: FormatDistance(s.DistanceMetres),
+                IsSuccess: s.IsSuccess,
+                ErrorCode: s.ErrorCode,
+                ShotIndex: s.ShotIndex,
+                IsAverage: false,
+                IsWinner: s.ShotIndex == _session.IdealShotIndex))
+            .ToList<ShotDisplayRow>();
+
+        // Append average row
+        rows.Add(new ShotDisplayRow(
+            Label: "Average",
+            Offset: "—",
+            ExpectedAt: null,
+            FiredAt: null,
+            Duration: FormatDuration((int?)_session.AverageDurationSeconds),
+            Distance: FormatDistance((int?)_session.AverageDistanceMetres),
+            IsSuccess: null,
+            ErrorCode: null,
+            ShotIndex: -1,
+            IsAverage: true,
+            IsWinner: false));
+
+        return rows;
+    }
+
+    private void HighlightWinner(RowRenderEventArgs<ShotDisplayRow> args)
+    {
+        if (args.Data is null) return;
+        if (args.Data.IsWinner)
+            args.Attributes.Add("style", "background:var(--rz-success-lighter, #d4edda);font-weight:600;");
+        else if (args.Data.IsAverage)
+            args.Attributes.Add("style", "background:var(--rz-base-200, #f8f9fa);font-style:italic;");
+    }
+
+    private static string FormatDuration(int? seconds) =>
+        seconds.HasValue ? $"{seconds.Value / 60} min {seconds.Value % 60} s" : "—";
+
+    private static string FormatDistance(int? metres)
+    {
+        if (!metres.HasValue) return "—";
+        return metres.Value >= 1000
+            ? $"{metres.Value / 1000.0:F1} km"
+            : $"{metres.Value} m";
+    }
+
+    // ── Cleanup ───────────────────────────────────────────────────────────────
+    public async ValueTask DisposeAsync()
+    {
+        await _cts.CancelAsync();
+        _timer?.Dispose();
+        _countdownTimer?.Dispose();
+        if (_timerLoop is not null)
+            await _timerLoop.ConfigureAwait(false);
+        if (_countdownLoop is not null)
+            await _countdownLoop.ConfigureAwait(false);
+        _cts.Dispose();
+    }
+}

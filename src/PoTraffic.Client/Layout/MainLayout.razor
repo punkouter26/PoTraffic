@@ -1,0 +1,38 @@
+﻿@inherits LayoutComponentBase
+@using Microsoft.AspNetCore.Components.Authorization
+@using PoTraffic.Client.Infrastructure.Auth
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Nav
+
+@* Radzen service host components — must be present exactly once in the root layout *@
+<RadzenNotification />
+<RadzenDialog />
+<RadzenTooltip />
+
+<div class="page">
+    <div class="sidebar">
+        <NavMenu />
+    </div>
+
+    <main>
+        <div class="top-row px-4">
+            @* Simplified top row, user info now in NavMenu *@
+            <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-m-0 rz-mr-4">v1.1.0 — 2026</RadzenText>
+        </div>
+
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>
+
+@code {
+    private async Task LogoutAsync()
+    {
+        if (AuthStateProvider is JwtAuthenticationStateProvider jwtProvider)
+        {
+            await jwtProvider.LogoutAsync();
+        }
+        Nav.NavigateTo("/login", forceLoad: true);
+    }
+}

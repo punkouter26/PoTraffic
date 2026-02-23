@@ -1,0 +1,22 @@
+@* Shared loading/error scaffold used across admin and data pages.
+   Renders a spinner when loading, an error alert on failure,
+   or ChildContent on success. *@
+
+@if (IsLoading)
+{
+    <RadzenProgressBarCircular Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+}
+else if (Error is not null)
+{
+    <RadzenAlert AlertStyle="AlertStyle.Danger" Text="@Error" />
+}
+else
+{
+    @ChildContent
+}
+
+@code {
+    [Parameter] public bool IsLoading { get; set; }
+    [Parameter] public string? Error { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

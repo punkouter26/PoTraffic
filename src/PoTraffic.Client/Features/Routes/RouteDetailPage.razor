@@ -1,0 +1,214 @@
+@page "/routes/{RouteId:guid}"
+@using PoTraffic.Shared.DTOs.History
+@using PoTraffic.Shared.DTOs.Routes
+@using PoTraffic.Client.Features.MonitoringWindows
+@inherits PollingComponentBase
+@inject HttpClient Http
+@inject NavigationManager Nav
+
+<div class="rz-mb-4">
+    <RadzenText Style="display:inline;" Text="Dashboard" />
+    <RadzenText Style="display:inline;" Text=" > " />
+    <RadzenText Style="display:inline;" Text="Route Detail" />
+</div>
+
+@if (_loading)
+{
+    <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+}
+else
+{
+    @if (_optimalDeparture is not null)
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Success" ShowIcon="true" class="rz-mb-3">
+            @($"⏰ {_optimalDepartureLabel}")
+        </RadzenAlert>
+    }
+
+    @* Dual-series chart: Today's Actual + Historical Baseline with ±1σ band *@
+    <RadzenCard class="rz-mb-4">
+        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">Travel Time Chart</RadzenText>
+
+        <RadzenChart Style="width:100%;height:300px;">
+            @* Today's actual series — Y values are travel time in minutes *@
+            <RadzenLineSeries Data="_chartActual" CategoryProperty="PolledAtDateTime"
+                              Title="Today's Actual" ValueProperty="DurationMinutes"
+                              Smooth="false">
+                <ChildContent>
+                    <RadzenMarkers MarkerType="MarkerType.Circle" />
+                </ChildContent>
+                <TooltipTemplate Context="p">
+                    @if (p.IsRerouted)
+                    {
+                        <div style="color:red;font-weight:bold;">⚠ Rerouted: @p.DurationMinutes.ToString("F1") min</div>
+                    }
+                    else
+                    {
+                        <div>@p.DurationMinutes.ToString("F1") min</div>
+                    }
+                </TooltipTemplate>
+            </RadzenLineSeries>
+
+            @* Rerouted overlay — red dots on top of normal dots *@
+            @if (_chartRerouted.Count > 0)
+            {
+                <RadzenLineSeries Data="_chartRerouted" CategoryProperty="PolledAtDateTime"
+                                  Title="Rerouted" ValueProperty="DurationMinutes"
+                                  Stroke="transparent" StrokeWidth="0">
+                    <RadzenMarkers MarkerType="MarkerType.Circle" StrokeWidth="2"
+                                   Stroke="#e53e3e" Fill="#e53e3e" />
+                </RadzenLineSeries>
+            }
+
+            @* Baseline mean series — Y values in minutes *@
+            <RadzenLineSeries Data="_chartBaseline" CategoryProperty="TimeSlotBucket"
+                              Title="Historical Baseline" ValueProperty="MeanMinutes"
+                              Smooth="true" LineType="LineType.Dashed">
+            </RadzenLineSeries>
+
+            @* ±1σ upper band (area series for delta shading) — Y values in minutes *@
+            @if (_chartUpperBand.Count > 0)
+            {
+                <RadzenAreaSeries Data="_chartUpperBand" CategoryProperty="TimeSlotBucket"
+                                  Title="+1σ" ValueProperty="Value"
+                                  Fill="rgba(0,200,0,0.1)" Stroke="rgba(0,200,0,0.3)"
+                                  StrokeWidth="1">
+                </RadzenAreaSeries>
+            }
+
+            <RadzenCategoryAxis FormatString="{0:HH:mm}" />
+            @* Y-axis: 0 – 120 minutes (2 hours), labelled in minutes *@
+            <RadzenValueAxis Min="0" Max="120">
+                <RadzenGridLines Visible="true" />
+                <RadzenAxisTitle Text="Minutes" />
+            </RadzenValueAxis>
+        </RadzenChart>
+    </RadzenCard>
+
+    @* Monitoring window configuration *@
+    <WindowConfigPanel RouteId="RouteId" OnSaved="OnWindowSaved" />
+
+    @* Poll history table *@
+    <RadzenCard>
+        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">Poll History</RadzenText>
+        <RadzenDataGrid Data="_todayPolls" TItem="PollRecordDto" PageSize="20" AllowPaging="true">
+            <Columns>
+                <RadzenDataGridColumn TItem="PollRecordDto" Property="PolledAtDateTime" Title="Polled At" FormatString="{0:h:mm:ss tt}" />
+                <RadzenDataGridColumn TItem="PollRecordDto" Title="Duration">
+                    <Template Context="p">
+                        @{
+                            int h = p.TravelDurationSeconds / 3600;
+                            int m = (p.TravelDurationSeconds % 3600) / 60;
+                        }
+                        @(h > 0 ? $"{h}h {m}m" : $"{m}m")
+                    </Template>
+                </RadzenDataGridColumn>
+                <RadzenDataGridColumn TItem="PollRecordDto" Title="Distance (mi)">
+                    <Template Context="p">
+                        @($"{p.DistanceMetres * 0.000621371:F1} mi")
+                    </Template>
+                </RadzenDataGridColumn>
+                <RadzenDataGridColumn TItem="PollRecordDto" Title="Rerouted?" Width="100px">
+                    <Template Context="p">
+                        @if (p.IsRerouted)
+                        {
+                            <RadzenBadge Text="YES" BadgeStyle="BadgeStyle.Danger" />
+                        }
+                    </Template>
+                </RadzenDataGridColumn>
+            </Columns>
+        </RadzenDataGrid>
+    </RadzenCard>
+}
+
+@code {
+    // Chart projection records — values expressed in minutes for the Y-axis
+    private sealed record ActualChartPoint(DateTime PolledAtDateTime, double DurationMinutes, bool IsRerouted);
+    private sealed record BaselineChartPoint(int TimeSlotBucket, double MeanMinutes);
+    private sealed record UpperBandPoint(int TimeSlotBucket, double Value);
+
+    [Parameter] public Guid RouteId { get; set; }
+
+    private bool _loading = true;
+    private List<PollRecordDto> _todayPolls = [];
+    private List<BaselineSlotDto> _baselineSlots = [];
+    // Minute-projected chart data — consumed by RadzenChart series
+    private List<ActualChartPoint> _chartActual = [];
+    private List<ActualChartPoint> _chartRerouted = [];
+    private List<BaselineChartPoint> _chartBaseline = [];
+    private List<UpperBandPoint> _chartUpperBand = [];
+    private OptimalDepartureDto? _optimalDeparture;
+    private string _optimalDepartureLabel = string.Empty;
+    // Observer pattern — PollingComponentBase base handles the timer loop
+    protected override TimeSpan PollingInterval => TimeSpan.FromSeconds(15);
+
+    private async Task OnWindowSaved()
+    {
+        await LoadDataAsync();
+        StateHasChanged();
+    }
+
+    protected override async Task LoadDataAsync()
+    {
+        _loading = true;
+        try
+        {
+            string dayOfWeek = DateTime.Today.DayOfWeek.ToString();
+
+            // Load today's poll records
+            var historyResult = await Http.GetFromJsonAsync<PagedResult<PollRecordDto>>(
+                $"/api/routes/{RouteId}/poll-history?page=1&pageSize=200");
+            if (historyResult is not null)
+            {
+                _todayPolls = [.. historyResult.Items];
+                // Project to minutes for the chart Y-axis
+                _chartActual = _todayPolls
+                    .Select(p => new ActualChartPoint(
+                        p.PolledAtDateTime,
+                        p.TravelDurationSeconds / 60.0,
+                        p.IsRerouted))
+                    .ToList();
+                _chartRerouted = _chartActual.Where(p => p.IsRerouted).ToList();
+            }
+
+            // Load baseline
+            var baseline = await Http.GetFromJsonAsync<BaselineResponse>(
+                $"/api/routes/{RouteId}/baseline?dayOfWeek={dayOfWeek}");
+            if (baseline is not null)
+            {
+                _baselineSlots = [.. baseline.Slots];
+                _chartBaseline = _baselineSlots
+                    .Select(s => new BaselineChartPoint(s.TimeSlotBucket, s.MeanDurationSeconds / 60.0))
+                    .ToList();
+                _chartUpperBand = _baselineSlots
+                    .Where(s => s.StdDevDurationSeconds.HasValue)
+                    .Select(s => new UpperBandPoint(
+                        s.TimeSlotBucket,
+                        (s.MeanDurationSeconds + s.StdDevDurationSeconds!.Value) / 60.0))
+                    .ToList();
+            }
+
+            // Load optimal departure
+            var optimal = await Http.GetFromJsonAsync<OptimalDepartureDto>(
+                $"/api/routes/{RouteId}/optimal-departure?dayOfWeek={dayOfWeek}");
+            if (optimal is not null)
+            {
+                _optimalDeparture = optimal;
+                int h = optimal.TimeSlotBucket / 60;
+                int m = optimal.TimeSlotBucket % 60;
+                _optimalDepartureLabel = $"Best departure: {h:D2}:{m:D2} " +
+                    $"(~{optimal.PredictedDurationSeconds / 60:F0} min)";
+            }
+        }
+        catch
+        {
+            // Silently handled — partial data shown
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    }
+}

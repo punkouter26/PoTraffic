@@ -1,0 +1,25 @@
+sequenceDiagram
+    participant U as User
+    participant B as Blazor Client
+    participant A as API / Auth
+    participant H as Hangfire / Provider
+
+    U->>B: Access Site
+    B->>A: POST /api/auth/login
+    A-->>B: Return JWT + Refresh Token
+    B->>U: Show Dashboard
+    
+    U->>B: Create New Route
+    B->>A: POST /api/routes
+    A->>H: Schedule Polling Jobs
+    A-->>B: Confirm Success
+    
+    loop Background Polling
+        H->>H: Trigger PollRouteJob
+        H->>A: Store PollRecord
+    end
+    
+    U->>B: View Route Details
+    B->>A: GET /api/routes/{id}/history
+    A-->>B: Return Analytics
+    B->>U: Render Charts (Radzen)

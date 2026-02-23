@@ -1,0 +1,27 @@
+graph TB
+    subgraph Pages [Blazor Pages]
+        Index[Index.razor]
+        RoutesPage[RouteListPage.razor]
+        RouteDetail[RouteDetailPage.razor]
+        Login[Login.razor]
+    end
+
+    subgraph Infrastructure [Client Services]
+        AuthService[IAuthService]
+        RouteClient[IRouteClient]
+        HistoryClient[IHistoryClient]
+    end
+
+    subgraph Components [Shared Components]
+        NavMenu[NavMenu.razor]
+        MainLayout[MainLayout.razor]
+        RadzenGrid[RadzenDataGrid]
+        RadzenChart[RadzenChart]
+    end
+
+    Index --> MainLayout
+    RoutesPage --> RouteClient
+    RoutesPage --> RadzenGrid
+    RouteDetail --> HistoryClient
+    RouteDetail --> RadzenChart
+    Login --> AuthService
