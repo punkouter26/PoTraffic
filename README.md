@@ -129,16 +129,22 @@ SQL Edge container starts automatically via Testcontainers. First run takes ~120
 
 ### E2E Tests (Playwright)
 
-```bash
-# Terminal 1 — API in Testing mode (activates /e2e/dev-login and /e2e/seed)
-ASPNETCORE_ENVIRONMENT=Testing dotnet run --project src/PoTraffic.Api
+```powershell
+# Terminal 1 — API in Testing profile (binds http://localhost:5150 and enables /e2e/*)
+dotnet run --project src/PoTraffic.Api --launch-profile Testing
 
 # Terminal 2 — Install Chromium (first time only)
 pwsh tests/PoTraffic.E2ETests/playwright.ps1 install chromium
 
-# Terminal 3 — Run E2E suite
+# Terminal 3 — Run E2E suite against the Testing host
+$env:E2E_BASE_URL = "http://localhost:5150"
 dotnet test tests/PoTraffic.E2ETests
+
+# Optional: run only route-create smoke test
+dotnet test tests/PoTraffic.E2ETests --filter "FullyQualifiedName~CreateRouteScenarios.AddRoute_WithOriginAndDestination_AppearsInRoutesList"
 ```
+
+If tests are skipped with "Testing endpoints are unavailable", verify that the API is running with the `Testing` launch profile and that `POST /e2e/seed-admin` is reachable at `E2E_BASE_URL`.
 
 ## Key Concepts
 

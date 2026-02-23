@@ -24,7 +24,15 @@ public sealed class SkipUnlessE2EReadyAttribute : FactAttribute
         }
 
         if (!IsAppReachable())
+        {
             Skip = $"App not reachable at {BaseUrl} — start API + Blazor WASM with ASPNETCORE_ENVIRONMENT=Testing and set E2E_BASE_URL.";
+            return;
+        }
+
+        if (!HasTestingEndpoints())
+        {
+            Skip = $"Testing endpoints are unavailable at {BaseUrl} — ensure ASPNETCORE_ENVIRONMENT=Testing and use a host exposing POST /e2e/seed-admin.";
+        }
     }
 
     private static bool IsPlaywrightInstalled()
@@ -54,6 +62,40 @@ public sealed class SkipUnlessE2EReadyAttribute : FactAttribute
             using var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(3) };
             HttpResponseMessage response = client.GetAsync(BaseUrl).GetAwaiter().GetResult();
             return (int)response.StatusCode < 500;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool HasTestingEndpoints()
+    {
+        try
+        {
+            using var handler = new HttpClientHandler
+            {
+                ServerCertificateCustomValidationCallback = (_, _, _, _) => true
+            };
+            using var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(5) };
+
+            using var request = new HttpRequestMessage(HttpMethod.Post, $"{BaseUrl.TrimEnd('/')}/e2e/seed-admin")
+            {
+                Content = new StringContent(string.Empty)
+            };
+
+            HttpResponseMessage response = client.Send(request);
+
+            // Expected when test endpoints are mapped in Testing env.
+            if (response.IsSuccessStatusCode)
+                return true;
+
+            // Typical non-testing responses (SPA fallback / endpoint missing / method not allowed).
+            if (response.StatusCode is System.Net.HttpStatusCode.NotFound or System.Net.HttpStatusCode.MethodNotAllowed)
+                return false;
+
+            // Other statuses (401/403/500) indicate endpoint path exists, so allow tests to run.
+            return true;
         }
         catch
         {

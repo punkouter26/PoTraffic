@@ -29,6 +29,9 @@
             <RadzenText TextStyle="TextStyle.Body1" class="rz-color-on-surface-variant">
                 Your commute monitoring is active. You have <strong>@_routes.Count</strong> routes being tracked for volatility.
             </RadzenText>
+            <RadzenButton class="rz-mt-4" ButtonStyle="ButtonStyle.Primary"
+                          Text="@PrimaryActionText" Icon="bolt"
+                          Click="@(() => Nav.NavigateTo(PrimaryActionPath))" />
             @if (_quotaConsumed >= QuotaConstants.DefaultDailyQuota - 2)
             {
                 <RadzenAlert AlertStyle="AlertStyle.Warning" ShowIcon="true" class="rz-mt-4">
@@ -97,6 +100,8 @@ else
     private List<RouteDto> _routes = [];
     private int _quotaConsumed;
     private bool _loading = true;
+    private string PrimaryActionText => _routes.Count == 0 ? "Create First Route" : "View Active Route";
+    private string PrimaryActionPath => _routes.Count == 0 ? "/routes/create" : $"/routes/{_routes[0].Id}";
 
     // Observer pattern — PollingComponentBase base handles the timer loop
     protected override TimeSpan PollingInterval => TimeSpan.FromSeconds(60);

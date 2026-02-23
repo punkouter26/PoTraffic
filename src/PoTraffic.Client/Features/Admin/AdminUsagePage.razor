@@ -6,7 +6,25 @@
 <PageTitle>Admin — User Usage</PageTitle>
 
 <RadzenCard class="rz-p-6 rz-mt-4">
-    <RadzenText TextStyle="TextStyle.H5" class="rz-mb-4">Admin Dashboard — Daily Usage</RadzenText>
+    <RadzenText TextStyle="TextStyle.H5" class="rz-mb-2">Admin Tools</RadzenText>
+    <RadzenText TextStyle="TextStyle.Body2" class="rz-mb-4">
+        Secondary diagnostics and test functionality for administrators.
+    </RadzenText>
+
+    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" Wrap="FlexWrap.Wrap" class="rz-mb-4">
+        <RadzenButton Text="Usage Insights" ButtonStyle="ButtonStyle.Light" Icon="people"
+                      Click="@(() => Nav.NavigateTo("/admin"))" />
+        <RadzenButton Text="Global Volatility" ButtonStyle="ButtonStyle.Light" Icon="analytics"
+                      Click="@(() => Nav.NavigateTo("/admin/volatility"))" />
+        <RadzenButton Text="Diagnostics" ButtonStyle="ButtonStyle.Light" Icon="build"
+                      Click="@(() => Nav.NavigateTo("/diag"))" />
+        <RadzenButton Text="Triple Test" ButtonStyle="ButtonStyle.Light" Icon="science"
+                      Click="@(() => Nav.NavigateTo("/admin/triple-test"))" />
+        <RadzenButton Text="System Seed" ButtonStyle="ButtonStyle.Light" Icon="database"
+                      Click="@(() => Nav.NavigateTo("/admin/seed"))" />
+    </RadzenStack>
+
+    <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">Daily Usage</RadzenText>
 
     <LoadingErrorCard IsLoading="_loading" Error="@_error">
         <RadzenDataGrid Data="_users" TItem="UserDailyUsageDto" AllowSorting="true" AllowFiltering="true"

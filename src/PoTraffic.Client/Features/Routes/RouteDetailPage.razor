@@ -25,100 +25,124 @@ else
         </RadzenAlert>
     }
 
-    @* Dual-series chart: Today's Actual + Historical Baseline with ±1σ band *@
     <RadzenCard class="rz-mb-4">
-        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">Travel Time Chart</RadzenText>
-
-        <RadzenChart Style="width:100%;height:300px;">
-            @* Today's actual series — Y values are travel time in minutes *@
-            <RadzenLineSeries Data="_chartActual" CategoryProperty="PolledAtDateTime"
-                              Title="Today's Actual" ValueProperty="DurationMinutes"
-                              Smooth="false">
-                <ChildContent>
-                    <RadzenMarkers MarkerType="MarkerType.Circle" />
-                </ChildContent>
-                <TooltipTemplate Context="p">
-                    @if (p.IsRerouted)
-                    {
-                        <div style="color:red;font-weight:bold;">⚠ Rerouted: @p.DurationMinutes.ToString("F1") min</div>
-                    }
-                    else
-                    {
-                        <div>@p.DurationMinutes.ToString("F1") min</div>
-                    }
-                </TooltipTemplate>
-            </RadzenLineSeries>
-
-            @* Rerouted overlay — red dots on top of normal dots *@
-            @if (_chartRerouted.Count > 0)
-            {
-                <RadzenLineSeries Data="_chartRerouted" CategoryProperty="PolledAtDateTime"
-                                  Title="Rerouted" ValueProperty="DurationMinutes"
-                                  Stroke="transparent" StrokeWidth="0">
-                    <RadzenMarkers MarkerType="MarkerType.Circle" StrokeWidth="2"
-                                   Stroke="#e53e3e" Fill="#e53e3e" />
-                </RadzenLineSeries>
-            }
-
-            @* Baseline mean series — Y values in minutes *@
-            <RadzenLineSeries Data="_chartBaseline" CategoryProperty="TimeSlotBucket"
-                              Title="Historical Baseline" ValueProperty="MeanMinutes"
-                              Smooth="true" LineType="LineType.Dashed">
-            </RadzenLineSeries>
-
-            @* ±1σ upper band (area series for delta shading) — Y values in minutes *@
-            @if (_chartUpperBand.Count > 0)
-            {
-                <RadzenAreaSeries Data="_chartUpperBand" CategoryProperty="TimeSlotBucket"
-                                  Title="+1σ" ValueProperty="Value"
-                                  Fill="rgba(0,200,0,0.1)" Stroke="rgba(0,200,0,0.3)"
-                                  StrokeWidth="1">
-                </RadzenAreaSeries>
-            }
-
-            <RadzenCategoryAxis FormatString="{0:HH:mm}" />
-            @* Y-axis: 0 – 120 minutes (2 hours), labelled in minutes *@
-            <RadzenValueAxis Min="0" Max="120">
-                <RadzenGridLines Visible="true" />
-                <RadzenAxisTitle Text="Minutes" />
-            </RadzenValueAxis>
-        </RadzenChart>
+        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">Monitoring Snapshot</RadzenText>
+        <RadzenRow>
+            <RadzenColumn Size="12" SizeMD="4">
+                <RadzenText TextStyle="TextStyle.Caption">Latest Sample</RadzenText>
+                <RadzenText>@(LatestPoll is null ? "No samples yet" : $"{LatestPoll.TravelDurationSeconds / 60}m at {LatestPoll.PolledAtDateTime:HH:mm:ss}")</RadzenText>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="4">
+                <RadzenText TextStyle="TextStyle.Caption">Samples Today</RadzenText>
+                <RadzenText>@_todayPolls.Count</RadzenText>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="4">
+                <RadzenText TextStyle="TextStyle.Caption">Next Poll ETA</RadzenText>
+                <RadzenText>@NextPollEtaLabel</RadzenText>
+            </RadzenColumn>
+        </RadzenRow>
+        <RadzenButton class="rz-mt-3" ButtonStyle="ButtonStyle.Light" Icon="analytics"
+                      Text="@(_showAnalysis ? "Hide Analysis" : "View Analysis")"
+                      Click="@ToggleAnalysis" />
     </RadzenCard>
 
     @* Monitoring window configuration *@
     <WindowConfigPanel RouteId="RouteId" OnSaved="OnWindowSaved" />
 
-    @* Poll history table *@
-    <RadzenCard>
-        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">Poll History</RadzenText>
-        <RadzenDataGrid Data="_todayPolls" TItem="PollRecordDto" PageSize="20" AllowPaging="true">
-            <Columns>
-                <RadzenDataGridColumn TItem="PollRecordDto" Property="PolledAtDateTime" Title="Polled At" FormatString="{0:h:mm:ss tt}" />
-                <RadzenDataGridColumn TItem="PollRecordDto" Title="Duration">
-                    <Template Context="p">
-                        @{
-                            int h = p.TravelDurationSeconds / 3600;
-                            int m = (p.TravelDurationSeconds % 3600) / 60;
-                        }
-                        @(h > 0 ? $"{h}h {m}m" : $"{m}m")
-                    </Template>
-                </RadzenDataGridColumn>
-                <RadzenDataGridColumn TItem="PollRecordDto" Title="Distance (mi)">
-                    <Template Context="p">
-                        @($"{p.DistanceMetres * 0.000621371:F1} mi")
-                    </Template>
-                </RadzenDataGridColumn>
-                <RadzenDataGridColumn TItem="PollRecordDto" Title="Rerouted?" Width="100px">
-                    <Template Context="p">
+    @if (_showAnalysis)
+    {
+        @* Dual-series chart: Today's Actual + Historical Baseline with ±1σ band *@
+        <RadzenCard class="rz-mb-4">
+            <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">Travel Time Chart</RadzenText>
+
+            <RadzenChart Style="width:100%;height:300px;">
+                @* Today's actual series — Y values are travel time in minutes *@
+                <RadzenLineSeries Data="_chartActual" CategoryProperty="PolledAtDateTime"
+                                  Title="Today's Actual" ValueProperty="DurationMinutes"
+                                  Smooth="false">
+                    <ChildContent>
+                        <RadzenMarkers MarkerType="MarkerType.Circle" />
+                    </ChildContent>
+                    <TooltipTemplate Context="p">
                         @if (p.IsRerouted)
                         {
-                            <RadzenBadge Text="YES" BadgeStyle="BadgeStyle.Danger" />
+                            <div style="color:red;font-weight:bold;">⚠ Rerouted: @p.DurationMinutes.ToString("F1") min</div>
                         }
-                    </Template>
-                </RadzenDataGridColumn>
-            </Columns>
-        </RadzenDataGrid>
-    </RadzenCard>
+                        else
+                        {
+                            <div>@p.DurationMinutes.ToString("F1") min</div>
+                        }
+                    </TooltipTemplate>
+                </RadzenLineSeries>
+
+                @* Rerouted overlay — red dots on top of normal dots *@
+                @if (_chartRerouted.Count > 0)
+                {
+                    <RadzenLineSeries Data="_chartRerouted" CategoryProperty="PolledAtDateTime"
+                                      Title="Rerouted" ValueProperty="DurationMinutes"
+                                      Stroke="transparent" StrokeWidth="0">
+                        <RadzenMarkers MarkerType="MarkerType.Circle" StrokeWidth="2"
+                                       Stroke="#e53e3e" Fill="#e53e3e" />
+                    </RadzenLineSeries>
+                }
+
+                @* Baseline mean series — Y values in minutes *@
+                <RadzenLineSeries Data="_chartBaseline" CategoryProperty="TimeSlotBucket"
+                                  Title="Historical Baseline" ValueProperty="MeanMinutes"
+                                  Smooth="true" LineType="LineType.Dashed">
+                </RadzenLineSeries>
+
+                @* ±1σ upper band (area series for delta shading) — Y values in minutes *@
+                @if (_chartUpperBand.Count > 0)
+                {
+                    <RadzenAreaSeries Data="_chartUpperBand" CategoryProperty="TimeSlotBucket"
+                                      Title="+1σ" ValueProperty="Value"
+                                      Fill="rgba(0,200,0,0.1)" Stroke="rgba(0,200,0,0.3)"
+                                      StrokeWidth="1">
+                    </RadzenAreaSeries>
+                }
+
+                <RadzenCategoryAxis FormatString="{0:HH:mm}" />
+                @* Y-axis: 0 – 120 minutes (2 hours), labelled in minutes *@
+                <RadzenValueAxis Min="0" Max="120">
+                    <RadzenGridLines Visible="true" />
+                    <RadzenAxisTitle Text="Minutes" />
+                </RadzenValueAxis>
+            </RadzenChart>
+        </RadzenCard>
+
+        @* Poll history table *@
+        <RadzenCard>
+            <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">Poll History</RadzenText>
+            <RadzenDataGrid Data="_todayPolls" TItem="PollRecordDto" PageSize="20" AllowPaging="true">
+                <Columns>
+                    <RadzenDataGridColumn TItem="PollRecordDto" Property="PolledAtDateTime" Title="Polled At" FormatString="{0:h:mm:ss tt}" />
+                    <RadzenDataGridColumn TItem="PollRecordDto" Title="Duration">
+                        <Template Context="p">
+                            @{
+                                int h = p.TravelDurationSeconds / 3600;
+                                int m = (p.TravelDurationSeconds % 3600) / 60;
+                            }
+                            @(h > 0 ? $"{h}h {m}m" : $"{m}m")
+                        </Template>
+                    </RadzenDataGridColumn>
+                    <RadzenDataGridColumn TItem="PollRecordDto" Title="Distance (mi)">
+                        <Template Context="p">
+                            @($"{p.DistanceMetres * 0.000621371:F1} mi")
+                        </Template>
+                    </RadzenDataGridColumn>
+                    <RadzenDataGridColumn TItem="PollRecordDto" Title="Rerouted?" Width="100px">
+                        <Template Context="p">
+                            @if (p.IsRerouted)
+                            {
+                                <RadzenBadge Text="YES" BadgeStyle="BadgeStyle.Danger" />
+                            }
+                        </Template>
+                    </RadzenDataGridColumn>
+                </Columns>
+            </RadzenDataGrid>
+        </RadzenCard>
+    }
 }
 
 @code {
@@ -139,6 +163,27 @@ else
     private List<UpperBandPoint> _chartUpperBand = [];
     private OptimalDepartureDto? _optimalDeparture;
     private string _optimalDepartureLabel = string.Empty;
+    private bool _showAnalysis;
+    private PollRecordDto? LatestPoll => _todayPolls.OrderByDescending(p => p.PolledAtDateTime).FirstOrDefault();
+    private string NextPollEtaLabel
+    {
+        get
+        {
+            if (LatestPoll is null)
+            {
+                return "Pending first sample";
+            }
+
+            DateTime nextPoll = LatestPoll.PolledAtDateTime.AddMinutes(5);
+            TimeSpan remaining = nextPoll - DateTime.Now;
+            if (remaining <= TimeSpan.Zero)
+            {
+                return "Due now";
+            }
+
+            return $"in {Math.Ceiling(remaining.TotalMinutes):F0} min";
+        }
+    }
     // Observer pattern — PollingComponentBase base handles the timer loop
     protected override TimeSpan PollingInterval => TimeSpan.FromSeconds(15);
 
@@ -147,6 +192,8 @@ else
         await LoadDataAsync();
         StateHasChanged();
     }
+
+    private void ToggleAnalysis() => _showAnalysis = !_showAnalysis;
 
     protected override async Task LoadDataAsync()
     {
@@ -208,7 +255,5 @@ else
         {
             _loading = false;
         }
-    }
-
     }
 }

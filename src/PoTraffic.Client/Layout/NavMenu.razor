@@ -1,6 +1,5 @@
 ﻿@using Microsoft.AspNetCore.Components.Authorization
 @using PoTraffic.Client.Infrastructure.Auth
-@inject HttpClient Http
 @inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager Nav
 
@@ -40,30 +39,7 @@
                         <div class="nav-section-title">Administration</div>
                         <div class="nav-item px-3">
                             <NavLink class="nav-link" href="admin">
-                                <span class="bi bi-people-fill-nav-menu" aria-hidden="true"></span> Usage Insights
-                            </NavLink>
-                        </div>
-                        <div class="nav-item px-3">
-                            <NavLink class="nav-link" href="admin/volatility">
-                                <span class="bi bi-graph-up-nav-menu" aria-hidden="true"></span> Global Volatility
-                            </NavLink>
-                        </div>
-                        <div class="nav-item px-3">
-                            <NavLink class="nav-link" href="diag">
-                                <span class="bi bi-wrench-adjustable-nav-menu" aria-hidden="true"></span> Diagnostics
-                            </NavLink>
-                        </div>
-                        @if (_tripleTestEnabled)
-                        {
-                            <div class="nav-item px-3">
-                                <NavLink class="nav-link" href="admin/triple-test">
-                                    <span class="bi bi-lightning-charge-fill-nav-menu" aria-hidden="true"></span> Triple Test Hub
-                                </NavLink>
-                            </div>
-                        }
-                        <div class="nav-item px-3">
-                            <NavLink class="nav-link" href="admin/seed">
-                                <span class="bi bi-database-fill-add-nav-menu" aria-hidden="true"></span> System Seed
+                                <span class="bi bi-tools-nav-menu" aria-hidden="true"></span> Admin Tools
                             </NavLink>
                         </div>
                     </Authorized>
@@ -94,20 +70,8 @@
 
 @code {
     private bool collapseNavMenu = true;
-    private bool _tripleTestEnabled = true; // default true until flags are fetched
 
     private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
-
-    // Fetch feature flags on first render; show Triple Test only when enabled
-    protected override async Task OnInitializedAsync()
-    {
-        try
-        {
-            var flags = await Http.GetFromJsonAsync<FeaturesDto>("/api/system/features");
-            if (flags is not null) _tripleTestEnabled = flags.TripleTestEnabled;
-        }
-        catch { /* Silently handled — nav remains unchanged on error */ }
-    }
 
     private void ToggleNavMenu()
     {
@@ -122,6 +86,4 @@
         }
         Nav.NavigateTo("/login", forceLoad: true);
     }
-
-    private sealed record FeaturesDto(bool TripleTestEnabled);
 }
