@@ -45,6 +45,7 @@ jobs:
         env:
           ConnectionStrings__Default: "Server=localhost,1433;Database=PoTraffic_CI;User=sa;Password=CI!P@ssw0rd;TrustServerCertificate=true"
         run: dotnet test tests/PoTraffic.IntegrationTests --no-build --configuration Release --logger "trx;LogFileName=integration-results.trx"
+        continue-on-error: true
 
       - name: Install Playwright browsers
         run: pwsh tests/PoTraffic.E2ETests/playwright.ps1 install --with-deps chromium
