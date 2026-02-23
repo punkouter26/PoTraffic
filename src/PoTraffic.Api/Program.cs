@@ -58,13 +58,15 @@ try
            .Enrich.FromLogContext());
 
     // ── Azure Key Vault (optional; skipped when VaultUri is empty) ───────────
+    // PrefixKeyVaultSecretManager strips the "PoTraffic--" namespace prefix so that
+    // e.g. "PoTraffic--ConnectionStrings--Default" → config key "ConnectionStrings:Default".
     string? vaultUri = builder.Configuration["AzureKeyVault:VaultUri"];
     if (!string.IsNullOrWhiteSpace(vaultUri))
     {
         builder.Configuration.AddAzureKeyVault(
             new Uri(vaultUri),
             new DefaultAzureCredential(),
-            new KeyVaultSecretManager());
+            new PrefixKeyVaultSecretManager());
     }
 
     // ── Typed options ─────────────────────────────────────────────────────────
