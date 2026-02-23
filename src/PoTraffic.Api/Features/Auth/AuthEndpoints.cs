@@ -20,6 +20,8 @@ public static class AuthEndpoints
         group.MapPost("logout", Logout).RequireAuthorization();
         group.MapPost("refresh-token", RefreshToken);
         group.MapGet("confirm-email", ConfirmEmail);
+        group.MapGet("external/{provider}/start", StartExternalLogin);
+        group.MapGet("external/{provider}/callback", CompleteExternalLogin);
 
         return app;
     }
@@ -65,6 +67,54 @@ public static class AuthEndpoints
         user.EmailVerificationToken = null;
         await db.SaveChangesAsync();
         return Results.NoContent();
+    }
+
+    private static IResult StartExternalLogin(
+        string provider,
+        HttpContext httpContext,
+        [FromQuery] string? returnUrl,
+        ExternalAuthService externalAuthService)
+    {
+        try
+        {
+            string redirectUri = BuildExternalCallbackUri(httpContext, provider);
+            string authorizationUrl = externalAuthService.BuildStartRedirectUrl(provider, redirectUri, returnUrl);
+            return Results.Redirect(authorizationUrl);
+        }
+        catch (InvalidOperationException)
+        {
+            return Results.NotFound(new { error = "UNSUPPORTED_PROVIDER" });
+        }
+    }
+
+    private static async Task<IResult> CompleteExternalLogin(
+        string provider,
+        HttpContext httpContext,
+        [FromQuery] string? code,
+        [FromQuery] string? state,
+        ExternalAuthService externalAuthService,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(state))
+        {
+            return Results.Redirect("/auth/external-complete#error=INVALID_CALLBACK");
+        }
+
+        string redirectUri = BuildExternalCallbackUri(httpContext, provider);
+        ExternalAuthCompletionResult result = await externalAuthService.CompleteLoginAsync(
+            provider,
+            code,
+            state,
+            redirectUri,
+            ct);
+
+        return Results.Redirect(ExternalAuthService.BuildCompletionRedirectPath(result));
+    }
+
+    private static string BuildExternalCallbackUri(HttpContext httpContext, string provider)
+    {
+        HttpRequest request = httpContext.Request;
+        return $"{request.Scheme}://{request.Host}{request.PathBase}/api/auth/external/{provider}/callback";
     }
 }
 

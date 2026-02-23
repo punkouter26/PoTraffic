@@ -1,0 +1,81 @@
+@page "/auth/external-complete"
+@using Microsoft.AspNetCore.Components.Authorization
+@using PoTraffic.Client.Infrastructure.Auth
+@inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthStateProvider
+
+<RadzenCard Style="max-width:520px;margin:auto;margin-top:80px;">
+    <RadzenText TextStyle="TextStyle.H5" class="rz-mb-3">Completing sign-in...</RadzenText>
+
+    @if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Danger">@_error</RadzenAlert>
+    }
+    else
+    {
+        <RadzenProgressBar Mode="ProgressBarMode.Indeterminate" ShowValue="false" />
+    }
+</RadzenCard>
+
+@code {
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Dictionary<string, string> values = ParseFragment(Nav.Uri);
+
+        if (values.TryGetValue("error", out string? error) && !string.IsNullOrWhiteSpace(error))
+        {
+            _error = "External sign-in failed. Please try again.";
+            return;
+        }
+
+        if (!values.TryGetValue("accessToken", out string? accessToken) || string.IsNullOrWhiteSpace(accessToken))
+        {
+            _error = "External sign-in did not return an access token.";
+            return;
+        }
+
+        if (AuthStateProvider is not JwtAuthenticationStateProvider jwtProvider)
+        {
+            _error = "Authentication provider is not available.";
+            return;
+        }
+
+        await jwtProvider.LoginAsync(accessToken);
+
+        string destination = values.TryGetValue("returnUrl", out string? returnUrl)
+            && !string.IsNullOrWhiteSpace(returnUrl)
+            && returnUrl.StartsWith('/')
+            ? returnUrl
+            : "/dashboard";
+
+        // forceLoad: true ensures Blazor boots fresh so the token already in localStorage
+        // is read during CascadingAuthenticationState initialisation — avoiding a race
+        // between NotifyAuthenticationStateChanged and the NavMenu's first render.
+        Nav.NavigateTo(destination, forceLoad: true);
+    }
+
+    private static Dictionary<string, string> ParseFragment(string uri)
+    {
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        int hashIndex = uri.IndexOf('#');
+        if (hashIndex < 0 || hashIndex == uri.Length - 1)
+            return result;
+
+        string fragment = uri[(hashIndex + 1)..];
+        foreach (string pair in fragment.Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            string[] parts = pair.Split('=', 2);
+            if (parts.Length == 0 || string.IsNullOrWhiteSpace(parts[0]))
+                continue;
+
+            string key = Uri.UnescapeDataString(parts[0]);
+            string value = parts.Length > 1 ? Uri.UnescapeDataString(parts[1]) : string.Empty;
+            result[key] = value;
+        }
+
+        return result;
+    }
+}

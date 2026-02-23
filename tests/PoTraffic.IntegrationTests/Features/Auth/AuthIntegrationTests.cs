@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.WebUtilities;
 using FluentAssertions;
 using PoTraffic.IntegrationTests.Helpers;
 using PoTraffic.Shared.DTOs.Auth;
@@ -76,5 +77,34 @@ public sealed class AuthIntegrationTests : BaseIntegrationTest
         HttpResponseMessage response = await client.PostAsJsonAsync("/api/auth/login", loginBody);
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized,
             "invalid credentials must return 401");
+    }
+
+    [SkipUnlessDockerAvailable]
+    public async Task ExternalGoogleLogin_StartAndCallback_ReturnsCompletionRedirectWithAccessToken()
+    {
+        await ApplyMigrationsAsync();
+        // Use a no-redirect client so we can inspect the 302 Location header directly.
+        HttpClient client = CreateClientNoRedirect();
+
+        HttpResponseMessage startResponse = await client.GetAsync("/api/auth/external/google/start?returnUrl=/dashboard");
+        startResponse.StatusCode.Should().Be(HttpStatusCode.Redirect);
+
+        Uri? startLocation = startResponse.Headers.Location;
+        startLocation.Should().NotBeNull();
+
+        Dictionary<string, string> query = QueryHelpers.ParseQuery(startLocation!.Query)
+            .ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToString());
+
+        query.TryGetValue("state", out string? state).Should().BeTrue();
+        state.Should().NotBeNullOrWhiteSpace();
+
+        HttpResponseMessage callbackResponse = await client.GetAsync(
+            $"/api/auth/external/google/callback?code=integration-test-code&state={Uri.EscapeDataString(state!)}");
+
+        callbackResponse.StatusCode.Should().Be(HttpStatusCode.Redirect);
+        Uri? callbackLocation = callbackResponse.Headers.Location;
+        callbackLocation.Should().NotBeNull();
+        callbackLocation!.ToString().Should().StartWith("/auth/external-complete#");
+        callbackLocation.ToString().Should().Contain("accessToken=");
     }
 }

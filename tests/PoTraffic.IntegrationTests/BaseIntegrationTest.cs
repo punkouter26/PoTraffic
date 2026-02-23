@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using PoTraffic.Api.Features.Auth;
 using PoTraffic.Api.Infrastructure.Providers;
 using PoTraffic.IntegrationTests.Helpers;
 using PoTraffic.Shared.Enums;
@@ -57,6 +58,8 @@ public abstract class BaseIntegrationTest : IAsyncLifetime
                 {
                     services.AddKeyedScoped<ITrafficProvider, FakeTrafficProvider>(RouteProvider.GoogleMaps);
                     services.AddKeyedScoped<ITrafficProvider, FakeTrafficProvider>(RouteProvider.TomTom);
+                    services.AddScoped<IExternalIdentityProvider>(_ => new FakeExternalIdentityProvider("google"));
+                    services.AddScoped<IExternalIdentityProvider>(_ => new FakeExternalIdentityProvider("microsoft"));
                 });
 
                 // Template Method pattern — allow subclasses to customise the host
@@ -91,6 +94,21 @@ public abstract class BaseIntegrationTest : IAsyncLifetime
             throw new InvalidOperationException("Factory not yet initialised. Call InitializeAsync first.");
 
         return _factory.CreateClient();
+    }
+
+    /// <summary>
+    /// Returns an <see cref="HttpClient"/> that does NOT follow redirects.
+    /// Use this when a test needs to inspect the raw 302/301 response and its Location header.
+    /// </summary>
+    protected HttpClient CreateClientNoRedirect()
+    {
+        if (_factory is null)
+            throw new InvalidOperationException("Factory not yet initialised. Call InitializeAsync first.");
+
+        return _factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false
+        });
     }
 
     /// <summary>Returns the root <see cref="IServiceProvider"/> of the test application host.</summary>

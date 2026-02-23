@@ -10,5 +10,9 @@ Refer to that document for the most up-to-date instructions on:
 - Database Migrations
 - Running & Testing
 
+For social login setup (Google + Microsoft), see:
+
+👉 [**Social Auth Setup**](./SocialAuthSetup.md)
+
 ## Docker Compose (Alternative)
 Use docker-compose up -d to spin up just the SQL Server container if not using Aspire.

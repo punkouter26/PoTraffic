@@ -70,6 +70,8 @@ try
     // ── Typed options ─────────────────────────────────────────────────────────
     builder.Services.Configure<JwtConfiguration>(
         builder.Configuration.GetSection("Jwt"));
+    builder.Services.Configure<ExternalAuthConfiguration>(
+        builder.Configuration.GetSection("ExternalAuth"));
     JwtConfiguration jwtCfg = builder.Configuration.GetSection("Jwt").Get<JwtConfiguration>()
         ?? throw new InvalidOperationException("Jwt configuration section is missing.");
 
@@ -148,6 +150,13 @@ try
 
     // JWT token service for auth handlers
     builder.Services.AddSingleton<JwtTokenService>();
+
+    // Strategy pattern — external provider implementation is selected by provider key at runtime.
+    builder.Services.AddDataProtection();
+    builder.Services.AddHttpClient();
+    builder.Services.AddScoped<IExternalIdentityProvider, GoogleExternalIdentityProvider>();
+    builder.Services.AddScoped<IExternalIdentityProvider, MicrosoftExternalIdentityProvider>();
+    builder.Services.AddScoped<ExternalAuthService>();
 
     // ── OpenTelemetry + CompositeRoutingSampler (Strategy pattern) ────────────
     string? appInsightsConnStr = builder.Configuration["ApplicationInsights:ConnectionString"];

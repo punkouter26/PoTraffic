@@ -87,4 +87,21 @@ public sealed class AuthScenarios : PlaywrightTestBase
         // Attempt re-login with same credentials → 401
         await Task.CompletedTask;
     }
+
+    [SkipUnlessE2EReady]
+    public async Task LoginPage_ShowsGoogleAndMicrosoftButtons()
+    {
+        await Page.GotoAsync($"{BaseUrl}/login");
+
+        await Page.GetByRole(Microsoft.Playwright.AriaRole.Button, new() { Name = "Continue with Google" })
+            .WaitForAsync(new() { Timeout = 30_000 });
+
+        bool googleVisible = await Page.GetByRole(Microsoft.Playwright.AriaRole.Button, new() { Name = "Continue with Google" })
+            .IsVisibleAsync();
+        bool microsoftVisible = await Page.GetByRole(Microsoft.Playwright.AriaRole.Button, new() { Name = "Continue with Microsoft" })
+            .IsVisibleAsync();
+
+        Assert.True(googleVisible, "Google sign-in button must be visible on login page.");
+        Assert.True(microsoftVisible, "Microsoft sign-in button must be visible on login page.");
+    }
 }

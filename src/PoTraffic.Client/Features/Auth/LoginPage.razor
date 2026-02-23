@@ -26,6 +26,12 @@
     <RadzenButton Text="Sign In" ButtonStyle="ButtonStyle.Primary" class="rz-w-100"
                   Click="@LoginAsync" IsBusy="_loading" />
 
+    <RadzenButton Text="Continue with Google" ButtonStyle="ButtonStyle.Secondary" class="rz-w-100 rz-mt-2"
+                  Click='() => StartExternalLogin("google")' Disabled="_loading" />
+
+    <RadzenButton Text="Continue with Microsoft" ButtonStyle="ButtonStyle.Secondary" class="rz-w-100 rz-mt-2"
+                  Click='() => StartExternalLogin("microsoft")' Disabled="_loading" />
+
     <RadzenText class="rz-mt-3">
         No account? <a href="/register">Register</a>
     </RadzenText>
@@ -74,5 +80,11 @@
         {
             _loading = false;
         }
+    }
+
+    private void StartExternalLogin(string provider)
+    {
+        string encodedReturnUrl = Uri.EscapeDataString("/dashboard");
+        Nav.NavigateTo($"/api/auth/external/{provider}/start?returnUrl={encodedReturnUrl}", forceLoad: true);
     }
 }
