@@ -50,7 +50,21 @@ public sealed class StartWindowCommandHandler : IRequestHandler<StartWindowComma
 
         DateOnly today = DateOnly.FromDateTime(DateTimeOffset.UtcNow.Date);
 
-        // 2. Count today's sessions for this user across all their routes
+        // 2. Idempotent guard — return existing session if one already exists for this route today
+        MonitoringSession? existingSession = await _db.MonitoringSessions
+            .FirstOrDefaultAsync(s => s.RouteId == window.Route.Id && s.SessionDate == today, ct);
+
+        if (existingSession is not null)
+        {
+            _logger.LogInformation(
+                "Start called for window {WindowId} but session {SessionId} already exists for today — idempotent return",
+                cmd.WindowId, existingSession.Id);
+            int quotaUsed = await _db.MonitoringSessions
+                .CountAsync(s => s.Route.UserId == cmd.UserId && s.SessionDate == today, ct);
+            return new StartWindowResult(true, null, Math.Max(0, QuotaConstants.DefaultDailyQuota - quotaUsed), existingSession.Id);
+        }
+
+        // 3. Count today's sessions for this user across all their routes
         int todaySessionCount = await _db.MonitoringSessions
             .CountAsync(s => s.Route.UserId == cmd.UserId && s.SessionDate == today, ct);
 
@@ -60,7 +74,7 @@ public sealed class StartWindowCommandHandler : IRequestHandler<StartWindowComma
             return new StartWindowResult(false, "QUOTA_EXCEEDED", 0, null);
         }
 
-        // 3. Create MonitoringSession (IsHolidayExcluded always false — PublicHolidays table removed S-09)
+        // 4. Create MonitoringSession (IsHolidayExcluded always false — PublicHolidays table removed S-09)
         var session = new MonitoringSession
         {
             RouteId = window.Route.Id,
