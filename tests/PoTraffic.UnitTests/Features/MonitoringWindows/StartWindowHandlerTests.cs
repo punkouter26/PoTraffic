@@ -42,6 +42,7 @@ public sealed class StartWindowHandlerTests
             Locale = "Europe/London"
         });
 
+        // The target route that the test will attempt to start
         db.Routes.Add(new Route
         {
             Id = routeId,
@@ -64,14 +65,29 @@ public sealed class StartWindowHandlerTests
             DaysOfWeekMask = 0b01111110 // Mon-Fri
         });
 
-        // Seed today's sessions for the user
+        // Seed today's sessions on DIFFERENT routes for the same user.
+        // Each route can only have one session per day (UNIQUE RouteId+SessionDate constraint),
+        // so quota consumption is modelled as one session per distinct route.
         DateOnly today = DateOnly.FromDateTime(DateTime.UtcNow);
         for (int i = 0; i < sessionCount; i++)
         {
+            Guid otherRouteId = Guid.NewGuid();
+            db.Routes.Add(new Route
+            {
+                Id = otherRouteId,
+                UserId = userId,
+                OriginAddress = $"X{i}",
+                OriginCoordinates = $"{i}.0,{i}.0",
+                DestinationAddress = $"Y{i}",
+                DestinationCoordinates = $"{i + 1}.0,{i + 1}.0",
+                Provider = (int)RouteProvider.GoogleMaps,
+                MonitoringStatus = (int)MonitoringStatus.Active,
+                CreatedAt = DateTimeOffset.UtcNow
+            });
             db.MonitoringSessions.Add(new MonitoringSession
             {
                 Id = Guid.NewGuid(),
-                RouteId = routeId,
+                RouteId = otherRouteId,
                 SessionDate = today,
                 State = (int)SessionState.Completed
             });
@@ -155,5 +171,69 @@ public sealed class StartWindowHandlerTests
         // Assert
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be("NOT_FOUND");
+    }
+
+    [Fact]
+    public async Task StartWindow_WhenSessionAlreadyExistsForRouteToday_ReturnsExistingSessionIdempotently()
+    {
+        // Arrange — create route+window, manually seed a session for it today (simulates CreateRoute having
+        // already started monitoring), then call Start again for the same window.
+        // Idempotent guard — Strategy pattern: swaps quota-check path for existing-session-return path.
+        string dbName = Guid.NewGuid().ToString();
+        PoTrafficDbContext db = CreateDb(dbName);
+        Guid userId = Guid.NewGuid();
+        Guid routeId = Guid.NewGuid();
+        Guid windowId = Guid.NewGuid();
+        Guid existingSessionId = Guid.NewGuid();
+
+        db.Users.Add(new User
+        {
+            Id = userId,
+            Email = $"user-{userId}@test.com",
+            PasswordHash = "hash",
+            Locale = "Europe/London"
+        });
+        db.Routes.Add(new Route
+        {
+            Id = routeId,
+            UserId = userId,
+            OriginAddress = "A",
+            OriginCoordinates = "1.0,1.0",
+            DestinationAddress = "B",
+            DestinationCoordinates = "2.0,2.0",
+            Provider = (int)RouteProvider.GoogleMaps,
+            MonitoringStatus = (int)MonitoringStatus.Active,
+            CreatedAt = DateTimeOffset.UtcNow
+        });
+        db.MonitoringWindows.Add(new MonitoringWindow
+        {
+            Id = windowId,
+            RouteId = routeId,
+            StartTime = new TimeOnly(7, 0),
+            EndTime = new TimeOnly(9, 0),
+            DaysOfWeekMask = 0b01111110
+        });
+        db.MonitoringSessions.Add(new MonitoringSession
+        {
+            Id = existingSessionId,
+            RouteId = routeId,
+            SessionDate = DateOnly.FromDateTime(DateTime.UtcNow),
+            State = (int)SessionState.Active
+        });
+        await db.SaveChangesAsync();
+
+        IBackgroundJobClient jobClient = Substitute.For<IBackgroundJobClient>();
+        var handler = new StartWindowCommandHandler(db, jobClient, NullLogger<StartWindowCommandHandler>.Instance);
+
+        // Act — second call for same route, same day
+        StartWindowResult result = await handler.Handle(
+            new StartWindowCommand(windowId, userId), CancellationToken.None);
+
+        // Assert — idempotent: succeed and return the EXISTING session, no new session created
+        result.IsSuccess.Should().BeTrue("duplicate start requests should be idempotent (FR-004)");
+        result.ErrorCode.Should().BeNull();
+        result.SessionId.Should().Be(existingSessionId);
+        int totalSessions = await db.MonitoringSessions.CountAsync();
+        totalSessions.Should().Be(1, "no duplicate session should be inserted");
     }
 }
