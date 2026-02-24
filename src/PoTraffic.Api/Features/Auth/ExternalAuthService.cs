@@ -4,6 +4,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using PoTraffic.Shared.DTOs.Auth;
 
@@ -18,6 +19,7 @@ public sealed class ExternalAuthService
     private readonly IDataProtector _stateProtector;
     private readonly PoTrafficDbContext _db;
     private readonly JwtTokenService _jwt;
+    private readonly IConfiguration _configuration;
     private readonly ILogger<ExternalAuthService> _logger;
 
     public ExternalAuthService(
@@ -25,12 +27,14 @@ public sealed class ExternalAuthService
         IDataProtectionProvider dataProtectionProvider,
         PoTrafficDbContext db,
         JwtTokenService jwt,
+        IConfiguration configuration,
         ILogger<ExternalAuthService> logger)
     {
         _providers = providers;
         _stateProtector = dataProtectionProvider.CreateProtector("PoTraffic.Auth.ExternalState.v1");
         _db = db;
         _jwt = jwt;
+        _configuration = configuration;
         _logger = logger;
     }
 
@@ -82,6 +86,11 @@ public sealed class ExternalAuthService
         string normalizedEmail = identity.Email.Trim().ToLowerInvariant();
         User? user = await _db.Set<User>().FirstOrDefaultAsync(u => u.Email == normalizedEmail, ct);
 
+        // Admin email promotion — configured in Auth:AdminEmail (non-sensitive, stored in appsettings)
+        string? adminEmail = _configuration["Auth:AdminEmail"];
+        bool isAdmin = !string.IsNullOrWhiteSpace(adminEmail)
+            && string.Equals(normalizedEmail, adminEmail.Trim().ToLowerInvariant(), StringComparison.Ordinal);
+
         if (user is null)
         {
             user = new User
@@ -90,7 +99,7 @@ public sealed class ExternalAuthService
                 Email = normalizedEmail,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(Guid.NewGuid().ToString("N")),
                 Locale = "en-US",
-                Role = "Commuter",
+                Role = isAdmin ? "Administrator" : "Commuter",
                 IsEmailVerified = identity.IsEmailVerified,
                 CreatedAt = DateTimeOffset.UtcNow,
                 LastLoginAt = DateTimeOffset.UtcNow
@@ -102,6 +111,9 @@ public sealed class ExternalAuthService
             user.LastLoginAt = DateTimeOffset.UtcNow;
             if (identity.IsEmailVerified)
                 user.IsEmailVerified = true;
+            // Ensure admin role is always set correctly — guards against DB records created before this rule
+            if (isAdmin && user.Role != "Administrator")
+                user.Role = "Administrator";
         }
 
         (string accessToken, string refreshToken, DateTimeOffset expiresAt) = _jwt.GenerateTokens(user);

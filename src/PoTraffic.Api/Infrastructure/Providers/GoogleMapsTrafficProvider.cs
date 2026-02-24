@@ -26,10 +26,10 @@ public sealed class GoogleMapsTrafficProvider : ITrafficProvider
 
     public async Task<string?> GeocodeAsync(string address, CancellationToken ct = default)
     {
-        string? apiKey = _configuration["PoTraffic:GoogleMaps:ApiKey"];
+        string? apiKey = _configuration["GoogleMaps:ApiKey"];
         if (string.IsNullOrWhiteSpace(apiKey))
         {
-            _logger.LogError("Google Maps API key is not configured (PoTraffic:GoogleMaps:ApiKey).");
+            _logger.LogError("Google Maps API key is not configured (GoogleMaps:ApiKey).");
             return null;
         }
 
@@ -64,10 +64,10 @@ public sealed class GoogleMapsTrafficProvider : ITrafficProvider
         string destinationCoordinates,
         CancellationToken ct = default)
     {
-        string? apiKey = _configuration["PoTraffic:GoogleMaps:ApiKey"];
+        string? apiKey = _configuration["GoogleMaps:ApiKey"];
         if (string.IsNullOrWhiteSpace(apiKey))
         {
-            _logger.LogError("Google Maps API key is not configured (PoTraffic:GoogleMaps:ApiKey).");
+            _logger.LogError("Google Maps API key is not configured (GoogleMaps:ApiKey).");
             return null;
         }
 
