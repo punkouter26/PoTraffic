@@ -134,7 +134,14 @@
 
             if (!createResp.IsSuccessStatusCode)
             {
-                _error = "Failed to create route. Please verify your addresses.";
+                var errBody = await createResp.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+                string? errorCode = errBody.TryGetProperty("error", out var prop) ? prop.GetString() : null;
+                _error = errorCode switch
+                {
+                    "GEOCODE_FAILED"   => "Address could not be geocoded. Check that the Google Maps API key is configured and the address is valid.",
+                    "SAME_COORDINATES" => "Origin and destination resolve to the same location. Please use different addresses.",
+                    _                  => "Failed to create route. Please verify your addresses."
+                };
                 return;
             }
 

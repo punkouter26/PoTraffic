@@ -48,7 +48,7 @@
     <PackageVersion Include="Aspire.Hosting.AppHost" Version="13.1.*" />
     <PackageVersion Include="Aspire.Hosting.SqlServer" Version="13.1.*" />
     <PackageVersion Include="Azure.Extensions.AspNetCore.Configuration.Secrets" Version="1.*" />
-    <PackageVersion Include="Azure.Identity" Version="1.14.*" />
+    <PackageVersion Include="Azure.Identity" Version="1.18.*" />
     <PackageVersion Include="Azure.Monitor.OpenTelemetry.Exporter" Version="1.*" />
   </ItemGroup>
 
