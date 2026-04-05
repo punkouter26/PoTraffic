@@ -2,6 +2,7 @@ using System.Security.Claims;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using PoTraffic.Api.Features.Account;
+using PoTraffic.Api.Infrastructure.Security;
 using PoTraffic.Shared.DTOs.Account;
 
 namespace PoTraffic.Api.Features.Account;
@@ -16,7 +17,7 @@ public static class AccountEndpoints
 
         grp.MapGet("/profile", async (ClaimsPrincipal user, ISender sender, CancellationToken ct) =>
         {
-            Guid userId = GetUserId(user);
+            Guid userId = user.GetUserId();
             ProfileDto? profile = await sender.Send(new GetProfileQuery(userId), ct);
             return profile is null ? Results.NotFound() : Results.Ok(profile);
         })
@@ -30,7 +31,7 @@ public static class AccountEndpoints
             ISender sender,
             CancellationToken ct) =>
         {
-            Guid userId = GetUserId(user);
+            Guid userId = user.GetUserId();
             ProfileDto? updated = await sender.Send(new UpdateProfileCommand(userId, body.Locale), ct);
             return updated is null ? Results.NotFound() : Results.Ok(updated);
         })
@@ -44,7 +45,7 @@ public static class AccountEndpoints
             ISender sender,
             CancellationToken ct) =>
         {
-            Guid userId = GetUserId(user);
+            Guid userId = user.GetUserId();
             ChangePasswordResult result = await sender.Send(
                 new ChangePasswordCommand(userId, body.CurrentPassword, body.NewPassword, body.ConfirmNewPassword), ct);
 
@@ -58,7 +59,7 @@ public static class AccountEndpoints
 
         grp.MapGet("/quota", async (ClaimsPrincipal user, ISender sender, CancellationToken ct) =>
         {
-            Guid userId = GetUserId(user);
+            Guid userId = user.GetUserId();
             QuotaDto? quota = await sender.Send(new GetQuotaQuery(userId), ct);
             return quota is null ? Results.NotFound() : Results.Ok(quota);
         })
@@ -69,7 +70,7 @@ public static class AccountEndpoints
         // FR-031: GDPR Art. 17 — self-service account deletion
         grp.MapDelete("/", async (ClaimsPrincipal user, ISender sender, CancellationToken ct) =>
         {
-            Guid userId = GetUserId(user);
+            Guid userId = user.GetUserId();
             bool deleted = await sender.Send(new DeleteAccountCommand(userId), ct);
             return deleted ? Results.NoContent() : Results.NotFound();
         })
@@ -80,10 +81,4 @@ public static class AccountEndpoints
         return app;
     }
 
-    private static Guid GetUserId(ClaimsPrincipal user)
-    {
-        string? sub = user.FindFirstValue(ClaimTypes.NameIdentifier)
-                    ?? user.FindFirstValue("sub");
-        return Guid.TryParse(sub, out Guid id) ? id : Guid.Empty;
-    }
 }

@@ -4,29 +4,27 @@
 @using PoTraffic.Shared.Enums
 @inject HttpClient Http
 
-<RadzenFieldset Text="Monitoring Window" class="rz-mb-3">
+<RadzenFieldset Text="Monitoring Schedule" class="rz-mb-3">
     @if (_loadingWindows)
     {
         <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" class="rz-mb-2" />
     }
-    else if (_activeWindow is not null)
+    else if (!string.IsNullOrEmpty(_loadError))
     {
-        @* Read-only view — window is immutable once created; delete to replace *@
-        <RadzenText TextStyle="TextStyle.Caption" class="rz-mb-1">Days of week:</RadzenText>
-        <RadzenText class="rz-mb-3">@string.Join(", ", _activeWindow.DaysOfWeek)</RadzenText>
-
-        <div class="rz-display-flex rz-gap-4 rz-mb-3">
+        <RadzenAlert AlertStyle="AlertStyle.Danger" ShowIcon="true" class="rz-mb-2">@_loadError</RadzenAlert>
+    }
+    else if (_activeWindow is not null && !_editing)
+    {
+        @* Read-only view with Edit Schedule button — hides the delete-to-replace mechanic *@
+        <div class="rz-display-flex rz-align-items-center rz-gap-4 rz-mb-2">
             <div>
-                <RadzenText TextStyle="TextStyle.Caption">Start Time</RadzenText>
-                <RadzenText>@_activeWindow.StartTime</RadzenText>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-mb-0">Schedule</RadzenText>
+                <RadzenText>@string.Join(", ", _activeWindow.DaysOfWeek) · @_activeWindow.StartTime – @_activeWindow.EndTime</RadzenText>
             </div>
-            <div>
-                <RadzenText TextStyle="TextStyle.Caption">End Time</RadzenText>
-                <RadzenText>@_activeWindow.EndTime</RadzenText>
-            </div>
+            <RadzenButton Text="Edit Schedule" Icon="edit" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small"
+                          Click="@StartEditing" />
         </div>
 
-        @* Session status banner *@
         @if (_activeSession is not null)
         {
             <RadzenAlert AlertStyle="AlertStyle.Success" ShowIcon="true" class="rz-mb-2">
@@ -40,7 +38,7 @@
         else
         {
             <RadzenAlert AlertStyle="AlertStyle.Info" ShowIcon="true" class="rz-mb-2">
-                Monitoring is not active yet. It starts automatically when you open this page and a window is active.
+                No active session for today. Click <strong>Start Monitoring</strong> to begin.
             </RadzenAlert>
         }
 
@@ -55,25 +53,37 @@
                 <RadzenButton Text="Stop Monitoring" ButtonStyle="ButtonStyle.Warning" Icon="stop"
                               Click="@StopMonitoringAsync" IsBusy="_saving" />
             }
+            else
+            {
+                <RadzenButton Text="Start Monitoring" ButtonStyle="ButtonStyle.Success" Icon="play_arrow"
+                              Click="@StartMonitoringAsync" IsBusy="_saving" />
+            }
         </div>
     }
     else
     {
-        @* Create form — only shown when no active window exists *@
+        @* Create / Edit form — _editing=true means updating an existing window *@
+        @if (_editing)
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Warning" ShowIcon="true" class="rz-mb-3">
+                Saving a new schedule replaces the current one. Today's session will be restarted.
+            </RadzenAlert>
+        }
+
         <RadzenText TextStyle="TextStyle.Caption" class="rz-mb-2">Days of week:</RadzenText>
-        <div class="rz-mb-3">
+        <div class="rz-display-flex rz-wrap rz-gap-3 rz-mb-3">
             @foreach ((string name, byte bit) in _days)
             {
-                <label class="rz-mr-3">
-                    <input type="checkbox" checked="@_selectedDays[name]"
-                           @onchange="@(e => _selectedDays[name] = (bool)(e.Value ?? false))" />
-                    @name
-                </label>
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.3rem">
+                    <RadzenCheckBox TValue="bool" Value="_selectedDays[name]"
+                                    Change="@(v => _selectedDays[name] = v)" />
+                    <RadzenText TextStyle="TextStyle.Body2" Style="margin:0;cursor:pointer;">@name</RadzenText>
+                </RadzenStack>
             }
         </div>
 
         <div class="rz-display-flex rz-gap-4 rz-mb-3">
-            <RadzenFormField Text="Start Time">
+            <RadzenFormField Text="Start Time" class="rz-mr-3">
                 <RadzenDatePicker @bind-Value="_startTime" ShowTime="true" DateFormat="HH:mm" />
             </RadzenFormField>
             <RadzenFormField Text="End Time">
@@ -86,8 +96,15 @@
             <RadzenAlert AlertStyle="AlertStyle.Danger" class="rz-mb-2">@_error</RadzenAlert>
         }
 
-        <RadzenButton Text="Save Window" ButtonStyle="ButtonStyle.Primary"
-                      Click="@SaveWindowAsync" IsBusy="_saving" />
+        <div class="rz-display-flex rz-gap-2">
+            <RadzenButton Text="@(_editing ? "Save Changes" : "Save Schedule")" ButtonStyle="ButtonStyle.Primary"
+                          Click="@SaveWindowAsync" IsBusy="_saving" />
+            @if (_editing)
+            {
+                <RadzenButton Text="Cancel" ButtonStyle="ButtonStyle.Light"
+                              Click="@CancelEditing" />
+            }
+        </div>
     }
 </RadzenFieldset>
 
@@ -97,9 +114,11 @@
 
     private bool _loadingWindows = true;
     private bool _saving;
+    private bool _editing;
     private MonitoringWindowDto? _activeWindow;
     private SessionDto? _activeSession;
     private string _error = "";
+    private string _loadError = "";
 
     private DateTime? _startTime = DateTime.Today.AddHours(7);
     private DateTime? _endTime = DateTime.Today.AddHours(9);
@@ -119,25 +138,19 @@
     protected override async Task OnParametersSetAsync()
     {
         await LoadWindowAsync();
-
-        if (_activeWindow is not null && _activeSession is null)
-        {
-            await StartMonitoringAsync();
-        }
     }
 
     private async Task LoadWindowAsync()
     {
         _loadingWindows = true;
         _error = "";
+        _loadError = "";
         try
         {
-            // Load window configuration
             var windows = await Http.GetFromJsonAsync<List<MonitoringWindowDto>>(
                 $"/api/routes/{RouteId}/windows");
             _activeWindow = windows?.FirstOrDefault(w => w.IsActive);
 
-            // Load today's active session (if any)
             _activeSession = null;
             if (_activeWindow is not null)
             {
@@ -148,8 +161,40 @@
                     s => s.State == SessionState.Active && s.SessionDate == today);
             }
         }
-        catch { /* silently handled */ }
-        finally { _loadingWindows = false; }
+        catch
+        {
+            _loadError = "Failed to load monitoring configuration. Please refresh the page.";
+        }
+        finally
+        {
+            _loadingWindows = false;
+        }
+    }
+
+    private void StartEditing()
+    {
+        _editing = true;
+        _error = "";
+        // Pre-populate form with existing window values
+        if (_activeWindow is not null)
+        {
+            if (TimeSpan.TryParse(_activeWindow.StartTime, out var start))
+                _startTime = DateTime.Today + start;
+            if (TimeSpan.TryParse(_activeWindow.EndTime, out var end))
+                _endTime = DateTime.Today + end;
+
+            foreach (var (name, bit) in _days)
+                _selectedDays[name] = false;
+            foreach (string day in _activeWindow.DaysOfWeek)
+                if (_selectedDays.ContainsKey(day[..3]))
+                    _selectedDays[day[..3]] = true;
+        }
+    }
+
+    private void CancelEditing()
+    {
+        _editing = false;
+        _error = "";
     }
 
     private async Task StartMonitoringAsync()
@@ -213,6 +258,12 @@
         _saving = true;
         try
         {
+            // C3/UX-7: Delete existing window first if editing — hide this mechanic from the user
+            if (_editing && _activeWindow is not null)
+            {
+                await Http.DeleteAsync($"/api/routes/{RouteId}/windows/{_activeWindow.Id}");
+            }
+
             HttpResponseMessage resp = await Http.PostAsJsonAsync(
                 $"/api/routes/{RouteId}/windows",
                 new
@@ -224,14 +275,14 @@
 
             if (resp.IsSuccessStatusCode)
             {
+                _editing = false;
                 await LoadWindowAsync();
                 await OnSaved.InvokeAsync();
             }
             else
-                _error = "Failed to save window. Please try again.";
+                _error = "Failed to save schedule. Please try again.";
         }
         catch { _error = "Unable to connect. Please try again."; }
         finally { _saving = false; }
     }
-
 }

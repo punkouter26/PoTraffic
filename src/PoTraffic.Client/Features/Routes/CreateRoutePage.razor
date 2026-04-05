@@ -25,11 +25,9 @@
     </RadzenFormField>
     <div class="rz-mb-3"></div>
 
-    <RadzenFormField Text="Provider" class="rz-w-100 rz-mb-4">
-        <RadzenDropDown @bind-Value="_provider"
-                        Data="@_providers"
-                        TextProperty="Label" ValueProperty="Value"
-                        Style="width:100%" />
+    <RadzenFormField Text="Traffic Provider" class="rz-w-100 rz-mb-3">
+        <RadzenDropDown @bind-Value="_provider" Data="_providers"
+                        TextProperty="Label" ValueProperty="Value" Style="width:100%;" />
     </RadzenFormField>
 
     <RadzenFieldset Text="Monitoring Schedule" class="rz-mb-4">
@@ -64,7 +62,6 @@
 @code {
     private string _origin = string.Empty;
     private string _destination = string.Empty;
-    private int _provider = 0; // GoogleMaps
     // Default start = now + 1 minute (truncated to the minute), end = start + 15 minutes
     private DateTime? _startTime = Truncate(DateTime.Now.AddMinutes(1));
     private DateTime? _endTime  = Truncate(DateTime.Now.AddMinutes(16));
@@ -73,9 +70,9 @@
         new(dt.Year, dt.Month, dt.Day, dt.Hour, dt.Minute, 0);
     private string _error = "";
     private bool _loading;
-
-    private List<ProviderItem> _providers = new();
-    private record ProviderItem(int Value, string Label);
+    private int _provider;
+    private List<ProviderOption> _providers = [];
+    private record ProviderOption(int Value, string Label);
 
     private readonly (string label, byte bit)[] _days =
     [
@@ -92,14 +89,14 @@
     {
         try
         {
-            var result = await Http.GetFromJsonAsync<List<ProviderItem>>("/api/routes/providers");
-            if (result != null) _providers = result;
+            var items = await Http.GetFromJsonAsync<List<System.Text.Json.JsonElement>>("/api/routes/providers");
+            if (items is not null)
+                _providers = items
+                    .Select(e => new ProviderOption(e.GetProperty("value").GetInt32(), e.GetProperty("label").GetString() ?? "Unknown"))
+                    .ToList();
+            if (_providers.Count > 0) _provider = _providers[0].Value;
         }
-        catch
-        {
-            // Fallback for static safety
-            _providers = [new(0, "Google Maps"), new(1, "TomTom")];
-        }
+        catch { /* providers list stays empty; user will see an empty dropdown */ }
     }
 
     private async Task SaveAsync()

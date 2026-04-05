@@ -1,64 +1,90 @@
 @page "/admin"
 @attribute [Authorize(Roles = "Administrator")]
 @inject HttpClient Http
-@inject NavigationManager Nav
 
-<PageTitle>Admin — User Usage</PageTitle>
+<PageTitle>Admin — Usage &amp; Volatility</PageTitle>
 
 <RadzenCard class="rz-p-6 rz-mt-4">
     <RadzenText TextStyle="TextStyle.H5" class="rz-mb-2">Admin Tools</RadzenText>
-    <RadzenText TextStyle="TextStyle.Body2" class="rz-mb-4">
-        Secondary diagnostics and test functionality for administrators.
-    </RadzenText>
+    <AdminNavBar ActivePage="Usage" />
 
-    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" Wrap="FlexWrap.Wrap" class="rz-mb-4">
-        <RadzenButton Text="Usage Insights" ButtonStyle="ButtonStyle.Light" Icon="people"
-                      Click="@(() => Nav.NavigateTo("/admin"))" />
-        <RadzenButton Text="Global Volatility" ButtonStyle="ButtonStyle.Light" Icon="analytics"
-                      Click="@(() => Nav.NavigateTo("/admin/volatility"))" />
-        <RadzenButton Text="Diagnostics" ButtonStyle="ButtonStyle.Light" Icon="build"
-                      Click="@(() => Nav.NavigateTo("/diag"))" />
-        <RadzenButton Text="Triple Test" ButtonStyle="ButtonStyle.Light" Icon="science"
-                      Click="@(() => Nav.NavigateTo("/admin/triple-test"))" />
-        <RadzenButton Text="System Seed" ButtonStyle="ButtonStyle.Light" Icon="database"
-                      Click="@(() => Nav.NavigateTo("/admin/seed"))" />
-    </RadzenStack>
+    <RadzenTabs>
+        <Tabs>
+            <RadzenTabsItem Text="Usage Insights" Icon="people">
+                <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2 rz-mt-3">Daily Usage</RadzenText>
+                <LoadingErrorCard IsLoading="_loading" Error="@_error">
+                    <RadzenDataGrid Data="_users" TItem="UserDailyUsageDto" AllowSorting="true" AllowFiltering="true"
+                                    PageSize="25" AllowPaging="true" class="rz-mt-2">
+                        <Columns>
+                            <RadzenDataGridColumn TItem="UserDailyUsageDto" Property="Email" Title="Email" />
+                            <RadzenDataGridColumn TItem="UserDailyUsageDto" Property="Locale" Title="Locale" Width="80px" />
+                            <RadzenDataGridColumn TItem="UserDailyUsageDto" Property="TodayPollCount" Title="Polls Today" Width="110px" />
+                            <RadzenDataGridColumn TItem="UserDailyUsageDto" Property="TodayEstimatedCostUsd" Title="Est. Cost (USD)" Width="130px">
+                                <Template Context="u">
+                                    @u.TodayEstimatedCostUsd.ToString("C4")
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="UserDailyUsageDto" Property="LastLoginAt" Title="Last Login">
+                                <Template Context="u">
+                                    @(u.LastLoginAt?.ToString("yyyy-MM-dd HH:mm") ?? "—")
+                                </Template>
+                            </RadzenDataGridColumn>
+                        </Columns>
+                    </RadzenDataGrid>
+                </LoadingErrorCard>
+            </RadzenTabsItem>
 
-    <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">Daily Usage</RadzenText>
-
-    <LoadingErrorCard IsLoading="_loading" Error="@_error">
-        <RadzenDataGrid Data="_users" TItem="UserDailyUsageDto" AllowSorting="true" AllowFiltering="true"
-                        PageSize="25" AllowPaging="true" class="rz-mt-2">
-            <Columns>
-                <RadzenDataGridColumn TItem="UserDailyUsageDto" Property="Email" Title="Email" />
-                <RadzenDataGridColumn TItem="UserDailyUsageDto" Property="Locale" Title="Locale" Width="80px" />
-                <RadzenDataGridColumn TItem="UserDailyUsageDto" Property="TodayPollCount" Title="Polls Today" Width="110px" />
-                <RadzenDataGridColumn TItem="UserDailyUsageDto" Property="TodayEstimatedCostUsd" Title="Est. Cost (USD)" Width="130px">
-                    <Template Context="u">
-                        @u.TodayEstimatedCostUsd.ToString("C4")
-                    </Template>
-                </RadzenDataGridColumn>
-                <RadzenDataGridColumn TItem="UserDailyUsageDto" Property="LastLoginAt" Title="Last Login">
-                    <Template Context="u">
-                        @(u.LastLoginAt?.ToString("yyyy-MM-dd HH:mm") ?? "—")
-                    </Template>
-                </RadzenDataGridColumn>
-            </Columns>
-        </RadzenDataGrid>
-    </LoadingErrorCard>
+            <RadzenTabsItem Text="Global Volatility" Icon="analytics">
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-mt-3 rz-mb-4">Mean travel time across all active routes — past 24 hours</RadzenText>
+                <LoadingErrorCard IsLoading="_volLoading" Error="@_volError">
+                    @if (_points.Count == 0 && !_volLoading)
+                    {
+                        <RadzenAlert AlertStyle="AlertStyle.Info" Text="No volatility data for the past 24 hours." />
+                    }
+                    else
+                    {
+                        <RadzenChart Style="height:280px">
+                            <RadzenLineSeries Data="_points" CategoryProperty="PolledAt"
+                                              ValueProperty="MeanDurationSeconds"
+                                              Title="Mean Duration (s)" Smooth="true">
+                                <TooltipTemplate Context="p">
+                                    <div>@(Math.Round(p.MeanDurationSeconds / 60, 1)) min · @p.RouteCount route(s)</div>
+                                </TooltipTemplate>
+                            </RadzenLineSeries>
+                            <RadzenCategoryAxis FormatString="{0:HH:mm}" />
+                            <RadzenValueAxis>
+                                <RadzenGridLines Visible="true" />
+                                <RadzenAxisTitle Text="Duration (s)" />
+                            </RadzenValueAxis>
+                        </RadzenChart>
+                    }
+                </LoadingErrorCard>
+            </RadzenTabsItem>
+        </Tabs>
+    </RadzenTabs>
 </RadzenCard>
 
 @code {
+    // ── Usage tab ──────────────────────────────────────────────────────────────
     private List<UserDailyUsageDto> _users = [];
     private bool _loading = true;
     private string? _error;
 
+    // ── Volatility tab ─────────────────────────────────────────────────────────
+    private List<RecentVolatilityPointDto> _points = [];
+    private bool _volLoading = true;
+    private string? _volError;
+
     protected override async Task OnInitializedAsync()
+    {
+        await Task.WhenAll(LoadUsageAsync(), LoadVolatilityAsync());
+    }
+
+    private async Task LoadUsageAsync()
     {
         try
         {
-            _users = await Http.GetFromJsonAsync<List<UserDailyUsageDto>>("/api/admin/users")
-                     ?? [];
+            _users = await Http.GetFromJsonAsync<List<UserDailyUsageDto>>("/api/admin/users") ?? [];
         }
         catch (Exception ex)
         {
@@ -67,6 +93,23 @@
         finally
         {
             _loading = false;
+        }
+    }
+
+    private async Task LoadVolatilityAsync()
+    {
+        try
+        {
+            _points = await Http.GetFromJsonAsync<List<RecentVolatilityPointDto>>(
+                "/api/admin/global-volatility/recent?hours=24") ?? [];
+        }
+        catch (Exception ex)
+        {
+            _volError = $"Failed to load volatility data: {ex.Message}";
+        }
+        finally
+        {
+            _volLoading = false;
         }
     }
 }

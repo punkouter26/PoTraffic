@@ -6,14 +6,6 @@
 <div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
         <a class="navbar-brand" href="dashboard">PoTraffic</a>
-        <AuthorizeView>
-            <Authorized>
-                <span class="navbar-user-email text-white opacity-75 small me-2">
-                    @(context.User.FindFirst("email")?.Value
-                      ?? context.User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value)
-                </span>
-            </Authorized>
-        </AuthorizeView>
         <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
             <span class="navbar-toggler-icon"></span>
         </button>
@@ -30,16 +22,6 @@
                         <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Dashboard
                     </NavLink>
                 </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="routes">
-                        <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> My Routes
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="account/settings">
-                        <span class="bi bi-gear-fill-nav-menu" aria-hidden="true"></span> Settings
-                    </NavLink>
-                </div>
 
                 <AuthorizeView Roles="Administrator">
                     <Authorized Context="adminContext">
@@ -52,12 +34,6 @@
                         </div>
                     </Authorized>
                 </AuthorizeView>
-
-                <div class="nav-separator"></div>
-                <div class="nav-item px-3 rz-mt-4">
-                    <RadzenButton class="rz-w-100" ButtonStyle="ButtonStyle.Light" Text="Sign Out" Icon="logout"
-                                  Click="LogoutAsync" />
-                </div>
             </Authorized>
 
             <NotAuthorized>
@@ -84,14 +60,5 @@
     private void ToggleNavMenu()
     {
         collapseNavMenu = !collapseNavMenu;
-    }
-
-    private async Task LogoutAsync()
-    {
-        if (AuthStateProvider is JwtAuthenticationStateProvider jwtProvider)
-        {
-            await jwtProvider.LogoutAsync();
-        }
-        Nav.NavigateTo("/login", forceLoad: true);
     }
 }

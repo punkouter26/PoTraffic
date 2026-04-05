@@ -12,8 +12,6 @@
     <ProjectReference Include="..\PoTraffic.Shared\PoTraffic.Shared.csproj" />
     <!-- Blazor WASM hosted client assets -->
     <ProjectReference Include="..\PoTraffic.Client\PoTraffic.Client.csproj" />
-    <!-- Aspire service defaults (OpenTelemetry OTLP, service discovery, health check wiring) -->
-    <ProjectReference Include="..\PoTraffic.ServiceDefaults\PoTraffic.ServiceDefaults.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -42,10 +40,22 @@
     <!-- OpenTelemetry -->
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
     <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
     <PackageReference Include="Azure.Monitor.OpenTelemetry.Exporter" />
+    <!-- HTTP resilience -->
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
     <!-- Password hashing -->
     <PackageReference Include="BCrypt.Net-Next" />
     <PackageReference Include="Serilog.Sinks.File" />
+    <!-- App Insights Serilog sink (Amendment — structured logs to App Insights) -->
+    <PackageReference Include="Serilog.Sinks.ApplicationInsights" />
+    <!-- Health checks -->
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" />
+    <PackageReference Include="AspNetCore.HealthChecks.Uris" />
+    <!-- OpenAPI / Scalar UI -->
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Scalar.AspNetCore" />
   </ItemGroup>
 
 </Project>

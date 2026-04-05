@@ -1,0 +1,14 @@
+@inject NavigationManager Nav
+
+<RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" Wrap="FlexWrap.Wrap" class="rz-mb-4">
+    <RadzenButton Text="Usage Insights" ButtonStyle="ButtonStyle.Light" Icon="people"
+                  Click="@(() => Nav.NavigateTo("/admin"))"
+                  Variant="@(ActivePage == "Usage" ? Variant.Filled : Variant.Outlined)" />
+    <RadzenButton Text="Diagnostics" ButtonStyle="ButtonStyle.Light" Icon="build"
+                  Click="@(() => Nav.NavigateTo("/diag"))"
+                  Variant="@(ActivePage == "Diag" ? Variant.Filled : Variant.Outlined)" />
+</RadzenStack>
+
+@code {
+    [Parameter] public string ActivePage { get; set; } = string.Empty;
+}

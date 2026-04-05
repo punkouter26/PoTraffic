@@ -8,7 +8,9 @@ using Hangfire;
 using Hangfire.Dashboard;
 using Hangfire.SqlServer;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -29,6 +31,7 @@ using PoTraffic.Api.Infrastructure.Providers;
 using PoTraffic.Api.Infrastructure.Security;
 using PoTraffic.Api.Infrastructure.Testing;
 using PoTraffic.Shared.Enums;
+using Scalar.AspNetCore;
 using Serilog;
 
 // ── Serilog bootstrap (MEL-only; all app code uses ILogger<T>) ───────────────
@@ -48,14 +51,45 @@ try
     if (builder.Environment.IsEnvironment("Testing"))
         builder.WebHost.UseStaticWebAssets();
 
-    // ── Aspire service defaults (OTLP exporter, service discovery, HTTP resilience) ─
-    builder.AddServiceDefaults();
+    // ── OpenTelemetry (no Aspire — wired directly) ──────────────────────────────────────
+    builder.Logging.AddOpenTelemetry(logging =>
+    {
+        logging.IncludeFormattedMessage = true;
+        logging.IncludeScopes = true;
+    });
+    builder.Services.AddOpenTelemetry()
+        .ConfigureResource(r => r.AddService("PoTraffic.Api"))
+        .WithMetrics(metrics => metrics
+            .AddMeter("Microsoft.AspNetCore.Hosting")
+            .AddMeter("Microsoft.AspNetCore.Server.Kestrel"))
+        .WithTracing(tracing =>
+        {
+            tracing
+                .AddAspNetCoreInstrumentation()
+                .AddHttpClientInstrumentation();
+            if (!string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]))
+                tracing.AddOtlpExporter();
+        });
+
+    // HTTP client resilience defaults
+    builder.Services.ConfigureHttpClientDefaults(http => http.AddStandardResilienceHandler());
 
     // ── Serilog as sole MEL backend (Amendment v1.1.0) ───────────────────────
     builder.Host.UseSerilog((ctx, services, cfg) =>
+    {
         cfg.ReadFrom.Configuration(ctx.Configuration)
            .ReadFrom.Services(services)
-           .Enrich.FromLogContext());
+           .Enrich.FromLogContext();
+
+        // App Insights Serilog sink — wired only when connection string is present
+        string? aiConnStr = ctx.Configuration["ApplicationInsights:ConnectionString"];
+        if (!string.IsNullOrWhiteSpace(aiConnStr))
+        {
+            cfg.WriteTo.ApplicationInsights(
+                new Microsoft.ApplicationInsights.Extensibility.TelemetryConfiguration { ConnectionString = aiConnStr },
+                TelemetryConverter.Traces);
+        }
+    });
 
     // ── Azure Key Vault (optional; skipped when VaultUri is empty) ───────────
     // PrefixKeyVaultSecretManager strips the "PoTraffic--" namespace prefix so that
@@ -85,6 +119,14 @@ try
         options.UseSqlServer(
             connectionString,
             sql => sql.EnableRetryOnFailure(maxRetryCount: 5)));
+
+    // ── Health checks — real connection pings (DB + external APIs) ───────────
+    builder.Services.AddHealthChecks()
+        .AddDbContextCheck<PoTrafficDbContext>(name: "sql-server", tags: ["ready"])
+        .AddUrlGroup(new Uri("https://maps.googleapis.com/maps/api/js"), name: "google-maps",
+            tags: ["ready"], timeout: TimeSpan.FromSeconds(5))
+        .AddUrlGroup(new Uri("https://api.tomtom.com"), name: "tomtom",
+            tags: ["ready"], timeout: TimeSpan.FromSeconds(5));
 
     // ── Hangfire (Amendment v1.1.0) ───────────────────────────────────────────
     builder.Services.AddHangfire(cfg => cfg
@@ -182,9 +224,13 @@ try
             p.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()));
 
     // ── Traffic providers — Strategy pattern, keyed by RouteProvider enum ────
-    if (builder.Environment.IsEnvironment("Testing"))
+    // Use mock providers in Testing or when Features:UseMockProviders is true (local dev without API keys)
+    bool useMockProviders = builder.Environment.IsEnvironment("Testing")
+        || builder.Configuration.GetValue<bool>("Features:UseMockProviders");
+
+    if (useMockProviders)
     {
-        // Integration/E2E isolation — replace production providers with mocks
+        // Integration/E2E isolation or local dev — replace production providers with mocks
         // Strategy pattern — swapping implementations per environment
         builder.Services.AddKeyedScoped<ITrafficProvider, MockTrafficProvider>(RouteProvider.GoogleMaps);
         builder.Services.AddKeyedScoped<ITrafficProvider, MockTrafficProvider>(RouteProvider.TomTom);
@@ -204,6 +250,9 @@ try
     // Chain of Responsibility pattern — GlobalExceptionHandler maps ValidationException → 422
     builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
+    // ── OpenAPI (Scalar UI) ───────────────────────────────────────────────────
+    builder.Services.AddOpenApi();
+
     WebApplication app = builder.Build();
 
     // ── Exception handling ────────────────────────────────────────────────────
@@ -214,6 +263,9 @@ try
     if (app.Environment.IsDevelopment())
     {
         app.UseDeveloperExceptionPage();
+        // OpenAPI document at /openapi/v1.json; Scalar UI at /scalar/v1
+        app.MapOpenApi();
+        app.MapScalarApiReference();
     }
 
     app.UseStatusCodePages();
@@ -226,6 +278,10 @@ try
     // ── Auth middleware ───────────────────────────────────────────────────────
     app.UseAuthentication();
     app.UseAuthorization();
+
+    // ── Log context enrichment — pushes UserId and Environment into every log event ──
+    // Ensures Serilog + OTel log entries carry these properties in all sinks.
+    app.UseMiddleware<LogContextEnrichmentMiddleware>();
 
     // ── Hangfire dashboard ────────────────────────────────────────────────────
     string dashboardPath = app.Configuration["Hangfire:DashboardPath"] ?? "/hangfire";
@@ -252,10 +308,26 @@ try
     // Error endpoint
     app.MapGet("/error", () => Results.Problem()).ExcludeFromDescription();
 
-    // Placeholder health-check
-    app.MapGet("/health", () => Results.Ok(new { status = "healthy" }))
-       .WithName("HealthCheck")
-       .AllowAnonymous();
+    // Health check endpoint — pings DB and external APIs, returns JSON status per dependency
+    app.MapHealthChecks("/health", new HealthCheckOptions
+    {
+        ResponseWriter = async (ctx, report) =>
+        {
+            ctx.Response.ContentType = "application/json";
+            string result = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                status  = report.Status.ToString(),
+                entries = report.Entries.Select(e => new
+                {
+                    name        = e.Key,
+                    status      = e.Value.Status.ToString(),
+                    description = e.Value.Description,
+                    durationMs  = e.Value.Duration.TotalMilliseconds
+                })
+            });
+            await ctx.Response.WriteAsync(result);
+        }
+    }).AllowAnonymous();
 
     // ── Serve Blazor WASM fallback (non-API requests) ─────────────────────────
     app.MapStaticAssets();

@@ -1,0 +1,177 @@
+@using System.Net.Http.Json
+@using PoTraffic.Shared.DTOs.Routes
+@using PoTraffic.Shared.DTOs.History
+@using PoTraffic.Shared.Enums
+@inject HttpClient Http
+@inject NavigationManager Nav
+@inject NotificationService NotificationService
+@inject DialogService DialogService
+
+@* UI-1/2/3/8: Route Card — combines optimal departure hero, ambient traffic color, and Check Now *@
+<div class="pt-route-card @AmbientClass">
+    <div class="pt-route-card-header">
+        <div class="pt-route-card-main">
+
+            @* UI-2: Optimal departure is the prominent headline *@
+            @if (OptimalDeparture is not null)
+            {
+                <div class="pt-departure-hero">
+                    ⏰ @_departureLabel
+                    @if (OptimalDeparture.LowerBound.HasValue && OptimalDeparture.UpperBound.HasValue)
+                    {
+                        <span class="pt-departure-sub">
+                            (@((OptimalDeparture.LowerBound.Value / 60).ToString("F0"))–@((OptimalDeparture.UpperBound.Value / 60).ToString("F0")) min range)
+                        </span>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="pt-departure-pending">Still building your baseline…</div>
+            }
+
+            @* Origin → Destination *@
+            <div class="pt-route-addresses">
+                <span class="pt-route-addr-from">@_originStreet</span>
+                <span class="pt-route-addr-arrow">→</span>
+                <span class="pt-route-addr-to">@_destStreet</span>
+            </div>
+        </div>
+
+        @* Status badge *@
+        <div style="flex-shrink:0;">
+            <RadzenBadge BadgeStyle="@(Route.MonitoringStatus == MonitoringStatus.Active ? BadgeStyle.Success : BadgeStyle.Warning)"
+                         Text="@Route.MonitoringStatus.ToString()" />
+        </div>
+    </div>
+
+    <div class="pt-route-card-meta">
+        @* Provider badge *@
+        <RadzenBadge BadgeStyle="@(Route.Provider == RouteProvider.GoogleMaps ? BadgeStyle.Primary : BadgeStyle.Secondary)"
+                     Text="@Route.Provider.ToString()" IsPill="true" />
+
+        @* Schedule from first active window *@
+        @if (_scheduleLabel is not null)
+        {
+            <span class="pt-route-schedule">@_scheduleLabel</span>
+        }
+
+        <div class="pt-route-card-actions">
+            @* UX-8: Check Now inline — no separate page needed *@
+            <RadzenButton Text="Check Now" Icon="search" Size="ButtonSize.Small"
+                          ButtonStyle="ButtonStyle.Light"
+                          Click="@CheckNowAsync" IsBusy="_checkingNow"
+                          Tooltip="Poll current travel time immediately" />
+            <RadzenButton Text="Details" Icon="arrow_forward" Size="ButtonSize.Small"
+                          ButtonStyle="ButtonStyle.Primary"
+                          Click="@(() => Nav.NavigateTo($"/routes/{Route.Id}"))" />
+            <RadzenButton Icon="delete" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Danger"
+                          Click="@DeleteAsync" Tooltip="Delete route" />
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public RouteDto Route { get; set; } = default!;
+    [Parameter] public OptimalDepartureDto? OptimalDeparture { get; set; }
+    [Parameter] public EventCallback OnDeleted { get; set; }
+    [Parameter] public EventCallback OnRefresh { get; set; }
+
+    private bool _checkingNow;
+    private string _originStreet = string.Empty;
+    private string _destStreet = string.Empty;
+    private string? _scheduleLabel;
+    private string _departureLabel = string.Empty;
+
+    // UI-3: Ambient color computed from monitoring status + whether we have a departure recommendation
+    private string AmbientClass => Route.MonitoringStatus switch
+    {
+        MonitoringStatus.Active when OptimalDeparture is not null => "pt-ambient-green",
+        MonitoringStatus.Active => "pt-ambient-blue",
+        MonitoringStatus.Paused => "pt-ambient-amber",
+        _ => "pt-ambient-slate"
+    };
+
+    protected override void OnParametersSet()
+    {
+        // Parse origin address to street line only
+        var originParts = Route.OriginAddress.Split(',');
+        _originStreet = originParts[0].Trim();
+
+        var destParts = Route.DestinationAddress.Split(',');
+        _destStreet = destParts[0].Trim();
+
+        // Build schedule label from first active window
+        var window = Route.Windows.FirstOrDefault(w => w.IsActive);
+        if (window is not null)
+        {
+            string days = string.Join(", ", window.DaysOfWeek.Select(d => d.Length >= 3 ? d[..3] : d));
+            _scheduleLabel = $"{days} · {window.StartTime[..5]}–{window.EndTime[..5]}";
+        }
+
+        // Format optimal departure label
+        if (OptimalDeparture is not null)
+        {
+            int h = OptimalDeparture.TimeSlotBucket / 60;
+            int m = OptimalDeparture.TimeSlotBucket % 60;
+            string period = h >= 12 ? "PM" : "AM";
+            int displayH = h > 12 ? h - 12 : (h == 0 ? 12 : h);
+            int estMin = (int)(OptimalDeparture.PredictedDurationSeconds / 60);
+            _departureLabel = $"Leave by {displayH}:{m:D2} {period} — ~{estMin} min";
+        }
+    }
+
+    private async Task CheckNowAsync()
+    {
+        _checkingNow = true;
+        try
+        {
+            HttpResponseMessage resp = await Http.PostAsync($"/api/routes/{Route.Id}/check-now", null);
+            if (resp.IsSuccessStatusCode)
+            {
+                CheckNowResponse? data = await resp.Content.ReadFromJsonAsync<CheckNowResponse>();
+                string detail = data is not null
+                    ? $"{data.DurationSeconds / 60} min — {data.DistanceMetres / 1000.0:F1} km"
+                    : "Live travel time retrieved";
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Info,
+                    Summary = "Current travel time",
+                    Detail = detail,
+                    Duration = 6000
+                });
+                await OnRefresh.InvokeAsync();
+            }
+            else
+            {
+                string errorDetail = resp.StatusCode == System.Net.HttpStatusCode.ServiceUnavailable
+                    ? "Traffic provider unavailable — try again later."
+                    : $"Request failed ({(int)resp.StatusCode}).";
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Check Now failed",
+                    Detail = errorDetail,
+                    Duration = 5000
+                });
+            }
+        }
+        finally { _checkingNow = false; }
+    }
+
+    private async Task DeleteAsync()
+    {
+        bool? confirmed = await DialogService.Confirm(
+            $"Delete route from {Route.OriginAddress} to {Route.DestinationAddress}?",
+            "Confirm Delete",
+            new ConfirmOptions { OkButtonText = "Delete", CancelButtonText = "Cancel" });
+
+        if (confirmed == true)
+        {
+            await Http.DeleteAsync($"/api/routes/{Route.Id}");
+            await OnDeleted.InvokeAsync();
+        }
+    }
+
+    private sealed record CheckNowResponse(int DurationSeconds, int DistanceMetres);
+}

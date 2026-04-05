@@ -1,5 +1,7 @@
 html, body {
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 15px;
+    -webkit-font-smoothing: antialiased;
 }
 
 h1:focus {
@@ -112,4 +114,523 @@ code {
 
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
     text-align: start;
+}
+
+/* ═══════════════════════════════════════════════
+   Po3UiUx UI-2: Design System Tokens
+═══════════════════════════════════════════════ */
+:root {
+    --pt-brand-primary: #3b82f6;
+    --pt-brand-surface: #f8fafc;
+    --pt-brand-sidebar: #0f172a;
+    --pt-accent-indigo: #6366f1;
+    --pt-accent-emerald: #10b981;
+    --pt-accent-amber: #f59e0b;
+    --pt-accent-rose: #f43f5e;
+    --pt-card-radius: 12px;
+}
+
+/* ═══════════════════════════════════════════════
+   Po3UiUx UI-5: Micro-animations
+═══════════════════════════════════════════════ */
+@keyframes pt-slide-up {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pt-shimmer {
+    0%   { background-position: -200% 0; }
+    100% { background-position:  200% 0; }
+}
+
+@keyframes pt-pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
+    70%  { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+article.content {
+    animation: pt-slide-up 0.2s ease;
+}
+
+.pt-skeleton {
+    background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+    background-size: 200% 100%;
+    animation: pt-shimmer 1.4s infinite;
+    border-radius: 6px;
+    height: 1rem;
+    width: 100%;
+}
+
+.pt-poll-live {
+    display: inline-block;
+    animation: pt-pulse 2s infinite;
+    border-radius: 4px;
+    padding: 2px 6px;
+}
+
+/* ═══════════════════════════════════════════════
+   Po3UiUx UI-1: KPI Stat Strip (Dashboard)
+═══════════════════════════════════════════════ */
+.pt-kpi-strip {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+@media (max-width: 900px) {
+    .pt-kpi-strip { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 480px) {
+    .pt-kpi-strip { grid-template-columns: 1fr; }
+}
+
+.pt-kpi-card {
+    background: #fff;
+    border-radius: var(--pt-card-radius, 12px);
+    border-top: 4px solid var(--pt-kpi-color, #3b82f6);
+    padding: 1.25rem 1.5rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    transition: box-shadow 0.15s ease;
+}
+
+.pt-kpi-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.10);
+}
+
+.pt-kpi-card .pt-kpi-value {
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1.1;
+    color: #1e293b;
+    font-variant-numeric: tabular-nums;
+}
+
+.pt-kpi-card .pt-kpi-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: #94a3b8;
+}
+
+.pt-kpi-card .pt-kpi-sub {
+    font-size: 0.82rem;
+    color: #64748b;
+    margin-top: 0.15rem;
+}
+
+.pt-kpi-blue   { --pt-kpi-color: #3b82f6; }
+.pt-kpi-green  { --pt-kpi-color: #10b981; }
+.pt-kpi-amber  { --pt-kpi-color: #f59e0b; }
+.pt-kpi-indigo { --pt-kpi-color: #6366f1; }
+.pt-kpi-rose   { --pt-kpi-color: #f43f5e; }
+
+/* ═══════════════════════════════════════════════
+   Po3UiUx UI-3: Route Detail Stat Blocks
+═══════════════════════════════════════════════ */
+.pt-stat-strip {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.pt-stat-block {
+    background: var(--pt-brand-surface, #f8fafc);
+    border-radius: 8px;
+    padding: 0.875rem 1rem;
+    border-left: 3px solid var(--pt-stat-color, #3b82f6);
+}
+
+.pt-stat-block .pt-stat-value {
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: #1e293b;
+    line-height: 1.2;
+}
+
+.pt-stat-block .pt-stat-label {
+    font-size: 0.72rem;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-top: 0.15rem;
+}
+
+.pt-stat-blue  { --pt-stat-color: #3b82f6; }
+.pt-stat-green { --pt-stat-color: #10b981; }
+.pt-stat-amber { --pt-stat-color: #f59e0b; }
+
+/* ═══════════════════════════════════════════════
+   Po3UiUx UX-7: Breadcrumb navigation
+═══════════════════════════════════════════════ */
+.pt-breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.875rem;
+    color: #94a3b8;
+    margin-bottom: 1.25rem;
+}
+
+.pt-breadcrumb a {
+    color: #64748b;
+    text-decoration: none;
+    transition: color 0.15s ease;
+}
+
+.pt-breadcrumb a:hover {
+    color: var(--pt-brand-primary, #3b82f6);
+}
+
+.pt-breadcrumb .pt-breadcrumb-sep {
+    color: #cbd5e1;
+    user-select: none;
+}
+
+.pt-breadcrumb .pt-breadcrumb-current {
+    color: #334155;
+    font-weight: 500;
+}
+
+/* ═══════════════════════════════════════════════
+   C2: Compact Dashboard Status Bar
+═══════════════════════════════════════════════ */
+.pt-status-bar {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    padding: 0.6rem 1.1rem;
+    background: #fff;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.pt-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 0.3rem;
+    flex-shrink: 0;
+}
+
+.pt-status-dot-green { background: #10b981; }
+.pt-status-dot-amber { background: #f59e0b; }
+.pt-status-dot-red   { background: #f43f5e; }
+
+.pt-status-item {
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: #475569;
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+}
+
+.pt-status-sep {
+    color: #cbd5e1;
+    user-select: none;
+}
+
+.pt-status-bar-actions {
+    margin-left: auto;
+}
+
+/* ═══════════════════════════════════════════════
+   UI-1/2/3: Route Card (C1 Dashboard)
+═══════════════════════════════════════════════ */
+.pt-route-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.pt-route-card {
+    background: #fff;
+    border-radius: 14px;
+    border: 1px solid #e2e8f0;
+    border-left: 5px solid var(--pt-ambient-color, #3b82f6);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    transition: box-shadow 0.18s ease, transform 0.12s ease;
+    overflow: hidden;
+}
+
+.pt-route-card:hover {
+    box-shadow: 0 6px 20px rgba(0,0,0,0.10);
+    transform: translateY(-1px);
+}
+
+.pt-route-card-header {
+    padding: 1.1rem 1.4rem 0.75rem 1.4rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+}
+
+.pt-route-card-main {
+    flex: 1;
+    min-width: 0;
+}
+
+/* Optimal departure hero line — the most important insight */
+.pt-departure-hero {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.2;
+    margin-bottom: 0.35rem;
+}
+
+.pt-departure-sub {
+    font-size: 0.8rem;
+    color: #64748b;
+    font-weight: 400;
+}
+
+.pt-departure-pending {
+    font-size: 1rem;
+    font-weight: 500;
+    color: #94a3b8;
+    font-style: italic;
+    margin-bottom: 0.35rem;
+}
+
+.pt-route-addresses {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.82rem;
+    color: #64748b;
+    margin-top: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.pt-route-addr-from {
+    font-weight: 500;
+    color: #334155;
+}
+
+.pt-route-addr-arrow {
+    color: #cbd5e1;
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+
+.pt-route-addr-to {
+    font-weight: 500;
+    color: #334155;
+}
+
+.pt-route-card-meta {
+    padding: 0.55rem 1.4rem 0.9rem 1.4rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    border-top: 1px solid #f1f5f9;
+    flex-wrap: wrap;
+}
+
+.pt-route-schedule {
+    font-size: 0.76rem;
+    color: #94a3b8;
+    font-weight: 500;
+}
+
+.pt-route-card-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-left: auto;
+    flex-wrap: wrap;
+}
+
+/* Ambient traffic state colors */
+.pt-ambient-green  { --pt-ambient-color: #10b981; }
+.pt-ambient-amber  { --pt-ambient-color: #f59e0b; }
+.pt-ambient-red    { --pt-ambient-color: #f43f5e; }
+.pt-ambient-blue   { --pt-ambient-color: #3b82f6; }
+.pt-ambient-slate  { --pt-ambient-color: #94a3b8; }
+
+/* ═══════════════════════════════════════════════
+   UX-10: User chip in top bar
+═══════════════════════════════════════════════ */
+.pt-user-chip {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.pt-user-chip-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: rgba(15, 23, 42, 0.07);
+    border: 1px solid #e2e8f0;
+    border-radius: 99px;
+    padding: 0.3rem 0.75rem 0.3rem 0.5rem;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: #334155;
+    transition: background 0.15s;
+    font-family: inherit;
+}
+
+.pt-user-chip-btn:hover {
+    background: rgba(15, 23, 42, 0.12);
+}
+
+.pt-user-avatar {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #3b82f6, #6366f1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 0.7rem;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.pt-user-dropdown {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 8px);
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    min-width: 200px;
+    z-index: 9999;
+    overflow: hidden;
+    animation: pt-slide-up 0.12s ease;
+}
+
+.pt-user-dropdown-header {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 0.8rem;
+    color: #64748b;
+}
+
+.pt-user-dropdown-email {
+    font-weight: 600;
+    color: #0f172a;
+    font-size: 0.85rem;
+    word-break: break-all;
+}
+
+.pt-dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.65rem 1rem;
+    font-size: 0.85rem;
+    color: #334155;
+    cursor: pointer;
+    background: none;
+    border: none;
+    width: 100%;
+    text-align: left;
+    font-family: inherit;
+    transition: background 0.12s;
+    text-decoration: none;
+}
+
+.pt-dropdown-item:hover {
+    background: #f8fafc;
+    color: #0f172a;
+}
+
+.pt-dropdown-item.danger {
+    color: #ef4444;
+}
+
+.pt-dropdown-item.danger:hover {
+    background: #fef2f2;
+}
+
+.pt-dropdown-divider {
+    height: 1px;
+    background: #f1f5f9;
+    margin: 0.25rem 0;
+}
+
+/* ═══════════════════════════════════════════════
+   UX-9: Collapsible raw data section
+═══════════════════════════════════════════════ */
+.pt-collapsible-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    user-select: none;
+    padding: 0.5rem 0;
+    color: #64748b;
+    font-size: 0.85rem;
+    font-weight: 500;
+    border: none;
+    background: none;
+    font-family: inherit;
+}
+
+.pt-collapsible-header:hover {
+    color: #334155;
+}
+
+.pt-collapsible-icon {
+    display: inline-block;
+    transition: transform 0.2s ease;
+}
+
+.pt-collapsible-icon.open {
+    transform: rotate(90deg);
+}
+
+/* ═══════════════════════════════════════════════
+   P1/UI-2: Optimal Departure Hero Banner (Route Detail)
+═══════════════════════════════════════════════ */
+.pt-departure-banner {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+    border: 1px solid #6ee7b7;
+    border-radius: 12px;
+    padding: 1rem 1.4rem;
+    box-shadow: 0 2px 8px rgba(16,185,129,0.12);
+}
+
+.pt-departure-banner-icon {
+    font-size: 2rem;
+    flex-shrink: 0;
+}
+
+.pt-departure-banner-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: #065f46;
+    margin-bottom: 0.2rem;
+}
+
+.pt-departure-banner-time {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #064e3b;
+    line-height: 1.2;
 }

@@ -10,7 +10,8 @@ public sealed record GetPollHistoryQuery(
     Guid RouteId,
     Guid UserId,
     int Page,
-    int PageSize) : IRequest<PagedResult<PollRecordDto>>;
+    int PageSize,
+    DateTime? SinceUtc = null) : IRequest<PagedResult<PollRecordDto>>;
 
 public sealed class GetPollHistoryQueryHandler
     : IRequestHandler<GetPollHistoryQuery, PagedResult<PollRecordDto>>
@@ -29,7 +30,10 @@ public sealed class GetPollHistoryQueryHandler
         int skip = (query.Page - 1) * query.PageSize;
 
         var baseQuery = _db.PollRecords
-            .Where(p => p.RouteId == query.RouteId && !p.IsDeleted)
+            .Where(p => p.RouteId == query.RouteId
+                && p.Route.UserId == query.UserId   // ownership: prevents cross-user IDOR
+                && !p.IsDeleted
+                && (query.SinceUtc == null || p.PolledAt >= query.SinceUtc))
             .OrderByDescending(p => p.PolledAt);
 
         int total = await baseQuery.CountAsync(ct);

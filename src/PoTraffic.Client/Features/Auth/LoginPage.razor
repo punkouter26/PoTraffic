@@ -1,15 +1,15 @@
 @page "/login"
+@layout AuthLayout
 @using System.Net.Http.Json
 @using Microsoft.AspNetCore.Components.Authorization
-@using Microsoft.AspNetCore.Components.WebAssembly.Hosting
 @using PoTraffic.Client.Infrastructure.Auth
+@using PoTraffic.Client.Layout
 @using PoTraffic.Shared.DTOs.Auth
 @inject HttpClient Http
 @inject NavigationManager Nav
 @inject AuthenticationStateProvider AuthStateProvider
-@inject IWebAssemblyHostEnvironment HostEnvironment
 
-<RadzenCard Style="max-width:440px;margin:auto;margin-top:80px;">
+<RadzenCard class="rz-p-6">
     <RadzenText TextStyle="TextStyle.H5" class="rz-mb-4">Sign In</RadzenText>
 
     @if (!string.IsNullOrEmpty(_error))
@@ -28,10 +28,10 @@
     <RadzenButton Text="Sign In" ButtonStyle="ButtonStyle.Primary" class="rz-w-100"
                   Click="@LoginAsync" IsBusy="_loading" />
 
-    <RadzenButton Text="Continue with Google" ButtonStyle="ButtonStyle.Secondary" class="rz-w-100 rz-mt-2"
+    <RadzenButton Text="🔵  Continue with Google" ButtonStyle="ButtonStyle.Light" class="rz-w-100 rz-mt-2 auth-social-btn"
                   Click='() => StartExternalLogin("google")' Disabled="_loading" />
 
-    <RadzenButton Text="Continue with Microsoft" ButtonStyle="ButtonStyle.Secondary" class="rz-w-100 rz-mt-2"
+    <RadzenButton Text="🪟  Continue with Microsoft" ButtonStyle="ButtonStyle.Light" class="rz-w-100 rz-mt-2 auth-social-btn"
                   Click='() => StartExternalLogin("microsoft")' Disabled="_loading" />
 
     <RadzenText class="rz-mt-3">
@@ -44,16 +44,6 @@
     private string _password = string.Empty;
     private string _error = "";
     private bool _loading;
-
-    protected override void OnInitialized()
-    {
-        // Pre-fill dev admin credentials only in non-production environments
-        if (!HostEnvironment.IsProduction())
-        {
-            _email = "admin@potraffic.dev";
-            _password = "Admin123!";
-        }
-    }
 
     private async Task LoginAsync()
     {

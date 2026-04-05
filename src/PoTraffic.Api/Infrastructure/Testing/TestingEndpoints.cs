@@ -28,9 +28,9 @@ public static class TestingEndpoints
         this IEndpointRouteBuilder app,
         IWebHostEnvironment env)
     {
-        // Guard: only expose in the dedicated Testing environment.
-        // Production, Development, and Staging must never serve these endpoints.
-        if (!env.IsEnvironment("Testing"))
+        // Guard: only expose in the dedicated Testing environment AND in local Development.
+        // Production and Staging must never serve these endpoints.
+        if (!env.IsEnvironment("Testing") && !env.IsDevelopment())
             return app;
 
         RouteGroupBuilder group = app.MapGroup("/e2e").WithTags("E2E");

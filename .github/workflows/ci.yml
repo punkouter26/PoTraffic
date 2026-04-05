@@ -99,4 +99,4 @@ jobs:
         run: cd publish; zip -r ../publish.zip .
 
       - name: Deploy to Azure App Service (PoTraffic RG)
-        run: az webapp deploy --resource-group PoTraffic --name potraffic-shared-22602 --src-path ./publish.zip --type zip
+        run: az webapp deploy --resource-group PoTraffic --name potraffic-api --src-path ./publish.zip --type zip

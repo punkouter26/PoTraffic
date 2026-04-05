@@ -6,11 +6,13 @@
 @inject HttpClient Http
 @inject NavigationManager Nav
 
-<div class="rz-mb-4">
-    <RadzenText Style="display:inline;" Text="Dashboard" />
-    <RadzenText Style="display:inline;" Text=" > " />
-    <RadzenText Style="display:inline;" Text="Route Detail" />
-</div>
+<PageTitle>Route Detail — PoTraffic</PageTitle>
+
+<nav class="pt-breadcrumb" aria-label="breadcrumb">
+    <a href="/dashboard">Dashboard</a>
+    <span class="pt-breadcrumb-sep">›</span>
+    <span class="pt-breadcrumb-current">Route Detail</span>
+</nav>
 
 @if (_loading)
 {
@@ -18,47 +20,72 @@
 }
 else
 {
+    @* UI-2: Optimal departure is the headline — always visible, not hidden *@
     @if (_optimalDeparture is not null)
     {
-        <RadzenAlert AlertStyle="AlertStyle.Success" ShowIcon="true" class="rz-mb-3">
-            @($"⏰ {_optimalDepartureLabel}")
-        </RadzenAlert>
+        <div class="pt-departure-banner rz-mb-4">
+            <span class="pt-departure-banner-icon">⏰</span>
+            <div>
+                <div class="pt-departure-banner-label">Best departure today</div>
+                <div class="pt-departure-banner-time">@_optimalDepartureLabel</div>
+            </div>
+        </div>
     }
 
     <RadzenCard class="rz-mb-4">
-        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">Monitoring Snapshot</RadzenText>
-        <RadzenRow>
-            <RadzenColumn Size="12" SizeMD="4">
-                <RadzenText TextStyle="TextStyle.Caption">Latest Sample</RadzenText>
-                <RadzenText>@(LatestPoll is null ? "No samples yet" : $"{LatestPoll.TravelDurationSeconds / 60}m at {LatestPoll.PolledAtDateTime:HH:mm:ss}")</RadzenText>
-            </RadzenColumn>
-            <RadzenColumn Size="12" SizeMD="4">
-                <RadzenText TextStyle="TextStyle.Caption">Samples Today</RadzenText>
-                <RadzenText>@_todayPolls.Count</RadzenText>
-            </RadzenColumn>
-            <RadzenColumn Size="12" SizeMD="4">
-                <RadzenText TextStyle="TextStyle.Caption">Next Poll ETA</RadzenText>
-                <RadzenText>@NextPollEtaLabel</RadzenText>
-            </RadzenColumn>
-        </RadzenRow>
-        <RadzenButton class="rz-mt-3" ButtonStyle="ButtonStyle.Light" Icon="analytics"
-                      Text="@(_showAnalysis ? "Hide Analysis" : "View Analysis")"
-                      Click="@ToggleAnalysis" />
+        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-3">Monitoring Snapshot</RadzenText>
+
+        <div class="pt-stat-strip">
+            <div class="pt-stat-block @(LatestPoll is null ? "pt-stat-amber" : "pt-stat-blue")">
+                <div class="pt-stat-label">Latest Sample</div>
+                <div class="pt-stat-value">
+                    @if (LatestPoll is null)
+                    {
+                        <text>No samples yet</text>
+                    }
+                    else
+                    {
+                        <text>@(LatestPoll.TravelDurationSeconds / 60)m</text>
+                    }
+                </div>
+                @if (LatestPoll is not null)
+                {
+                    <div style="font-size:0.8rem;color:#64748b;margin-top:0.15rem;">at @LatestPoll.PolledAtDateTime.ToLocalTime().ToString("HH:mm:ss")</div>
+                }
+            </div>
+            <div class="pt-stat-block pt-stat-green">
+                <div class="pt-stat-label">Samples (24h)</div>
+                <div class="pt-stat-value">@_todayPolls.Count</div>
+                @if (_todayPolls.Count > 0)
+                {
+                    <div style="font-size:0.8rem;color:#64748b;margin-top:0.15rem;">@_todayPolls.Count(p => p.IsRerouted) rerouted</div>
+                }
+            </div>
+            <div class="pt-stat-block @(NextPollEtaLabel == "Due now" ? "pt-stat-green" : "pt-stat-amber")">
+                <div class="pt-stat-label">Next Poll ETA</div>
+                <div class="pt-stat-value @(NextPollEtaLabel == "Due now" ? "pt-poll-live" : "")">@NextPollEtaLabel</div>
+            </div>
+        </div>
     </RadzenCard>
 
     @* Monitoring window configuration *@
     <WindowConfigPanel RouteId="RouteId" OnSaved="OnWindowSaved" />
 
-    @if (_showAnalysis)
-    {
-        @* Dual-series chart: Today's Actual + Historical Baseline with ±1σ band *@
-        <RadzenCard class="rz-mb-4">
-            <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">Travel Time Chart</RadzenText>
+    @* P1/UX-9: Chart always visible — no toggle required *@
+    <RadzenCard class="rz-mb-4">
+        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">Travel Time Trend (Past 24h)</RadzenText>
 
+        @if (_chartActual.Count == 0)
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Info" ShowIcon="true">
+                No samples yet for this period. Data will appear once monitoring polls begin.
+            </RadzenAlert>
+        }
+        else
+        {
             <RadzenChart Style="width:100%;height:300px;">
-                @* Today's actual series — Y values are travel time in minutes *@
                 <RadzenLineSeries Data="_chartActual" CategoryProperty="PolledAtDateTime"
-                                  Title="Today's Actual" ValueProperty="DurationMinutes"
+                                  Title="Past 24h Actual" ValueProperty="DurationMinutes"
                                   Smooth="false">
                     <ChildContent>
                         <RadzenMarkers MarkerType="MarkerType.Circle" />
@@ -75,7 +102,6 @@ else
                     </TooltipTemplate>
                 </RadzenLineSeries>
 
-                @* Rerouted overlay — red dots on top of normal dots *@
                 @if (_chartRerouted.Count > 0)
                 {
                     <RadzenLineSeries Data="_chartRerouted" CategoryProperty="PolledAtDateTime"
@@ -86,13 +112,11 @@ else
                     </RadzenLineSeries>
                 }
 
-                @* Baseline mean series — Y values in minutes *@
                 <RadzenLineSeries Data="_chartBaseline" CategoryProperty="TimeSlotBucket"
                                   Title="Historical Baseline" ValueProperty="MeanMinutes"
                                   Smooth="true" LineType="LineType.Dashed">
                 </RadzenLineSeries>
 
-                @* ±1σ upper band (area series for delta shading) — Y values in minutes *@
                 @if (_chartUpperBand.Count > 0)
                 {
                     <RadzenAreaSeries Data="_chartUpperBand" CategoryProperty="TimeSlotBucket"
@@ -103,50 +127,57 @@ else
                 }
 
                 <RadzenCategoryAxis FormatString="{0:HH:mm}" />
-                @* Y-axis: 0 – 120 minutes (2 hours), labelled in minutes *@
                 <RadzenValueAxis Min="0" Max="120">
                     <RadzenGridLines Visible="true" />
                     <RadzenAxisTitle Text="Minutes" />
                 </RadzenValueAxis>
             </RadzenChart>
-        </RadzenCard>
+        }
+    </RadzenCard>
 
-        @* Poll history table *@
+    @* UX-9: Raw poll table — collapsed by default for stat-lovers *@
+    @if (_todayPolls.Count > 0)
+    {
         <RadzenCard>
-            <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">Poll History</RadzenText>
-            <RadzenDataGrid Data="_todayPolls" TItem="PollRecordDto" PageSize="20" AllowPaging="true">
-                <Columns>
-                    <RadzenDataGridColumn TItem="PollRecordDto" Property="PolledAtDateTime" Title="Polled At" FormatString="{0:h:mm:ss tt}" />
-                    <RadzenDataGridColumn TItem="PollRecordDto" Title="Duration">
-                        <Template Context="p">
-                            @{
-                                int h = p.TravelDurationSeconds / 3600;
-                                int m = (p.TravelDurationSeconds % 3600) / 60;
-                            }
-                            @(h > 0 ? $"{h}h {m}m" : $"{m}m")
-                        </Template>
-                    </RadzenDataGridColumn>
-                    <RadzenDataGridColumn TItem="PollRecordDto" Title="Distance (mi)">
-                        <Template Context="p">
-                            @($"{p.DistanceMetres * 0.000621371:F1} mi")
-                        </Template>
-                    </RadzenDataGridColumn>
-                    <RadzenDataGridColumn TItem="PollRecordDto" Title="Rerouted?" Width="100px">
-                        <Template Context="p">
-                            @if (p.IsRerouted)
-                            {
-                                <RadzenBadge Text="YES" BadgeStyle="BadgeStyle.Danger" />
-                            }
-                        </Template>
-                    </RadzenDataGridColumn>
-                </Columns>
-            </RadzenDataGrid>
+            <button class="pt-collapsible-header" @onclick="ToggleRawData" type="button">
+                <span class="pt-collapsible-icon @(_showRawData ? "open" : "")">›</span>
+                Raw Poll Data (Past 24h · @_todayPolls.Count records)
+            </button>
+            @if (_showRawData)
+            {
+                <RadzenDataGrid Data="_todayPolls" TItem="PollRecordDto" PageSize="20" AllowPaging="true" class="rz-mt-2">
+                    <Columns>
+                        <RadzenDataGridColumn TItem="PollRecordDto" Property="PolledAtDateTime" Title="Polled At" FormatString="{0:h:mm:ss tt}" />
+                        <RadzenDataGridColumn TItem="PollRecordDto" Title="Duration">
+                            <Template Context="p">
+                                @{
+                                    int h = p.TravelDurationSeconds / 3600;
+                                    int m = (p.TravelDurationSeconds % 3600) / 60;
+                                }
+                                @(h > 0 ? $"{h}h {m}m" : $"{m}m")
+                            </Template>
+                        </RadzenDataGridColumn>
+                        <RadzenDataGridColumn TItem="PollRecordDto" Title="Distance (mi)">
+                            <Template Context="p">
+                                @($"{p.DistanceMetres * 0.000621371:F1} mi")
+                            </Template>
+                        </RadzenDataGridColumn>
+                        <RadzenDataGridColumn TItem="PollRecordDto" Title="Rerouted?" Width="100px">
+                            <Template Context="p">
+                                @if (p.IsRerouted)
+                                {
+                                    <RadzenBadge Text="YES" BadgeStyle="BadgeStyle.Danger" />
+                                }
+                            </Template>
+                        </RadzenDataGridColumn>
+                    </Columns>
+                </RadzenDataGrid>
+            }
         </RadzenCard>
     }
 }
 
 @code {
-    // Chart projection records — values expressed in minutes for the Y-axis
     private sealed record ActualChartPoint(DateTime PolledAtDateTime, double DurationMinutes, bool IsRerouted);
     private sealed record BaselineChartPoint(int TimeSlotBucket, double MeanMinutes);
     private sealed record UpperBandPoint(int TimeSlotBucket, double Value);
@@ -154,16 +185,15 @@ else
     [Parameter] public Guid RouteId { get; set; }
 
     private bool _loading = true;
+    private bool _showRawData;
     private List<PollRecordDto> _todayPolls = [];
     private List<BaselineSlotDto> _baselineSlots = [];
-    // Minute-projected chart data — consumed by RadzenChart series
     private List<ActualChartPoint> _chartActual = [];
     private List<ActualChartPoint> _chartRerouted = [];
     private List<BaselineChartPoint> _chartBaseline = [];
     private List<UpperBandPoint> _chartUpperBand = [];
     private OptimalDepartureDto? _optimalDeparture;
     private string _optimalDepartureLabel = string.Empty;
-    private bool _showAnalysis;
     private PollRecordDto? LatestPoll => _todayPolls.OrderByDescending(p => p.PolledAtDateTime).FirstOrDefault();
     private string NextPollEtaLabel
     {
@@ -193,7 +223,7 @@ else
         StateHasChanged();
     }
 
-    private void ToggleAnalysis() => _showAnalysis = !_showAnalysis;
+    private void ToggleRawData() => _showRawData = !_showRawData;
 
     protected override async Task LoadDataAsync()
     {
@@ -202,9 +232,10 @@ else
         {
             string dayOfWeek = DateTime.Today.DayOfWeek.ToString();
 
-            // Load today's poll records
+            // Load past 24h poll records
+            string sinceUtc = Uri.EscapeDataString(DateTime.UtcNow.AddHours(-24).ToString("o"));
             var historyResult = await Http.GetFromJsonAsync<PagedResult<PollRecordDto>>(
-                $"/api/routes/{RouteId}/poll-history?page=1&pageSize=200");
+                $"/api/routes/{RouteId}/poll-history?page=1&pageSize=300&sinceUtc={sinceUtc}");
             if (historyResult is not null)
             {
                 _todayPolls = [.. historyResult.Items];

@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using PoTraffic.Api.Infrastructure.Providers;
+using PoTraffic.Api.Infrastructure.Security;
 using PoTraffic.Shared.DTOs.Routes;
 using PoTraffic.Shared.Enums;
 
@@ -46,26 +47,7 @@ public static class RoutesEndpoints
     }
 
     private static Guid? ExtractUserId(ClaimsPrincipal user, ILogger? logger = null)
-    {
-        // T112: Robust user ID extraction for both OIDC (sub) and ASP.NET Identity (NameIdentifier)
-        // Check for NameIdentifier first as it's the standard .NET mapping
-        string? raw = user.FindFirstValue(ClaimTypes.NameIdentifier) ?? 
-                      user.FindFirstValue("sub") ??
-                      user.Identity?.Name; // Fallback to Identity.Name which we set to "sub" in Program.cs
-
-        if (Guid.TryParse(raw, out Guid id))
-        {
-            // Debug log to confirm identity hydration in E2E/Production
-            // logger?.LogDebug("[Auth] ExtractUserId: Found {UserId}", id);
-            return id;
-        }
-
-        logger?.LogWarning("[Auth] ExtractUserId: FAILED. Raw: '{Raw}', Claims: {Claims}", 
-            raw ?? "NULL",
-            string.Join(", ", user.Claims.Take(5).Select(c => $"{c.Type}={c.Value}")));
-        
-        return null;
-    }
+        => user.GetUserIdOrNull(logger);
 
     // POST /api/routes/verify-address
     private static async Task<IResult> VerifySingleAddress(
@@ -175,9 +157,8 @@ public static class RoutesEndpoints
         Guid? userId = ExtractUserId(context.User, logger);
         if (userId is null) return Results.Unauthorized();
 
-        // Verify ownership via route query (fetch single route)
-        PagedResult<RouteDto> routes = await sender.Send(new GetRoutesQuery(userId.Value, 1, 1000));
-        RouteDto? route = routes.Items.FirstOrDefault(r => r.Id == routeId);
+        // Verify ownership via direct single-route query (O(1) vs loading 1000 routes)
+        RouteDto? route = await sender.Send(new GetRouteByIdQuery(routeId, userId.Value));
         if (route is null) return Results.NotFound();
 
         // Resolve provider and get live travel time without persisting

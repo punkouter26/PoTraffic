@@ -22,6 +22,8 @@ public sealed record RegisterResult(
 
 public sealed class RegisterCommandValidator : AbstractValidator<RegisterCommand>
 {
+    private static readonly HashSet<string> _validLocales = ["en-IE", "en-GB", "en-US", "de-DE", "fr-FR"];
+
     private readonly PoTrafficDbContext _db;
 
     public RegisterCommandValidator(PoTrafficDbContext db)
@@ -40,7 +42,8 @@ public sealed class RegisterCommandValidator : AbstractValidator<RegisterCommand
 
         RuleFor(x => x.Locale)
             .NotEmpty()
-            .MaximumLength(50);
+            .Must(l => _validLocales.Contains(l))
+            .WithMessage("Locale must be one of: en-IE, en-GB, en-US, de-DE, fr-FR.");
     }
 
     private async Task<bool> BeUnique(string email, CancellationToken ct)

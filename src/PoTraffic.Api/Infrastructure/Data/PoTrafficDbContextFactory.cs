@@ -13,9 +13,11 @@ internal sealed class PoTrafficDbContextFactory : IDesignTimeDbContextFactory<Po
     {
         DbContextOptionsBuilder<PoTrafficDbContext> optionsBuilder = new();
 
-        // Use a placeholder connection string; migrations only require the provider + schema, not a live DB.
-        optionsBuilder.UseSqlServer(
-            "Server=(local);Database=PoTraffic_Dev;Trusted_Connection=True;TrustServerCertificate=True;");
+        // Read connection string from env var first (CI / Docker dev), fall back to local dev default.
+        string connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__Default")
+            ?? "Server=tcp:localhost,52357;Database=PoTraffic;User=sa;Password=Dev!P@ssw0rd;TrustServerCertificate=True";
+
+        optionsBuilder.UseSqlServer(connectionString);
 
         return new PoTrafficDbContext(optionsBuilder.Options);
     }

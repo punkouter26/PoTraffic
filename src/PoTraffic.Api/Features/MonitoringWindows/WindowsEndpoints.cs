@@ -4,7 +4,7 @@ using MediatR;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
-using PoTraffic.Api.Features.Routes;
+using PoTraffic.Api.Infrastructure.Security;
 using PoTraffic.Shared.DTOs.Routes;
 
 namespace PoTraffic.Api.Features.MonitoringWindows;
@@ -28,15 +28,9 @@ public static class WindowsEndpoints
     }
 
     private static Guid? ExtractUserId(ClaimsPrincipal user)
-    {
-        // T113: Ensure claim synchronization between Blazor WASM and Minimal API
-        string? raw = user.FindFirstValue(ClaimTypes.NameIdentifier) ?? 
-                      user.FindFirstValue("sub") ??
-                      user.Identity?.Name;
-        return Guid.TryParse(raw, out Guid id) ? id : null;
-    }
+        => user.GetUserIdOrNull();
 
-    // GET /api/routes/{routeId}/windows — returns the route's windows via the route DTO
+    // GET /api/routes/{routeId}/windows — direct query on MonitoringWindows table
     private static async Task<IResult> GetWindows(
         Guid routeId,
         HttpContext context,
@@ -45,12 +39,12 @@ public static class WindowsEndpoints
         Guid? userId = ExtractUserId(context.User);
         if (userId is null) return Results.Unauthorized();
 
-        PagedResult<RouteDto> routes = await sender.Send(new GetRoutesQuery(userId.Value, 1, 1000));
-        RouteDto? route = routes.Items.FirstOrDefault(r => r.Id == routeId);
+        IReadOnlyList<MonitoringWindowDto>? windows =
+            await sender.Send(new GetWindowsQuery(routeId, userId.Value));
 
-        return route is null
+        return windows is null
             ? Results.NotFound()
-            : Results.Ok(route.Windows);
+            : Results.Ok(windows);
     }
 
     // POST /api/routes/{routeId}/windows

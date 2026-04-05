@@ -1,5 +1,6 @@
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using PoTraffic.Api.Infrastructure.Security;
 
 namespace PoTraffic.Api.Features.History;
 
@@ -16,17 +17,18 @@ public static class HistoryEndpoints
             .RequireAuthorization()
             .WithTags("History");
 
-        // GET /api/routes/{routeId}/poll-history?page=1&pageSize=20
+        // GET /api/routes/{routeId}/poll-history?page=1&pageSize=20&sinceUtc=2026-04-04T00:00:00Z
         group.MapGet("/poll-history", async (
             Guid routeId,
             ISender sender,
             HttpContext ctx,
             [FromQuery] int page = 1,
-            [FromQuery] int pageSize = 50) =>
+            [FromQuery] int pageSize = 50,
+            [FromQuery] DateTime? sinceUtc = null) =>
         {
-            Guid userId = ctx.GetUserId();
+            Guid userId = ctx.User.GetUserId();
             var result = await sender.Send(
-                new GetPollHistoryQuery(routeId, userId, page, pageSize));
+                new GetPollHistoryQuery(routeId, userId, page, pageSize, sinceUtc));
             return Results.Ok(result);
         });
 
@@ -34,9 +36,11 @@ public static class HistoryEndpoints
         group.MapGet("/baseline", async (
             Guid routeId,
             ISender sender,
+            HttpContext ctx,
             [FromQuery] string dayOfWeek = "Monday") =>
         {
-            var result = await sender.Send(new GetBaselineQuery(routeId, dayOfWeek));
+            Guid userId = ctx.User.GetUserId();
+            var result = await sender.Send(new GetBaselineQuery(routeId, userId, dayOfWeek));
             return Results.Ok(result);
         });
 
@@ -46,7 +50,7 @@ public static class HistoryEndpoints
             ISender sender,
             HttpContext ctx) =>
         {
-            Guid userId = ctx.GetUserId();
+            Guid userId = ctx.User.GetUserId();
             var result = await sender.Send(new GetSessionsQuery(routeId, userId));
             return Results.Ok(result);
         });
@@ -55,25 +59,14 @@ public static class HistoryEndpoints
         group.MapGet("/optimal-departure", async (
             Guid routeId,
             ISender sender,
+            HttpContext ctx,
             [FromQuery] string dayOfWeek = "Monday") =>
         {
-            var result = await sender.Send(new GetOptimalDepartureQuery(routeId, dayOfWeek));
+            Guid userId = ctx.User.GetUserId();
+            var result = await sender.Send(new GetOptimalDepartureQuery(routeId, userId, dayOfWeek));
             return result is null ? Results.NoContent() : Results.Ok(result);
         });
 
         return routes;
-    }
-}
-
-/// <summary>
-/// Extension to extract the authenticated user's ID from the JWT claim.
-/// </summary>
-file static class HttpContextExtensions
-{
-    internal static Guid GetUserId(this HttpContext ctx)
-    {
-        string? sub = ctx.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
-                   ?? ctx.User.FindFirst("sub")?.Value;
-        return sub is not null && Guid.TryParse(sub, out Guid id) ? id : Guid.Empty;
     }
 }

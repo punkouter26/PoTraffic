@@ -2,59 +2,125 @@
 @attribute [Authorize(Roles = "Administrator")]
 @inject HttpClient Http
 
-<PageTitle>Diagnostics — System Configuration</PageTitle>
+<PageTitle>Diagnostics &amp; Tools</PageTitle>
 
 <RadzenCard class="rz-p-6 rz-mt-4">
-    <RadzenText TextStyle="TextStyle.H5" class="rz-mb-4">System Configuration</RadzenText>
-    <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-mb-4" style="color:var(--rz-text-tertiary-color)">
-        Sensitive values are masked. Values can be updated by administrators.
-    </RadzenText>
+    <RadzenText TextStyle="TextStyle.H5" class="rz-mb-2">Diagnostics &amp; Tools</RadzenText>
+    <AdminNavBar ActivePage="Diag" />
 
-    <LoadingErrorCard IsLoading="_loading" Error="@_error">
-        <RadzenDataGrid Data="_configs" TItem="SystemConfigDto" AllowSorting="true" class="rz-mt-2">
-            <Columns>
-                <RadzenDataGridColumn TItem="SystemConfigDto" Property="Key" Title="Key" Width="220px" />
-                <RadzenDataGridColumn TItem="SystemConfigDto" Property="Value" Title="Value" Width="200px">
-                    <Template Context="c">
-                        @if (c.IsSensitive)
-                        {
-                            <span style="font-style:italic;color:var(--rz-text-tertiary-color)">@c.Value</span>
-                        }
-                        else
-                        {
-                            @c.Value
-                        }
-                    </Template>
-                </RadzenDataGridColumn>
-                <RadzenDataGridColumn TItem="SystemConfigDto" Property="Description" Title="Description" />
-                <RadzenDataGridColumn TItem="SystemConfigDto" Title="Sensitive" Width="90px">
-                    <Template Context="c">
-                        @if (c.IsSensitive)
-                        {
-                            <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="Yes" />
-                        }
-                        else
-                        {
-                            <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="No" />
-                        }
-                    </Template>
-                </RadzenDataGridColumn>
-            </Columns>
-        </RadzenDataGrid>
-    </LoadingErrorCard>
+    <RadzenTabs>
+        <Tabs>
+            <RadzenTabsItem Text="Connection Health" Icon="health_and_safety">
+                <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-mt-3 rz-mb-2"
+                            style="color:var(--rz-text-tertiary-color)">
+                    Live ping results for all external dependencies.
+                </RadzenText>
+                <LoadingErrorCard IsLoading="_healthLoading" Error="@_healthError">
+                    <RadzenDataGrid Data="_health" TItem="ConnectionHealthDto" AllowSorting="true" class="rz-mt-2">
+                        <Columns>
+                            <RadzenDataGridColumn TItem="ConnectionHealthDto" Property="Name" Title="Dependency" Width="160px" />
+                            <RadzenDataGridColumn TItem="ConnectionHealthDto" Title="Status" Width="120px">
+                                <Template Context="h">
+                                    <RadzenBadge BadgeStyle="@(h.Status == "Healthy" ? BadgeStyle.Success : BadgeStyle.Danger)"
+                                                 Text="@h.Status" />
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="ConnectionHealthDto" Property="Description" Title="Description" />
+                            <RadzenDataGridColumn TItem="ConnectionHealthDto" Property="DurationMs" Title="ms" Width="80px" FormatString="{0:F0}" />
+                        </Columns>
+                    </RadzenDataGrid>
+                </LoadingErrorCard>
+            </RadzenTabsItem>
+
+            <RadzenTabsItem Text="System Config" Icon="settings">
+                <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-mt-3 rz-mb-4"
+                            style="color:var(--rz-text-tertiary-color)">
+                    Sensitive values are masked. Values can be updated by administrators.
+                </RadzenText>
+                <LoadingErrorCard IsLoading="_loading" Error="@_error">
+                    <RadzenDataGrid Data="_configs" TItem="SystemConfigDto" AllowSorting="true" class="rz-mt-2">
+                        <Columns>
+                            <RadzenDataGridColumn TItem="SystemConfigDto" Property="Key" Title="Key" Width="220px" />
+                            <RadzenDataGridColumn TItem="SystemConfigDto" Property="Value" Title="Value" Width="200px">
+                                <Template Context="c">
+                                    @if (c.IsSensitive)
+                                    {
+                                        <span style="font-style:italic;color:var(--rz-text-tertiary-color)">@c.Value</span>
+                                    }
+                                    else
+                                    {
+                                        @c.Value
+                                    }
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="SystemConfigDto" Property="Description" Title="Description" />
+                            <RadzenDataGridColumn TItem="SystemConfigDto" Title="Sensitive" Width="90px">
+                                <Template Context="c">
+                                    @if (c.IsSensitive)
+                                    {
+                                        <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="Yes" />
+                                    }
+                                    else
+                                    {
+                                        <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="No" />
+                                    }
+                                </Template>
+                            </RadzenDataGridColumn>
+                        </Columns>
+                    </RadzenDataGrid>
+                </LoadingErrorCard>
+            </RadzenTabsItem>
+
+            <RadzenTabsItem Text="Seed Data" Icon="database">
+                <div class="rz-mt-3">
+                    <SeedDataPanel />
+                </div>
+            </RadzenTabsItem>
+
+            <RadzenTabsItem Text="Triple Test" Icon="science">
+                <div class="rz-mt-3" style="max-width:800px;">
+                    <TripleTestPanel />
+                </div>
+            </RadzenTabsItem>
+        </Tabs>
+    </RadzenTabs>
 </RadzenCard>
 
 @code {
+    private List<ConnectionHealthDto> _health = [];
+    private bool _healthLoading = true;
+    private string? _healthError;
+
     private List<SystemConfigDto> _configs = [];
     private bool _loading = true;
     private string? _error;
 
     protected override async Task OnInitializedAsync()
     {
+        await Task.WhenAll(LoadHealthAsync(), LoadConfigAsync());
+    }
+
+    private async Task LoadHealthAsync()
+    {
         try
         {
-            _configs = await Http.GetFromJsonAsync<List<SystemConfigDto>>("/api/admin/configuration")
-                       ?? [];
+            _health = await Http.GetFromJsonAsync<List<ConnectionHealthDto>>("/api/admin/connection-health") ?? [];
+        }
+        catch (Exception ex)
+        {
+            _healthError = $"Failed to load connection health: {ex.Message}";
+        }
+        finally
+        {
+            _healthLoading = false;
+        }
+    }
+
+    private async Task LoadConfigAsync()
+    {
+        try
+        {
+            _configs = await Http.GetFromJsonAsync<List<SystemConfigDto>>("/api/admin/configuration") ?? [];
         }
         catch (Exception ex)
         {

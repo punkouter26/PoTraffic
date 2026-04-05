@@ -1,46 +1,45 @@
 @page "/dashboard"
 @using PoTraffic.Shared.DTOs.Routes
+@using PoTraffic.Shared.DTOs.History
+@using PoTraffic.Shared.DTOs.Account
 @using PoTraffic.Shared.Enums
+@using PoTraffic.Client.Features.Routes
 @inherits PollingComponentBase
 @inject HttpClient Http
 @inject NavigationManager Nav
 
 @using PoTraffic.Shared.Constants
-<RadzenRow class="rz-mb-6">
-    <RadzenColumn Size="12" SizeMD="4">
-        <RadzenCard class="rz-display-flex rz-flex-column rz-align-items-center rz-justify-content-center" Style="height: 100%; min-height: 280px;">
-            <RadzenText TextStyle="TextStyle.H6" class="rz-mb-4">Daily Quota Usage</RadzenText>
-            <RadzenArcGauge Style="width: 200px; height: 160px;">
-                <RadzenArcGaugeScale Step="2" Min="0" Max="@QuotaConstants.DefaultDailyQuota" MinorStep="1" Radius="1.5" TickPosition="GaugeTickPosition.Outside">
-                    <RadzenArcGaugeScaleValue Value="@_quotaConsumed" ShowValue="true">
-                        <Template Context="scaleValue">
-                            <RadzenText TextStyle="TextStyle.H4" class="rz-m-0">@scaleValue.Value</RadzenText>
-                            <RadzenText TextStyle="TextStyle.Caption" class="rz-m-0">/ @QuotaConstants.DefaultDailyQuota</RadzenText>
-                        </Template>
-                    </RadzenArcGaugeScaleValue>
-                </RadzenArcGaugeScale>
-            </RadzenArcGauge>
-            <RadzenText TextStyle="TextStyle.Body2" class="rz-mt-2">Sessions used today</RadzenText>
-        </RadzenCard>
-    </RadzenColumn>
-    <RadzenColumn Size="12" SizeMD="8">
-        <RadzenCard Style="height: 100%;">
-            <RadzenText TextStyle="TextStyle.H4" class="rz-mb-2">Welcome Back</RadzenText>
-            <RadzenText TextStyle="TextStyle.Body1" class="rz-color-on-surface-variant">
-                Your commute monitoring is active. You have <strong>@_routes.Count</strong> routes being tracked for volatility.
-            </RadzenText>
-            <RadzenButton class="rz-mt-4" ButtonStyle="ButtonStyle.Primary"
-                          Text="@PrimaryActionText" Icon="bolt"
-                          Click="@(() => Nav.NavigateTo(PrimaryActionPath))" />
-            @if (_quotaConsumed >= QuotaConstants.DefaultDailyQuota - 2)
-            {
-                <RadzenAlert AlertStyle="AlertStyle.Warning" ShowIcon="true" class="rz-mt-4">
-                    Daily quota almost reached. Monitoring will pause once limit is hit.
-                </RadzenAlert>
-            }
-        </RadzenCard>
-    </RadzenColumn>
-</RadzenRow>
+
+<PageTitle>Dashboard — PoTraffic</PageTitle>
+
+@* C2: Compact status bar replaces 4 KPI cards *@
+<div class="pt-status-bar">
+    @{
+        int activeCount = _routes.Count(r => r.MonitoringStatus == MonitoringStatus.Active);
+        string dotClass = activeCount > 0 ? "pt-status-dot-green" : "pt-status-dot-amber";
+    }
+    <span class="pt-status-item">
+        <span class="pt-status-dot @dotClass"></span>
+        @activeCount of @_routes.Count routes active
+    </span>
+    <span class="pt-status-sep">·</span>
+    <span class="pt-status-item">
+        @_quotaConsumed / @QuotaConstants.DefaultDailyQuota quota used today
+    </span>
+    <span class="pt-status-sep">·</span>
+    <span class="pt-status-item" style="color:#94a3b8;">Resets midnight UTC</span>
+    <div class="pt-status-bar-actions">
+        <RadzenButton Text="+ Add Route" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Small"
+                      Click="@(() => Nav.NavigateTo("/routes/create"))" />
+    </div>
+</div>
+
+@if (_quotaConsumed >= QuotaConstants.DefaultDailyQuota - 2)
+{
+    <RadzenAlert AlertStyle="AlertStyle.Warning" ShowIcon="true" class="rz-mb-3">
+        Daily quota almost reached. Monitoring will pause once the limit is hit.
+    </RadzenAlert>
+}
 
 @if (_loading)
 {
@@ -48,62 +47,34 @@
 }
 else if (_routes.Count == 0)
 {
-    <RadzenAlert AlertStyle="AlertStyle.Info" class="rz-mt-4">
-        No routes configured. <a href="/routes/create">Add a route</a> to start monitoring.
-    </RadzenAlert>
+    <div style="text-align:center; padding:3rem 1rem;">
+        <div style="font-size:3rem; margin-bottom:1rem;">🛣️</div>
+        <div style="font-size:1.2rem; font-weight:600; color:#334155; margin-bottom:0.5rem;">No routes yet</div>
+        <div style="color:#94a3b8; margin-bottom:1.5rem;">Add your first commute route to start monitoring traffic patterns.</div>
+        <RadzenButton Text="Add Your First Route" ButtonStyle="ButtonStyle.Primary" Icon="add"
+                      Click="@(() => Nav.NavigateTo("/routes/create"))" />
+    </div>
 }
 else
 {
-    <RadzenText TextStyle="TextStyle.H5" class="rz-mb-3 rz-mt-4">Active Monitoring</RadzenText>
-    <RadzenDataGrid Data="_routes" TItem="RouteDto" AllowSorting="true" AllowPaging="true" PageSize="10"
-                    ColumnWidth="200px" class="rz-shadow-2 rz-border-radius-2">
-        <Columns>
-            <RadzenDataGridColumn TItem="RouteDto" Property="OriginAddress" Title="Origin">
-                <Template Context="route">
-                    <RadzenText TextStyle="TextStyle.Body2" class="rz-text-truncate" style="max-width: 250px;">
-                        <strong>@route.OriginAddress.Split(',')[0]</strong><br/>
-                        <small class="rz-color-on-surface-variant">@string.Join(',', route.OriginAddress.Split(',').Skip(1))</small>
-                    </RadzenText>
-                </Template>
-            </RadzenDataGridColumn>
-            <RadzenDataGridColumn TItem="RouteDto" Property="DestinationAddress" Title="Destination">
-                <Template Context="route">
-                    <RadzenText TextStyle="TextStyle.Body2" class="rz-text-truncate" style="max-width: 250px;">
-                        <strong>@route.DestinationAddress.Split(',')[0]</strong><br/>
-                        <small class="rz-color-on-surface-variant">@string.Join(',', route.DestinationAddress.Split(',').Skip(1))</small>
-                    </RadzenText>
-                </Template>
-            </RadzenDataGridColumn>
-            <RadzenDataGridColumn TItem="RouteDto" Property="Provider" Title="Provider" Width="120px">
-                <Template Context="route">
-                    <RadzenBadge BadgeStyle="@(route.Provider == RouteProvider.GoogleMaps ? BadgeStyle.Primary : BadgeStyle.Secondary)"
-                                 Text="@route.Provider.ToString()" IsPill="true" />
-                </Template>
-            </RadzenDataGridColumn>
-            <RadzenDataGridColumn TItem="RouteDto" Property="MonitoringStatus" Title="Status" Width="120px">
-                <Template Context="route">
-                    <RadzenBadge BadgeStyle="@(route.MonitoringStatus == MonitoringStatus.Active ? BadgeStyle.Success : BadgeStyle.Warning)"
-                                 Text="@route.MonitoringStatus.ToString()" />
-                </Template>
-            </RadzenDataGridColumn>
-            <RadzenDataGridColumn TItem="RouteDto" Title="Actions" Width="100px" TextAlign="TextAlign.Center">
-                <Template Context="route">
-                    <RadzenButton Icon="analytics" Size="ButtonSize.Medium" ButtonStyle="ButtonStyle.Light"
-                                  Click="@(() => Nav.NavigateTo($"/routes/{route.Id}"))" />
-                </Template>
-            </RadzenDataGridColumn>
-        </Columns>
-    </RadzenDataGrid>
+    @* C1/UI-1: Route cards replace the grid — one card per route *@
+    <div class="pt-route-cards">
+        @foreach (RouteDto route in _routes)
+        {
+            <RouteCard Route="route"
+                       OptimalDeparture="@(_optimalDepartures.GetValueOrDefault(route.Id))"
+                       OnDeleted="@LoadDataAsync"
+                       OnRefresh="@LoadDataAsync" />
+        }
+    </div>
 }
 
 @code {
     private List<RouteDto> _routes = [];
+    private Dictionary<Guid, OptimalDepartureDto> _optimalDepartures = [];
     private int _quotaConsumed;
     private bool _loading = true;
-    private string PrimaryActionText => _routes.Count == 0 ? "Create First Route" : "View Active Route";
-    private string PrimaryActionPath => _routes.Count == 0 ? "/routes/create" : $"/routes/{_routes[0].Id}";
 
-    // Observer pattern — PollingComponentBase base handles the timer loop
     protected override TimeSpan PollingInterval => TimeSpan.FromSeconds(60);
 
     protected override async Task LoadDataAsync()
@@ -111,21 +82,36 @@ else
         _loading = true;
         try
         {
+            string dayOfWeek = DateTime.Today.DayOfWeek.ToString();
+
             var result = await Http.GetFromJsonAsync<PagedResult<RouteDto>>("/api/routes?page=1&pageSize=100");
             if (result is not null)
-            {
                 _routes = [.. result.Items];
-            }
 
             var quota = await Http.GetFromJsonAsync<QuotaDto>("/api/account/quota");
             if (quota is not null)
-            {
                 _quotaConsumed = quota.UsedToday;
+
+            // UI-2: Load optimal departure for each route (2-3 calls for typical user)
+            _optimalDepartures = [];
+            foreach (RouteDto route in _routes)
+            {
+                try
+                {
+                    var optimal = await Http.GetFromJsonAsync<OptimalDepartureDto>(
+                        $"/api/routes/{route.Id}/optimal-departure?dayOfWeek={dayOfWeek}");
+                    if (optimal is not null)
+                        _optimalDepartures[route.Id] = optimal;
+                }
+                catch
+                {
+                    // Individual route failure doesn't break the dashboard
+                }
             }
         }
         catch
         {
-            // Silently handled — loading state remains
+            // Silently handled — data shown may be partial
         }
         finally
         {

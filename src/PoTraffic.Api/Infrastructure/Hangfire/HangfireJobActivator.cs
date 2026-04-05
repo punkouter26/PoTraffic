@@ -4,8 +4,8 @@ namespace PoTraffic.Api.Infrastructure.Hangfire;
 
 /// <summary>
 /// Adapter pattern — bridges Hangfire job activation to ASP.NET Core DI scope lifecycle.
-/// Each job is resolved within its own <see cref="IServiceScope"/>, which is disposed
-/// once the job method returns.
+/// Each job runs inside a <see cref="ServiceScopeJobActivatorScope"/> that owns and
+/// disposes the <see cref="IServiceScope"/> when Hangfire calls <see cref="JobActivatorScope.DisposeScope"/>.
 /// </summary>
 public sealed class HangfireJobActivator : JobActivator
 {
@@ -16,9 +16,17 @@ public sealed class HangfireJobActivator : JobActivator
         _scopeFactory = scopeFactory ?? throw new ArgumentNullException(nameof(scopeFactory));
     }
 
-    public override object ActivateJob(Type jobType)
+    public override JobActivatorScope BeginScope(JobActivatorContext context)
+        => new ServiceScopeJobActivatorScope(_scopeFactory.CreateScope());
+
+    private sealed class ServiceScopeJobActivatorScope : JobActivatorScope
     {
-        IServiceScope scope = _scopeFactory.CreateScope();
-        return scope.ServiceProvider.GetRequiredService(jobType);
+        private readonly IServiceScope _scope;
+
+        public ServiceScopeJobActivatorScope(IServiceScope scope) => _scope = scope;
+
+        public override object Resolve(Type type) => _scope.ServiceProvider.GetRequiredService(type);
+
+        public override void DisposeScope() => _scope.Dispose();
     }
 }

@@ -10,6 +10,7 @@ namespace PoTraffic.Api.Features.History;
 
 public sealed record GetOptimalDepartureQuery(
     Guid RouteId,
+    Guid UserId,
     string DayOfWeek) : IRequest<OptimalDepartureDto?>;
 
 public sealed class GetOptimalDepartureQueryHandler
@@ -28,6 +29,12 @@ public sealed class GetOptimalDepartureQueryHandler
 
     public async Task<OptimalDepartureDto?> Handle(GetOptimalDepartureQuery query, CancellationToken ct)
     {
+        // Ownership guard — prevents IDOR: user A querying user B's optimal departure via a known route GUID
+        bool owned = await _db.Routes
+            .AnyAsync(r => r.Id == query.RouteId && r.UserId == query.UserId, ct);
+        if (!owned)
+            return null;
+
         // Shared SQL — see BaselineSqlQueries.SlotAggregate (DRY: avoids drift with GetBaselineQuery).
         List<ProjectionSlot> slots;
 

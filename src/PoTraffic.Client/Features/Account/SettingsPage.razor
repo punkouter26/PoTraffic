@@ -22,7 +22,8 @@
                         </RadzenFormField>
                         <RadzenFormField Text="Locale">
                             <ChildContent>
-                                <RadzenTextBox @bind-Value="_newLocale" />
+                                @* UX-10: Dropdown mirrors RegisterPage locale list — prevents freeform text that fails server validation *@
+                                <RadzenDropDown @bind-Value="_newLocale" Data="@_validLocales" Style="width:100%;" />
                             </ChildContent>
                         </RadzenFormField>
                         <RadzenButton Text="Save" ButtonStyle="ButtonStyle.Primary"
@@ -107,6 +108,9 @@
     private bool _profileSaved;
     private bool _passwordSaved;
     private string? _passwordError;
+
+    // UX-10: Whitelist matches server-side validator — prevents freeform input that fails validation
+    private static readonly List<string> _validLocales = ["en-IE", "en-GB", "en-US", "de-DE", "fr-FR"];
 
     protected override async Task OnInitializedAsync()
     {

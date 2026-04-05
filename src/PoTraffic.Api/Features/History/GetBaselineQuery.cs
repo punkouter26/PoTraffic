@@ -10,6 +10,7 @@ namespace PoTraffic.Api.Features.History;
 
 public sealed record GetBaselineQuery(
     Guid RouteId,
+    Guid UserId,
     string DayOfWeek) : IRequest<BaselineResponse>;
 
 public sealed class GetBaselineQueryHandler
@@ -26,6 +27,12 @@ public sealed class GetBaselineQueryHandler
 
     public async Task<BaselineResponse> Handle(GetBaselineQuery query, CancellationToken ct)
     {
+        // Ownership guard — prevents IDOR: user A querying user B's baseline via a known route GUID
+        bool owned = await _db.Routes
+            .AnyAsync(r => r.Id == query.RouteId && r.UserId == query.UserId, ct);
+        if (!owned)
+            return new BaselineResponse(query.RouteId, query.DayOfWeek, 0, []);
+
         // Shared SQL — see BaselineSqlQueries.SlotAggregate (DRY: avoids drift with GetOptimalDepartureQuery).
         // LINQ cannot produce STDEV(); raw SQL is intentional per §6.2 of data-model.md.
         List<ProjectionSlot> slots;

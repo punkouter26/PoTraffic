@@ -14,7 +14,10 @@ public sealed class UpdateProfileValidator : AbstractValidator<UpdateProfileComm
 
     public UpdateProfileValidator()
     {
-        RuleFor(c => c.Locale).NotEmpty().MaximumLength(10);
+        RuleFor(c => c.Locale)
+            .NotEmpty()
+            .Must(l => _validLocales.Contains(l))
+            .WithMessage("Locale must be one of: en-IE, en-GB, en-US, de-DE, fr-FR.");
     }
 }
 

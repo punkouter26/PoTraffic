@@ -1,5 +1,6 @@
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using PoTraffic.Api.Features.Admin;
 using PoTraffic.Shared.DTOs.Admin;
 using PoTraffic.Shared.Enums;
@@ -31,7 +32,7 @@ public static class AdminEndpoints
         .WithName("GetSystemConfiguration")
         .Produces<IReadOnlyList<SystemConfigDto>>();
 
-        // T120: GET /api/admin/global-volatility (US5 FR-024)
+        // T120: GET /api/admin/global-volatility (US5 FR-024) — historical day-of-week baseline
         grp.MapGet("/global-volatility", async (ISender sender, CancellationToken ct) =>
         {
             IReadOnlyList<GlobalVolatilitySlotDto> slots = await sender.Send(new GetGlobalVolatilityQuery(), ct);
@@ -39,6 +40,18 @@ public static class AdminEndpoints
         })
         .WithName("GetGlobalVolatility")
         .Produces<IReadOnlyList<GlobalVolatilitySlotDto>>();
+
+        // GET /api/admin/global-volatility/recent?hours=24 — real-time 24h rolling time-series
+        grp.MapGet("/global-volatility/recent", async (
+            ISender sender,
+            CancellationToken ct,
+            [FromQuery] int hours = 24) =>
+        {
+            IReadOnlyList<RecentVolatilityPointDto> points = await sender.Send(new GetRecentVolatilityQuery(hours), ct);
+            return Results.Ok(points);
+        })
+        .WithName("GetRecentVolatility")
+        .Produces<IReadOnlyList<RecentVolatilityPointDto>>();
 
         grp.MapGet("/poll-cost-summary", async (ISender sender, CancellationToken ct) =>
         {
@@ -116,6 +129,21 @@ public static class AdminEndpoints
         })
         .WithName("ClearDatabase")
         .Produces<ClearDatabaseResult>();
+
+        // GET /api/admin/connection-health — live ping status for all external dependencies
+        // Re-uses the registered IHealthCheckService; masks no values (statuses only).
+        grp.MapGet("/connection-health", async (HealthCheckService healthCheckService, CancellationToken ct) =>
+        {
+            HealthReport report = await healthCheckService.CheckHealthAsync(ct);
+            IEnumerable<ConnectionHealthDto> results = report.Entries.Select(e => new ConnectionHealthDto(
+                Name: e.Key,
+                Status: e.Value.Status.ToString(),
+                Description: e.Value.Description,
+                DurationMs: e.Value.Duration.TotalMilliseconds));
+            return Results.Ok(results);
+        })
+        .WithName("GetConnectionHealth")
+        .Produces<IEnumerable<ConnectionHealthDto>>();
 
         return app;
     }
