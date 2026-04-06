@@ -1,0 +1,161 @@
+@using PoTraffic.Shared.DTOs.Admin
+
+@* Results grid and winner alert shown once a TripleTestSession is available *@
+
+@if (CompletedShots < 3)
+{
+    <div class="rz-display-flex rz-align-items-center rz-gap-3 rz-mb-2">
+        <RadzenProgressBarCircular Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Small" />
+        <RadzenText>@CompletedShots / 3 shots complete — polling every 3 s (@PollCount polls, last @LastPollAge)</RadzenText>
+    </div>
+    <RadzenButton Text="Refresh Now" Icon="refresh" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small"
+                  Click="@OnRefresh" class="rz-mb-3" />
+}
+
+<details style="font-size:0.8rem;color:var(--rz-text-secondary-color);margin-bottom:12px">
+    <summary style="cursor:pointer">Session debug info</summary>
+    <div style="padding:8px 0;line-height:1.9">
+        <div><strong>Session ID:</strong> <code>@Session.SessionId</code></div>
+        <div><strong>Origin:</strong> @Session.OriginAddress</div>
+        <div><strong>Destination:</strong> @Session.DestinationAddress</div>
+        <div><strong>Provider:</strong> @Session.Provider</div>
+        <div><strong>Scheduled At:</strong> @Session.ScheduledAt.ToLocalTime().ToString("HH:mm:ss")</div>
+        <div><strong>Shot 1 expected:</strong> @Session.ScheduledAt.ToLocalTime().ToString("HH:mm:ss")</div>
+        <div><strong>Shot 2 expected:</strong> @Session.ScheduledAt.ToLocalTime().AddSeconds(20).ToString("HH:mm:ss")</div>
+        <div><strong>Shot 3 expected:</strong> @Session.ScheduledAt.ToLocalTime().AddSeconds(40).ToString("HH:mm:ss")</div>
+        <div><strong>Polls fired:</strong> @PollCount</div>
+    </div>
+</details>
+
+@if (AllDone && Session.IdealShotIndex.HasValue)
+{
+    var winner = Session.Shots.First(s => s.ShotIndex == Session.IdealShotIndex.Value);
+    <RadzenAlert AlertStyle="AlertStyle.Success" class="rz-mb-3" AllowClose="false">
+        <strong>Shot #@(winner.ShotIndex + 1) (+@winner.OffsetSeconds s)</strong> was fastest:
+        <strong>@FormatDuration(winner.DurationSeconds)</strong> — @FormatDistance(winner.DistanceMetres)
+        @if (Session.AverageDurationSeconds.HasValue)
+        {
+            <span> | Average: <strong>@FormatDuration((int?)Session.AverageDurationSeconds)</strong></span>
+        }
+    </RadzenAlert>
+}
+else if (AllDone)
+{
+    <RadzenAlert AlertStyle="AlertStyle.Warning" class="rz-mb-3" AllowClose="false">
+        All 3 shots failed — no travel time data available.
+    </RadzenAlert>
+}
+
+<RadzenDataGrid Data="@GetDisplayRows()" TItem="ShotDisplayRow"
+                AllowSorting="false" AllowFiltering="false"
+                RowRender="@HighlightWinner" class="rz-mb-4">
+    <Columns>
+        <RadzenDataGridColumn TItem="ShotDisplayRow" Property="Label" Title="Shot" Width="70px" />
+        <RadzenDataGridColumn TItem="ShotDisplayRow" Property="Offset" Title="Offset" Width="70px" />
+        <RadzenDataGridColumn TItem="ShotDisplayRow" Title="Expected At" Width="110px">
+            <Template Context="row">@(row.ExpectedAt?.ToString("HH:mm:ss") ?? "—")</Template>
+        </RadzenDataGridColumn>
+        <RadzenDataGridColumn TItem="ShotDisplayRow" Property="FiredAt" Title="Fired At" Width="110px">
+            <Template Context="row">
+                @if (row.FiredAt.HasValue)
+                {
+                    <span style="color:var(--rz-success)">@row.FiredAt.Value.ToLocalTime().ToString("HH:mm:ss")</span>
+                }
+                else if (!row.IsAverage)
+                {
+                    <span style="color:var(--rz-text-secondary-color)">pending…</span>
+                }
+                else { <span>—</span> }
+            </Template>
+        </RadzenDataGridColumn>
+        <RadzenDataGridColumn TItem="ShotDisplayRow" Property="Duration" Title="Duration" Width="110px" />
+        <RadzenDataGridColumn TItem="ShotDisplayRow" Property="Distance" Title="Distance" Width="100px" />
+        <RadzenDataGridColumn TItem="ShotDisplayRow" Property="Status" Title="Status" Width="90px">
+            <Template Context="row">
+                @if (row.IsAverage)
+                {
+                    <RadzenBadge BadgeStyle="BadgeStyle.Light" Text="avg" />
+                }
+                else if (row.IsSuccess == true)
+                {
+                    <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="OK" />
+                }
+                else if (row.IsSuccess == false)
+                {
+                    <RadzenBadge BadgeStyle="BadgeStyle.Danger" Text="@(row.ErrorCode ?? "ERR")" />
+                }
+                else
+                {
+                    <RadzenBadge BadgeStyle="BadgeStyle.Light" Text="pending" />
+                }
+            </Template>
+        </RadzenDataGridColumn>
+    </Columns>
+</RadzenDataGrid>
+
+@if (AllDone)
+{
+    <RadzenButton Text="Run Another" ButtonStyle="ButtonStyle.Light" Icon="refresh" Click="@OnReset" />
+}
+
+@code {
+    [Parameter, EditorRequired] public TripleTestSessionDto Session { get; set; } = default!;
+    [Parameter] public bool AllDone { get; set; }
+    [Parameter] public int CompletedShots { get; set; }
+    [Parameter] public int PollCount { get; set; }
+    [Parameter] public string LastPollAge { get; set; } = "never";
+    [Parameter] public EventCallback OnRefresh { get; set; }
+    [Parameter] public EventCallback OnReset { get; set; }
+
+    private sealed record ShotDisplayRow(
+        string Label, string Offset, DateTime? ExpectedAt, DateTimeOffset? FiredAt,
+        string Duration, string Distance, bool? IsSuccess, string? ErrorCode,
+        int ShotIndex, bool IsAverage, bool IsWinner);
+
+    private List<ShotDisplayRow> GetDisplayRows()
+    {
+        DateTime scheduledLocal = Session.ScheduledAt.ToLocalTime().DateTime;
+
+        var rows = Session.Shots
+            .OrderBy(s => s.ShotIndex)
+            .Select(s => new ShotDisplayRow(
+                Label: $"Shot {s.ShotIndex + 1}",
+                Offset: $"+{s.OffsetSeconds}s",
+                ExpectedAt: scheduledLocal.AddSeconds(s.OffsetSeconds),
+                FiredAt: s.FiredAt,
+                Duration: FormatDuration(s.DurationSeconds),
+                Distance: FormatDistance(s.DistanceMetres),
+                IsSuccess: s.IsSuccess,
+                ErrorCode: s.ErrorCode,
+                ShotIndex: s.ShotIndex,
+                IsAverage: false,
+                IsWinner: s.ShotIndex == Session.IdealShotIndex))
+            .ToList<ShotDisplayRow>();
+
+        rows.Add(new ShotDisplayRow(
+            Label: "Average", Offset: "—", ExpectedAt: null, FiredAt: null,
+            Duration: FormatDuration((int?)Session.AverageDurationSeconds),
+            Distance: FormatDistance((int?)Session.AverageDistanceMetres),
+            IsSuccess: null, ErrorCode: null, ShotIndex: -1, IsAverage: true, IsWinner: false));
+
+        return rows;
+    }
+
+    private void HighlightWinner(RowRenderEventArgs<ShotDisplayRow> args)
+    {
+        if (args.Data is null) return;
+        if (args.Data.IsWinner)
+            args.Attributes.Add("style", "background:var(--rz-success-lighter, #d4edda);font-weight:600;");
+        else if (args.Data.IsAverage)
+            args.Attributes.Add("style", "background:var(--rz-base-200, #f8f9fa);font-style:italic;");
+    }
+
+    private static string FormatDuration(int? seconds) =>
+        seconds.HasValue ? $"{seconds.Value / 60} min {seconds.Value % 60} s" : "—";
+
+    private static string FormatDistance(int? metres)
+    {
+        if (!metres.HasValue) return "—";
+        return metres.Value >= 1000 ? $"{metres.Value / 1000.0:F1} km" : $"{metres.Value} m";
+    }
+}

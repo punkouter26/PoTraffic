@@ -1,0 +1,77 @@
+@using PoTraffic.Shared.DTOs.History
+
+@* Travel Time Trend chart — displays past 24h actual polls vs historical baseline *@
+
+<RadzenCard class="rz-mb-4">
+    <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">Travel Time Trend (Past 24h)</RadzenText>
+
+    @if (ChartActual.Count == 0)
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Info" ShowIcon="true">
+            No samples yet for this period. Data will appear once monitoring polls begin.
+        </RadzenAlert>
+    }
+    else
+    {
+        <RadzenChart Style="width:100%;height:300px;">
+            <RadzenLineSeries Data="@ChartActual" CategoryProperty="PolledAtDateTime"
+                              Title="Past 24h Actual" ValueProperty="DurationMinutes"
+                              Smooth="false">
+                <ChildContent>
+                    <RadzenMarkers MarkerType="MarkerType.Circle" />
+                </ChildContent>
+                <TooltipTemplate Context="p">
+                    @if (p.IsRerouted)
+                    {
+                        <div style="color:red;font-weight:bold;">⚠ Rerouted: @p.DurationMinutes.ToString("F1") min</div>
+                    }
+                    else
+                    {
+                        <div>@p.DurationMinutes.ToString("F1") min</div>
+                    }
+                </TooltipTemplate>
+            </RadzenLineSeries>
+
+            @if (ChartRerouted.Count > 0)
+            {
+                <RadzenLineSeries Data="@ChartRerouted" CategoryProperty="PolledAtDateTime"
+                                  Title="Rerouted" ValueProperty="DurationMinutes"
+                                  Stroke="transparent" StrokeWidth="0">
+                    <RadzenMarkers MarkerType="MarkerType.Circle" StrokeWidth="2"
+                                   Stroke="#e53e3e" Fill="#e53e3e" />
+                </RadzenLineSeries>
+            }
+
+            <RadzenLineSeries Data="@ChartBaseline" CategoryProperty="TimeSlotBucket"
+                              Title="Historical Baseline" ValueProperty="MeanMinutes"
+                              Smooth="true" LineType="LineType.Dashed">
+            </RadzenLineSeries>
+
+            @if (ChartUpperBand.Count > 0)
+            {
+                <RadzenAreaSeries Data="@ChartUpperBand" CategoryProperty="TimeSlotBucket"
+                                  Title="+1σ" ValueProperty="Value"
+                                  Fill="rgba(0,200,0,0.1)" Stroke="rgba(0,200,0,0.3)"
+                                  StrokeWidth="1">
+                </RadzenAreaSeries>
+            }
+
+            <RadzenCategoryAxis FormatString="{0:HH:mm}" />
+            <RadzenValueAxis Min="0" Max="120">
+                <RadzenGridLines Visible="true" />
+                <RadzenAxisTitle Text="Minutes" />
+            </RadzenValueAxis>
+        </RadzenChart>
+    }
+</RadzenCard>
+
+@code {
+    public sealed record ActualChartPoint(DateTime PolledAtDateTime, double DurationMinutes, bool IsRerouted);
+    public sealed record BaselineChartPoint(int TimeSlotBucket, double MeanMinutes);
+    public sealed record UpperBandPoint(int TimeSlotBucket, double Value);
+
+    [Parameter, EditorRequired] public List<ActualChartPoint> ChartActual { get; set; } = [];
+    [Parameter] public List<ActualChartPoint> ChartRerouted { get; set; } = [];
+    [Parameter] public List<BaselineChartPoint> ChartBaseline { get; set; } = [];
+    [Parameter] public List<UpperBandPoint> ChartUpperBand { get; set; } = [];
+}

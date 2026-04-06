@@ -1,4 +1,4 @@
-namespace PoTraffic.Api.Features.Routes.Entities;
+namespace PoTraffic.Api.Features.Admin.Entities;
 
 public sealed class TripleTestShot
 {

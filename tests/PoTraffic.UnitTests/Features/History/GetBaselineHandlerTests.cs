@@ -43,7 +43,7 @@ public sealed class GetBaselineHandlerTests
 
         // Act
         var result = await handler.Handle(
-            new GetBaselineQuery(routeId, "Monday"),
+            new GetBaselineQuery(routeId, Guid.Empty, "Monday"),
             CancellationToken.None);
 
         // Assert — no sessions → baseline response has empty slot list
@@ -65,7 +65,7 @@ public sealed class GetBaselineHandlerTests
 
         // Act
         var result = await handler.Handle(
-            new GetBaselineQuery(routeId, "Tuesday"),
+            new GetBaselineQuery(routeId, Guid.Empty, "Tuesday"),
             CancellationToken.None);
 
         // Assert

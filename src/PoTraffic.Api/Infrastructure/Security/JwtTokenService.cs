@@ -29,7 +29,7 @@ public sealed class JwtTokenService
     {
         DateTimeOffset expiresAt = DateTimeOffset.UtcNow.AddMinutes(_config.ExpiryMinutes);
 
-        SymmetricSecurityKey key = new(Encoding.UTF8.GetBytes(_config.Key));
+        SymmetricSecurityKey key = new(Encoding.UTF8.GetBytes(_config.Key)) { KeyId = "potraffic-key" };
         SigningCredentials creds = new(key, SecurityAlgorithms.HmacSha256);
 
         Claim[] claims =

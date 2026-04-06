@@ -28,11 +28,17 @@
     <RadzenButton Text="Sign In" ButtonStyle="ButtonStyle.Primary" class="rz-w-100"
                   Click="@LoginAsync" IsBusy="_loading" />
 
-    <RadzenButton Text="🔵  Continue with Google" ButtonStyle="ButtonStyle.Light" class="rz-w-100 rz-mt-2 auth-social-btn"
-                  Click='() => StartExternalLogin("google")' Disabled="_loading" />
+    @if (_availableProviders.Contains("google"))
+    {
+        <RadzenButton Text="🔵  Continue with Google" ButtonStyle="ButtonStyle.Light" class="rz-w-100 rz-mt-2 auth-social-btn"
+                      Click='() => StartExternalLogin("google")' Disabled="_loading" />
+    }
 
-    <RadzenButton Text="🪟  Continue with Microsoft" ButtonStyle="ButtonStyle.Light" class="rz-w-100 rz-mt-2 auth-social-btn"
-                  Click='() => StartExternalLogin("microsoft")' Disabled="_loading" />
+    @if (_availableProviders.Contains("microsoft"))
+    {
+        <RadzenButton Text="🪟  Continue with Microsoft" ButtonStyle="ButtonStyle.Light" class="rz-w-100 rz-mt-2 auth-social-btn"
+                      Click='() => StartExternalLogin("microsoft")' Disabled="_loading" />
+    }
 
     <RadzenText class="rz-mt-3">
         No account? <a href="/register">Register</a>
@@ -44,6 +50,21 @@
     private string _password = string.Empty;
     private string _error = "";
     private bool _loading;
+    private List<string> _availableProviders = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var result = await Http.GetFromJsonAsync<ProvidersResponse>("/api/auth/providers");
+            if (result is not null)
+                _availableProviders = result.Providers;
+        }
+        catch
+        {
+            // Non-fatal — social login buttons simply won't appear
+        }
+    }
 
     private async Task LoginAsync()
     {
@@ -89,4 +110,6 @@
         string encodedReturnUrl = Uri.EscapeDataString("/dashboard");
         Nav.NavigateTo($"/api/auth/external/{provider}/start?returnUrl={encodedReturnUrl}", forceLoad: true);
     }
+
+    private sealed record ProvidersResponse(List<string> Providers);
 }

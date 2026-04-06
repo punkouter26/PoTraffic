@@ -68,7 +68,7 @@
     <PackageVersion Include="AspNetCore.HealthChecks.Uris" Version="9.*" />
     <PackageVersion Include="BCrypt.Net-Next" Version="4.*" />
     <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="10.*" />
-    <PackageVersion Include="Radzen.Blazor" Version="*" />
+    <PackageVersion Include="Radzen.Blazor" Version="10.*" /><!-- Pinned at major 10; resolved 10.2.0 — review before upgrading to v11+ for breaking changes -->
     <PackageVersion Include="Scalar.AspNetCore" Version="2.*" />
     <PackageVersion Include="System.IdentityModel.Tokens.Jwt" Version="8.16.0" />
   </ItemGroup>

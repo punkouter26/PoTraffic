@@ -15,6 +15,7 @@ public static class AuthEndpoints
     {
         RouteGroupBuilder group = app.MapGroup("/api/auth").WithTags("Auth");
 
+        group.MapGet("providers", GetAvailableProviders);
         group.MapPost("register", Register);
         group.MapPost("login", Login);
         group.MapPost("logout", Logout).RequireAuthorization();
@@ -24,6 +25,15 @@ public static class AuthEndpoints
         group.MapGet("external/{provider}/callback", CompleteExternalLogin);
 
         return app;
+    }
+
+    private static IResult GetAvailableProviders(IEnumerable<IExternalIdentityProvider> providers)
+    {
+        var available = providers
+            .Where(p => p.IsConfigured())
+            .Select(p => p.ProviderName)
+            .ToList();
+        return Results.Ok(new { providers = available });
     }
 
     private static async Task<IResult> Register(ISender sender, [FromBody] RegisterRequest request)

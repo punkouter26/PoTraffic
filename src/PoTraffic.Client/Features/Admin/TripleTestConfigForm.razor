@@ -1,0 +1,53 @@
+@using PoTraffic.Shared.Enums
+
+@* Configuration form shown before the test is running *@
+
+@if (!string.IsNullOrEmpty(Error))
+{
+    <RadzenAlert AlertStyle="AlertStyle.Danger" class="rz-mb-3">@Error</RadzenAlert>
+}
+
+<RadzenFormField Text="Origin Address" class="rz-w-100 rz-mb-3">
+    <RadzenTextBox Value="@Origin" ValueChanged="@((v) => OriginChanged.InvokeAsync(v))"
+                   Placeholder="e.g. 1 Apple Park Way, Cupertino, CA" Style="width:100%" />
+</RadzenFormField>
+
+<RadzenFormField Text="Destination Address" class="rz-w-100 rz-mb-3">
+    <RadzenTextBox Value="@Destination" ValueChanged="@((v) => DestinationChanged.InvokeAsync(v))"
+                   Placeholder="e.g. 1 Infinite Loop, Cupertino, CA" Style="width:100%" />
+</RadzenFormField>
+
+<RadzenFormField Text="Provider" class="rz-w-100 rz-mb-3">
+    <RadzenDropDown Value="@Provider" ValueChanged="@((int v) => ProviderChanged.InvokeAsync(v))"
+                    Data="@_providers" TextProperty="Label" ValueProperty="Value" Style="width:100%" />
+</RadzenFormField>
+
+<RadzenFormField Text="Start At (leave empty to start immediately)" class="rz-w-100 rz-mb-4">
+    <RadzenDatePicker Value="@StartAt" ValueChanged="@((DateTime? v) => StartAtChanged.InvokeAsync(v))"
+                      ShowTime="true" DateFormat="yyyy-MM-dd HH:mm"
+                      Placeholder="Now" AllowClear="true" Style="width:100%" />
+</RadzenFormField>
+
+<RadzenButton Text="Run Triple Test" ButtonStyle="ButtonStyle.Primary" Icon="science" class="rz-w-100"
+              Click="@OnSubmit" IsBusy="@IsSubmitting"
+              Disabled="@(string.IsNullOrWhiteSpace(Origin) || string.IsNullOrWhiteSpace(Destination))" />
+
+@code {
+    [Parameter] public string Origin { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> OriginChanged { get; set; }
+    [Parameter] public string Destination { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> DestinationChanged { get; set; }
+    [Parameter] public int Provider { get; set; }
+    [Parameter] public EventCallback<int> ProviderChanged { get; set; }
+    [Parameter] public DateTime? StartAt { get; set; }
+    [Parameter] public EventCallback<DateTime?> StartAtChanged { get; set; }
+    [Parameter] public bool IsSubmitting { get; set; }
+    [Parameter] public string? Error { get; set; }
+    [Parameter] public EventCallback OnSubmit { get; set; }
+
+    private readonly List<object> _providers =
+    [
+        new { Label = "Google Maps", Value = 0 },
+        new { Label = "TomTom", Value = 1 }
+    ];
+}

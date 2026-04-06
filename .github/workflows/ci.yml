@@ -32,6 +32,14 @@ jobs:
         with:
           dotnet-version: '10.x'
 
+      # Cache NuGet packages — dramatically speeds up subsequent runs
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'Directory.Packages.props') }}
+          restore-keys: nuget-${{ runner.os }}-
+
       - name: Restore
         run: dotnet restore PoTraffic.slnx
 
@@ -77,6 +85,7 @@ jobs:
     needs: build-and-test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    environment: production
     permissions:
       id-token: write
       contents: read
@@ -88,7 +97,7 @@ jobs:
           name: api-publish
           path: ./publish
 
-      - name: Azure login
+      - name: Azure login (OIDC — no long-lived secrets)
         uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -99,4 +108,24 @@ jobs:
         run: cd publish; zip -r ../publish.zip .
 
       - name: Deploy to Azure App Service (PoTraffic RG)
-        run: az webapp deploy --resource-group PoTraffic --name potraffic-api --src-path ./publish.zip --type zip
+        run: |
+          az webapp deploy \
+            --resource-group PoTraffic \
+            --name potraffic-api \
+            --src-path ./publish.zip \
+            --type zip \
+            --restart true \
+            --clean true
+
+      # Wait for the app to restart then verify the /health endpoint
+      - name: Health check
+        run: |
+          echo "Waiting 30s for app to restart..."
+          sleep 30
+          status=$(curl -s -o /dev/null -w "%{http_code}" https://potraffic-api.azurewebsites.net/health)
+          echo "Health endpoint returned: $status"
+          if [ "$status" != "200" ]; then
+            echo "::error::Health check failed — HTTP $status"
+            exit 1
+          fi
+          echo "::notice::Deployment healthy — HTTP $status"

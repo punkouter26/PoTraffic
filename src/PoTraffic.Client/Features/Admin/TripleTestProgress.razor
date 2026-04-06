@@ -1,0 +1,36 @@
+@* Progress display shown while the test is running but no session data received yet *@
+
+<div class="rz-display-flex rz-align-items-center rz-gap-3 rz-mb-3">
+    <RadzenProgressBarCircular Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Small" />
+    <RadzenText>Waiting for first poll…</RadzenText>
+</div>
+
+@if (StartAt.HasValue)
+{
+    var first = StartAt.Value;
+    <RadzenCard class="rz-p-3 rz-mb-3" style="background:var(--rz-base-200,#f8f9fa);border:1px solid var(--rz-base-300,#dee2e6)">
+        <RadzenText TextStyle="TextStyle.Caption" style="font-weight:600">SCHEDULED SHOTS</RadzenText>
+        <div style="font-size:0.85rem;margin-top:4px;line-height:1.8">
+            <div>Shot 1 (+0 s) — fires at <strong>@first.ToString("HH:mm:ss")</strong> @CountdownLabel(first)</div>
+            <div>Shot 2 (+20 s) — fires at <strong>@first.AddSeconds(20).ToString("HH:mm:ss")</strong> @CountdownLabel(first.AddSeconds(20))</div>
+            <div>Shot 3 (+40 s) — fires at <strong>@first.AddSeconds(40).ToString("HH:mm:ss")</strong> @CountdownLabel(first.AddSeconds(40))</div>
+        </div>
+        <div style="font-size:0.78rem;color:var(--rz-text-secondary-color);margin-top:6px">
+            Session ID: <code>@SessionId</code>
+        </div>
+    </RadzenCard>
+}
+<RadzenButton Text="Refresh Now" Icon="refresh" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small"
+              Click="@OnRefresh" />
+
+@code {
+    [Parameter] public Guid? SessionId { get; set; }
+    [Parameter] public DateTime? StartAt { get; set; }
+    [Parameter] public EventCallback OnRefresh { get; set; }
+
+    private static string CountdownLabel(DateTime target)
+    {
+        double secs = (target - DateTime.Now).TotalSeconds;
+        return secs <= 0 ? "✓ due" : $"(in {(int)secs}s)";
+    }
+}

@@ -55,3 +55,33 @@ playwright-report/
 
 # dotnet publish output
 publish/
+
+# Bootstrap vendor dist — only bootstrap.min.css is intentionally tracked.
+# All other variants (grid, reboot, utilities, RTL, JS bundles, source maps)
+# were removed in cleanup and must not be re-added accidentally.
+src/**/wwwroot/lib/bootstrap/dist/css/bootstrap-*.css
+src/**/wwwroot/lib/bootstrap/dist/css/bootstrap-*.css.map
+src/**/wwwroot/lib/bootstrap/dist/css/bootstrap.css
+src/**/wwwroot/lib/bootstrap/dist/css/bootstrap.css.map
+src/**/wwwroot/lib/bootstrap/dist/css/bootstrap.min.css.map
+src/**/wwwroot/lib/bootstrap/dist/css/bootstrap.rtl*
+src/**/wwwroot/lib/bootstrap/dist/js/
+
+# Test binary artefacts
+**/*.trx
+*.coverage
+*.coveragexml
+
+# JetBrains Rider
+.idea/
+*.sln.iml
+
+# Visual Studio Code workspace-specific settings (not launch/tasks)
+.vscode/settings.json
+.vscode/*.code-snippets
+
+# Azure Functions local settings (may contain secrets)
+local.settings.json
+
+# User secrets manifest (secrets themselves are in %APPDATA%)
+secrets.json

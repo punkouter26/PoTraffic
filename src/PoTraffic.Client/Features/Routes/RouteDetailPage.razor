@@ -72,126 +72,23 @@ else
     <WindowConfigPanel RouteId="RouteId" OnSaved="OnWindowSaved" />
 
     @* P1/UX-9: Chart always visible — no toggle required *@
-    <RadzenCard class="rz-mb-4">
-        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">Travel Time Trend (Past 24h)</RadzenText>
-
-        @if (_chartActual.Count == 0)
-        {
-            <RadzenAlert AlertStyle="AlertStyle.Info" ShowIcon="true">
-                No samples yet for this period. Data will appear once monitoring polls begin.
-            </RadzenAlert>
-        }
-        else
-        {
-            <RadzenChart Style="width:100%;height:300px;">
-                <RadzenLineSeries Data="_chartActual" CategoryProperty="PolledAtDateTime"
-                                  Title="Past 24h Actual" ValueProperty="DurationMinutes"
-                                  Smooth="false">
-                    <ChildContent>
-                        <RadzenMarkers MarkerType="MarkerType.Circle" />
-                    </ChildContent>
-                    <TooltipTemplate Context="p">
-                        @if (p.IsRerouted)
-                        {
-                            <div style="color:red;font-weight:bold;">⚠ Rerouted: @p.DurationMinutes.ToString("F1") min</div>
-                        }
-                        else
-                        {
-                            <div>@p.DurationMinutes.ToString("F1") min</div>
-                        }
-                    </TooltipTemplate>
-                </RadzenLineSeries>
-
-                @if (_chartRerouted.Count > 0)
-                {
-                    <RadzenLineSeries Data="_chartRerouted" CategoryProperty="PolledAtDateTime"
-                                      Title="Rerouted" ValueProperty="DurationMinutes"
-                                      Stroke="transparent" StrokeWidth="0">
-                        <RadzenMarkers MarkerType="MarkerType.Circle" StrokeWidth="2"
-                                       Stroke="#e53e3e" Fill="#e53e3e" />
-                    </RadzenLineSeries>
-                }
-
-                <RadzenLineSeries Data="_chartBaseline" CategoryProperty="TimeSlotBucket"
-                                  Title="Historical Baseline" ValueProperty="MeanMinutes"
-                                  Smooth="true" LineType="LineType.Dashed">
-                </RadzenLineSeries>
-
-                @if (_chartUpperBand.Count > 0)
-                {
-                    <RadzenAreaSeries Data="_chartUpperBand" CategoryProperty="TimeSlotBucket"
-                                      Title="+1σ" ValueProperty="Value"
-                                      Fill="rgba(0,200,0,0.1)" Stroke="rgba(0,200,0,0.3)"
-                                      StrokeWidth="1">
-                    </RadzenAreaSeries>
-                }
-
-                <RadzenCategoryAxis FormatString="{0:HH:mm}" />
-                <RadzenValueAxis Min="0" Max="120">
-                    <RadzenGridLines Visible="true" />
-                    <RadzenAxisTitle Text="Minutes" />
-                </RadzenValueAxis>
-            </RadzenChart>
-        }
-    </RadzenCard>
+    <TravelTimeTrendChart ChartActual="_chartActual" ChartRerouted="_chartRerouted"
+                          ChartBaseline="_chartBaseline" ChartUpperBand="_chartUpperBand" />
 
     @* UX-9: Raw poll table — collapsed by default for stat-lovers *@
-    @if (_todayPolls.Count > 0)
-    {
-        <RadzenCard>
-            <button class="pt-collapsible-header" @onclick="ToggleRawData" type="button">
-                <span class="pt-collapsible-icon @(_showRawData ? "open" : "")">›</span>
-                Raw Poll Data (Past 24h · @_todayPolls.Count records)
-            </button>
-            @if (_showRawData)
-            {
-                <RadzenDataGrid Data="_todayPolls" TItem="PollRecordDto" PageSize="20" AllowPaging="true" class="rz-mt-2">
-                    <Columns>
-                        <RadzenDataGridColumn TItem="PollRecordDto" Property="PolledAtDateTime" Title="Polled At" FormatString="{0:h:mm:ss tt}" />
-                        <RadzenDataGridColumn TItem="PollRecordDto" Title="Duration">
-                            <Template Context="p">
-                                @{
-                                    int h = p.TravelDurationSeconds / 3600;
-                                    int m = (p.TravelDurationSeconds % 3600) / 60;
-                                }
-                                @(h > 0 ? $"{h}h {m}m" : $"{m}m")
-                            </Template>
-                        </RadzenDataGridColumn>
-                        <RadzenDataGridColumn TItem="PollRecordDto" Title="Distance (mi)">
-                            <Template Context="p">
-                                @($"{p.DistanceMetres * 0.000621371:F1} mi")
-                            </Template>
-                        </RadzenDataGridColumn>
-                        <RadzenDataGridColumn TItem="PollRecordDto" Title="Rerouted?" Width="100px">
-                            <Template Context="p">
-                                @if (p.IsRerouted)
-                                {
-                                    <RadzenBadge Text="YES" BadgeStyle="BadgeStyle.Danger" />
-                                }
-                            </Template>
-                        </RadzenDataGridColumn>
-                    </Columns>
-                </RadzenDataGrid>
-            }
-        </RadzenCard>
-    }
+    <PollHistoryTable Polls="_todayPolls" />
 }
 
 @code {
-    private sealed record ActualChartPoint(DateTime PolledAtDateTime, double DurationMinutes, bool IsRerouted);
-    private sealed record BaselineChartPoint(int TimeSlotBucket, double MeanMinutes);
-    private sealed record UpperBandPoint(int TimeSlotBucket, double Value);
-
     [Parameter] public Guid RouteId { get; set; }
 
     private bool _loading = true;
-    private bool _showRawData;
     private List<PollRecordDto> _todayPolls = [];
     private List<BaselineSlotDto> _baselineSlots = [];
-    private List<ActualChartPoint> _chartActual = [];
-    private List<ActualChartPoint> _chartRerouted = [];
-    private List<BaselineChartPoint> _chartBaseline = [];
-    private List<UpperBandPoint> _chartUpperBand = [];
+    private List<TravelTimeTrendChart.ActualChartPoint> _chartActual = [];
+    private List<TravelTimeTrendChart.ActualChartPoint> _chartRerouted = [];
+    private List<TravelTimeTrendChart.BaselineChartPoint> _chartBaseline = [];
+    private List<TravelTimeTrendChart.UpperBandPoint> _chartUpperBand = [];
     private OptimalDepartureDto? _optimalDeparture;
     private string _optimalDepartureLabel = string.Empty;
     private PollRecordDto? LatestPoll => _todayPolls.OrderByDescending(p => p.PolledAtDateTime).FirstOrDefault();
@@ -223,8 +120,6 @@ else
         StateHasChanged();
     }
 
-    private void ToggleRawData() => _showRawData = !_showRawData;
-
     protected override async Task LoadDataAsync()
     {
         _loading = true;
@@ -239,9 +134,8 @@ else
             if (historyResult is not null)
             {
                 _todayPolls = [.. historyResult.Items];
-                // Project to minutes for the chart Y-axis
                 _chartActual = _todayPolls
-                    .Select(p => new ActualChartPoint(
+                    .Select(p => new TravelTimeTrendChart.ActualChartPoint(
                         p.PolledAtDateTime,
                         p.TravelDurationSeconds / 60.0,
                         p.IsRerouted))
@@ -256,11 +150,11 @@ else
             {
                 _baselineSlots = [.. baseline.Slots];
                 _chartBaseline = _baselineSlots
-                    .Select(s => new BaselineChartPoint(s.TimeSlotBucket, s.MeanDurationSeconds / 60.0))
+                    .Select(s => new TravelTimeTrendChart.BaselineChartPoint(s.TimeSlotBucket, s.MeanDurationSeconds / 60.0))
                     .ToList();
                 _chartUpperBand = _baselineSlots
                     .Where(s => s.StdDevDurationSeconds.HasValue)
-                    .Select(s => new UpperBandPoint(
+                    .Select(s => new TravelTimeTrendChart.UpperBandPoint(
                         s.TimeSlotBucket,
                         (s.MeanDurationSeconds + s.StdDevDurationSeconds!.Value) / 60.0))
                     .ToList();

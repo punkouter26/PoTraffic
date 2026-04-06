@@ -43,7 +43,7 @@ public sealed class GetOptimalDepartureHandlerTests
 
         // Act — InMemory returns an empty baseline (no raw SQL support), so handler returns null
         var result = await handler.Handle(
-            new GetOptimalDepartureQuery(routeId, "Monday"),
+            new GetOptimalDepartureQuery(routeId, Guid.Empty, "Monday"),
             CancellationToken.None);
 
         // Assert — null is correct when no baseline data available (FR-012)
@@ -62,7 +62,7 @@ public sealed class GetOptimalDepartureHandlerTests
 
         // Act
         var result = await handler.Handle(
-            new GetOptimalDepartureQuery(Guid.NewGuid(), "Wednesday"),
+            new GetOptimalDepartureQuery(Guid.NewGuid(), Guid.Empty, "Wednesday"),
             CancellationToken.None);
 
         // Assert
