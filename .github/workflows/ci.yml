@@ -91,13 +91,13 @@ jobs:
 
     steps:
       - name: Download publish artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v4.2.1
         with:
           name: api-publish
           path: ./publish
 
       - name: Azure login (OIDC — no long-lived secrets)
-        uses: azure/login@v2
+        uses: azure/login@v2.3.0
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -113,18 +113,23 @@ jobs:
             --name potraffic-api \
             --src-path ./publish.zip \
             --type zip \
-            --restart true \
+            --async true \
             --clean true
 
-      # Wait for the app to restart then verify the /health endpoint
+      # App needs ~2-3 min to cold-start (Key Vault + DB migrations on Linux container).
+      # Retry up to 20 times with 15s intervals (max 5 min total) before failing.
       - name: Health check
         run: |
-          echo "Waiting 30s for app to restart..."
-          sleep 30
-          status=$(curl -s -o /dev/null -w "%{http_code}" https://potraffic-api.azurewebsites.net/health)
-          echo "Health endpoint returned: $status"
-          if [ "$status" != "200" ]; then
-            echo "::error::Health check failed — HTTP $status"
-            exit 1
-          fi
-          echo "::notice::Deployment healthy — HTTP $status"
+          echo "Waiting 60s for app cold-start..."
+          sleep 60
+          for i in $(seq 1 20); do
+            status=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 https://potraffic-api.azurewebsites.net/health || echo "000")
+            echo "Attempt $i — Health endpoint returned: $status"
+            if [ "$status" = "200" ]; then
+              echo "::notice::Deployment healthy — HTTP $status"
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "::error::Health check failed after all retries"
+          exit 1
