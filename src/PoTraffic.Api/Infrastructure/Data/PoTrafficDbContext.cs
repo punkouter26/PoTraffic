@@ -1,10 +1,11 @@
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 using PoTraffic.Api.Infrastructure.Data.Projections;
 
 namespace PoTraffic.Api.Infrastructure.Data;
 
-public sealed class PoTrafficDbContext : DbContext
+public sealed class PoTrafficDbContext : DbContext, IDataProtectionKeyContext
 {
     public PoTrafficDbContext(DbContextOptions<PoTrafficDbContext> options) : base(options) { }
 
@@ -14,6 +15,8 @@ public sealed class PoTrafficDbContext : DbContext
     public DbSet<MonitoringSession> MonitoringSessions => Set<MonitoringSession>();
     public DbSet<PollRecord> PollRecords => Set<PollRecord>();
     public DbSet<SystemConfiguration> SystemConfigurations => Set<SystemConfiguration>();
+    // Data Protection keys persisted to SQL so they survive app restarts / deployments
+    public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
     public DbSet<TripleTestSession> TripleTestSessions => Set<TripleTestSession>();
     public DbSet<TripleTestShot> TripleTestShots => Set<TripleTestShot>();
 

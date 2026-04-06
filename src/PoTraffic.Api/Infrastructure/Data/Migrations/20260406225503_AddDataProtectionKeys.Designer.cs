@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using PoTraffic.Api.Infrastructure.Data;
 
@@ -11,9 +12,11 @@ using PoTraffic.Api.Infrastructure.Data;
 namespace PoTraffic.Api.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(PoTrafficDbContext))]
-    partial class PoTrafficDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260406225503_AddDataProtectionKeys")]
+    partial class AddDataProtectionKeys
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

@@ -1,8 +1,10 @@
 using System.Text;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.IdentityModel.Tokens;
 using PoTraffic.Api.Features.Auth;
+using PoTraffic.Api.Infrastructure.Data;
 
 namespace PoTraffic.Api.Infrastructure.Security;
 
@@ -46,7 +48,12 @@ internal static class SecurityExtensions
         });
 
         services.AddSingleton<JwtTokenService>();
-        services.AddDataProtection();
+        // Persist Data Protection keys to SQL so they survive app restarts and deployments.
+        // Without persistence, the encrypted OAuth state (nonce) cannot be decrypted after
+        // a restart, causing INVALID_STATE errors on the external login callback.
+        services.AddDataProtection()
+            .SetApplicationName("PoTraffic")
+            .PersistKeysToDbContext<PoTrafficDbContext>();
         services.AddHttpClient();
         services.AddScoped<IExternalIdentityProvider, GoogleExternalIdentityProvider>();
         services.AddScoped<IExternalIdentityProvider, MicrosoftExternalIdentityProvider>();
