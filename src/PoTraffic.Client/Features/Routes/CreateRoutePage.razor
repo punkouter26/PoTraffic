@@ -25,11 +25,6 @@
     </RadzenFormField>
     <div class="rz-mb-3"></div>
 
-    <RadzenFormField Text="Traffic Provider" class="rz-w-100 rz-mb-3">
-        <RadzenDropDown @bind-Value="_provider" Data="_providers"
-                        TextProperty="Label" ValueProperty="Value" Style="width:100%;" />
-    </RadzenFormField>
-
     <RadzenFieldset Text="Monitoring Schedule" class="rz-mb-4">
         <div class="rz-display-flex rz-gap-4 rz-mb-3">
             <RadzenFormField Text="Start Time">
@@ -70,9 +65,7 @@
         new(dt.Year, dt.Month, dt.Day, dt.Hour, dt.Minute, 0);
     private string _error = "";
     private bool _loading;
-    private int _provider;
-    private List<ProviderOption> _providers = [];
-    private record ProviderOption(int Value, string Label);
+    private readonly int _provider = (int)RouteProvider.GoogleMaps;
 
     private readonly (string label, byte bit)[] _days =
     [
@@ -84,20 +77,6 @@
 
     private void ToggleDay(byte bit) => _mask ^= bit;
     private bool IsDaySelected(byte bit) => (_mask & bit) != 0;
-
-    protected override async Task OnInitializedAsync()
-    {
-        try
-        {
-            var items = await Http.GetFromJsonAsync<List<System.Text.Json.JsonElement>>("/api/routes/providers");
-            if (items is not null)
-                _providers = items
-                    .Select(e => new ProviderOption(e.GetProperty("value").GetInt32(), e.GetProperty("label").GetString() ?? "Unknown"))
-                    .ToList();
-            if (_providers.Count > 0) _provider = _providers[0].Value;
-        }
-        catch { /* providers list stays empty; user will see an empty dropdown */ }
-    }
 
     private async Task SaveAsync()
     {

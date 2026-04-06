@@ -49,6 +49,13 @@ test-results/
 playwright-report/
 *.webm
 *.zip
+.playwright/
+
+# Node modules (if any E2E tooling adds them)
+node_modules/
+
+# Merge conflict originals
+*.orig
 
 # GitHub Copilot agent files (local tooling)
 .copilotignore
