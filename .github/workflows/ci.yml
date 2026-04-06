@@ -108,6 +108,14 @@ jobs:
 
       - name: Deploy to Azure App Service (PoTraffic RG)
         run: |
+          # Set explicit startup command — published output contains 2 runtimeconfig.json files
+          # (PoTraffic.Api + PoTraffic.Client), which confuses Azure's auto-detection.
+          az webapp config set \
+            --resource-group PoTraffic \
+            --name potraffic-api \
+            --startup-file "dotnet PoTraffic.Api.dll" \
+            --output none
+
           az webapp deploy \
             --resource-group PoTraffic \
             --name potraffic-api \
