@@ -108,44 +108,25 @@ jobs:
 
       - name: Deploy to Azure App Service (PoTraffic RG)
         run: |
-          # Note: startup-file "dotnet PoTraffic.Api.dll" is already set permanently on
-          # the App Service config. Calling az webapp config set here on every deploy
-          # triggers an extra app restart, which puts Kudu in a 503 state for new deploys.
+          # On free tier (alwaysOn=false) the app container goes idle between runs.
+          # 'az webapp deploy' tries to warm up the specific running container instance;
+          # if that instance is idle/crashed it returns 503 and refuses the upload.
+          # Solution: stop the app first so Kudu deploys to a clean stopped state,
+          # then start it again. Kudu SCM (scm.azurewebsites.net) stays alive even
+          # when the app process is stopped, so config-zip always succeeds.
 
-          # Wait for Kudu SCM to be ready before deploying (it can be in a transitional state
-          # after a restart or config change, returning 503 and rejecting zip deployments).
-          echo "Waiting for Kudu to be ready..."
-          for i in $(seq 1 20); do
-            kudu_status=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 \
-              https://potraffic-api.scm.azurewebsites.net/api/settings || echo "000")
-            echo "Kudu attempt $i: $kudu_status"
-            if [ "$kudu_status" = "401" ] || [ "$kudu_status" = "200" ]; then
-              echo "Kudu is ready (HTTP $kudu_status)"
-              break
-            fi
-            sleep 15
-          done
+          echo "Stopping app to clear any idle/crashed container state..."
+          az webapp stop --resource-group PoTraffic --name potraffic-api --output none
+          sleep 10
 
-          # Retry deploy up to 3 times in case of transient 503 from Kudu
-          for attempt in 1 2 3; do
-            echo "Deploy attempt $attempt..."
-            if az webapp deploy \
-              --resource-group PoTraffic \
-              --name potraffic-api \
-              --src-path ./publish.zip \
-              --type zip \
-              --async true \
-              --clean true; then
-              echo "Deploy submitted successfully"
-              break
-            fi
-            if [ "$attempt" = "3" ]; then
-              echo "::error::Deploy failed after 3 attempts"
-              exit 1
-            fi
-            echo "Deploy attempt $attempt failed, retrying in 30s..."
-            sleep 30
-          done
+          echo "Deploying zip via Kudu SCM..."
+          az webapp deployment source config-zip \
+            --resource-group PoTraffic \
+            --name potraffic-api \
+            --src ./publish.zip
+
+          echo "Starting app..."
+          az webapp start --resource-group PoTraffic --name potraffic-api --output none
 
       # App needs ~2-3 min to cold-start (Key Vault + DB migrations on Linux container).
       # Retry up to 20 times with 15s intervals (max 5 min total) before failing.
