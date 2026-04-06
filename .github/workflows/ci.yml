@@ -108,25 +108,36 @@ jobs:
 
       - name: Deploy to Azure App Service (PoTraffic RG)
         run: |
-          # On free tier (alwaysOn=false) the app container goes idle between runs.
-          # 'az webapp deploy' tries to warm up the specific running container instance;
-          # if that instance is idle/crashed it returns 503 and refuses the upload.
-          # Solution: stop the app first so Kudu deploys to a clean stopped state,
-          # then start it again. Kudu SCM (scm.azurewebsites.net) stays alive even
-          # when the app process is stopped, so config-zip always succeeds.
+          # Get Kudu publishing credentials (always available via OIDC service principal)
+          KUDU_USER=$(az webapp deployment list-publishing-credentials \
+            --resource-group PoTraffic --name potraffic-api \
+            --query publishingUserName -o tsv)
+          KUDU_PASS=$(az webapp deployment list-publishing-credentials \
+            --resource-group PoTraffic --name potraffic-api \
+            --query publishingPassword -o tsv)
 
-          echo "Stopping app to clear any idle/crashed container state..."
-          az webapp stop --resource-group PoTraffic --name potraffic-api --output none
-          sleep 10
+          # Use Kudu REST API with isAsync=true — returns 202 immediately after the
+          # ZIP is received, without waiting for the app container to start.
+          # 'az webapp deploy' fails on free-tier idle containers (SCM warmup 503).
+          # 'az webapp deployment source config-zip' hangs until app starts (sync).
+          # This direct Kudu call is the only reliably async option.
+          echo "Uploading ZIP to Kudu (async)..."
+          HTTP_STATUS=$(curl -s -o /tmp/kudu_resp.txt -w "%{http_code}" \
+            --max-time 300 \
+            -X POST \
+            -u "$KUDU_USER:$KUDU_PASS" \
+            -H "Content-Type: application/zip" \
+            --data-binary @./publish.zip \
+            "https://potraffic-api.scm.azurewebsites.net/api/zipdeploy?isAsync=true&clean=true")
 
-          echo "Deploying zip via Kudu SCM..."
-          az webapp deployment source config-zip \
-            --resource-group PoTraffic \
-            --name potraffic-api \
-            --src ./publish.zip
+          echo "Kudu response: HTTP $HTTP_STATUS"
+          cat /tmp/kudu_resp.txt || true
 
-          echo "Starting app..."
-          az webapp start --resource-group PoTraffic --name potraffic-api --output none
+          if [ "$HTTP_STATUS" != "202" ] && [ "$HTTP_STATUS" != "200" ]; then
+            echo "::error::Kudu zipdeploy failed — HTTP $HTTP_STATUS"
+            exit 1
+          fi
+          echo "Deployment queued (HTTP $HTTP_STATUS). Waiting for app to start..."
 
       # App needs ~2-3 min to cold-start (Key Vault + DB migrations on Linux container).
       # Retry up to 20 times with 15s intervals (max 5 min total) before failing.
