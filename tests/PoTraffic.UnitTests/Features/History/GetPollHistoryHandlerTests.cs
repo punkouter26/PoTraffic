@@ -22,7 +22,7 @@ public sealed class GetPollHistoryHandlerTests
         return new PoTrafficDbContext(opts);
     }
 
-    private static async Task<(PoTrafficDbContext Db, Guid RouteId, Guid OtherRouteId)> SeedAsync(
+    private static async Task<(PoTrafficDbContext Db, Guid UserId, Guid RouteId, Guid OtherRouteId)> SeedAsync(
         string dbName, int pollCount = 5)
     {
         PoTrafficDbContext db = CreateDb(dbName);
@@ -80,7 +80,7 @@ public sealed class GetPollHistoryHandlerTests
         });
 
         await db.SaveChangesAsync();
-        return (db, routeId, otherRouteId);
+        return (db, userId, routeId, otherRouteId);
     }
 
     [Fact]
@@ -88,12 +88,12 @@ public sealed class GetPollHistoryHandlerTests
     {
         // Arrange
         string dbName = Guid.NewGuid().ToString();
-        (PoTrafficDbContext db, Guid routeId, _) = await SeedAsync(dbName, pollCount: 5);
+        (PoTrafficDbContext db, Guid userId, Guid routeId, _) = await SeedAsync(dbName, pollCount: 5);
         var handler = new GetPollHistoryQueryHandler(db);
 
         // Act
         var result = await handler.Handle(
-            new GetPollHistoryQuery(routeId, UserId: Guid.NewGuid(), Page: 1, PageSize: 20),
+            new GetPollHistoryQuery(routeId, UserId: userId, Page: 1, PageSize: 20),
             CancellationToken.None);
 
         // Assert
@@ -106,16 +106,16 @@ public sealed class GetPollHistoryHandlerTests
     {
         // Arrange
         string dbName = Guid.NewGuid().ToString();
-        (PoTrafficDbContext db, Guid routeId, _) = await SeedAsync(dbName, pollCount: 10);
+        (PoTrafficDbContext db, Guid userId, Guid routeId, _) = await SeedAsync(dbName, pollCount: 10);
         var handler = new GetPollHistoryQueryHandler(db);
 
         // Act — page 1 of 3 records each
         var page1 = await handler.Handle(
-            new GetPollHistoryQuery(routeId, Guid.NewGuid(), Page: 1, PageSize: 3),
+            new GetPollHistoryQuery(routeId, userId, Page: 1, PageSize: 3),
             CancellationToken.None);
 
         var page2 = await handler.Handle(
-            new GetPollHistoryQuery(routeId, Guid.NewGuid(), Page: 2, PageSize: 3),
+            new GetPollHistoryQuery(routeId, userId, Page: 2, PageSize: 3),
             CancellationToken.None);
 
         // Assert

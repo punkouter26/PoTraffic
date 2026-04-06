@@ -52,7 +52,7 @@ public sealed class AuthValidatorTests
             .Options;
         await using PoTrafficDbContext db = new(opts);
         var validator = new RegisterCommandValidator(db);
-        var command = new RegisterCommand("new@example.com", "Password1!", "Europe/London");
+        var command = new RegisterCommand("new@example.com", "Password1!", "en-US");
 
         ValidationResult result = await validator.ValidateAsync(command);
 
