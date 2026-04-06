@@ -108,13 +108,9 @@ jobs:
 
       - name: Deploy to Azure App Service (PoTraffic RG)
         run: |
-          # Set explicit startup command — published output contains 2 runtimeconfig.json files
-          # (PoTraffic.Api + PoTraffic.Client), which confuses Azure's auto-detection.
-          az webapp config set \
-            --resource-group PoTraffic \
-            --name potraffic-api \
-            --startup-file "dotnet PoTraffic.Api.dll" \
-            --output none
+          # Note: startup-file "dotnet PoTraffic.Api.dll" is already set permanently on
+          # the App Service config. Calling az webapp config set here on every deploy
+          # triggers an extra app restart, which puts Kudu in a 503 state for new deploys.
 
           # Wait for Kudu SCM to be ready before deploying (it can be in a transitional state
           # after a restart or config change, returning 503 and rejecting zip deployments).
