@@ -108,6 +108,14 @@ jobs:
 
       - name: Deploy to Azure App Service (PoTraffic RG)
         run: |
+          # Ensure startup time limit is generous: Key Vault reads (~60s) +
+          # Azure SQL auto-pause resume (~90s) + EF migrations + Hangfire init
+          # can easily exceed the default 230s timeout. 800s gives ample margin.
+          az webapp config appsettings set \
+            --resource-group PoTraffic --name potraffic-api \
+            --settings WEBSITES_CONTAINER_START_TIME_LIMIT=800 \
+            --output none
+
           # Kudu basic auth is disabled in modern Azure App Service (security default).
           # Use an Azure AD Bearer token instead — available after az login (OIDC).
           TOKEN=$(az account get-access-token --resource https://management.azure.com \
@@ -133,20 +141,22 @@ jobs:
           fi
           echo "Deployment queued (HTTP $HTTP_STATUS). Waiting for app to start..."
 
-      # App needs ~2-3 min to cold-start (Key Vault + DB migrations on Linux container).
-      # Retry up to 20 times with 15s intervals (max 5 min total) before failing.
+      # Cold-start budget: Key Vault (~60s) + Azure SQL resume (~90s) + EF
+      # migrations + Hangfire init can total 5-8 min. Health check is also slow
+      # because /health itself queries the DB. Allow --max-time 120 per attempt
+      # and up to 40 retries (40 × 30s = 20 min), after a 2-min initial wait.
       - name: Health check
         run: |
-          echo "Waiting 60s for app cold-start..."
-          sleep 60
-          for i in $(seq 1 20); do
-            status=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 https://potraffic-api.azurewebsites.net/health || echo "000")
+          echo "Waiting 120s for container to start..."
+          sleep 120
+          for i in $(seq 1 40); do
+            status=$(curl -s -o /dev/null -w "%{http_code}" --max-time 120 https://potraffic-api.azurewebsites.net/health || echo "000")
             echo "Attempt $i — Health endpoint returned: $status"
             if [ "$status" = "200" ]; then
               echo "::notice::Deployment healthy — HTTP $status"
               exit 0
             fi
-            sleep 15
+            sleep 30
           done
           echo "::error::Health check failed after all retries"
           exit 1
