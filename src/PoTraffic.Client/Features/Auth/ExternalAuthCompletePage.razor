@@ -50,10 +50,12 @@
             ? returnUrl
             : "/dashboard";
 
-        // forceLoad: true ensures Blazor boots fresh so the token already in localStorage
-        // is read during CascadingAuthenticationState initialisation — avoiding a race
-        // between NotifyAuthenticationStateChanged and the NavMenu's first render.
-        Nav.NavigateTo(destination, forceLoad: true);
+        // Token is already persisted to localStorage by LoginAsync above.
+        // Use forceLoad:false — the auth state change notification handles re-rendering.
+        // forceLoad:true inside OnInitializedAsync causes Blazor to throttle/block the
+        // navigation because it fires a full page reload before the component finishes
+        // initialising, resulting in an infinite loading spinner.
+        Nav.NavigateTo(destination, forceLoad: false);
     }
 
     private static Dictionary<string, string> ParseFragment(string uri)
