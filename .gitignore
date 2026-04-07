@@ -92,3 +92,7 @@ local.settings.json
 
 # User secrets manifest (secrets themselves are in %APPDATA%)
 secrets.json
+
+logs_out/
+logs.zip
+*.zip
