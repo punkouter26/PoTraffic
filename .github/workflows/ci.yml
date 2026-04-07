@@ -108,21 +108,22 @@ jobs:
 
       - name: Deploy to Azure App Service (PoTraffic RG)
         run: |
-          # Ensure startup time limit is generous: Key Vault reads (~60s) +
-          # Azure SQL auto-pause resume (~90s) + EF migrations + Hangfire init
-          # can easily exceed the default 230s timeout. 800s gives ample margin.
+          # Idempotent settings: disable Oryx build (we deploy pre-built binaries)
+          # and keep startup limit generous for cold-start.
           az webapp config appsettings set \
             --resource-group PoTraffic --name potraffic-api \
-            --settings WEBSITES_CONTAINER_START_TIME_LIMIT=800 \
+            --settings \
+              SCM_DO_BUILD_DURING_DEPLOYMENT=false \
+              WEBSITES_CONTAINER_START_TIME_LIMIT=800 \
             --output none
 
           # Kudu basic auth is disabled in modern Azure App Service (security default).
-          # Use an Azure AD Bearer token instead — available after az login (OIDC).
+          # Use an Azure AD Bearer token — available after az login (OIDC).
           TOKEN=$(az account get-access-token --resource https://management.azure.com \
             --query accessToken -o tsv)
 
-          # POST to Kudu zipdeploy with isAsync=true — returns 202 immediately after
-          # the ZIP is received, without waiting for the app container to restart.
+          # POST to Kudu zipdeploy with isAsync=true — returns 202 immediately
+          # after the ZIP is received without waiting for app container restart.
           echo "Uploading ZIP to Kudu (async)..."
           HTTP_STATUS=$(curl -s -o /tmp/kudu_resp.txt -w "%{http_code}" \
             --max-time 300 \
@@ -139,7 +140,29 @@ jobs:
             echo "::error::Kudu zipdeploy failed — HTTP $HTTP_STATUS"
             exit 1
           fi
-          echo "Deployment queued (HTTP $HTTP_STATUS). Waiting for app to start..."
+
+          # Poll Kudu deployment status until complete (status 4=Success, 3=Failed).
+          # Without this, CI health check passes on the OLD running app while the
+          # new deployment processes asynchronously and potentially fails.
+          echo "Polling Kudu deployment status..."
+          for i in $(seq 1 60); do
+            DEPLOY_STATUS=$(curl -s \
+              -H "Authorization: Bearer $TOKEN" \
+              --max-time 15 \
+              "https://potraffic-api.scm.azurewebsites.net/api/deployments/latest" \
+              | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('status','?'),d.get('complete','?'))" 2>/dev/null || echo "? ?")
+            STATUS_CODE=$(echo "$DEPLOY_STATUS" | awk '{print $1}')
+            COMPLETE=$(echo "$DEPLOY_STATUS" | awk '{print $2}')
+            echo "Kudu deploy status: $STATUS_CODE (complete=$COMPLETE) — attempt $i"
+            if [ "$STATUS_CODE" = "4" ] && [ "$COMPLETE" = "True" ]; then
+              echo "Deployment succeeded (Kudu status 4)"
+              break
+            elif [ "$STATUS_CODE" = "3" ] && [ "$COMPLETE" = "True" ]; then
+              echo "::error::Kudu deployment failed (status 3)"
+              exit 1
+            fi
+            sleep 10
+          done
 
       # Cold-start budget: Key Vault (~60s) + Azure SQL resume (~90s) + EF
       # migrations + Hangfire init can total 5-8 min. Health check is also slow
