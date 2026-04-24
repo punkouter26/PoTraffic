@@ -28,7 +28,7 @@
                     </button>
                     @if (_menuOpen)
                     {
-                        <div class="pt-user-dropdown">
+                        <div class="pt-user-dropdown" @onclick:stopPropagation="true">
                             <div class="pt-user-dropdown-header">
                                 <div style="font-size:0.72rem; color:#94a3b8; margin-bottom:2px;">Signed in as</div>
                                 <div class="pt-user-dropdown-email">@_email</div>
