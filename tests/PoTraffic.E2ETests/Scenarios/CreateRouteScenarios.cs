@@ -64,28 +64,32 @@ public sealed class CreateRouteScenarios : PlaywrightTestBase
 
         await Page.WaitForURLAsync($"{BaseUrl}/dashboard", new() { Timeout = 30_000 });
 
-        // Navigate to /routes
+        // Navigate to /routes — redirects to /dashboard where routes are shown as cards
         await Page.GotoAsync($"{BaseUrl}/routes");
+        await Page.WaitForURLAsync($"{BaseUrl}/dashboard", new() { Timeout = 15_000 });
 
-        // ── Assert — both addresses visible in the RadzenDataGrid ────────────────
-        // We look for cells containing the street name (ignoring commas/spacing for now)
+        // Wait for the dashboard status bar to appear (signals the page finished loading)
+        await Page.Locator(".pt-status-bar").WaitForAsync(new() { Timeout = 30_000 });
+
+        // ── Assert — addresses visible in route cards (pt-route-addr-from / pt-route-addr-to) ──
+        // /routes was merged into /dashboard (C1/UX-6). Routes render as .pt-route-card.
         string originStreet = origin.Split(',').First();
-        Microsoft.Playwright.ILocator originCell =
-            Page.Locator("td").Filter(new() { HasText = originStreet }).First;
-        await originCell.WaitForAsync(new() { Timeout = 15_000, State = Microsoft.Playwright.WaitForSelectorState.Visible });
+        Microsoft.Playwright.ILocator originAddr =
+            Page.Locator(".pt-route-addr-from").Filter(new() { HasText = originStreet }).First;
+        await originAddr.WaitForAsync(new() { Timeout = 15_000, State = Microsoft.Playwright.WaitForSelectorState.Visible });
 
-        bool originVisible = await originCell.IsVisibleAsync();
+        bool originVisible = await originAddr.IsVisibleAsync();
         Assert.True(originVisible,
-            $"Expected origin street '{originStreet}' to be visible in the routes grid.");
+            $"Expected origin street '{originStreet}' to be visible in a route card.");
 
         string destStreet = destination.Split(',').First();
-        Microsoft.Playwright.ILocator destCell =
-            Page.Locator("td").Filter(new() { HasText = destStreet }).First;
-        await destCell.WaitForAsync(new() { Timeout = 15_000, State = Microsoft.Playwright.WaitForSelectorState.Visible });
+        Microsoft.Playwright.ILocator destAddr =
+            Page.Locator(".pt-route-addr-to").Filter(new() { HasText = destStreet }).First;
+        await destAddr.WaitForAsync(new() { Timeout = 15_000, State = Microsoft.Playwright.WaitForSelectorState.Visible });
 
-        bool destVisible = await destCell.IsVisibleAsync();
+        bool destVisible = await destAddr.IsVisibleAsync();
         Assert.True(destVisible,
-            $"Expected destination street '{destStreet}' to be visible in the routes grid.");
+            $"Expected destination street '{destStreet}' to be visible in a route card.");
     }
 
     /// <summary>
@@ -137,48 +141,54 @@ public sealed class CreateRouteScenarios : PlaywrightTestBase
         var originInput = Page.Locator("input.rz-textbox").First;
         await originInput.WaitForAsync(new() { Timeout = 20_000 });
 
-        // Fill in origin address and click the first Verify button
+        // Fill in origin and destination addresses
+        // The form no longer has a standalone "Verify" button — address geocoding now
+        // happens as part of "Save & Start Monitoring" submission.
         await originInput.ClickAsync();
         await Page.Keyboard.PressAsync("Control+A");
         await Page.Keyboard.PressAsync("Backspace");
         await Page.Keyboard.TypeAsync(OriginAddress);
         await Page.Keyboard.PressAsync("Tab");
 
-        await Page.GetByRole(Microsoft.Playwright.AriaRole.Button, new() { Name = "Verify" })
-                  .First
+        var destInput = Page.Locator("input.rz-textbox").Nth(1);
+        await destInput.ClickAsync();
+        await Page.Keyboard.PressAsync("Control+A");
+        await Page.Keyboard.PressAsync("Backspace");
+        await Page.Keyboard.TypeAsync(DestinationAddress);
+        await Page.Keyboard.PressAsync("Tab");
+
+        // Click the Save & Start Monitoring submit button
+        await Page.GetByRole(Microsoft.Playwright.AriaRole.Button, new() { Name = "Save & Start Monitoring" })
                   .ClickAsync();
 
-        // ── Assert — a response message is visible (not a crash or silent 404) ───
-        // RadzenAlert renders as <div role="alert"> with AlertStyle.Danger for both
-        // success ("verified ✓") and failure ("could not be verified") outcomes.
-        // We wait for the alert text to contain either expected phrase; this avoids false
-        // matches on unrelated alerts (nav banners, previous state, etc.).
-        await Page.WaitForFunctionAsync(
-            @"() => {
-                const alerts = [...document.querySelectorAll('.rz-alert, [role=""alert""]')];
-                return alerts.some(el => {
-                    const t = el.innerText.toLowerCase();
-                    return t.includes('verified') || t.includes('could not');
-                });
-            }",
-            null,
-            new() { Timeout = 20_000 });
+        // ── Assert — either success (navigate to /dashboard) or inline error shown ──
+        // With the stub geocoding provider in Testing env the creation may succeed or
+        // fail. Either outcome is valid — what's NOT acceptable is a silent hang or Blazor crash.
+        bool navigatedToDashboard = false;
+        try
+        {
+            await Page.WaitForURLAsync($"{BaseUrl}/dashboard", new() { Timeout = 10_000 });
+            navigatedToDashboard = true;
+        }
+        catch (Exception)
+        {
+            // Didn't navigate — check for an inline error alert instead
+        }
 
-        var alertDiv = Page.Locator(".rz-alert, [role='alert']")
-            .Filter(new() { HasTextRegex = new System.Text.RegularExpressions.Regex("verified|could not", System.Text.RegularExpressions.RegexOptions.IgnoreCase) })
-            .First;
-        string alertText = await alertDiv.InnerTextAsync();
-
-        bool hasResponse = alertText.Contains("verified", StringComparison.OrdinalIgnoreCase) ||
-                           alertText.Contains("could not be verified", StringComparison.OrdinalIgnoreCase);
-
-        Assert.True(hasResponse,
-            $"Expected a verify response message but got: '{alertText}'\n" +
-            $"Console: {string.Join("; ", consoleMessages.TakeLast(10))}");
+        if (!navigatedToDashboard)
+        {
+            // An inline error from the API should be displayed in RadzenAlert
+            ILocator errorAlert = Page.Locator(".rz-alert, [role='alert']").First;
+            bool alertVisible = await errorAlert.IsVisibleAsync();
+            string alertText = alertVisible ? await errorAlert.InnerTextAsync() : "(no alert)";
+            Assert.True(alertVisible,
+                $"Expected either navigation to /dashboard or an error alert after form submit, " +
+                $"but neither occurred. URL: {Page.Url}. Alert text: '{alertText}'.");
+        }
 
         // Guard: the "An unhandled error has occurred." Blazor error toast must NOT be visible
         bool blazorCrash = await Page.Locator("#blazor-error-ui").IsVisibleAsync();
         Assert.False(blazorCrash,
-            "Blazor error toast appeared — the verify endpoint likely returned an unexpected error.");
+            "Blazor error toast appeared — the route creation endpoint returned an unexpected unhandled error.");
     }
 }

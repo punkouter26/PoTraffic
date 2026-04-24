@@ -94,6 +94,58 @@ try
 
     WebApplication app = builder.Build();
 
+    // ── Blazor WASM WebRootFileProvider fix ───────────────────────────────────
+    // In .NET 10, MapStaticAssets() creates endpoint-based routes for each fingerprinted
+    // static asset, but MapFallbackToFile("index.html") uses WebRootFileProvider (the older
+    // middleware approach). UseStaticWebAssets() may not update WebRootFileProvider correctly
+    // outside of the Development environment. We manually populate it from the runtime manifest
+    // so that SPA routing (MapFallbackToFile) can serve index.html for all non-API routes.
+    if (!app.Environment.IsProduction())
+    {
+        IWebHostEnvironment webEnv = app.Services.GetRequiredService<IWebHostEnvironment>();
+        ILogger<Program> startupLogger = app.Services.GetRequiredService<ILogger<Program>>();
+
+        if (!webEnv.WebRootFileProvider.GetFileInfo("index.html").Exists)
+        {
+            startupLogger.LogWarning(
+                "WebRootFileProvider does not contain index.html — configuring from static web assets manifest.");
+
+            string manifestPath = Path.Combine(
+                AppContext.BaseDirectory,
+                $"{webEnv.ApplicationName}.staticwebassets.runtime.json");
+
+            if (File.Exists(manifestPath))
+            {
+                using System.Text.Json.JsonDocument manifestDoc =
+                    System.Text.Json.JsonDocument.Parse(File.ReadAllText(manifestPath));
+                if (manifestDoc.RootElement.TryGetProperty("ContentRoots",
+                    out System.Text.Json.JsonElement roots))
+                {
+                    Microsoft.Extensions.FileProviders.IFileProvider[] providers = roots.EnumerateArray()
+                        .Select(r => r.GetString() ?? string.Empty)
+                        .Where(p => !string.IsNullOrEmpty(p) && Directory.Exists(p))
+                        .Select(p =>
+                            (Microsoft.Extensions.FileProviders.IFileProvider)
+                            new Microsoft.Extensions.FileProviders.PhysicalFileProvider(p))
+                        .ToArray();
+
+                    if (providers.Length > 0)
+                    {
+                        webEnv.WebRootFileProvider =
+                            new Microsoft.Extensions.FileProviders.CompositeFileProvider(providers);
+                        startupLogger.LogInformation(
+                            "Configured WebRootFileProvider with {Count} content root(s) from static web assets manifest.",
+                            providers.Length);
+                    }
+                }
+            }
+            else
+            {
+                startupLogger.LogWarning("Static web assets manifest not found at {Path}.", manifestPath);
+            }
+        }
+    }
+
     // ── Exception handling ────────────────────────────────────────────────────
     // GlobalExceptionHandler runs first (handles ValidationException → 422);
     // unhandled exceptions fall through to the default handler.
@@ -138,10 +190,12 @@ try
     app.MapAccountEndpoints();
     app.MapAdminEndpoints();
     app.MapAuthEndpoints();
+    app.MapAnonEndpoints();
     app.MapRoutesEndpoints();
     app.MapWindowsEndpoints();
     app.MapHistoryEndpoints();
     app.MapSystemEndpoints();
+    app.MapDiagEndpoints();
     app.MapTestingEndpoints(app.Environment);
 
     // Error endpoint

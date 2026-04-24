@@ -74,43 +74,35 @@ public sealed class CheckNowScenarios : PlaywrightTestBase
         await Page.WaitForURLAsync($"{BaseUrl}/dashboard", new() { Timeout = 30_000 });
 
         // ── Navigation with debug output ─────────────────────────────────────────
+        // /routes redirects to /dashboard (C1/UX-6 merge). Routes render as .pt-route-card.
         await Page.GotoAsync($"{BaseUrl}/routes");
-        System.Console.WriteLine($"[DEBUG] Navigation to /routes. Current URL: {Page.Url}");
+        await Page.WaitForURLAsync($"{BaseUrl}/dashboard", new() { Timeout = 15_000 });
+        System.Console.WriteLine($"[DEBUG] Navigation to /routes → /dashboard. Current URL: {Page.Url}");
 
-        // Wait for ROOT loading progress to disappear (splash screen)
-        await Page.Locator(".loading-progress").WaitForAsync(new() { State = WaitForSelectorState.Detached, Timeout = 60_000 });
+        // Wait for the status bar to appear (dashboard finished loading)
+        await Page.Locator(".pt-status-bar").WaitForAsync(new() { Timeout = 30_000 });
 
-        // Wait for Radzen progress bar to load (if any)
-        try {
-            await Page.Locator(".rz-progressbar").WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 2000 });
-        } catch {}
-        
-        // Wait for Radzen progress bar to DISAPPEAR
-        await Page.WaitForFunctionAsync("() => document.querySelector('.rz-progressbar') === null", null, new PageWaitForFunctionOptions { Timeout = 30_000 });
-        
-        string content = await Page.ContentAsync();
-        System.Console.WriteLine($"[DEBUG] Page Content: {content}"); // Print ALL content
-
-        // T114: Resilient grid locator. Radzen 5 splits the address with bold/span tags.
+        // T114: Find the route card by origin address (pt-route-addr-from span)
         string firstPart = origin.Split(',')[0];
-        Microsoft.Playwright.ILocator originCell = Page.Locator($"td:has-text('{firstPart}')").First;
+        Microsoft.Playwright.ILocator routeCard =
+            Page.Locator(".pt-route-card").Filter(new() { HasText = firstPart }).First;
         try
         {
-            await originCell.WaitForAsync(new() { Timeout = 15_000 });
+            await routeCard.WaitForAsync(new() { Timeout = 15_000 });
         }
         catch (Exception ex)
         {
             string diagnostics = string.Join("\n", consoleMessages.TakeLast(30));
             throw new InvalidOperationException(
-                $"Routes grid did not show seeded route with origin '{firstPart}' within 15 s.\nURL: {Page.Url}\n" +
+                $"Route card with origin '{firstPart}' did not appear on dashboard within 15 s.\nURL: {Page.Url}\n" +
                 $"Console (last 30):\n{diagnostics}", ex);
         }
 
-        // ── Click "Check Now" on the seeded route's row ──────────────────────────
-        // Search button is the first button in the actions column for this row.
-        // We find the row with the origin address and pick the first button.
-        Microsoft.Playwright.ILocator routeRow = Page.Locator("tr").Filter(new() { HasText = firstPart }).First;
-        Microsoft.Playwright.ILocator checkNowButton = routeRow.Locator("button").First;
+        // ── Click "Check Now" on the seeded route's card ─────────────────────────
+        // Route cards render a RadzenButton with Text="Check Now" in .pt-route-card-actions.
+        // We scope the lookup to the specific card that contains the origin address.
+        Microsoft.Playwright.ILocator checkNowButton =
+            routeCard.GetByRole(Microsoft.Playwright.AriaRole.Button, new() { Name = "Check Now" });
 
         await checkNowButton.WaitForAsync(new() { Timeout = 15_000, State = WaitForSelectorState.Attached });
         await checkNowButton.ClickAsync(new() { Force = true });

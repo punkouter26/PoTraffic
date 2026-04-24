@@ -57,22 +57,24 @@ public sealed class AdminLoginScenarios : PlaywrightTestBase
         // Click the Sign In button
         await Page.GetByRole(AriaRole.Button, new() { Name = "Sign In" }).ClickAsync();
 
-        // Assert — should navigate to /dashboard and show the Dashboard heading
+        // Assert — should navigate to /dashboard and show the status bar
         await Page.WaitForURLAsync("**/dashboard", new() { Timeout = 15_000 });
 
-        // Verify the page contains the Welcome Back heading (H4)
-        ILocator dashboardHeading = Page.GetByRole(AriaRole.Heading, new() { Name = "Welcome Back" });
-        await dashboardHeading.WaitForAsync(new() { Timeout = 10_000 });
-        (await dashboardHeading.IsVisibleAsync()).Should().BeTrue("the Welcome Back heading should be visible after login");
+        // Verify the pt-status-bar is visible — DashboardPage always renders this for authenticated users.
+        // The dashboard was redesigned to use a compact status bar instead of a heading.
+        ILocator statusBar = Page.Locator(".pt-status-bar");
+        await statusBar.WaitForAsync(new() { Timeout = 10_000 });
+        (await statusBar.IsVisibleAsync()).Should().BeTrue("the dashboard status bar should be visible after login");
 
         // Verify the URL is correct
         Page.Url.Should().Contain("/dashboard");
 
-        // Verify the nav menu shows authenticated links (Dashboard, Routes, Settings)
+        // Verify the nav menu shows authenticated links (Dashboard appears for all authenticated users)
         ILocator navDashboard = Page.Locator(".sidebar").GetByText("Dashboard");
         (await navDashboard.IsVisibleAsync()).Should().BeTrue("the Dashboard nav link should appear for authenticated users");
 
-        ILocator navRoutes = Page.Locator(".sidebar").GetByText("Routes");
-        (await navRoutes.IsVisibleAsync()).Should().BeTrue("the Routes nav link should appear for authenticated users");
+        // Admin users see the Admin Tools link in the sidebar
+        ILocator navAdmin = Page.Locator(".sidebar").GetByText("Admin Tools");
+        (await navAdmin.IsVisibleAsync()).Should().BeTrue("the Admin Tools nav link should appear for Administrator users");
     }
 }

@@ -114,7 +114,7 @@ public sealed class MobileViewportScenarios : IAsyncLifetime
         await _page.GotoAsync("/admin");
         await _page.WaitForURLAsync("**/login**", new PageWaitForURLOptions
         {
-            Timeout = 5_000
+            Timeout = 30_000   // Allow time for WASM cold-start + Blazor auth redirect
         });
 
         // Assert

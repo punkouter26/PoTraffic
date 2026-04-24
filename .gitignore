@@ -96,3 +96,25 @@ secrets.json
 logs_out/
 logs.zip
 *.zip
+
+# Azurite (local Azure Storage emulator) data
+azurite/
+
+# Container runtime data
+.docker/
+
+# LLMDOCS generated artifacts (if any)
+LLMDOCS/_site/
+
+# Debug logging
+*.log.txt
+
+# Rider
+*.dotSettings.user
+
+# ReSharper
+*_ReSharper*
+*.DotSettings.user
+
+# LSCache build artifacts
+*.csproj.lscache
