@@ -1,4 +1,5 @@
 ﻿@inherits LayoutComponentBase
+@implements IDisposable
 @using Microsoft.AspNetCore.Components.Authorization
 @using PoTraffic.Client.Infrastructure.Auth
 @inject AuthenticationStateProvider AuthStateProvider
@@ -16,32 +17,35 @@
 
     <main>
         <div class="top-row px-4">
-            @* UX-10: User chip with dropdown replacing the version label *@
-            <div class="pt-user-chip" @onclick:stopPropagation="true">
-                <button class="pt-user-chip-btn" @onclick="ToggleMenu" type="button">
-                    <div class="pt-user-avatar">@_initials</div>
-                    <span>@_email</span>
-                    <span style="font-size:0.7rem; color:#94a3b8; margin-left:2px;">▾</span>
-                </button>
-                @if (_menuOpen)
-                {
-                    <div class="pt-user-dropdown">
-                        <div class="pt-user-dropdown-header">
-                            <div style="font-size:0.72rem; color:#94a3b8; margin-bottom:2px;">Signed in as</div>
-                            <div class="pt-user-dropdown-email">@_email</div>
+            @if (_isAuthenticated)
+            {
+                @* UX-10: User chip with dropdown replacing the version label *@
+                <div class="pt-user-chip" @onclick:stopPropagation="true">
+                    <button class="pt-user-chip-btn" @onclick="ToggleMenu" type="button">
+                        <div class="pt-user-avatar">@_initials</div>
+                        <span>@_email</span>
+                        <span style="font-size:0.7rem; color:#94a3b8; margin-left:2px;">▾</span>
+                    </button>
+                    @if (_menuOpen)
+                    {
+                        <div class="pt-user-dropdown">
+                            <div class="pt-user-dropdown-header">
+                                <div style="font-size:0.72rem; color:#94a3b8; margin-bottom:2px;">Signed in as</div>
+                                <div class="pt-user-dropdown-email">@_email</div>
+                            </div>
+                            <a class="pt-dropdown-item" href="/account/settings">
+                                <span class="material-symbols-outlined" style="font-size:1rem;">settings</span>
+                                Account Settings
+                            </a>
+                            <div class="pt-dropdown-divider"></div>
+                            <button class="pt-dropdown-item danger" @onclick="LogoutAsync" type="button">
+                                <span class="material-symbols-outlined" style="font-size:1rem;">logout</span>
+                                Sign Out
+                            </button>
                         </div>
-                        <a class="pt-dropdown-item" href="/account/settings">
-                            <span class="material-symbols-outlined" style="font-size:1rem;">settings</span>
-                            Account Settings
-                        </a>
-                        <div class="pt-dropdown-divider"></div>
-                        <button class="pt-dropdown-item danger" @onclick="LogoutAsync" type="button">
-                            <span class="material-symbols-outlined" style="font-size:1rem;">logout</span>
-                            Sign Out
-                        </button>
-                    </div>
-                }
-            </div>
+                    }
+                </div>
+            }
         </div>
 
         <article class="content px-4">
@@ -60,16 +64,39 @@
     private bool _menuOpen;
     private string _email = string.Empty;
     private string _initials = "?";
+    private bool _isAuthenticated;
 
     protected override async Task OnInitializedAsync()
     {
-        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        AuthStateProvider.AuthenticationStateChanged += HandleAuthStateChanged;
+        await UpdateUserStateAsync(await AuthStateProvider.GetAuthenticationStateAsync());
+    }
+
+    private async void HandleAuthStateChanged(Task<AuthenticationState> stateTask)
+    {
+        await UpdateUserStateAsync(await stateTask);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private Task UpdateUserStateAsync(AuthenticationState authState)
+    {
         var user = authState.User;
-        _email = user.FindFirst("email")?.Value
-            ?? user.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value
-            ?? string.Empty;
-        if (!string.IsNullOrEmpty(_email))
+        _isAuthenticated = user.Identity?.IsAuthenticated == true;
+
+        if (_isAuthenticated)
+        {
+            _email = user.FindFirst("email")?.Value
+                ?? user.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value
+                ?? user.Identity?.Name
+                ?? "User";
             _initials = _email[0].ToString().ToUpperInvariant();
+            return Task.CompletedTask;
+        }
+
+        _menuOpen = false;
+        _email = string.Empty;
+        _initials = "?";
+        return Task.CompletedTask;
     }
 
     private void ToggleMenu() => _menuOpen = !_menuOpen;
@@ -81,6 +108,11 @@
         if (AuthStateProvider is JwtAuthenticationStateProvider jwtProvider)
             await jwtProvider.LogoutAsync();
         Nav.NavigateTo("/login", forceLoad: true);
+    }
+
+    public void Dispose()
+    {
+        AuthStateProvider.AuthenticationStateChanged -= HandleAuthStateChanged;
     }
 }
 
