@@ -1,0 +1,8 @@
+<step title="Incoming Request" date="2026-04-24T15:08:33.468" instance="38949c" url="/api/deployments/latest" method="GET" type="request" pid="854,1,5" Accept="*/*" Host="potraffic-api.scm.azurewebsites.net" User-Agent="curl/8.5.0" Authorization="Bea..." X-ARR-LOG-ID="742c4fab-9395-4c61-837e-1ec40c91b9e4" CLIENT-IP="172.182.200.146:64833" X-SITE-DEPLOYMENT-ID="potraffic-api" WAS-DEFAULT-HOSTNAME="potraffic-api.scm.azurewebsites.net" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/api/deployments/latest" X-Client-IP="172.182.200.146" X-Client-Port="64833" >
+  <step title="DeploymentService.GetResult" date="2026-04-24T15:08:33.565" >
+    <step title="DeploymentService.GetLatestDeployment" date="2026-04-24T15:08:33.572" >
+      <step title="DeploymentManager.GetResults" date="2026-04-24T15:08:33.577" /><!-- duration: 132ms -->
+    </step><!-- duration: 154ms -->
+  </step><!-- duration: 164ms -->
+  <step title="Outgoing response" date="2026-04-24T15:08:33.815" type="response" statusCode="202" statusText="Accepted" /><!-- duration: 29ms -->
+</step><!-- duration: 379ms -->
