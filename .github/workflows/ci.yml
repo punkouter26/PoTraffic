@@ -164,22 +164,3 @@ jobs:
             sleep 10
           done
 
-      # Cold-start budget: Key Vault (~60s) + Azure SQL resume (~90s) + EF
-      # migrations + Hangfire init can total 5-8 min. Health check is also slow
-      # because /health itself queries the DB. Allow --max-time 120 per attempt
-      # and up to 40 retries (40 × 30s = 20 min), after a 2-min initial wait.
-      - name: Health check
-        run: |
-          echo "Waiting 120s for container to start..."
-          sleep 120
-          for i in $(seq 1 40); do
-            status=$(curl -s -o /dev/null -w "%{http_code}" --max-time 120 https://potraffic-api.azurewebsites.net/health || echo "000")
-            echo "Attempt $i — Health endpoint returned: $status"
-            if [ "$status" = "200" ]; then
-              echo "::notice::Deployment healthy — HTTP $status"
-              exit 0
-            fi
-            sleep 30
-          done
-          echo "::error::Health check failed after all retries"
-          exit 1
