@@ -117,6 +117,14 @@ jobs:
               WEBSITES_CONTAINER_START_TIME_LIMIT=800 \
             --output none
 
+          # Explicitly set startup command — the publish output contains two runtimeconfig.json
+          # files (PoTraffic.Api and PoTraffic.Client) which confuses Azure auto-detection.
+          # Without this, Azure may run the wrong DLL and serve the Welcome page.
+          az webapp config set \
+            --resource-group PoTraffic --name potraffic-api \
+            --startup-file "dotnet PoTraffic.Api.dll" \
+            --output none
+
           # az webapp deploy uses OIDC-derived credentials automatically (no manual
           # token plumbing needed) and is the recommended CLI command for zip deployments.
           # --clean ensures stale files from previous deploys are removed.
