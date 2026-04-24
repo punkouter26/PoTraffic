@@ -229,12 +229,31 @@ try
     // ── Startup: run EF Core migrations and seed admin user ─────────────────
     // Ensures schema is always current and an Administrator account exists on
     // every cold-start (idempotent — safe to run against an existing database).
+    // Retry loop handles Azure SQL serverless auto-pause resume latency (can take
+    // 30-90s on cold wake). Without retries, MigrateAsync() times out and crashes
+    // the app before it can serve requests.
     await using (AsyncServiceScope scope = app.Services.CreateAsyncScope())
     {
         PoTrafficDbContext db = scope.ServiceProvider.GetRequiredService<PoTrafficDbContext>();
         ILogger<Program> startupLog = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
 
-        await db.Database.MigrateAsync();
+        const int maxMigrationAttempts = 6;
+        for (int attempt = 1; attempt <= maxMigrationAttempts; attempt++)
+        {
+            try
+            {
+                startupLog.LogInformation("Database migration attempt {Attempt}/{Max}...", attempt, maxMigrationAttempts);
+                await db.Database.MigrateAsync();
+                break; // success
+            }
+            catch (Exception ex) when (attempt < maxMigrationAttempts)
+            {
+                startupLog.LogWarning(ex,
+                    "Migration attempt {Attempt} failed (DB may be resuming from serverless pause). Retrying in 20s...",
+                    attempt);
+                await Task.Delay(TimeSpan.FromSeconds(20));
+            }
+        }
         startupLog.LogInformation("Database migrations applied.");
 
         const string adminEmail    = "admin@potraffic.dev";
