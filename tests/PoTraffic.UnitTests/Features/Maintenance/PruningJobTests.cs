@@ -90,9 +90,11 @@ public sealed class PruningJobTests
         // PolledAt < GETUTCDATE() - 90 → strictly less than means exact boundary is not deleted
         db.Set<PollRecord>().Add(new PollRecord
         {
-            Id = Guid.NewGuid(), RouteId = routeId,
+            Id = Guid.NewGuid(),
+            RouteId = routeId,
             PolledAt = DateTime.UtcNow.AddDays(-90).AddMinutes(5), // 90 days ago + 5 min → just inside window
-            TravelDurationSeconds = 300, DistanceMetres = 5000
+            TravelDurationSeconds = 300,
+            DistanceMetres = 5000
         });
         await db.SaveChangesAsync();
 

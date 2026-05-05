@@ -28,7 +28,7 @@ public static class DiagEndpoints
 
             // Get health check results
             HealthReport report = await healthCheckService.CheckHealthAsync();
-            
+
             // Build connection status
             var connections = report.Entries.Select(e => new
             {
@@ -42,14 +42,14 @@ public static class DiagEndpoints
             // Build masked configuration keys (non-sensitive only)
             var configKeys = new List<object>();
             var sensitivePatterns = new[] { "Key", "Secret", "Password", "Token", "ConnectionString", "ApiKey" };
-            
+
             foreach (var section in configuration.GetChildren())
             {
                 foreach (var key in section.GetChildren())
                 {
-                    bool isSensitive = sensitivePatterns.Any(p => 
+                    bool isSensitive = sensitivePatterns.Any(p =>
                         key.Key.Contains(p, StringComparison.OrdinalIgnoreCase));
-                    
+
                     configKeys.Add(new
                     {
                         path = $"{section.Key}:{key.Key}",
@@ -83,7 +83,7 @@ public static class DiagEndpoints
     {
         if (string.IsNullOrEmpty(value)) return "(empty)";
         if (value.Length <= 4) return "****";
-        
+
         int visibleChars = Math.Min(3, value.Length / 4);
         return value[..visibleChars] + new string('*', Math.Max(4, value.Length - visibleChars * 2)) + value[^visibleChars..];
     }
@@ -159,16 +159,17 @@ public static class DiagEndpoints
                     </tr>
                 </thead>
                 <tbody>
-                    {string.Join("\n", connections.Select(c => {
-                        dynamic conn = c;
-                        string dotClass = conn.status == "Healthy" ? "dot-healthy" : conn.status == "Degraded" ? "dot-degraded" : "dot-unhealthy";
-                        return $@"<tr>
+                    {string.Join("\n", connections.Select(c =>
+        {
+            dynamic conn = c;
+            string dotClass = conn.status == "Healthy" ? "dot-healthy" : conn.status == "Degraded" ? "dot-degraded" : "dot-unhealthy";
+            return $@"<tr>
                             <td><span class=""status-dot {dotClass}""></span>{conn.name}</td>
                             <td><span class=""status-badge status-{conn.status.ToString().ToLower()}"">{conn.status}</span></td>
                             <td>{conn.durationMs:F2}</td>
                             <td style=""color: #94a3b8; font-size: 0.875rem;"">{conn.description} {conn.exception}</td>
                         </tr>";
-                    }))}
+        }))}
                 </tbody>
             </table>
         </div>
@@ -183,14 +184,15 @@ public static class DiagEndpoints
                     </tr>
                 </thead>
                 <tbody>
-                    {string.Join("\n", configKeys.Select(c => {
-                        dynamic cfg = c;
-                        string valueClass = cfg.isSensitive ? "sensitive" : "";
-                        return $@"<tr>
+                    {string.Join("\n", configKeys.Select(c =>
+        {
+            dynamic cfg = c;
+            string valueClass = cfg.isSensitive ? "sensitive" : "";
+            return $@"<tr>
                             <td>{cfg.path}</td>
                             <td class=""{valueClass}"">{cfg.value}</td>
                         </tr>";
-                    }))}
+        }))}
                 </tbody>
             </table>
         </div>

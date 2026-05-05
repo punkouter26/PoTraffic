@@ -40,7 +40,7 @@ public sealed class SkipUnlessE2EReadyAttribute : FactAttribute
         // Playwright stores browser executables in %LOCALAPPDATA%/ms-playwright on Windows,
         // and ~/.cache/ms-playwright on Linux/macOS.
         string localData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        string homeDir   = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        string homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
 
         string[] candidates =
         [

@@ -14,7 +14,7 @@ namespace PoTraffic.E2ETests.Scenarios;
 /// </summary>
 public sealed class CheckNowScenarios : PlaywrightTestBase
 {
-    private const string OriginAddress      = "501 Sylview Dr, Pasadena, CA";
+    private const string OriginAddress = "501 Sylview Dr, Pasadena, CA";
     private const string DestinationAddress = "456 S Fair Oaks Ave, Pasadena, CA";
 
     /// <summary>
@@ -37,13 +37,13 @@ public sealed class CheckNowScenarios : PlaywrightTestBase
             email, OriginAddress, DestinationAddress);
 
         var consoleMessages = new List<string>();
-        Page.Console += (_, msg) => 
+        Page.Console += (_, msg) =>
         {
             string log = $"[BROWSER_{msg.Type.ToUpper()}] {msg.Text}";
             consoleMessages.Add(log);
             System.Console.WriteLine(log);
         };
-        Page.PageError += (_, err) => 
+        Page.PageError += (_, err) =>
         {
             string log = $"[BROWSER_ERROR] {err}";
             consoleMessages.Add(log);
@@ -134,8 +134,8 @@ public sealed class CheckNowScenarios : PlaywrightTestBase
         // a blank/silent response is the only unacceptable outcome (FR-016).
         bool hasExpectedContent =
             notificationText.Contains("Current travel time", StringComparison.OrdinalIgnoreCase)
-            || notificationText.Contains("Check Now failed",  StringComparison.OrdinalIgnoreCase)
-            || notificationText.Contains("min",               StringComparison.OrdinalIgnoreCase);
+            || notificationText.Contains("Check Now failed", StringComparison.OrdinalIgnoreCase)
+            || notificationText.Contains("min", StringComparison.OrdinalIgnoreCase);
 
         Assert.True(hasExpectedContent,
             $"Notification did not contain expected travel-time or error content.\n" +
@@ -174,13 +174,13 @@ public sealed class CheckNowScenarios : PlaywrightTestBase
         (_, string origin, _) = await api.SeedRouteAsync(email, OriginAddress, DestinationAddress);
 
         var consoleMessages = new List<string>();
-        Page.Console += (_, msg) => 
+        Page.Console += (_, msg) =>
         {
             string log = $"[BROWSER_{msg.Type.ToUpper()}] {msg.Text}";
             consoleMessages.Add(log);
             System.Console.WriteLine(log);
         };
-        Page.PageError += (_, err) => 
+        Page.PageError += (_, err) =>
         {
             string log = $"[BROWSER_ERROR] {err}";
             consoleMessages.Add(log);
@@ -213,7 +213,7 @@ public sealed class CheckNowScenarios : PlaywrightTestBase
         string text = await notification.InnerTextAsync();
 
         Assert.Contains("Current travel time", text, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("min",                 text, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("km",                  text, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("min", text, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("km", text, StringComparison.OrdinalIgnoreCase);
     }
 }

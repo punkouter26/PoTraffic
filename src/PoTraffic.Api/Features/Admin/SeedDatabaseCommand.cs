@@ -15,7 +15,7 @@ public sealed record SeedDatabaseResult(int UsersCreated, int RoutesCreated, int
 
 public sealed class SeedDatabaseHandler(
     PoTrafficDbContext db,
-    ILogger<SeedDatabaseHandler> logger) 
+    ILogger<SeedDatabaseHandler> logger)
     : IRequestHandler<SeedDatabaseCommand, SeedDatabaseResult>
 {
     public async Task<SeedDatabaseResult> Handle(SeedDatabaseCommand request, CancellationToken ct)
@@ -38,13 +38,13 @@ public sealed class SeedDatabaseHandler(
             {
                 user = new User
                 {
-                    Id                     = Guid.NewGuid(),
-                    Email                  = u.Email,
-                    PasswordHash           = BCrypt.Net.BCrypt.HashPassword("User123!"),
-                    Locale                 = "en-US",
-                    Role                   = "Commuter",
-                    IsEmailVerified        = true,
-                    CreatedAt              = DateTimeOffset.UtcNow
+                    Id = Guid.NewGuid(),
+                    Email = u.Email,
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("User123!"),
+                    Locale = "en-US",
+                    Role = "Commuter",
+                    IsEmailVerified = true,
+                    CreatedAt = DateTimeOffset.UtcNow
                 };
                 db.Users.Add(user);
                 usersCreatedCount++;
@@ -65,15 +65,15 @@ public sealed class SeedDatabaseHandler(
                 {
                     var route = new EntityRoute
                     {
-                        Id                     = Guid.NewGuid(),
-                        UserId                 = user.Id,
-                        OriginAddress          = rd.Origin,
-                        OriginCoordinates      = "34.1478,-118.1445", // dummy coordinates
-                        DestinationAddress     = rd.Destination,
+                        Id = Guid.NewGuid(),
+                        UserId = user.Id,
+                        OriginAddress = rd.Origin,
+                        OriginCoordinates = "34.1478,-118.1445", // dummy coordinates
+                        DestinationAddress = rd.Destination,
                         DestinationCoordinates = "34.1478,-118.1445", // dummy coordinates
-                        Provider               = rd.Provider,
-                        MonitoringStatus       = 0,
-                        CreatedAt              = DateTimeOffset.UtcNow
+                        Provider = rd.Provider,
+                        MonitoringStatus = 0,
+                        CreatedAt = DateTimeOffset.UtcNow
                     };
                     db.Routes.Add(route);
                     routesCreatedCount++;
@@ -97,7 +97,7 @@ public sealed class SeedDatabaseHandler(
                             for (int m = 0; m < 60; m += 5)
                             {
                                 var polledAt = date.AddHours(h).AddMinutes(m);
-                                
+
                                 // Randomize duration with some "volatility" (high standard deviation)
                                 // Standard variation: +/- 5 mins
                                 // Rare anomaly: + 20 mins
@@ -107,13 +107,13 @@ public sealed class SeedDatabaseHandler(
 
                                 db.PollRecords.Add(new PollRecord
                                 {
-                                    Id                    = Guid.NewGuid(),
-                                    RouteId               = route.Id,
-                                    PolledAt              = polledAt,
+                                    Id = Guid.NewGuid(),
+                                    RouteId = route.Id,
+                                    PolledAt = polledAt,
                                     TravelDurationSeconds = duration,
-                                    DistanceMetres        = 18000 + random.Next(-200, 200),
-                                    IsRerouted            = isAnomalous && random.Next(1, 100) > 50,
-                                    RawProviderResponse   = "{ \"status\": \"OK\", \"simulated\": true }"
+                                    DistanceMetres = 18000 + random.Next(-200, 200),
+                                    IsRerouted = isAnomalous && random.Next(1, 100) > 50,
+                                    RawProviderResponse = "{ \"status\": \"OK\", \"simulated\": true }"
                                 });
                                 pollsCreatedCount++;
                             }
@@ -124,8 +124,8 @@ public sealed class SeedDatabaseHandler(
         }
 
         await db.SaveChangesAsync(ct);
-        
-        logger.LogInformation("[Admin] Seeded database: {Users} users, {Routes} routes, {Polls} polls.", 
+
+        logger.LogInformation("[Admin] Seeded database: {Users} users, {Routes} routes, {Polls} polls.",
             usersCreatedCount, routesCreatedCount, pollsCreatedCount);
 
         return new SeedDatabaseResult(usersCreatedCount, routesCreatedCount, pollsCreatedCount);

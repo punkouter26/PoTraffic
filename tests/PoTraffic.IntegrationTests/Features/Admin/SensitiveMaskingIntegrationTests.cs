@@ -33,15 +33,15 @@ public sealed class SensitiveMaskingIntegrationTests : BaseIntegrationTest
             db.SystemConfigurations.AddRange(
                 new SystemConfiguration
                 {
-                    Key         = "test.api.key",
-                    Value       = "super-secret-value-1234",
+                    Key = "test.api.key",
+                    Value = "super-secret-value-1234",
                     Description = "Sensitive API key",
                     IsSensitive = true
                 },
                 new SystemConfiguration
                 {
-                    Key         = "test.poll.interval",
-                    Value       = "60",
+                    Key = "test.poll.interval",
+                    Value = "60",
                     Description = "Non-sensitive polling interval",
                     IsSensitive = false
                 });

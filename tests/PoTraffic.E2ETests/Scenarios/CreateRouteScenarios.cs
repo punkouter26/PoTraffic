@@ -14,7 +14,7 @@ namespace PoTraffic.E2ETests.Scenarios;
 /// </summary>
 public sealed class CreateRouteScenarios : PlaywrightTestBase
 {
-    private const string OriginAddress      = "501 Sylview Dr, Pasadena, CA";
+    private const string OriginAddress = "501 Sylview Dr, Pasadena, CA";
     private const string DestinationAddress = "456 S Fair Oaks Ave, Pasadena, CA";
 
     /// <summary>

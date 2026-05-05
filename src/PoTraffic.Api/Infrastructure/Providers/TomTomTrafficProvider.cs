@@ -67,8 +67,8 @@ public sealed class TomTomTrafficProvider : ITrafficProvider
         }
 
         string origin = ToOsrm(originCoordinates);
-        string dest   = ToOsrm(destinationCoordinates);
-        string url    = $"https://router.project-osrm.org/route/v1/driving/{origin};{dest}?overview=false&annotations=false";
+        string dest = ToOsrm(destinationCoordinates);
+        string url = $"https://router.project-osrm.org/route/v1/driving/{origin};{dest}?overview=false&annotations=false";
 
         try
         {
@@ -106,7 +106,7 @@ public sealed class TomTomTrafficProvider : ITrafficProvider
     // ── Response projection types (OSRM Routing API) ─────────────────────────
 
     private sealed record OsrmRouteResponse(
-        [property: JsonPropertyName("code")]   string      Code,
+        [property: JsonPropertyName("code")] string Code,
         [property: JsonPropertyName("routes")] OsrmRoute[] Routes);
 
     private sealed record OsrmRoute(

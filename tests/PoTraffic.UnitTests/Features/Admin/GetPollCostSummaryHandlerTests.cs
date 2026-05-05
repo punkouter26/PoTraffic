@@ -38,9 +38,12 @@ public sealed class GetPollCostSummaryHandlerTests
         db.Users.Add(new User { Id = userId, Email = "admin@test.com", PasswordHash = "x", Locale = "en-IE", CreatedAt = DateTimeOffset.UtcNow });
         db.Routes.Add(new EntityRoute
         {
-            Id = routeId, UserId = userId,
-            OriginAddress = "A", OriginCoordinates = "0,0",
-            DestinationAddress = "B", DestinationCoordinates = "1,1",
+            Id = routeId,
+            UserId = userId,
+            OriginAddress = "A",
+            OriginCoordinates = "0,0",
+            DestinationAddress = "B",
+            DestinationCoordinates = "1,1",
             Provider = 0 // GoogleMaps
         });
 

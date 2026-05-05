@@ -17,7 +17,7 @@ namespace PoTraffic.E2ETests.Scenarios;
 /// </summary>
 public sealed class MonitoringWindowScenarios : PlaywrightTestBase
 {
-    private const string OriginAddress      = "501 Sylview Dr, Pasadena, CA";
+    private const string OriginAddress = "501 Sylview Dr, Pasadena, CA";
     private const string DestinationAddress = "456 S Fair Oaks Ave, Pasadena, CA";
 
     /// <summary>
@@ -55,7 +55,7 @@ public sealed class MonitoringWindowScenarios : PlaywrightTestBase
 
         // ── Navigate to Route Detail page ────────────────────────────────────────
         await Page.GotoAsync($"{BaseUrl}/routes/{routeId}");
-        
+
         // Wait for ROOT loading progress to disappear (splash screen)
         await Page.Locator(".loading-progress").WaitForAsync(new() { State = WaitForSelectorState.Detached, Timeout = 60_000 });
 
@@ -152,14 +152,14 @@ public sealed class MonitoringWindowScenarios : PlaywrightTestBase
 
         // Navigate to route detail
         await Page.GotoAsync($"{BaseUrl}/routes/{routeId}");
-        
+
         // Wait for ROOT loading progress to disappear (splash screen)
         await Page.Locator(".loading-progress").WaitForAsync(new() { State = WaitForSelectorState.Detached, Timeout = 60_000 });
 
         // Wait for the WindowConfigPanel fieldset to appear — actual text is "Monitoring Schedule"
         ILocator fieldset = Page.Locator(".rz-fieldset", new() { HasText = "Monitoring Schedule" }).First;
         await fieldset.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 30_000 });
-        
+
         // Wait for the form to be ready — "Save Schedule" when no window exists
         await fieldset.GetByRole(AriaRole.Button, new() { Name = "Save Schedule" }).WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 30_000 });
 

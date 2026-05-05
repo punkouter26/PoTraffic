@@ -103,9 +103,9 @@ public static class RoutesEndpoints
             ? Results.Created($"/api/routes/{result.Route!.Id}", result.Route)
             : result.ErrorCode switch
             {
-                "GEOCODE_FAILED"     => Results.UnprocessableEntity(new { error = result.ErrorCode }),
-                "SAME_COORDINATES"   => Results.UnprocessableEntity(new { error = result.ErrorCode }),
-                _                    => Results.UnprocessableEntity(new { error = result.ErrorCode })
+                "GEOCODE_FAILED" => Results.UnprocessableEntity(new { error = result.ErrorCode }),
+                "SAME_COORDINATES" => Results.UnprocessableEntity(new { error = result.ErrorCode }),
+                _ => Results.UnprocessableEntity(new { error = result.ErrorCode })
             };
     }
 
@@ -126,10 +126,10 @@ public static class RoutesEndpoints
             ? Results.Ok(result.Route)
             : result.ErrorCode switch
             {
-                "NOT_FOUND"          => Results.NotFound(),
-                "GEOCODE_FAILED"     => Results.UnprocessableEntity(new { error = result.ErrorCode }),
-                "SAME_COORDINATES"   => Results.UnprocessableEntity(new { error = result.ErrorCode }),
-                _                    => Results.UnprocessableEntity(new { error = result.ErrorCode })
+                "NOT_FOUND" => Results.NotFound(),
+                "GEOCODE_FAILED" => Results.UnprocessableEntity(new { error = result.ErrorCode }),
+                "SAME_COORDINATES" => Results.UnprocessableEntity(new { error = result.ErrorCode }),
+                _ => Results.UnprocessableEntity(new { error = result.ErrorCode })
             };
     }
 
@@ -171,7 +171,7 @@ public static class RoutesEndpoints
             : Results.Ok(new
             {
                 durationSeconds = travelResult.DurationSeconds,
-                distanceMetres  = travelResult.DistanceMetres
+                distanceMetres = travelResult.DistanceMetres
             });
     }
 

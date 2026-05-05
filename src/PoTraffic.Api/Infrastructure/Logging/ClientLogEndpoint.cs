@@ -46,11 +46,11 @@ public static class ClientLogEndpoints
             LogLevel level = entry.Level?.ToUpperInvariant() switch
             {
                 "CRITICAL" or "FATAL" => LogLevel.Critical,
-                "ERROR"               => LogLevel.Error,
-                "WARNING" or "WARN"   => LogLevel.Warning,
-                "DEBUG"               => LogLevel.Debug,
-                "TRACE"               => LogLevel.Trace,
-                _                     => LogLevel.Information
+                "ERROR" => LogLevel.Error,
+                "WARNING" or "WARN" => LogLevel.Warning,
+                "DEBUG" => LogLevel.Debug,
+                "TRACE" => LogLevel.Trace,
+                _ => LogLevel.Information
             };
 
             logger.Log(

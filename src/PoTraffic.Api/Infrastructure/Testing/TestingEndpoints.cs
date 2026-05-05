@@ -73,10 +73,10 @@ public static class TestingEndpoints
         ];
 
         JwtSecurityToken token = new(
-            issuer:   jwtConfig.Issuer,
+            issuer: jwtConfig.Issuer,
             audience: jwtConfig.Audience,
-            claims:   claims,
-            expires:  DateTime.UtcNow.AddMinutes(jwtConfig.ExpiryMinutes),
+            claims: claims,
+            expires: DateTime.UtcNow.AddMinutes(jwtConfig.ExpiryMinutes),
             signingCredentials: creds);
 
         string tokenString = new JwtSecurityTokenHandler().WriteToken(token);
@@ -105,7 +105,7 @@ public static class TestingEndpoints
         ILogger<LogCategory> logger,
         CancellationToken ct)
     {
-        const string adminEmail    = "admin@potraffic.dev";
+        const string adminEmail = "admin@potraffic.dev";
         const string adminPassword = "Admin123!";
 
         bool exists = await db.Set<User>().AnyAsync(u => u.Email == adminEmail, ct);
@@ -113,14 +113,14 @@ public static class TestingEndpoints
         {
             db.Set<User>().Add(new User
             {
-                Id                     = Guid.NewGuid(),
-                Email                  = adminEmail,
-                PasswordHash           = BCrypt.Net.BCrypt.HashPassword(adminPassword),
-                Locale                 = "en-US",
-                Role                   = "Administrator",
-                IsEmailVerified        = true,
+                Id = Guid.NewGuid(),
+                Email = adminEmail,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(adminPassword),
+                Locale = "en-US",
+                Role = "Administrator",
+                IsEmailVerified = true,
                 EmailVerificationToken = null,
-                CreatedAt              = DateTimeOffset.UtcNow
+                CreatedAt = DateTimeOffset.UtcNow
             });
 
             await db.SaveChangesAsync(ct);
@@ -145,10 +145,10 @@ public static class TestingEndpoints
             return Results.NotFound(new { error = $"User '{request.UserEmail}' not found." });
 
         // T105: Idempotent - return existing route if user already has it to avoid 409/duplicate errors
-        EntityRoute? existing = await db.Set<EntityRoute>().FirstOrDefaultAsync(r => 
-            r.UserId == user.Id && 
-            r.OriginAddress == request.OriginAddress && 
-            r.DestinationAddress == request.DestinationAddress && 
+        EntityRoute? existing = await db.Set<EntityRoute>().FirstOrDefaultAsync(r =>
+            r.UserId == user.Id &&
+            r.OriginAddress == request.OriginAddress &&
+            r.DestinationAddress == request.DestinationAddress &&
             r.Provider == request.Provider &&
             r.MonitoringStatus != 2, ct);
 
@@ -160,15 +160,15 @@ public static class TestingEndpoints
 
         var route = new EntityRoute
         {
-            Id                     = Guid.NewGuid(),
-            UserId                 = user.Id,
-            OriginAddress          = request.OriginAddress,
-            OriginCoordinates      = "37.4220,-122.0841",  // fake coords — E2E only
-            DestinationAddress     = request.DestinationAddress,
+            Id = Guid.NewGuid(),
+            UserId = user.Id,
+            OriginAddress = request.OriginAddress,
+            OriginCoordinates = "37.4220,-122.0841",  // fake coords — E2E only
+            DestinationAddress = request.DestinationAddress,
             DestinationCoordinates = "37.3318,-122.0312",  // fake coords — E2E only
-            Provider               = request.Provider,
-            MonitoringStatus       = 0,
-            CreatedAt              = DateTimeOffset.UtcNow
+            Provider = request.Provider,
+            MonitoringStatus = 0,
+            CreatedAt = DateTimeOffset.UtcNow
         };
 
         db.Set<EntityRoute>().Add(route);

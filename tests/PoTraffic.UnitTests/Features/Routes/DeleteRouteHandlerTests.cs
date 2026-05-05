@@ -33,12 +33,16 @@ public sealed class DeleteRouteHandlerTests
         using PoTrafficDbContext db = CreateDb(dbName);
 
         Guid routeId = Guid.NewGuid();
-        Guid userId  = Guid.NewGuid();
+        Guid userId = Guid.NewGuid();
 
         db.Routes.Add(new EntityRoute
         {
-            Id = routeId, UserId = userId, OriginAddress = "A", DestinationAddress = "B",
-            Provider = (int)RouteProvider.GoogleMaps, MonitoringStatus = (int)MonitoringStatus.Active,
+            Id = routeId,
+            UserId = userId,
+            OriginAddress = "A",
+            DestinationAddress = "B",
+            Provider = (int)RouteProvider.GoogleMaps,
+            MonitoringStatus = (int)MonitoringStatus.Active,
             CreatedAt = DateTimeOffset.UtcNow
         });
         await db.SaveChangesAsync();
@@ -65,13 +69,17 @@ public sealed class DeleteRouteHandlerTests
         using PoTrafficDbContext db = CreateDb(dbName);
 
         Guid routeId = Guid.NewGuid();
-        Guid userId  = Guid.NewGuid();
+        Guid userId = Guid.NewGuid();
         const string jobId = "hangfire-job-42";
 
         db.Routes.Add(new EntityRoute
         {
-            Id = routeId, UserId = userId, OriginAddress = "A", DestinationAddress = "B",
-            Provider = (int)RouteProvider.GoogleMaps, MonitoringStatus = (int)MonitoringStatus.Active,
+            Id = routeId,
+            UserId = userId,
+            OriginAddress = "A",
+            DestinationAddress = "B",
+            Provider = (int)RouteProvider.GoogleMaps,
+            MonitoringStatus = (int)MonitoringStatus.Active,
             HangfireJobChainId = jobId,
             CreatedAt = DateTimeOffset.UtcNow
         });
@@ -120,8 +128,12 @@ public sealed class DeleteRouteHandlerTests
 
         db.Routes.Add(new EntityRoute
         {
-            Id = routeId, UserId = realOwner, OriginAddress = "A", DestinationAddress = "B",
-            Provider = (int)RouteProvider.GoogleMaps, MonitoringStatus = (int)MonitoringStatus.Active,
+            Id = routeId,
+            UserId = realOwner,
+            OriginAddress = "A",
+            DestinationAddress = "B",
+            Provider = (int)RouteProvider.GoogleMaps,
+            MonitoringStatus = (int)MonitoringStatus.Active,
             CreatedAt = DateTimeOffset.UtcNow
         });
         await db.SaveChangesAsync();

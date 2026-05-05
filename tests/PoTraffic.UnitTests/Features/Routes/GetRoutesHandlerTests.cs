@@ -29,20 +29,28 @@ public sealed class GetRoutesHandlerTests
         string dbName = Guid.NewGuid().ToString();
         using PoTrafficDbContext db = CreateDb(dbName);
 
-        Guid userId  = Guid.NewGuid();
+        Guid userId = Guid.NewGuid();
         Guid otherId = Guid.NewGuid();
 
         db.Routes.AddRange(
             new EntityRoute
             {
-                Id = Guid.NewGuid(), UserId = userId,  OriginAddress = "A", DestinationAddress = "B",
-                Provider = (int)RouteProvider.GoogleMaps, MonitoringStatus = (int)MonitoringStatus.Active,
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                OriginAddress = "A",
+                DestinationAddress = "B",
+                Provider = (int)RouteProvider.GoogleMaps,
+                MonitoringStatus = (int)MonitoringStatus.Active,
                 CreatedAt = DateTimeOffset.UtcNow
             },
             new EntityRoute
             {
-                Id = Guid.NewGuid(), UserId = otherId, OriginAddress = "C", DestinationAddress = "D",
-                Provider = (int)RouteProvider.TomTom, MonitoringStatus = (int)MonitoringStatus.Active,
+                Id = Guid.NewGuid(),
+                UserId = otherId,
+                OriginAddress = "C",
+                DestinationAddress = "D",
+                Provider = (int)RouteProvider.TomTom,
+                MonitoringStatus = (int)MonitoringStatus.Active,
                 CreatedAt = DateTimeOffset.UtcNow
             });
         await db.SaveChangesAsync();
@@ -70,14 +78,22 @@ public sealed class GetRoutesHandlerTests
         db.Routes.AddRange(
             new EntityRoute
             {
-                Id = Guid.NewGuid(), UserId = userId, OriginAddress = "A", DestinationAddress = "B",
-                Provider = (int)RouteProvider.GoogleMaps, MonitoringStatus = (int)MonitoringStatus.Active,
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                OriginAddress = "A",
+                DestinationAddress = "B",
+                Provider = (int)RouteProvider.GoogleMaps,
+                MonitoringStatus = (int)MonitoringStatus.Active,
                 CreatedAt = DateTimeOffset.UtcNow
             },
             new EntityRoute
             {
-                Id = Guid.NewGuid(), UserId = userId, OriginAddress = "C", DestinationAddress = "D",
-                Provider = (int)RouteProvider.GoogleMaps, MonitoringStatus = (int)MonitoringStatus.Deleted,
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                OriginAddress = "C",
+                DestinationAddress = "D",
+                Provider = (int)RouteProvider.GoogleMaps,
+                MonitoringStatus = (int)MonitoringStatus.Deleted,
                 CreatedAt = DateTimeOffset.UtcNow
             });
         await db.SaveChangesAsync();
@@ -122,8 +138,12 @@ public sealed class GetRoutesHandlerTests
         {
             db.Routes.Add(new EntityRoute
             {
-                Id = Guid.NewGuid(), UserId = userId, OriginAddress = $"Origin{i}", DestinationAddress = $"Dest{i}",
-                Provider = (int)RouteProvider.GoogleMaps, MonitoringStatus = (int)MonitoringStatus.Active,
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                OriginAddress = $"Origin{i}",
+                DestinationAddress = $"Dest{i}",
+                Provider = (int)RouteProvider.GoogleMaps,
+                MonitoringStatus = (int)MonitoringStatus.Active,
                 CreatedAt = DateTimeOffset.UtcNow.AddMinutes(-i) // different timestamps for ordering
             });
         }

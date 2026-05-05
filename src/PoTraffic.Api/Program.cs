@@ -209,13 +209,13 @@ try
             ctx.Response.ContentType = "application/json";
             string result = System.Text.Json.JsonSerializer.Serialize(new
             {
-                status  = report.Status.ToString(),
+                status = report.Status.ToString(),
                 entries = report.Entries.Select(e => new
                 {
-                    name        = e.Key,
-                    status      = e.Value.Status.ToString(),
+                    name = e.Key,
+                    status = e.Value.Status.ToString(),
                     description = e.Value.Description,
-                    durationMs  = e.Value.Duration.TotalMilliseconds
+                    durationMs = e.Value.Duration.TotalMilliseconds
                 })
             });
             await ctx.Response.WriteAsync(result);
@@ -256,7 +256,7 @@ try
         }
         startupLog.LogInformation("Database migrations applied.");
 
-        const string adminEmail    = "admin@potraffic.dev";
+        const string adminEmail = "admin@potraffic.dev";
         const string adminPassword = "Admin123!";
 
         bool adminExists = await db.Set<User>()
@@ -267,14 +267,14 @@ try
             db.Set<User>().Add(
                 new User
                 {
-                    Id                     = Guid.NewGuid(),
-                    Email                  = adminEmail,
-                    PasswordHash           = BCrypt.Net.BCrypt.HashPassword(adminPassword),
-                    Locale                 = "en-US",
-                    Role                   = "Administrator",
-                    IsEmailVerified        = true,
+                    Id = Guid.NewGuid(),
+                    Email = adminEmail,
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(adminPassword),
+                    Locale = "en-US",
+                    Role = "Administrator",
+                    IsEmailVerified = true,
                     EmailVerificationToken = null,
-                    CreatedAt              = DateTimeOffset.UtcNow
+                    CreatedAt = DateTimeOffset.UtcNow
                 });
             await db.SaveChangesAsync();
             startupLog.LogInformation("Default admin user created ({Email}).", adminEmail);

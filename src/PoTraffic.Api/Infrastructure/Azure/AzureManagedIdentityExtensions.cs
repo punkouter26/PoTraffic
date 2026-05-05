@@ -39,7 +39,7 @@ public static class AzureManagedIdentityExtensions
     {
         // Check if we should exclude Managed Identity (for local development)
         bool excludeManagedIdentity = configuration.GetValue<bool>("AzureCredential:ExcludeManagedIdentityCredential");
-        
+
         if (excludeManagedIdentity)
         {
             // Local development: use Visual Studio, Azure CLI, etc.
@@ -73,7 +73,7 @@ public static class AzureManagedIdentityExtensions
     public static string GetKeyVaultUri(IConfiguration configuration)
     {
         string? configuredUri = configuration["AzureKeyVault:VaultUri"];
-        
+
         if (!string.IsNullOrWhiteSpace(configuredUri))
         {
             return configuredUri;
@@ -102,14 +102,14 @@ public static class AzureResourceConstants
     // App Service
     public const string AppServiceName = "app-potraffic";
     public const string AppServicePlanName = "asp-poshared";
-    
+
     // Storage
     public const string StorageAccountName = "potraffic";
     public const string TableStorageEndpoint = "https://potraffic.table.core.windows.net/";
-    
+
     // Key Vault
     public const string KeyVaultName = "kv-poshared";
-    
+
     // App Insights
     public const string AppInsightsName = "appi-poshared";
 }

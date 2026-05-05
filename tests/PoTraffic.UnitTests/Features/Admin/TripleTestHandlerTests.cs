@@ -214,9 +214,13 @@ public sealed class TripleTestHandlerTests
         db.TripleTestSessions.Add(new TripleTestSession
         {
             Id = sessionId,
-            OriginAddress = "A", OriginCoordinates = "1,1",
-            DestinationAddress = "B", DestinationCoordinates = "2,2",
-            Provider = 0, ScheduledAt = DateTimeOffset.UtcNow, CreatedAt = DateTimeOffset.UtcNow
+            OriginAddress = "A",
+            OriginCoordinates = "1,1",
+            DestinationAddress = "B",
+            DestinationCoordinates = "2,2",
+            Provider = 0,
+            ScheduledAt = DateTimeOffset.UtcNow,
+            CreatedAt = DateTimeOffset.UtcNow
         });
 
         DateTimeOffset now = DateTimeOffset.UtcNow;
@@ -249,9 +253,13 @@ public sealed class TripleTestHandlerTests
         db.TripleTestSessions.Add(new TripleTestSession
         {
             Id = sessionId,
-            OriginAddress = "A", OriginCoordinates = "1,1",
-            DestinationAddress = "B", DestinationCoordinates = "2,2",
-            Provider = 0, ScheduledAt = DateTimeOffset.UtcNow, CreatedAt = DateTimeOffset.UtcNow
+            OriginAddress = "A",
+            OriginCoordinates = "1,1",
+            DestinationAddress = "B",
+            DestinationCoordinates = "2,2",
+            Provider = 0,
+            ScheduledAt = DateTimeOffset.UtcNow,
+            CreatedAt = DateTimeOffset.UtcNow
         });
 
         db.TripleTestShots.AddRange([
@@ -298,9 +306,13 @@ public sealed class TripleTestHandlerTests
         db.TripleTestSessions.Add(new TripleTestSession
         {
             Id = sessionId,
-            OriginAddress = "A", OriginCoordinates = "1,1",
-            DestinationAddress = "B", DestinationCoordinates = "2,2",
-            Provider = 0, ScheduledAt = DateTimeOffset.UtcNow, CreatedAt = DateTimeOffset.UtcNow
+            OriginAddress = "A",
+            OriginCoordinates = "1,1",
+            DestinationAddress = "B",
+            DestinationCoordinates = "2,2",
+            Provider = 0,
+            ScheduledAt = DateTimeOffset.UtcNow,
+            CreatedAt = DateTimeOffset.UtcNow
         });
 
         db.TripleTestShots.AddRange([

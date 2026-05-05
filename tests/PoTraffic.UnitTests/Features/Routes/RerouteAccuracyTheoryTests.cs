@@ -30,7 +30,7 @@ public sealed class RerouteAccuracyTheoryTests
     {
         var factory = Substitute.For<ITrafficProviderFactory>();
         factory.GetProvider(Arg.Any<RouteProvider>()).Returns(provider);
-        
+
         return factory;
     }
 

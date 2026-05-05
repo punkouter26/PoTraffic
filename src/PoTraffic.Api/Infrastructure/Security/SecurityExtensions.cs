@@ -27,14 +27,15 @@ internal static class SecurityExtensions
             {
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
-                    ValidateIssuer           = true,
-                    ValidateAudience         = true,
-                    ValidateLifetime         = true,
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
+                    ValidateLifetime = true,
                     ValidateIssuerSigningKey = true,
-                    ValidIssuer              = jwtCfg.Issuer,
-                    ValidAudience            = jwtCfg.Audience,
-                    IssuerSigningKey         = new SymmetricSecurityKey(
-                        Encoding.UTF8.GetBytes(jwtCfg.Key)) { KeyId = "potraffic-key" },
+                    ValidIssuer = jwtCfg.Issuer,
+                    ValidAudience = jwtCfg.Audience,
+                    IssuerSigningKey = new SymmetricSecurityKey(
+                        Encoding.UTF8.GetBytes(jwtCfg.Key))
+                    { KeyId = "potraffic-key" },
                     ClockSkew = TimeSpan.Zero,
                     // Ensure "sub" and "role" claims are mapped correctly to User.Identity properties
                     NameClaimType = "sub",

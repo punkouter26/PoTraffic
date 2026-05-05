@@ -90,8 +90,8 @@ public sealed class GoogleMapsTrafficProvider : ITrafficProvider
                 return null;
             }
 
-            int duration  = element.DurationInTraffic?.Value ?? element.Duration.Value;
-            int distance  = element.Distance.Value;
+            int duration = element.DurationInTraffic?.Value ?? element.Duration.Value;
+            int distance = element.Distance.Value;
             string rawJson = System.Text.Json.JsonSerializer.Serialize(response);
 
             _logger.LogDebug(
@@ -112,17 +112,17 @@ public sealed class GoogleMapsTrafficProvider : ITrafficProvider
     // ── Response projection types (Google Distance Matrix API) ─────────────────
 
     private sealed record GoogleDistanceMatrixResponse(
-        [property: JsonPropertyName("status")]  string  Status,
-        [property: JsonPropertyName("rows")]    GoogleRow[] Rows);
+        [property: JsonPropertyName("status")] string Status,
+        [property: JsonPropertyName("rows")] GoogleRow[] Rows);
 
     private sealed record GoogleRow(
         [property: JsonPropertyName("elements")] GoogleElement[] Elements);
 
     private sealed record GoogleElement(
-        [property: JsonPropertyName("status")]               string        Status,
-        [property: JsonPropertyName("duration")]             GoogleValue   Duration,
-        [property: JsonPropertyName("duration_in_traffic")] GoogleValue?  DurationInTraffic,
-        [property: JsonPropertyName("distance")]             GoogleValue   Distance);
+        [property: JsonPropertyName("status")] string Status,
+        [property: JsonPropertyName("duration")] GoogleValue Duration,
+        [property: JsonPropertyName("duration_in_traffic")] GoogleValue? DurationInTraffic,
+        [property: JsonPropertyName("distance")] GoogleValue Distance);
 
     private sealed record GoogleValue(
         [property: JsonPropertyName("value")] int Value);
@@ -130,7 +130,7 @@ public sealed class GoogleMapsTrafficProvider : ITrafficProvider
     // ── Response projection types (Google Geocoding API v3) ───────────────────
 
     private sealed record GoogleGeocodeResponse(
-        [property: JsonPropertyName("status")]  string Status,
+        [property: JsonPropertyName("status")] string Status,
         [property: JsonPropertyName("results")] GoogleGeocodeResult[] Results);
 
     private sealed record GoogleGeocodeResult(

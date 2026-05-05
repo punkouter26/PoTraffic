@@ -25,12 +25,12 @@ public sealed class SkipUnlessDockerAvailableAttribute : FactAttribute
             {
                 StartInfo = new ProcessStartInfo
                 {
-                    FileName               = "docker",
-                    Arguments              = "info",
+                    FileName = "docker",
+                    Arguments = "info",
                     RedirectStandardOutput = true,
-                    RedirectStandardError  = true,
-                    UseShellExecute        = false,
-                    CreateNoWindow         = true
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
                 }
             };
             process.Start();

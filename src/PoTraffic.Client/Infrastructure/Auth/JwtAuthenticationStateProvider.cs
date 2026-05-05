@@ -111,10 +111,10 @@ public sealed class JwtAuthenticationStateProvider : AuthenticationStateProvider
             // Use the "jwt" authentication type to ensure IsAuthenticated is true.
             // Explicitly set the name and role claim types to ensure consistency.
             ClaimsIdentity identity = new(claims, "jwt", ClaimTypes.Name, ClaimTypes.Role);
-            
+
             // Console logging to help debug E2E failures (can be removed in future cleanup)
             Console.WriteLine($"[AUTH_PROVIDER] Token parsed. Sub: {jwt.Subject}, Exp: {jwt.ValidTo}, Authenticated: {identity.IsAuthenticated}");
-            
+
             return new ClaimsPrincipal(identity);
         }
         catch

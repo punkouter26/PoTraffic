@@ -31,7 +31,7 @@ public sealed class RerouteDetectionTests
     {
         var factory = Substitute.For<ITrafficProviderFactory>();
         factory.GetProvider(Arg.Any<RouteProvider>()).Returns(provider);
-        
+
         return factory;
     }
 

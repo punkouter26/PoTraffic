@@ -16,7 +16,7 @@ public sealed record ClearDatabaseResult(int UsersDeleted, int RoutesDeleted, in
 
 public sealed class ClearDatabaseHandler(
     PoTrafficDbContext db,
-    ILogger<ClearDatabaseHandler> logger) 
+    ILogger<ClearDatabaseHandler> logger)
     : IRequestHandler<ClearDatabaseCommand, ClearDatabaseResult>
 {
     public async Task<ClearDatabaseResult> Handle(ClearDatabaseCommand request, CancellationToken ct)
@@ -45,17 +45,17 @@ public sealed class ClearDatabaseHandler(
         // 3. Clear data tables. 
         // EF Core with Cascade handles everything if we remove non-admin users.
         // However, to ensure we catch routes/polls even if they somehow detached, we empty them too.
-        
+
         // ExecuteDelete is more efficient for large clear-downs in EF Core 7+ (which we are on NET 10)
         await db.PollRecords.ExecuteDeleteAsync(ct);
         await db.MonitoringSessions.ExecuteDeleteAsync(ct);
         await db.MonitoringWindows.ExecuteDeleteAsync(ct);
         await db.Routes.ExecuteDeleteAsync(ct);
-        
+
         // Final step: clear non-admin users
         await db.Users.Where(u => u.Role != "Administrator").ExecuteDeleteAsync(ct);
 
-        logger.LogWarning("[Admin] Database Wiped: {Users} users, {Routes} routes, {Polls} polls cleared by administrative action.", 
+        logger.LogWarning("[Admin] Database Wiped: {Users} users, {Routes} routes, {Polls} polls cleared by administrative action.",
             usersToDeleteCount, routesToDeleteCount, pollsToDeleteCount);
 
         return new ClearDatabaseResult(usersToDeleteCount, routesToDeleteCount, pollsToDeleteCount);

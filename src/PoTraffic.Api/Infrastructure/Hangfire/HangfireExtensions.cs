@@ -25,11 +25,11 @@ internal static class HangfireExtensions
                 connectionString,
                 new SqlServerStorageOptions
                 {
-                    CommandBatchMaxTimeout      = TimeSpan.FromMinutes(5),
-                    SlidingInvisibilityTimeout  = TimeSpan.FromMinutes(5),
-                    QueuePollInterval           = TimeSpan.Zero,
+                    CommandBatchMaxTimeout = TimeSpan.FromMinutes(5),
+                    SlidingInvisibilityTimeout = TimeSpan.FromMinutes(5),
+                    QueuePollInterval = TimeSpan.Zero,
                     UseRecommendedIsolationLevel = true,
-                    DisableGlobalLocks           = true
+                    DisableGlobalLocks = true
                 }));
 
         services.AddHangfireServer((sp, options) =>

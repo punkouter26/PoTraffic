@@ -34,9 +34,12 @@ public sealed class DeleteAccountCommandTests
         db.Users.Add(new User { Id = userId, Email = "del@test.com", PasswordHash = "h", Locale = "en-IE", CreatedAt = DateTimeOffset.UtcNow });
         db.Routes.Add(new EntityRoute
         {
-            Id = routeId, UserId = userId,
-            OriginAddress = "A", OriginCoordinates = "0,0",
-            DestinationAddress = "B", DestinationCoordinates = "1,1"
+            Id = routeId,
+            UserId = userId,
+            OriginAddress = "A",
+            OriginCoordinates = "0,0",
+            DestinationAddress = "B",
+            DestinationCoordinates = "1,1"
         });
         await db.SaveChangesAsync();
 

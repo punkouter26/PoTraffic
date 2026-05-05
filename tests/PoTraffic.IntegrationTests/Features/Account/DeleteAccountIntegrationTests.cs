@@ -24,9 +24,9 @@ public sealed class DeleteAccountIntegrationTests : BaseIntegrationTest
         // Arrange — register a fresh user
         var registerBody = new
         {
-            Email    = "delete-me@test.invalid",
+            Email = "delete-me@test.invalid",
             Password = "Test!P@ss99",
-            Locale   = "en-IE"
+            Locale = "en-IE"
         };
         HttpResponseMessage registerResponse = await client.PostAsJsonAsync("/api/auth/register", registerBody);
         registerResponse.StatusCode.Should().Be(HttpStatusCode.Created, "registration must succeed");
@@ -60,9 +60,9 @@ public sealed class DeleteAccountIntegrationTests : BaseIntegrationTest
         // Arrange — register + authenticate
         var registerBody = new
         {
-            Email    = "delete-twice@test.invalid",
+            Email = "delete-twice@test.invalid",
             Password = "Test!P@ss99",
-            Locale   = "en-IE"
+            Locale = "en-IE"
         };
         HttpResponseMessage registerResponse = await client.PostAsJsonAsync("/api/auth/register", registerBody);
         AuthResponse? auth = await registerResponse.Content.ReadFromJsonAsync<AuthResponse>();

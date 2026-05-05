@@ -42,13 +42,18 @@ public sealed class CheckNowHandlerTests
         using PoTrafficDbContext db = CreateDb(dbName);
 
         Guid routeId = Guid.NewGuid();
-        Guid userId  = Guid.NewGuid();
+        Guid userId = Guid.NewGuid();
 
         db.Routes.Add(new EntityRoute
         {
-            Id = routeId, UserId = userId, OriginAddress = "A", OriginCoordinates = "1.0,1.0",
-            DestinationAddress = "B", DestinationCoordinates = "2.0,2.0",
-            Provider = (int)RouteProvider.GoogleMaps, MonitoringStatus = (int)MonitoringStatus.Active,
+            Id = routeId,
+            UserId = userId,
+            OriginAddress = "A",
+            OriginCoordinates = "1.0,1.0",
+            DestinationAddress = "B",
+            DestinationCoordinates = "2.0,2.0",
+            Provider = (int)RouteProvider.GoogleMaps,
+            MonitoringStatus = (int)MonitoringStatus.Active,
             CreatedAt = DateTimeOffset.UtcNow
         });
         await db.SaveChangesAsync();
@@ -103,13 +108,18 @@ public sealed class CheckNowHandlerTests
         using PoTrafficDbContext db = CreateDb(dbName);
 
         Guid routeId = Guid.NewGuid();
-        Guid userId  = Guid.NewGuid();
+        Guid userId = Guid.NewGuid();
 
         db.Routes.Add(new EntityRoute
         {
-            Id = routeId, UserId = userId, OriginAddress = "A", OriginCoordinates = "1.0,1.0",
-            DestinationAddress = "B", DestinationCoordinates = "2.0,2.0",
-            Provider = (int)RouteProvider.GoogleMaps, MonitoringStatus = (int)MonitoringStatus.Active,
+            Id = routeId,
+            UserId = userId,
+            OriginAddress = "A",
+            OriginCoordinates = "1.0,1.0",
+            DestinationAddress = "B",
+            DestinationCoordinates = "2.0,2.0",
+            Provider = (int)RouteProvider.GoogleMaps,
+            MonitoringStatus = (int)MonitoringStatus.Active,
             CreatedAt = DateTimeOffset.UtcNow
         });
         await db.SaveChangesAsync();
@@ -137,14 +147,19 @@ public sealed class CheckNowHandlerTests
         string dbName = Guid.NewGuid().ToString();
         using PoTrafficDbContext db = CreateDb(dbName);
 
-        Guid routeId   = Guid.NewGuid();
+        Guid routeId = Guid.NewGuid();
         Guid realOwner = Guid.NewGuid();
 
         db.Routes.Add(new EntityRoute
         {
-            Id = routeId, UserId = realOwner, OriginAddress = "A", OriginCoordinates = "1.0,1.0",
-            DestinationAddress = "B", DestinationCoordinates = "2.0,2.0",
-            Provider = (int)RouteProvider.GoogleMaps, MonitoringStatus = (int)MonitoringStatus.Active,
+            Id = routeId,
+            UserId = realOwner,
+            OriginAddress = "A",
+            OriginCoordinates = "1.0,1.0",
+            DestinationAddress = "B",
+            DestinationCoordinates = "2.0,2.0",
+            Provider = (int)RouteProvider.GoogleMaps,
+            MonitoringStatus = (int)MonitoringStatus.Active,
             CreatedAt = DateTimeOffset.UtcNow
         });
         await db.SaveChangesAsync();

@@ -95,7 +95,7 @@ public sealed class AuthScenarios : PlaywrightTestBase
         // ── Pre-condition — skip if no OAuth providers configured in this env ────
         using HttpClient apiHttp = new() { BaseAddress = new Uri(BaseUrl) };
         var providersResponse = await apiHttp.GetFromJsonAsync<ProvidersDto>("/api/auth/providers");
-        bool hasGoogle    = providersResponse?.Providers.Contains("google",    StringComparer.OrdinalIgnoreCase) ?? false;
+        bool hasGoogle = providersResponse?.Providers.Contains("google", StringComparer.OrdinalIgnoreCase) ?? false;
         bool hasMicrosoft = providersResponse?.Providers.Contains("microsoft", StringComparer.OrdinalIgnoreCase) ?? false;
 
         if (!hasGoogle && !hasMicrosoft)

@@ -70,9 +70,9 @@ public static class WindowsEndpoints
             ? Results.Created($"/api/routes/{routeId}/windows/{result.WindowId}", new { windowId = result.WindowId })
             : result.ErrorCode switch
             {
-                "NOT_FOUND"             => Results.NotFound(),
+                "NOT_FOUND" => Results.NotFound(),
                 "WINDOW_ALREADY_ACTIVE" => Results.Conflict(new { error = result.ErrorCode }),
-                _                       => Results.UnprocessableEntity(new { error = result.ErrorCode })
+                _ => Results.UnprocessableEntity(new { error = result.ErrorCode })
             };
     }
 
@@ -110,15 +110,15 @@ public static class WindowsEndpoints
         {
             return result.ErrorCode switch
             {
-                "NOT_FOUND"     => Results.NotFound(),
+                "NOT_FOUND" => Results.NotFound(),
                 "QUOTA_EXCEEDED" => Results.StatusCode(429),
-                _               => Results.UnprocessableEntity(new { error = result.ErrorCode })
+                _ => Results.UnprocessableEntity(new { error = result.ErrorCode })
             };
         }
 
         return Results.Ok(new
         {
-            sessionId      = result.SessionId,
+            sessionId = result.SessionId,
             quotaRemaining = result.QuotaRemaining
         });
     }
