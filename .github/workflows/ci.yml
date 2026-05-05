@@ -14,6 +14,7 @@ concurrency:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 35
     services:
       sqlserver:
         image: mcr.microsoft.com/azure-sql-edge:latest
@@ -50,6 +51,9 @@ jobs:
 
       - name: Build
         run: dotnet build PoTraffic.slnx --no-restore --configuration Release
+
+      - name: Verify formatting
+        run: dotnet format PoTraffic.slnx --verify-no-changes --verbosity minimal
 
       - name: Unit tests
         run: dotnet test tests/PoTraffic.UnitTests --no-build --configuration Release --logger "trx;LogFileName=unit-results.trx"
@@ -90,6 +94,7 @@ jobs:
     needs: build-and-test
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     environment:
       name: production
     permissions:
@@ -164,3 +169,11 @@ jobs:
             fi
             sleep 10
           done
+
+      - name: Verify deployment health
+        run: |
+          curl --fail --show-error --silent \
+            --retry 10 \
+            --retry-delay 10 \
+            --retry-connrefused \
+            "https://potraffic-api.azurewebsites.net/health"
