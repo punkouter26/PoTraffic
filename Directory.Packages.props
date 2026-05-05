@@ -50,7 +50,7 @@
   <ItemGroup Label="Azure">
     <PackageVersion Include="Azure.Data.Tables" Version="12.*" />
     <PackageVersion Include="Azure.Extensions.AspNetCore.Configuration.Secrets" Version="1.*" />
-    <PackageVersion Include="Azure.Identity" Version="1.18.*" />
+    <PackageVersion Include="Azure.Identity" Version="1.21.0" />
     <PackageVersion Include="Azure.Monitor.OpenTelemetry.Exporter" Version="1.*" />
   </ItemGroup>
 
@@ -87,3 +87,7 @@
   </ItemGroup>
 
 </Project>
+
+
+
+
