@@ -40,7 +40,7 @@ jobs:
 
       # Cache NuGet packages — dramatically speeds up subsequent runs
       - name: Cache NuGet packages
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'Directory.Packages.props') }}
