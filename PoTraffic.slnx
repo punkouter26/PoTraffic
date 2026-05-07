@@ -1,7 +1,10 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/PoTraffic.Api/PoTraffic.Api.csproj" />
+    <Project Path="src/PoTraffic.Application/PoTraffic.Application.csproj" />
     <Project Path="src/PoTraffic.Client/PoTraffic.Client.csproj" />
+    <Project Path="src/PoTraffic.Domain/PoTraffic.Domain.csproj" />
+    <Project Path="src/PoTraffic.Infrastructure/PoTraffic.Infrastructure.csproj" />
     <Project Path="src/PoTraffic.Shared/PoTraffic.Shared.csproj" />
   </Folder>
   <Folder Name="/tests/">

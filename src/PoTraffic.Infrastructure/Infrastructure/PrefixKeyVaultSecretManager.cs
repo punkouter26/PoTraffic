@@ -15,7 +15,7 @@ namespace PoTraffic.Api.Infrastructure;
 /// All secrets without the expected prefix are excluded from configuration loading,
 /// keeping the shared vault tidy for multi-app scenarios.
 /// </summary>
-internal sealed class PrefixKeyVaultSecretManager : KeyVaultSecretManager
+public sealed class PrefixKeyVaultSecretManager : KeyVaultSecretManager
 {
     private const string Prefix = "PoTraffic--";
 

@@ -2,12 +2,12 @@ using Microsoft.EntityFrameworkCore;
 
 namespace PoTraffic.Api.Infrastructure.Data;
 
-internal static class DataExtensions
+public static class DataExtensions
 {
     /// <summary>
     /// Registers EF Core (SQL Server with retry) and health checks for DB + external traffic APIs.
     /// </summary>
-    internal static IServiceCollection AddDataServices(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddDataServices(this IServiceCollection services, IConfiguration configuration)
     {
         string connectionString = configuration.GetConnectionString("Default")
             ?? throw new InvalidOperationException("Default connection string is missing.");

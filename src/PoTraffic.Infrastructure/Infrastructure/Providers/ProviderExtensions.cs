@@ -3,13 +3,13 @@ using PoTraffic.Shared.Enums;
 
 namespace PoTraffic.Api.Infrastructure.Providers;
 
-internal static class ProviderExtensions
+public static class ProviderExtensions
 {
     /// <summary>
     /// Registers traffic providers as keyed services using the Strategy pattern.
     /// Swaps real providers for MockTrafficProvider in Testing or when Features:UseMockProviders is true.
     /// </summary>
-    internal static IServiceCollection AddTrafficProviders(this IServiceCollection services, IConfiguration configuration, IWebHostEnvironment environment)
+    public static IServiceCollection AddTrafficProviders(this IServiceCollection services, IConfiguration configuration, IWebHostEnvironment environment)
     {
         bool useMockProviders = environment.IsEnvironment("Testing")
             || configuration.GetValue<bool>("Features:UseMockProviders");

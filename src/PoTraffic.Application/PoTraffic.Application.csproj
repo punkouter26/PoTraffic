@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>PoTraffic.Application</RootNamespace>
+    <AssemblyName>PoTraffic.Application</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PoTraffic.Shared\PoTraffic.Shared.csproj" />
+    <ProjectReference Include="..\PoTraffic.Domain\PoTraffic.Domain.csproj" />
+  </ItemGroup>
+
+</Project>
