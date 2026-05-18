@@ -48,7 +48,7 @@ try
     // the resolved secrets rather than the appsettings.json placeholder values.
     // PrefixKeyVaultSecretManager strips the "PoTraffic--" namespace prefix so that
     // e.g. "PoTraffic--ConnectionStrings--Default" → config key "ConnectionStrings:Default".
-    string? vaultUri = builder.Configuration["AzureKeyVault:VaultUri"];
+    string? vaultUri = builder.Configuration["KeyVault:Uri"] ?? builder.Configuration["AzureKeyVault:VaultUri"];
     if (!string.IsNullOrWhiteSpace(vaultUri))
     {
         builder.Configuration.AddAzureKeyVault(

@@ -1,0 +1,8 @@
+name: potraffic
+metadata:
+  template: potraffic-appservice
+services:
+  web:
+    project: ./src/PoTraffic.Api
+    language: dotnet
+    host: appservice

@@ -54,14 +54,7 @@ internal static class ObservabilityExtensions
             cfg.ReadFrom.Configuration(ctx.Configuration)
                .ReadFrom.Services(services)
                .Enrich.FromLogContext();
-
-            string? aiConnStr = ctx.Configuration["ApplicationInsights:ConnectionString"];
-            if (!string.IsNullOrWhiteSpace(aiConnStr))
-            {
-                cfg.WriteTo.ApplicationInsights(
-                    new Microsoft.ApplicationInsights.Extensibility.TelemetryConfiguration { ConnectionString = aiConnStr },
-                    TelemetryConverter.Traces);
-            }
+            // AppInsights telemetry handled by AddAzureMonitorTraceExporter() in OTel pipeline.
         });
 
         return builder;
