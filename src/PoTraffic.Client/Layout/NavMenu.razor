@@ -1,92 +1,39 @@
-﻿@using Microsoft.AspNetCore.Components.Authorization
-@using PoTraffic.Client.Infrastructure.Auth
-@implements IDisposable
-@inject AuthenticationStateProvider AuthStateProvider
-@inject NavigationManager Nav
+@inject NavigationManager Navigation
 
-<div class="top-row ps-3 navbar navbar-dark">
+<nav class="navbar navbar-expand-lg navbar-light bg-light sticky-top border-bottom">
     <div class="container-fluid">
-        <a class="navbar-brand" href="dashboard">PoTraffic</a>
-        <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
+        <!-- Brand/Logo (left) -->
+        <a class="navbar-brand fw-bold" href="/">
+            <span class="bi bi-app"></span> PoTraffic
+        </a>
+
+        <!-- Toggler for mobile -->
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" 
+                data-bs-target="#navbarNav" aria-controls="navbarNav" 
+                aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
         </button>
+
+        <!-- Navigation Links (right) -->
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav ms-auto">
+                <li class="nav-item">
+                    <a class="nav-link" href="/" @onclick="HandleNavigation">Home</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/about" @onclick="HandleNavigation">About</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/diag" @onclick="HandleNavigation">Diagnostics</a>
+                </li>
+            </ul>
+        </div>
     </div>
-</div>
-
-<div class="@NavMenuCssClass nav-scrollable" @onclick="ToggleNavMenu">
-    <nav class="nav flex-column">
-        @if (_isAuthenticated)
-        {
-            <div class="nav-section-title">Personal</div>
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="dashboard" Match="NavLinkMatch.All">
-                    <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Dashboard
-                </NavLink>
-            </div>
-
-            @if (_isAdmin)
-            {
-                <div class="nav-separator"></div>
-                <div class="nav-section-title">Administration</div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="admin">
-                        <span class="bi bi-tools-nav-menu" aria-hidden="true"></span> Admin Tools
-                    </NavLink>
-                </div>
-            }
-        }
-        else
-        {
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="login" Match="NavLinkMatch.All">
-                    <span class="bi bi-box-arrow-in-right-nav-menu" aria-hidden="true"></span> Sign In
-                </NavLink>
-            </div>
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="register">
-                    <span class="bi bi-person-plus-nav-menu" aria-hidden="true"></span> Register
-                </NavLink>
-            </div>
-        }
-    </nav>
-</div>
+</nav>
 
 @code {
-    private bool collapseNavMenu = true;
-    private bool _isAuthenticated;
-    private bool _isAdmin;
-
-    protected override async Task OnInitializedAsync()
+    private async Task HandleNavigation()
     {
-        AuthStateProvider.AuthenticationStateChanged += HandleAuthStateChanged;
-        await UpdateUserStateAsync(await AuthStateProvider.GetAuthenticationStateAsync());
-    }
-
-    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
-
-    private void ToggleNavMenu()
-    {
-        collapseNavMenu = !collapseNavMenu;
-    }
-
-    private async void HandleAuthStateChanged(Task<AuthenticationState> stateTask)
-    {
-        await UpdateUserStateAsync(await stateTask);
-        await InvokeAsync(StateHasChanged);
-    }
-
-    private Task UpdateUserStateAsync(AuthenticationState authState)
-    {
-        var user = authState.User;
-        _isAuthenticated = user.Identity?.IsAuthenticated == true;
-        _isAdmin = _isAuthenticated &&
-            (user.IsInRole("Administrator") ||
-             user.Claims.Any(c => c.Type is "role" or System.Security.Claims.ClaimTypes.Role && c.Value == "Administrator"));
-        return Task.CompletedTask;
-    }
-
-    public void Dispose()
-    {
-        AuthStateProvider.AuthenticationStateChanged -= HandleAuthStateChanged;
+        await Task.Delay(100);
     }
 }
