@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using PoTraffic.Api.Features.Auth;
 using PoTraffic.Api.Infrastructure.Providers;
@@ -54,16 +53,18 @@ public abstract class BaseIntegrationTest : IAsyncLifetime
         // Wait for SQL Server engine readiness (port open ≠ engine ready)
         await WaitForSqlReadinessAsync(_dbContainer.GetConnectionString());
 
+        // Override the connection string BEFORE creating WebApplicationFactory.
+        // Service registrations (AddDataServices, AddHangfireServices) read ConnectionStrings:Default
+        // from builder.Configuration at registration time — before builder.Build() is called.
+        // WithWebHostBuilder ConfigureAppConfiguration callbacks run only during builder.Build()
+        // and therefore arrive too late to override the CI env var for service registrations.
+        // Setting the env var here ensures WebApplication.CreateBuilder picks up the correct
+        // Testcontainers connection string when it loads configuration.
+        Environment.SetEnvironmentVariable("ConnectionStrings__Default", _dbContainer.GetConnectionString());
+
         _factory = new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder =>
             {
-                // ConfigureAppConfiguration runs after all appsettings files and env vars,
-                // so this in-memory override wins over ConnectionStrings__Default in CI.
-                builder.ConfigureAppConfiguration((_, cfg) =>
-                    cfg.AddInMemoryCollection(new Dictionary<string, string?>
-                    {
-                        ["ConnectionStrings:Default"] = _dbContainer.GetConnectionString()
-                    }));
 
                 // Replace real traffic providers with a fake that returns
                 // deterministic geocode coordinates (avoids GEOCODE_FAILED 422)
@@ -90,6 +91,12 @@ public abstract class BaseIntegrationTest : IAsyncLifetime
             await _factory.DisposeAsync();
 
         await _dbContainer.DisposeAsync();
+
+        // Clear env vars set in InitializeAsync so they don't bleed into the next test instance.
+        // Tests run sequentially (parallelizeAssembly=false), so no race conditions.
+        Environment.SetEnvironmentVariable("ConnectionStrings__Default", null);
+        Environment.SetEnvironmentVariable("AzureKeyVault__VaultUri", null);
+        Environment.SetEnvironmentVariable("KeyVault__Uri", null);
     }
 
     // ── Protected helpers ─────────────────────────────────────────────────────
