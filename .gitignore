@@ -123,3 +123,23 @@ app-logs*/
 
 # LSCache build artifacts
 *.csproj.lscache
+
+# CI/CD output snapshots — generated at runtime, never source-controlled
+output.json
+
+# Azure Developer CLI
+.azure/
+
+# Terraform / Bicep state
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+
+# Cursor / Windsurf / AI editor metadata
+.cursor/
+.cursorignore
+.windsurfrules
+
+# dotnet tool manifests local overrides
+.config/dotnet-tools.json
