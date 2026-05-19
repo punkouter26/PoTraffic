@@ -6,7 +6,6 @@ on:
   workflow_dispatch:
 
 permissions:
-  id-token: write
   contents: read
 
 concurrency:
@@ -17,8 +16,6 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    environment:
-      name: production
 
     steps:
       - uses: actions/checkout@v4
@@ -44,28 +41,11 @@ jobs:
       - name: Publish API
         run: dotnet publish src/PoTraffic.Api/PoTraffic.Api.csproj --no-build --configuration Release --output ./publish
 
-      - name: Azure login
-        uses: azure/login@v2.3.0
-        with:
-          client-id: ${{ vars.AZURE_CLIENT_ID }}
-          tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Configure App Service
-        run: |
-          az webapp config appsettings set \
-            --resource-group PoTraffic --name potraffic-api \
-            --settings SCM_DO_BUILD_DURING_DEPLOYMENT=false WEBSITES_CONTAINER_START_TIME_LIMIT=800 \
-            --output none
-          az webapp config set \
-            --resource-group PoTraffic --name potraffic-api \
-            --startup-file "dotnet PoTraffic.Api.dll" \
-            --output none
-
       - name: Deploy to Azure App Service
         uses: azure/webapps-deploy@v3
         with:
           app-name: potraffic-api
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
           package: ./publish
 
       - name: Verify health
