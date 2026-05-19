@@ -1,39 +1,7 @@
+@* NavMenu — top navbar, app name left-aligned, no nav items (per standard §10).
+   /diag and /health are internal-only endpoints; no links are surfaced here. *@
 @inject NavigationManager Navigation
 
-<nav class="navbar navbar-expand-lg navbar-light bg-light sticky-top border-bottom">
-    <div class="container-fluid">
-        <!-- Brand/Logo (left) -->
-        <a class="navbar-brand fw-bold" href="/">
-            <span class="bi bi-app"></span> PoTraffic
-        </a>
-
-        <!-- Toggler for mobile -->
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" 
-                data-bs-target="#navbarNav" aria-controls="navbarNav" 
-                aria-expanded="false" aria-label="Toggle navigation">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-
-        <!-- Navigation Links (right) -->
-        <div class="collapse navbar-collapse" id="navbarNav">
-            <ul class="navbar-nav ms-auto">
-                <li class="nav-item">
-                    <a class="nav-link" href="/" @onclick="HandleNavigation">Home</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/about" @onclick="HandleNavigation">About</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/diag" @onclick="HandleNavigation">Diagnostics</a>
-                </li>
-            </ul>
-        </div>
-    </div>
+<nav class="pt-top-navbar">
+    <a class="pt-brand" href="/">PoTraffic</a>
 </nav>
-
-@code {
-    private async Task HandleNavigation()
-    {
-        await Task.Delay(100);
-    }
-}

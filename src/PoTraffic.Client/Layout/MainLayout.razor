@@ -4,55 +4,73 @@
 @using PoTraffic.Client.Infrastructure.Auth
 @inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager Nav
+@inject HttpClient Http
 
 @* Radzen service host components — must be present exactly once in the root layout *@
 <RadzenNotification />
 <RadzenDialog />
 <RadzenTooltip />
 
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
+@* Standard §10 — top nav bar (portrait-phone-first), app name left-aligned, no nav items.
+   User identity chip is on the right; ANON sessions show "ANON LOGGED IN" (§6). *@
+<header class="pt-top-bar">
+    <NavMenu />
 
-    <main>
-        <div class="top-row px-4">
-            @if (_isAuthenticated)
-            {
-                @* UX-10: User chip with dropdown replacing the version label *@
-                <div class="pt-user-chip" @onclick:stopPropagation="true">
-                    <button class="pt-user-chip-btn" @onclick="ToggleMenu" type="button">
-                        <div class="pt-user-avatar">@_initials</div>
-                        <span>@_email</span>
-                        <span style="font-size:0.7rem; color:#94a3b8; margin-left:2px;">▾</span>
-                    </button>
-                    @if (_menuOpen)
-                    {
-                        <div class="pt-user-dropdown" @onclick:stopPropagation="true">
-                            <div class="pt-user-dropdown-header">
-                                <div style="font-size:0.72rem; color:#94a3b8; margin-bottom:2px;">Signed in as</div>
-                                <div class="pt-user-dropdown-email">@_email</div>
-                            </div>
-                            <a class="pt-dropdown-item" href="/account/settings">
-                                <span class="material-symbols-outlined" style="font-size:1rem;">settings</span>
-                                Account Settings
-                            </a>
-                            <div class="pt-dropdown-divider"></div>
-                            <button class="pt-dropdown-item danger" @onclick="LogoutAsync" type="button">
-                                <span class="material-symbols-outlined" style="font-size:1rem;">logout</span>
-                                Sign Out
-                            </button>
+    @* Mock-data banner — shown when server reports UseMockProviders=true (§10 / §7) *@
+    @if (_isMockMode)
+    {
+        <span class="pt-mock-badge">⚠ USING MOCK DATA</span>
+    }
+
+    @if (_isAuthenticated)
+    {
+        @* Strategy: ANON accounts use email prefix "anon" + digits + "@potraffic.dev" *@
+        @if (_isAnon)
+        {
+            @* §6 — When ANON is logged in show "ANON LOGGED IN" *@
+            <div class="pt-user-chip pt-anon-chip" title="Development ANON session">
+                <span class="pt-user-avatar">A</span>
+                <span>ANON LOGGED IN</span>
+                <button class="pt-anon-signout" @onclick="LogoutAsync" type="button" title="Sign out">✕</button>
+            </div>
+        }
+        else
+        {
+            @* §6 — Regular user: show their email *@
+            <div class="pt-user-chip" @onclick:stopPropagation="true">
+                <button class="pt-user-chip-btn" @onclick="ToggleMenu" type="button">
+                    <div class="pt-user-avatar">@_initials</div>
+                    <span>@_email</span>
+                    <span class="pt-chevron">▾</span>
+                </button>
+                @if (_menuOpen)
+                {
+                    <div class="pt-user-dropdown" @onclick:stopPropagation="true">
+                        <div class="pt-user-dropdown-header">
+                            <div class="pt-dropdown-label">Signed in as</div>
+                            <div class="pt-user-dropdown-email">@_email</div>
                         </div>
-                    }
-                </div>
-            }
-        </div>
+                        <a class="pt-dropdown-item" href="/account/settings">
+                            <span class="material-symbols-outlined" style="font-size:1rem;">settings</span>
+                            Account Settings
+                        </a>
+                        <div class="pt-dropdown-divider"></div>
+                        <button class="pt-dropdown-item danger" @onclick="LogoutAsync" type="button">
+                            <span class="material-symbols-outlined" style="font-size:1rem;">logout</span>
+                            Sign Out
+                        </button>
+                    </div>
+                }
+            </div>
+        }
+    }
+</header>
 
-        <article class="content px-4">
-            @Body
-        </article>
-    </main>
-</div>
+<main class="pt-main-content">
+    <article class="content px-4">
+        @Body
+    </article>
+</main>
 
 @* Close dropdown when clicking outside *@
 @if (_menuOpen)
@@ -65,11 +83,14 @@
     private string _email = string.Empty;
     private string _initials = "?";
     private bool _isAuthenticated;
+    private bool _isAnon;
+    private bool _isMockMode;
 
     protected override async Task OnInitializedAsync()
     {
         AuthStateProvider.AuthenticationStateChanged += HandleAuthStateChanged;
         await UpdateUserStateAsync(await AuthStateProvider.GetAuthenticationStateAsync());
+        await LoadMockModeAsync();
     }
 
     private async void HandleAuthStateChanged(Task<AuthenticationState> stateTask)
@@ -89,6 +110,11 @@
                 ?? user.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value
                 ?? user.Identity?.Name
                 ?? "User";
+
+            // §6 — Detect ANON session by email pattern (anonNNNNNN@potraffic.dev)
+            _isAnon = _email.StartsWith("anon", StringComparison.OrdinalIgnoreCase)
+                      && _email.EndsWith("@potraffic.dev", StringComparison.OrdinalIgnoreCase);
+
             _initials = _email[0].ToString().ToUpperInvariant();
             return Task.CompletedTask;
         }
@@ -96,7 +122,26 @@
         _menuOpen = false;
         _email = string.Empty;
         _initials = "?";
+        _isAnon = false;
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Fetches feature flags from the server so the client can display the MOCK DATA banner
+    /// when the server is running with mock providers active (§10).
+    /// </summary>
+    private async Task LoadMockModeAsync()
+    {
+        try
+        {
+            var flags = await Http.GetFromJsonAsync<SystemFlagsDto>("/api/system/features");
+            _isMockMode = flags?.UseMockProviders == true;
+        }
+        catch
+        {
+            // Non-fatal — banner simply won't appear on network error
+            _isMockMode = false;
+        }
     }
 
     private void ToggleMenu() => _menuOpen = !_menuOpen;
@@ -114,5 +159,8 @@
     {
         AuthStateProvider.AuthenticationStateChanged -= HandleAuthStateChanged;
     }
+
+    // DTO for the /api/system/features response (local to this layout file)
+    private sealed record SystemFlagsDto(bool UseMockProviders, bool TripleTestEnabled);
 }
 

@@ -9,20 +9,20 @@ namespace PoTraffic.Api.Features.Auth;
 
 /// <summary>
 /// ANON login for development/testing bypass of OAuth.
-/// Creates or uses a system ANON user for testing without credentials.
-/// All actions are logged under the ANON account.
+/// Each call creates a unique ANON user (e.g. anon463443@potraffic.dev) so that
+/// parallel test runs or manual sessions do not collide in the database.
+/// All activity is stored under that session's own ANON account.
+/// (Standard §6 — ANON bypass with unique suffix per session.)
 /// </summary>
 public static class AnonAuthExtensions
 {
     /// <summary>
-    /// GUID reserved for the ANON development user.
+    /// Email domain suffix shared by all ANON accounts.
+    /// Clients check <c>email.StartsWith("anon") &amp;&amp; email.EndsWith("@potraffic.dev")</c>
+    /// to detect ANON sessions and display "ANON LOGGED IN" instead of the raw address.
     /// </summary>
-    public static readonly Guid AnonUserId = new("00000000-0000-0000-0000-000000000001");
-
-    /// <summary>
-    /// Email for the ANON development user.
-    /// </summary>
-    public const string AnonEmail = "anon@potraffic.dev";
+    public const string AnonEmailDomain = "@potraffic.dev";
+    public const string AnonEmailPrefix = "anon";
 
     public static IEndpointRouteBuilder MapAnonEndpoints(this IEndpointRouteBuilder app)
     {
@@ -77,36 +77,37 @@ public sealed class AnonLoginCommandHandler : IRequestHandler<AnonLoginCommand, 
 
     public async Task<AnonLoginResult> Handle(AnonLoginCommand command, CancellationToken ct)
     {
-        // Find or create ANON user
-        User? anonUser = await _db.Set<User>()
-            .FirstOrDefaultAsync(u => u.Email == AnonAuthExtensions.AnonEmail, ct);
+        // Each ANON session gets a brand-new unique account so parallel runs never collide.
+        // Suffix is 6 random digits (000000–999999), giving 1 million distinct ANON identities.
+        int suffix = Random.Shared.Next(100_000, 1_000_000);
+        string anonEmail = $"{AnonAuthExtensions.AnonEmailPrefix}{suffix}{AnonAuthExtensions.AnonEmailDomain}";
 
-        if (anonUser is null)
+        // Ensure no accidental collision — retry once if needed
+        bool exists = await _db.Set<User>().AnyAsync(u => u.Email == anonEmail, ct);
+        if (exists)
         {
-            anonUser = new User
-            {
-                Id = AnonAuthExtensions.AnonUserId,
-                Email = AnonAuthExtensions.AnonEmail,
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(Guid.NewGuid().ToString()), // Random hash
-                Locale = "en-US",
-                Role = "Developer", // Special role for ANON users
-                IsEmailVerified = true,
-                EmailVerificationToken = null,
-                CreatedAt = DateTimeOffset.UtcNow,
-                LastLoginAt = DateTimeOffset.UtcNow
-            };
-            _db.Set<User>().Add(anonUser);
-            await _db.SaveChangesAsync(ct);
-            _logger.LogWarning("ANON development user created. User ID: {UserId}", anonUser.Id);
-        }
-        else
-        {
-            // Update last login
-            anonUser.LastLoginAt = DateTimeOffset.UtcNow;
-            await _db.SaveChangesAsync(ct);
+            suffix = Random.Shared.Next(100_000, 1_000_000);
+            anonEmail = $"{AnonAuthExtensions.AnonEmailPrefix}{suffix}{AnonAuthExtensions.AnonEmailDomain}";
         }
 
-        _logger.LogWarning("ANON login bypass used. User ID: {UserId}", anonUser.Id);
+        User anonUser = new()
+        {
+            Id = Guid.NewGuid(),
+            Email = anonEmail,
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(Guid.NewGuid().ToString()),
+            Locale = "en-US",
+            Role = "Developer", // Special role for ANON dev/test users
+            IsEmailVerified = true,
+            EmailVerificationToken = null,
+            CreatedAt = DateTimeOffset.UtcNow,
+            LastLoginAt = DateTimeOffset.UtcNow
+        };
+
+        _db.Set<User>().Add(anonUser);
+        await _db.SaveChangesAsync(ct);
+        _logger.LogWarning(
+            "ANON development user created. Email: {Email}, User ID: {UserId}",
+            anonEmail, anonUser.Id);
 
         // Generate tokens
         (string accessToken, string refreshToken, DateTimeOffset expiresAt) = _jwt.GenerateTokens(anonUser);

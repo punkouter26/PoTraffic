@@ -103,8 +103,13 @@ azurite/
 # Container runtime data
 .docker/
 
-# LLMDOCS generated artifacts (if any)
-LLMDOCS/_site/
+# LLMDOCS generated artifacts (all)
+LLMDOCS/
+
+# Azure App Service / Kudu diagnostic log dumps (never committed)
+app-logs-fresh/
+app-logs-latest/
+app-logs*/
 
 # Debug logging
 *.log.txt
