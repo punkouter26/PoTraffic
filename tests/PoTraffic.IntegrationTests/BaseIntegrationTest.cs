@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using PoTraffic.Api.Features.Auth;
 using PoTraffic.Api.Infrastructure.Providers;
@@ -40,6 +41,14 @@ public abstract class BaseIntegrationTest : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
+        // Suppress Azure Key Vault loading regardless of ASPNETCORE_ENVIRONMENT.
+        // In CI (no Azure credentials) AddAzureKeyVault would throw CredentialUnavailableException
+        // during builder.Build(), causing WebApplicationFactory to report "entry point exited".
+        // Environment variables override appsettings.*.json files and are read by
+        // WebApplication.CreateBuilder before any WithWebHostBuilder callbacks execute.
+        Environment.SetEnvironmentVariable("AzureKeyVault__VaultUri", string.Empty);
+        Environment.SetEnvironmentVariable("KeyVault__Uri", string.Empty);
+
         await _dbContainer.StartAsync();
 
         // Wait for SQL Server engine readiness (port open ≠ engine ready)
@@ -48,9 +57,13 @@ public abstract class BaseIntegrationTest : IAsyncLifetime
         _factory = new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder =>
             {
-                builder.UseSetting(
-                    "ConnectionStrings:Default",
-                    _dbContainer.GetConnectionString());
+                // ConfigureAppConfiguration runs after all appsettings files and env vars,
+                // so this in-memory override wins over ConnectionStrings__Default in CI.
+                builder.ConfigureAppConfiguration((_, cfg) =>
+                    cfg.AddInMemoryCollection(new Dictionary<string, string?>
+                    {
+                        ["ConnectionStrings:Default"] = _dbContainer.GetConnectionString()
+                    }));
 
                 // Replace real traffic providers with a fake that returns
                 // deterministic geocode coordinates (avoids GEOCODE_FAILED 422)
