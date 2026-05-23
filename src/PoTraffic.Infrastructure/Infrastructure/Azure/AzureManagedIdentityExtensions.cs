@@ -72,7 +72,7 @@ public static class AzureManagedIdentityExtensions
     /// </summary>
     public static string GetKeyVaultUri(IConfiguration configuration)
     {
-        string? configuredUri = configuration["AzureKeyVault:VaultUri"];
+        string? configuredUri = configuration["KeyVault:Uri"];
 
         if (!string.IsNullOrWhiteSpace(configuredUri))
         {

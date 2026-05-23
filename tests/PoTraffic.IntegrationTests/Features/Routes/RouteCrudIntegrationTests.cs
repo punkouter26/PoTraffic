@@ -20,7 +20,8 @@ public sealed class RouteCrudIntegrationTests : BaseIntegrationTest
         HttpClient client = CreateClient();
 
         // Arrange — register a real user to satisfy FK constraints
-        var registerBody = new { Email = "crud@test.invalid", Password = "Str0ng!Pass", Locale = "en-IE" };
+        string uniqueEmail = $"crud-{Guid.NewGuid():N}@test.invalid";
+        var registerBody = new { Email = uniqueEmail, Password = "Str0ng!Pass", Locale = "en-IE" };
         HttpResponseMessage registerResp = await client.PostAsJsonAsync("/api/auth/register", registerBody);
         registerResp.StatusCode.Should().Be(HttpStatusCode.Created, "user registration must succeed");
         AuthResponse? auth = await registerResp.Content.ReadFromJsonAsync<AuthResponse>();

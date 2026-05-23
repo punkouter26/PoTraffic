@@ -1,7 +1,122 @@
-@* NavMenu — top navbar, app name left-aligned, no nav items (per standard §10).
-   /diag and /health are internal-only endpoints; no links are surfaced here. *@
-@inject NavigationManager Navigation
+﻿@using Microsoft.AspNetCore.Components.Authorization
+@using PoTraffic.Client.Infrastructure.Auth
+@implements IDisposable
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Nav
 
-<nav class="pt-top-navbar">
-    <a class="pt-brand" href="/">PoTraffic</a>
+<nav class="navbar navbar-dark app-navbar" role="navigation" aria-label="Main navigation">
+    <a class="navbar-brand" href="dashboard">PoTraffic</a>
+
+    <button class="navbar-toggler" @onclick="ToggleNavMenu" aria-expanded="@(!collapseNavMenu)" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="navbar-collapse @(collapseNavMenu ? "" : "show")">
+        <div class="navbar-nav me-auto">
+            @if (_isAuthenticated)
+            {
+                <NavLink class="nav-link" href="dashboard" Match="NavLinkMatch.All">Dashboard</NavLink>
+                @if (_isAdmin)
+                {
+                    <NavLink class="nav-link" href="admin">Admin</NavLink>
+                }
+            }
+            else
+            {
+                <NavLink class="nav-link" href="login" Match="NavLinkMatch.All">Sign In</NavLink>
+                <NavLink class="nav-link" href="register">Register</NavLink>
+            }
+        </div>
+
+        @if (_isAuthenticated)
+        {
+            <div class="pt-user-chip" @onclick:stopPropagation="true">
+                <button class="pt-user-chip-btn" @onclick="ToggleUserMenu" type="button">
+                    <div class="pt-user-avatar">@_initials</div>
+                    <span>@_email</span>
+                    <span class="pt-user-caret">▾</span>
+                </button>
+                @if (_menuOpen)
+                {
+                    <div class="pt-user-dropdown" @onclick:stopPropagation="true">
+                        <div class="pt-user-dropdown-header">
+                            <div class="pt-user-dropdown-label">Signed in as</div>
+                            <div class="pt-user-dropdown-email">@_email</div>
+                        </div>
+                        <a class="pt-dropdown-item" href="/account/settings">Account Settings</a>
+                        <div class="pt-dropdown-divider"></div>
+                        <button class="pt-dropdown-item danger" @onclick="LogoutAsync" type="button">Sign Out</button>
+                    </div>
+                }
+            </div>
+        }
+    </div>
 </nav>
+
+@if (_menuOpen)
+{
+    <div class="pt-overlay" @onclick="CloseUserMenu"></div>
+}
+
+@code {
+    private bool collapseNavMenu = true;
+    private bool _menuOpen;
+    private bool _isAuthenticated;
+    private bool _isAdmin;
+    private string _email = string.Empty;
+    private string _initials = "?";
+
+    protected override async Task OnInitializedAsync()
+    {
+        AuthStateProvider.AuthenticationStateChanged += HandleAuthStateChanged;
+        await UpdateUserStateAsync(await AuthStateProvider.GetAuthenticationStateAsync());
+    }
+
+    private void ToggleNavMenu() => collapseNavMenu = !collapseNavMenu;
+    private void ToggleUserMenu() => _menuOpen = !_menuOpen;
+    private void CloseUserMenu() => _menuOpen = false;
+
+    private async void HandleAuthStateChanged(Task<AuthenticationState> stateTask)
+    {
+        await UpdateUserStateAsync(await stateTask);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private Task UpdateUserStateAsync(AuthenticationState authState)
+    {
+        var user = authState.User;
+        _isAuthenticated = user.Identity?.IsAuthenticated == true;
+        _isAdmin = _isAuthenticated &&
+            (user.IsInRole("Administrator") ||
+             user.Claims.Any(c => c.Type is "role" or System.Security.Claims.ClaimTypes.Role && c.Value == "Administrator"));
+
+        if (_isAuthenticated)
+        {
+            _email = user.FindFirst("email")?.Value
+                ?? user.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value
+                ?? user.Identity?.Name
+                ?? "User";
+            _initials = _email[0].ToString().ToUpperInvariant();
+        }
+        else
+        {
+            _menuOpen = false;
+            _email = string.Empty;
+            _initials = "?";
+        }
+        return Task.CompletedTask;
+    }
+
+    private async Task LogoutAsync()
+    {
+        _menuOpen = false;
+        if (AuthStateProvider is JwtAuthenticationStateProvider jwtProvider)
+            await jwtProvider.LogoutAsync();
+        Nav.NavigateTo("/login", forceLoad: true);
+    }
+
+    public void Dispose()
+    {
+        AuthStateProvider.AuthenticationStateChanged -= HandleAuthStateChanged;
+    }
+}

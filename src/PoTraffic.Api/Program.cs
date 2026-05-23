@@ -48,7 +48,7 @@ try
     // the resolved secrets rather than the appsettings.json placeholder values.
     // PrefixKeyVaultSecretManager strips the "PoTraffic--" namespace prefix so that
     // e.g. "PoTraffic--ConnectionStrings--Default" → config key "ConnectionStrings:Default".
-    string? vaultUri = builder.Configuration["KeyVault:Uri"] ?? builder.Configuration["AzureKeyVault:VaultUri"];
+    string? vaultUri = builder.Configuration["KeyVault:Uri"];
     if (!string.IsNullOrWhiteSpace(vaultUri))
     {
         builder.Configuration.AddAzureKeyVault(
@@ -224,7 +224,26 @@ try
 
     // ── Serve Blazor WASM fallback (non-API requests) ─────────────────────────
     app.MapStaticAssets();
-    app.MapFallbackToFile("index.html");
+
+    if (app.Environment.IsEnvironment("Testing"))
+    {
+        string testingIndexPath = Path.GetFullPath(
+            Path.Combine(app.Environment.ContentRootPath, "..", "PoTraffic.Client", "wwwroot", "index.html"));
+
+        if (File.Exists(testingIndexPath))
+        {
+            app.MapGet("/index.html", () => Results.File(testingIndexPath, "text/html"));
+            app.MapFallback(() => Results.File(testingIndexPath, "text/html"));
+        }
+        else
+        {
+            app.MapFallbackToFile("index.html");
+        }
+    }
+    else
+    {
+        app.MapFallbackToFile("index.html");
+    }
 
     // ── Startup: run EF Core migrations and seed admin user ─────────────────
     // Ensures schema is always current and an Administrator account exists on

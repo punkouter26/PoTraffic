@@ -1,62 +1,91 @@
-name: CI-CD
+name: CI/CD — Build, Test & Deploy
 
 on:
   push:
     branches: [master]
+  pull_request:
+    branches: [master]
   workflow_dispatch:
 
 permissions:
-  id-token: write
   contents: read
+  id-token: write
+
+env:
+  DOTNET_VERSION: '10.0.x'
+  AZURE_WEBAPP_NAME: potraffic-api
+  AZURE_RESOURCE_GROUP: PoTraffic
+  SOLUTION_PATH: PoTraffic.slnx
+  API_PROJECT_PATH: src/PoTraffic.Api/PoTraffic.Api.csproj
+  UNIT_TEST_PATH: tests/PoTraffic.UnitTests
 
 concurrency:
-  group: deploy-${{ github.ref }}
+  group: deploy-${{ github.repository }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build-and-deploy:
+  build-and-test:
+    name: Build & Test
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup .NET 10
-        uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '10.x'
-
-      - name: Cache NuGet packages
-        uses: actions/cache@v4
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - uses: actions/cache@v4
         with:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'Directory.Packages.props') }}
           restore-keys: nuget-${{ runner.os }}-
-
-      - name: Restore
-        run: dotnet restore PoTraffic.slnx
-
-      - name: Build
-        run: dotnet build PoTraffic.slnx --no-restore --configuration Release
-
-      - name: Publish API
-        run: dotnet publish src/PoTraffic.Api/PoTraffic.Api.csproj --no-build --configuration Release --output ./publish
-
-      - name: Azure login
-        uses: azure/login@v2.3.0
+      - run: dotnet restore ${{ env.SOLUTION_PATH }}
+      - run: dotnet build ${{ env.SOLUTION_PATH }} --no-restore -c Release
+      - run: dotnet format ${{ env.SOLUTION_PATH }} --verify-no-changes --verbosity minimal
+      - run: dotnet test ${{ env.UNIT_TEST_PATH }} -c Release --no-build --logger trx --results-directory TestResults
+      - if: always()
+        uses: actions/upload-artifact@v4
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Deploy to Azure App Service
-        uses: azure/webapps-deploy@v3
+          name: unit-test-results
+          path: TestResults/*.trx
+      - run: dotnet publish ${{ env.API_PROJECT_PATH }} -c Release --no-restore -o publish
+      - uses: actions/upload-artifact@v4
         with:
-          app-name: potraffic-api
-          package: ./publish
+          name: webapp
+          path: publish
+          retention-days: 1
 
-      - name: Verify health
+  deploy:
+    name: Deploy to Azure
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: https://potraffic-api.azurewebsites.net
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: webapp
+          path: publish
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - run: cd publish && zip -r ../webapp.zip . && cd ..
+      - uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          resource-group-name: ${{ env.AZURE_RESOURCE_GROUP }}
+          package: webapp.zip
+      - name: Verify deployment (health check)
         run: |
-          curl --fail --show-error --silent \
-            --retry 12 --retry-delay 10 --retry-connrefused \
-            "https://potraffic-api.azurewebsites.net/health"
+          sleep 20
+          for i in 1 2 3 4 5; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net/health" --max-time 30 || echo "000")
+            echo "Health check attempt $i: HTTP $STATUS"
+            if [ "$STATUS" = "200" ]; then echo "Deployment verified."; exit 0; fi
+            sleep 15
+          done
+          echo "WARNING: Health check did not return 200 after 5 attempts."
