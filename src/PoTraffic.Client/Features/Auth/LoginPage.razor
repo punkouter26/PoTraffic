@@ -32,8 +32,8 @@
 
     @if (HostEnvironment.IsDevelopment())
     {
-        <RadzenButton Text="🔓  ANON (Dev Only)" ButtonStyle="ButtonStyle.Warning" class="rz-w-100 rz-mt-2"
-                      Click="@AnonLoginAsync" IsBusy="_loading" />
+        <RadzenButton Text="🔓  GUEST (Dev Only)" ButtonStyle="ButtonStyle.Warning" class="rz-w-100 rz-mt-2"
+                      Click="@GuestLoginAsync" IsBusy="_loading" />
     }
 
     @if (_availableProviders.Contains("google"))
@@ -119,14 +119,14 @@
         Nav.NavigateTo($"/api/auth/external/{provider}/start?returnUrl={encodedReturnUrl}", forceLoad: true);
     }
 
-    private async Task AnonLoginAsync()
+    private async Task GuestLoginAsync()
     {
         _error = "";
         _loading = true;
 
         try
         {
-            HttpResponseMessage response = await Http.PostAsJsonAsync("/api/auth/anon-login", new { });
+            HttpResponseMessage response = await Http.PostAsJsonAsync("/api/auth/guest-login", new { });
 
             if (response.IsSuccessStatusCode)
             {
@@ -142,7 +142,7 @@
             }
             else
             {
-                _error = "ANON login failed. Check server logs.";
+                _error = "GUEST login failed. Check server logs.";
             }
         }
         catch

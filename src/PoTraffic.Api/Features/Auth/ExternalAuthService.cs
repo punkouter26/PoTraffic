@@ -100,6 +100,7 @@ public sealed class ExternalAuthService
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(Guid.NewGuid().ToString("N")),
                 Locale = "en-US",
                 Role = isAdmin ? "Administrator" : "Commuter",
+                AuthProvider = authProvider.ProviderName.ToLowerInvariant(),
                 IsEmailVerified = identity.IsEmailVerified,
                 CreatedAt = DateTimeOffset.UtcNow,
                 LastLoginAt = DateTimeOffset.UtcNow

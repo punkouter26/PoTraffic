@@ -12,6 +12,14 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <!-- Silence informational-only MSBuild messages that are not actionable warnings -->
     <NoWarn>$(NoWarn)</NoWarn>
+    <!--
+      Git-driven versioning via MinVer (Rule 1 — Git-Driven Versioning).
+      MinVer reads the nearest git tag and produces a deterministic version
+      (e.g. 1.2.0+local.5.gabc123). Tag main with v1.0.0 to cut a release.
+      Override per-project with <MinVerSkip>true</MinVerSkip> if needed.
+    -->
+    <MinVerTagPrefix>v</MinVerTagPrefix>
+    <MinVerDefaultPreReleasePhase>preview</MinVerDefaultPreReleasePhase>
   </PropertyGroup>
 
 </Project>

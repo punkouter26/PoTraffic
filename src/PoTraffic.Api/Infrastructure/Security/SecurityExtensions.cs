@@ -14,7 +14,7 @@ internal static class SecurityExtensions
     /// Registers JWT Bearer authentication, authorization policies, DataProtection, and external OAuth providers.
     /// Strategy pattern — external provider implementation is selected by provider key at runtime.
     /// </summary>
-    internal static IServiceCollection AddSecurityServices(this IServiceCollection services, IConfiguration configuration)
+    internal static IServiceCollection AddSecurityServices(this IServiceCollection services, IConfiguration configuration, string environmentName)
     {
         JwtConfiguration jwtCfg = configuration.GetSection("Jwt").Get<JwtConfiguration>()
             ?? throw new InvalidOperationException("Jwt configuration section is missing.");
@@ -46,6 +46,15 @@ internal static class SecurityExtensions
         services.AddAuthorization(opts =>
         {
             opts.AddPolicy("AdminOnly", p => p.RequireRole("Administrator"));
+
+            // Rule 13: in Production, Microsoft OAuth is REQUIRED.
+            // GUEST and password-only sessions are rejected. The policy is a no-op
+            // in non-Production environments so dev/test E2E flows keep working.
+            opts.AddPolicy("ProductionMicrosoftAuth", p =>
+            {
+                p.RequireAuthenticatedUser();
+                p.RequireAssertion(ctx => ProductionMicrosoftAuthPolicy.Evaluate(environmentName, ctx));
+            });
         });
 
         services.AddSingleton<JwtTokenService>();

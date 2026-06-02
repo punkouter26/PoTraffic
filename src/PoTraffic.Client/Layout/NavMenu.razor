@@ -33,7 +33,16 @@
             <div class="pt-user-chip" @onclick:stopPropagation="true">
                 <button class="pt-user-chip-btn" @onclick="ToggleUserMenu" type="button">
                     <div class="pt-user-avatar">@_initials</div>
-                    <span>@_email</span>
+                    <span>
+                        @if (_isGuest)
+                        {
+                            <text>@_displayLabel LOGGED IN</text>
+                        }
+                        else
+                        {
+                            <text>@_email</text>
+                        }
+                    </span>
                     <span class="pt-user-caret">▾</span>
                 </button>
                 @if (_menuOpen)
@@ -41,7 +50,7 @@
                     <div class="pt-user-dropdown" @onclick:stopPropagation="true">
                         <div class="pt-user-dropdown-header">
                             <div class="pt-user-dropdown-label">Signed in as</div>
-                            <div class="pt-user-dropdown-email">@_email</div>
+                            <div class="pt-user-dropdown-email">@_displayLabel</div>
                         </div>
                         <a class="pt-dropdown-item" href="/account/settings">Account Settings</a>
                         <div class="pt-dropdown-divider"></div>
@@ -63,7 +72,9 @@
     private bool _menuOpen;
     private bool _isAuthenticated;
     private bool _isAdmin;
+    private bool _isGuest;
     private string _email = string.Empty;
+    private string _displayLabel = string.Empty;
     private string _initials = "?";
 
     protected override async Task OnInitializedAsync()
@@ -89,6 +100,9 @@
         _isAdmin = _isAuthenticated &&
             (user.IsInRole("Administrator") ||
              user.Claims.Any(c => c.Type is "role" or System.Security.Claims.ClaimTypes.Role && c.Value == "Administrator"));
+        _isGuest = _isAuthenticated && (
+            user.IsInRole("Guest") ||
+            user.Claims.Any(c => c.Type is "role" or System.Security.Claims.ClaimTypes.Role && c.Value == "Guest"));
 
         if (_isAuthenticated)
         {
@@ -96,12 +110,28 @@
                 ?? user.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value
                 ?? user.Identity?.Name
                 ?? "User";
-            _initials = _email[0].ToString().ToUpperInvariant();
+
+            // Rule 6: display "GUEST12345678 LOGGED IN" for guest sessions.
+            if (_isGuest && _email.StartsWith("guest", StringComparison.OrdinalIgnoreCase) && _email.EndsWith("@potraffic.dev", StringComparison.OrdinalIgnoreCase))
+            {
+                // guest12345678@potraffic.dev → GUEST12345678
+                string localPart = _email[..^"@potraffic.dev".Length];
+                string digits = localPart["guest".Length..];
+                _displayLabel = $"GUEST{digits}";
+                _initials = "G";
+            }
+            else
+            {
+                _displayLabel = _email;
+                _initials = _email[0].ToString().ToUpperInvariant();
+            }
         }
         else
         {
             _menuOpen = false;
             _email = string.Empty;
+            _displayLabel = string.Empty;
+            _isGuest = false;
             _initials = "?";
         }
         return Task.CompletedTask;

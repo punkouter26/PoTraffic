@@ -37,6 +37,7 @@ public sealed class JwtTokenService
             new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new(JwtRegisteredClaimNames.Email, user.Email),
             new("role", user.Role),
+            new("auth_provider", user.AuthProvider ?? "password"),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         ];
 

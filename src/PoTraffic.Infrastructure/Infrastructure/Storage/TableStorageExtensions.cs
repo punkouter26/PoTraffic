@@ -35,8 +35,15 @@ public static class TableStorageExtensions
         IWebHostEnvironment environment)
     {
         string? connectionString = configuration["ConnectionStrings:TableStorage"];
-        bool useAzurite = string.IsNullOrEmpty(connectionString) ||
-                          environment.IsDevelopment() && !configuration.GetValue<bool>("AzureCredential:UseProductionStorage");
+
+        // Rule 5 — Dynamic Switching: Azurite locally, Azure Table Storage in cloud.
+        //   "UseDevelopmentStorage=true"  → Azurite (docker-compose runs it on :10001).
+        //   Empty / "AzureTable:UseManagedIdentity=true" → Managed Identity against the
+        //   storage account in `rg-potraffic`.
+        //   Any other string → interpreted as a custom Azure Table Storage connection string.
+        bool useAzurite = string.IsNullOrEmpty(connectionString)
+            || connectionString.Contains("UseDevelopmentStorage=true", StringComparison.OrdinalIgnoreCase)
+            || (environment.IsDevelopment() && !configuration.GetValue<bool>("AzureCredential:UseProductionStorage"));
 
         TableClientOptions tableOptions = new()
         {

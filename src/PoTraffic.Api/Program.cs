@@ -1,4 +1,5 @@
 using Azure.Extensions.AspNetCore.Configuration.Secrets;
+using Azure.Data.Tables;
 using Azure.Identity;
 using FluentValidation;
 using Hangfire;
@@ -21,6 +22,7 @@ using PoTraffic.Api.Infrastructure.Logging;
 using PoTraffic.Api.Infrastructure.Observability;
 using PoTraffic.Api.Infrastructure.Providers;
 using PoTraffic.Api.Infrastructure.Security;
+using PoTraffic.Api.Infrastructure.Storage;
 using PoTraffic.Api.Infrastructure.Testing;
 using Scalar.AspNetCore;
 using Serilog;
@@ -48,20 +50,40 @@ try
     // the resolved secrets rather than the appsettings.json placeholder values.
     // PrefixKeyVaultSecretManager strips the "PoTraffic--" namespace prefix so that
     // e.g. "PoTraffic--ConnectionStrings--Default" → config key "ConnectionStrings:Default".
+    //
+    // Rule 10 (First-Run Success): We try Key Vault first when configured, but
+    // fall back to appsettings (Development only) so a fresh checkout works
+    // before the developer has authenticated via `az login`.
     string? vaultUri = builder.Configuration["KeyVault:Uri"];
-    if (!string.IsNullOrWhiteSpace(vaultUri))
+    bool keyVaultConfigured = !string.IsNullOrWhiteSpace(vaultUri);
+    if (keyVaultConfigured)
     {
         builder.Configuration.AddAzureKeyVault(
-            new Uri(vaultUri),
+            new Uri(vaultUri!),
             new DefaultAzureCredential(),
             new PrefixKeyVaultSecretManager());
+    }
+
+    // Guard: a placeholder JWT key in Production is a security incident waiting
+    // to happen. Fail-fast so it never reaches the wire.
+    string? jwtKey = builder.Configuration["Jwt:Key"];
+    bool isProdLike = builder.Environment.IsProduction() || builder.Environment.IsStaging();
+    bool jwtKeyLooksPlaceholder = string.IsNullOrWhiteSpace(jwtKey)
+        || jwtKey.StartsWith("REPLACE_WITH", StringComparison.OrdinalIgnoreCase)
+        || jwtKey.StartsWith("PoTraffic-LocalDev", StringComparison.OrdinalIgnoreCase);
+    if (isProdLike && (jwtKeyLooksPlaceholder || !keyVaultConfigured))
+    {
+        throw new InvalidOperationException(
+            "JWT signing key is missing or still a placeholder, and Key Vault is not configured. " +
+            "Production requires 'KeyVault:Uri' set and a non-placeholder 'Jwt:Key' resolved from Key Vault.");
     }
 
     // ── Infrastructure extension methods (grouped by responsibility) ──────────
     builder.AddObservability();
     builder.Services.AddDataServices(builder.Configuration);
+    builder.Services.AddTableStorageServices(builder.Configuration, builder.Environment);
     builder.Services.AddHangfireServices(builder.Configuration);
-    builder.Services.AddSecurityServices(builder.Configuration);
+    builder.Services.AddSecurityServices(builder.Configuration, builder.Environment.EnvironmentName);
     builder.Services.AddTrafficProviders(builder.Configuration, builder.Environment);
 
     // ── MediatR CQRS ─────────────────────────────────────────────────────────
@@ -190,7 +212,12 @@ try
     app.MapAccountEndpoints();
     app.MapAdminEndpoints();
     app.MapAuthEndpoints();
-    app.MapAnonEndpoints();
+    // Rule 6 / Rule 13: GUEST login is only registered in Dev + Testing.
+    // In Production the endpoint is omitted entirely (no `guest-login` route).
+    if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
+    {
+        app.MapGuestEndpoints();
+    }
     app.MapRoutesEndpoints();
     app.MapWindowsEndpoints();
     app.MapHistoryEndpoints();
@@ -245,12 +272,28 @@ try
         app.MapFallbackToFile("index.html");
     }
 
-    // ── Startup: run EF Core migrations and seed admin user ─────────────────
+    // ── Startup: run EF Core migrations, seed admin user, ensure Table Storage tables ──
     // Ensures schema is always current and an Administrator account exists on
     // every cold-start (idempotent — safe to run against an existing database).
     // Retry loop handles Azure SQL serverless auto-pause resume latency (can take
     // 30-90s on cold wake). Without retries, MigrateAsync() times out and crashes
     // the app before it can serve requests.
+    // ── Ensure Table Storage tables exist (idempotent, Azurite + Azure) ────
+    {
+        TableServiceClient? tableService = app.Services.GetService<TableServiceClient>();
+        if (tableService is not null)
+        {
+            try
+            {
+                await TableStorageExtensions.EnsureTablesExistAsync(tableService, "TrafficPolls");
+                Console.WriteLine("[startup] Table Storage: TrafficPolls table ensured.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[startup] Table Storage: failed to ensure TrafficPolls table — continuing. {ex.Message}");
+            }
+        }
+    }
     await using (AsyncServiceScope scope = app.Services.CreateAsyncScope())
     {
         PoTrafficDbContext db = scope.ServiceProvider.GetRequiredService<PoTrafficDbContext>();

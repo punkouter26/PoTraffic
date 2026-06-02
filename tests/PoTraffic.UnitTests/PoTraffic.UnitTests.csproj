@@ -6,8 +6,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\PoTraffic.Api\PoTraffic.Api.csproj" />
     <ProjectReference Include="..\..\src\PoTraffic.Shared\PoTraffic.Shared.csproj" />
+    <ProjectReference Include="..\..\src\PoTraffic.Domain\PoTraffic.Domain.csproj" />
+    <ProjectReference Include="..\..\src\PoTraffic.Application\PoTraffic.Application.csproj" />
+    <ProjectReference Include="..\..\src\PoTraffic.Api\PoTraffic.Api.csproj" />
   </ItemGroup>
 
   <ItemGroup>

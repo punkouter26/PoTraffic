@@ -3,27 +3,49 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
 using PoTraffic.Api.Infrastructure.Data;
 using PoTraffic.Api.Infrastructure.Providers;
+using System.Security.Cryptography;
 
 namespace PoTraffic.Api.Features.Config;
 
 /// <summary>
 /// Diagnostics page showing status of all external connections, keys, and configuration.
-/// Masked sensitive values for security. Development mode only.
+/// Masked sensitive values for security.
+///
+/// Rule 4 — /diag must be available in both Development and Production. In
+/// Production the route is "hidden" (unobvious path + secret token header) so
+/// that it doesn't appear in UI navigation. The secret token is configured via
+/// <c>Diag:SecretToken</c> in appsettings (overridable via Key Vault).
 /// </summary>
 public static class DiagEndpoints
 {
+    private const string SecretHeaderName = "X-PoTraffic-Diag";
+
     public static IEndpointRouteBuilder MapDiagEndpoints(this IEndpointRouteBuilder app)
     {
-        // /diag — HTML diagnostics page (development only)
-        app.MapGet("/diag", async (
+        // /diag-{env}?key={secret} — Production-safe hidden diagnostic page.
+        // The path segment is unpredictable (per-environment) and the secret is
+        // checked before any data is rendered.
+        app.MapGet("/diag-{envSegment}", async (
+            string envSegment,
             HealthCheckService healthCheckService,
             IConfiguration configuration,
             IWebHostEnvironment env,
+            HttpContext httpContext,
             ILogger<Program> logger) =>
         {
+            // Dev: any /diag-* URL is allowed (no secret required) for convenience.
+            // Non-Dev: require header X-PoTraffic-Diag matching the configured secret.
             if (!env.IsDevelopment())
             {
-                return (IResult)Results.Forbid();
+                string? expected = configuration["Diag:SecretToken"];
+                string? presented = httpContext.Request.Headers[SecretHeaderName].FirstOrDefault();
+                if (string.IsNullOrWhiteSpace(expected) ||
+                    !CryptographicOperations.FixedTimeEquals(
+                        System.Text.Encoding.UTF8.GetBytes(expected),
+                        System.Text.Encoding.UTF8.GetBytes(presented ?? string.Empty)))
+                {
+                    return (IResult)Results.NotFound();
+                }
             }
 
             // Get health check results

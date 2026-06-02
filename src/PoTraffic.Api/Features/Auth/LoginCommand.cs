@@ -51,6 +51,7 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, LoginRes
         if (user is null || !BCrypt.Net.BCrypt.Verify(command.Password, user.PasswordHash))
             return new LoginResult(false, null, "INVALID_CREDENTIALS");
 
+        user.AuthProvider = "password";
         (string accessToken, string refreshToken, DateTimeOffset expiresAt) = _jwt.GenerateTokens(user);
 
         user.RefreshToken = refreshToken;

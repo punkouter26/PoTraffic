@@ -13,6 +13,13 @@ public sealed class User
     /// <summary>"Commuter" or "Administrator"</summary>
     public string Role { get; set; } = "Commuter";
 
+    /// <summary>
+    /// Identity provider that minted the most recent session for this user.
+    /// One of: "password", "guest", "google", "microsoft".
+    /// Used by the production Microsoft-only auth policy (Rule 13).
+    /// </summary>
+    public string AuthProvider { get; set; } = "password";
+
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? LastLoginAt { get; set; }
     public string? RefreshToken { get; set; }
