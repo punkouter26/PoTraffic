@@ -1,10 +1,9 @@
 using FluentAssertions;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using PoTraffic.Api.Features.History;
-using PoTraffic.Api.Infrastructure.Data;
+using PoTraffic.Api.Infrastructure.Storage;
 
-using PoTraffic.Api.Infrastructure.Data.Projections;
+using PoTraffic.Shared.DTOs.History;
 using PoTraffic.Shared.Constants;
 using PoTraffic.Shared.Enums;
 
@@ -17,12 +16,9 @@ namespace PoTraffic.UnitTests.Features.History;
 /// </summary>
 public sealed class GetBaselineHandlerTests
 {
-    private static PoTrafficDbContext CreateDb(string name)
+    private static TableStorageContext CreateDb()
     {
-        DbContextOptions<PoTrafficDbContext> opts = new DbContextOptionsBuilder<PoTrafficDbContext>()
-            .UseInMemoryDatabase(name)
-            .Options;
-        return new PoTrafficDbContext(opts);
+        return new TableStorageContext();
     }
 
     /// <summary>
@@ -35,8 +31,7 @@ public sealed class GetBaselineHandlerTests
     public async Task GetBaselineHandler_WhenFewerThanThreeSessions_ReturnsEmptySlotList()
     {
         // Arrange
-        string dbName = Guid.NewGuid().ToString();
-        PoTrafficDbContext db = CreateDb(dbName);
+        TableStorageContext db = CreateDb();
 
         Guid routeId = Guid.NewGuid();
         var handler = new GetBaselineQueryHandler(db, NullLogger<GetBaselineQueryHandler>.Instance);
@@ -57,8 +52,7 @@ public sealed class GetBaselineHandlerTests
     public async Task GetBaselineHandler_ReturnsCorrectRouteId()
     {
         // Arrange
-        string dbName = Guid.NewGuid().ToString();
-        PoTrafficDbContext db = CreateDb(dbName);
+        TableStorageContext db = CreateDb();
         Guid routeId = Guid.NewGuid();
 
         var handler = new GetBaselineQueryHandler(db, NullLogger<GetBaselineQueryHandler>.Instance);

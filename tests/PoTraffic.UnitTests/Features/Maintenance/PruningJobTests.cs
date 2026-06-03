@@ -1,8 +1,7 @@
 using FluentAssertions;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using PoTraffic.Api.Features.Maintenance;
-using PoTraffic.Api.Infrastructure.Data;
+using PoTraffic.Api.Infrastructure.Storage;
 
 
 namespace PoTraffic.UnitTests.Features.Maintenance;
@@ -13,35 +12,27 @@ namespace PoTraffic.UnitTests.Features.Maintenance;
 /// </summary>
 public sealed class PruningJobTests
 {
-    private static PoTrafficDbContext CreateDb(string name)
+    private static TableStorageContext CreateDb()
     {
-        DbContextOptions<PoTrafficDbContext> opts = new DbContextOptionsBuilder<PoTrafficDbContext>()
-            .UseInMemoryDatabase(name)
-            .Options;
-        return new PoTrafficDbContext(opts);
+        return new TableStorageContext();
     }
 
     [Fact]
     public async Task PruneJob_MarksOldRecordsDeleted_DoesNotTouchRecentRecords()
     {
         // Arrange
-        string dbName = Guid.NewGuid().ToString();
-        await using PoTrafficDbContext db = CreateDb(dbName);
+        await using TableStorageContext db = CreateDb();
 
         Guid routeId = Guid.NewGuid();
         DateTime cutoff = DateTime.UtcNow.AddDays(-90);
 
         // 3 old records (> 90 days)
-        db.Set<PollRecord>().AddRange([
-            new PollRecord { Id = Guid.NewGuid(), RouteId = routeId, PolledAt = cutoff.AddDays(-2), TravelDurationSeconds = 300, DistanceMetres = 5000, RawProviderResponse = "data" },
-            new PollRecord { Id = Guid.NewGuid(), RouteId = routeId, PolledAt = cutoff.AddDays(-5), TravelDurationSeconds = 310, DistanceMetres = 5000, RawProviderResponse = "data" },
+        db.AddRange(new[] { , ,  }), RouteId = routeId, PolledAt = cutoff.AddDays(-5), TravelDurationSeconds = 310, DistanceMetres = 5000, RawProviderResponse = "data" },
             new PollRecord { Id = Guid.NewGuid(), RouteId = routeId, PolledAt = cutoff.AddDays(-30), TravelDurationSeconds = 320, DistanceMetres = 5000, RawProviderResponse = "data" },
         ]);
 
         // 2 recent records (< 90 days)
-        db.Set<PollRecord>().AddRange([
-            new PollRecord { Id = Guid.NewGuid(), RouteId = routeId, PolledAt = cutoff.AddDays(1), TravelDurationSeconds = 290, DistanceMetres = 5000 },
-            new PollRecord { Id = Guid.NewGuid(), RouteId = routeId, PolledAt = DateTime.UtcNow.AddDays(-10), TravelDurationSeconds = 280, DistanceMetres = 5000 },
+        db.AddRange(new[] { , ,  }), RouteId = routeId, PolledAt = DateTime.UtcNow.AddDays(-10), TravelDurationSeconds = 280, DistanceMetres = 5000 },
         ]);
 
         await db.SaveChangesAsync();
@@ -55,7 +46,7 @@ public sealed class PruningJobTests
         deleted.Should().Be(3, "3 records are older than 90 days");
 
         // Reload bypassing global filter
-        List<PollRecord> allRecords = await db.Set<PollRecord>().IgnoreQueryFilters().ToListAsync();
+        List<PollRecord> allRecords = await db.PollRecords.ToList();
         allRecords.Count(r => r.IsDeleted).Should().Be(3);
         allRecords.Count(r => !r.IsDeleted).Should().Be(2);
 
@@ -68,8 +59,7 @@ public sealed class PruningJobTests
     [Fact]
     public async Task PruneJob_WhenNoOldRecords_ReturnsZero()
     {
-        string dbName = Guid.NewGuid().ToString();
-        await using PoTrafficDbContext db = CreateDb(dbName);
+        await using TableStorageContext db = CreateDb();
 
         var handler = new PruneOldPollRecordsCommandHandler(db, NullLogger<PruneOldPollRecordsCommandHandler>.Instance);
 
@@ -82,13 +72,12 @@ public sealed class PruningJobTests
     public async Task PruneJob_DoesNotTouchRecordExactlyAtBoundary()
     {
         // Record exactly 90 days ago should NOT be pruned (boundary is exclusive)
-        string dbName = Guid.NewGuid().ToString();
-        await using PoTrafficDbContext db = CreateDb(dbName);
+        await using TableStorageContext db = CreateDb();
         Guid routeId = Guid.NewGuid();
 
         // Exactly 90 days — borderline (should NOT be deleted per spec: < 90 days window means > 90 days is deleted)
         // PolledAt < GETUTCDATE() - 90 → strictly less than means exact boundary is not deleted
-        db.Set<PollRecord>().Add(new PollRecord
+        db.Add(new PollRecord
         {
             Id = Guid.NewGuid(),
             RouteId = routeId,

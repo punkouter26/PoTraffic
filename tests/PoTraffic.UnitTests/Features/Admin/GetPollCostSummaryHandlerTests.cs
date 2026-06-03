@@ -1,8 +1,7 @@
 using FluentAssertions;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using PoTraffic.Api.Features.Admin;
-using PoTraffic.Api.Infrastructure.Data;
+using PoTraffic.Api.Infrastructure.Storage;
 
 using PoTraffic.Shared.DTOs.Admin;
 
@@ -15,28 +14,24 @@ namespace PoTraffic.UnitTests.Features.Admin;
 /// </summary>
 public sealed class GetPollCostSummaryHandlerTests
 {
-    private static PoTrafficDbContext CreateDb(string name)
+    private static TableStorageContext CreateDb()
     {
-        DbContextOptions<PoTrafficDbContext> opts = new DbContextOptionsBuilder<PoTrafficDbContext>()
-            .UseInMemoryDatabase(name)
-            .Options;
-        return new PoTrafficDbContext(opts);
+        return new TableStorageContext();
     }
 
     [Fact]
     public async Task GetPollCostSummary_ComputesCorrectCost_ForGoogleMaps()
     {
         // Arrange
-        string dbName = Guid.NewGuid().ToString();
-        await using PoTrafficDbContext db = CreateDb(dbName);
+        await using TableStorageContext db = CreateDb();
 
         Guid userId = Guid.NewGuid();
         Guid routeId = Guid.NewGuid();
         DateTimeOffset todayStart = DateTimeOffset.UtcNow.Date;
 
         // Need a User and Route for the navigation to work
-        db.Users.Add(new User { Id = userId, Email = "admin@test.com", PasswordHash = "x", Locale = "en-IE", CreatedAt = DateTimeOffset.UtcNow });
-        db.Routes.Add(new EntityRoute
+        db.Add(new User { Id = userId, Email = "admin@test.com", PasswordHash = "x", Locale = "en-IE", CreatedAt = DateTimeOffset.UtcNow });
+        db.Add(new EntityRoute
         {
             Id = routeId,
             UserId = userId,
@@ -48,14 +43,7 @@ public sealed class GetPollCostSummaryHandlerTests
         });
 
         // Manually seed cost config (EnsureCreated may not run HasData in InMemory)
-        db.SystemConfigurations.AddRange([
-            new SystemConfiguration { Key = "cost.perpoll.googlemaps", Value = "0.005", IsSensitive = false },
-            new SystemConfiguration { Key = "cost.perpoll.tomtom",     Value = "0.004", IsSensitive = false },
-        ]);
-
-        // 2 polls today for Google Maps route (Provider = 0)
-        db.PollRecords.AddRange([
-            new PollRecord { Id = Guid.NewGuid(), RouteId = routeId, PolledAt = todayStart.AddHours(8), TravelDurationSeconds = 300, DistanceMetres = 5000 },
+        db.AddRange(new[] { , ,  }), TravelDurationSeconds = 300, DistanceMetres = 5000 },
             new PollRecord { Id = Guid.NewGuid(), RouteId = routeId, PolledAt = todayStart.AddHours(9), TravelDurationSeconds = 310, DistanceMetres = 5000 },
         ]);
         await db.SaveChangesAsync();
@@ -75,8 +63,7 @@ public sealed class GetPollCostSummaryHandlerTests
     [Fact]
     public async Task GetPollCostSummary_WhenNoPollsToday_ReturnsSummaryWithZeroCost()
     {
-        string dbName = Guid.NewGuid().ToString();
-        await using PoTrafficDbContext db = CreateDb(dbName);
+        await using TableStorageContext db = CreateDb();
 
         var handler = new GetPollCostSummaryHandler(db, NullLogger<GetPollCostSummaryHandler>.Instance);
 

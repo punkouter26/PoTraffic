@@ -2,11 +2,10 @@ using FluentAssertions;
 using Hangfire;
 using Hangfire.Common;
 using Hangfire.States;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using PoTraffic.Api.Features.Admin;
-using PoTraffic.Api.Infrastructure.Data;
+using PoTraffic.Api.Infrastructure.Storage;
 using PoTraffic.Api.Infrastructure.Providers;
 using PoTraffic.Shared.Enums;
 
@@ -18,12 +17,9 @@ namespace PoTraffic.UnitTests.Features.Admin;
 /// </summary>
 public sealed class TripleTestHandlerTests
 {
-    private static PoTrafficDbContext CreateDb(string name)
+    private static TableStorageContext CreateDb()
     {
-        DbContextOptions<PoTrafficDbContext> opts = new DbContextOptionsBuilder<PoTrafficDbContext>()
-            .UseInMemoryDatabase(name)
-            .Options;
-        return new PoTrafficDbContext(opts);
+        return new TableStorageContext();
     }
 
     private static ITrafficProviderFactory BuildProviderFactory(ITrafficProvider provider)
@@ -39,8 +35,7 @@ public sealed class TripleTestHandlerTests
     public async Task StartTripleTest_WhenOriginGeocodeFails_ReturnsGeocodeError()
     {
         // Arrange
-        string dbName = Guid.NewGuid().ToString();
-        await using PoTrafficDbContext db = CreateDb(dbName);
+        await using TableStorageContext db = CreateDb();
         var fakeProvider = Substitute.For<ITrafficProvider>();
         fakeProvider.GeocodeAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns((string?)null);  // geocode always fails
@@ -65,8 +60,7 @@ public sealed class TripleTestHandlerTests
     public async Task StartTripleTest_WhenDestinationGeocodeFails_ReturnsGeocodeError()
     {
         // Arrange
-        string dbName = Guid.NewGuid().ToString();
-        await using PoTrafficDbContext db = CreateDb(dbName);
+        await using TableStorageContext db = CreateDb();
         var fakeProvider = Substitute.For<ITrafficProvider>();
         fakeProvider.GeocodeAsync("Origin", Arg.Any<CancellationToken>()).Returns("1.0,1.0");
         fakeProvider.GeocodeAsync("BadDest", Arg.Any<CancellationToken>()).Returns((string?)null);
@@ -90,8 +84,7 @@ public sealed class TripleTestHandlerTests
     public async Task StartTripleTest_WhenValid_CreatesSessionWith3ShotStubsAndSchedules3Jobs()
     {
         // Arrange
-        string dbName = Guid.NewGuid().ToString();
-        await using PoTrafficDbContext db = CreateDb(dbName);
+        await using TableStorageContext db = CreateDb();
         var fakeProvider = Substitute.For<ITrafficProvider>();
         fakeProvider.GeocodeAsync("A", Arg.Any<CancellationToken>()).Returns("1.0,1.0");
         fakeProvider.GeocodeAsync("B", Arg.Any<CancellationToken>()).Returns("2.0,2.0");
@@ -114,7 +107,7 @@ public sealed class TripleTestHandlerTests
 
         // Assert — 3 shot stubs persisted in DB
         int shotCount = await db.TripleTestShots
-            .CountAsync(s => s.SessionId == result.SessionId!.Value);
+            .Count(s => s.SessionId == result.SessionId!.Value);
         shotCount.Should().Be(3);
 
         // Assert — shot offsets are 0, 20, 40 seconds
@@ -122,13 +115,13 @@ public sealed class TripleTestHandlerTests
             .Where(s => s.SessionId == result.SessionId!.Value)
             .OrderBy(s => s.ShotIndex)
             .Select(s => s.OffsetSeconds)
-            .ToListAsync();
+            .ToList();
         offsets.Should().BeEquivalentTo([0, 20, 40]);
 
         // Assert — all shots start with no results (pending)
         bool anyFired = await db.TripleTestShots
             .Where(s => s.SessionId == result.SessionId!.Value)
-            .AnyAsync(s => s.IsSuccess != null);
+            .Any(s => s.IsSuccess != null);
         anyFired.Should().BeFalse("shots should be unfired stubs");
 
         // Assert — 3 Hangfire jobs were scheduled
@@ -139,8 +132,7 @@ public sealed class TripleTestHandlerTests
     public async Task StartTripleTest_WhenSameCoordinates_ReturnsSameCoordinatesError()
     {
         // Arrange
-        string dbName = Guid.NewGuid().ToString();
-        await using PoTrafficDbContext db = CreateDb(dbName);
+        await using TableStorageContext db = CreateDb();
         var fakeProvider = Substitute.For<ITrafficProvider>();
         fakeProvider.GeocodeAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns("1.0,1.0");  // both addresses resolve to same coords
@@ -166,11 +158,10 @@ public sealed class TripleTestHandlerTests
     public async Task GetTripleTestSession_WhenAllShotsSucceed_ReturnsCorrectWinnerAndAverage()
     {
         // Arrange
-        string dbName = Guid.NewGuid().ToString();
-        await using PoTrafficDbContext db = CreateDb(dbName);
+        await using TableStorageContext db = CreateDb();
 
         Guid sessionId = Guid.NewGuid();
-        db.TripleTestSessions.Add(new TripleTestSession
+        db.Add(new TripleTestSession
         {
             Id = sessionId,
             OriginAddress = "A",
@@ -184,9 +175,7 @@ public sealed class TripleTestHandlerTests
 
         // Shot 0: 600s, Shot 1: 500s (WINNER), Shot 2: 700s
         DateTimeOffset now = DateTimeOffset.UtcNow;
-        db.TripleTestShots.AddRange([
-            new TripleTestShot { Id = Guid.NewGuid(), SessionId = sessionId, ShotIndex = 0, OffsetSeconds = 0,  FiredAt = now,            IsSuccess = true, DurationSeconds = 600, DistanceMetres = 10000 },
-            new TripleTestShot { Id = Guid.NewGuid(), SessionId = sessionId, ShotIndex = 1, OffsetSeconds = 20, FiredAt = now.AddSeconds(20), IsSuccess = true, DurationSeconds = 500, DistanceMetres = 10000 },
+        db.AddRange(new[] { , ,  }), IsSuccess = true, DurationSeconds = 500, DistanceMetres = 10000 },
             new TripleTestShot { Id = Guid.NewGuid(), SessionId = sessionId, ShotIndex = 2, OffsetSeconds = 40, FiredAt = now.AddSeconds(40), IsSuccess = true, DurationSeconds = 700, DistanceMetres = 10000 }
         ]);
         await db.SaveChangesAsync();
@@ -207,11 +196,10 @@ public sealed class TripleTestHandlerTests
     public async Task GetTripleTestSession_WhenOneShotFails_WinnerFromRemaining()
     {
         // Arrange
-        string dbName = Guid.NewGuid().ToString();
-        await using PoTrafficDbContext db = CreateDb(dbName);
+        await using TableStorageContext db = CreateDb();
 
         Guid sessionId = Guid.NewGuid();
-        db.TripleTestSessions.Add(new TripleTestSession
+        db.Add(new TripleTestSession
         {
             Id = sessionId,
             OriginAddress = "A",
@@ -224,9 +212,7 @@ public sealed class TripleTestHandlerTests
         });
 
         DateTimeOffset now = DateTimeOffset.UtcNow;
-        db.TripleTestShots.AddRange([
-            new TripleTestShot { Id = Guid.NewGuid(), SessionId = sessionId, ShotIndex = 0, OffsetSeconds = 0,  FiredAt = now,            IsSuccess = true,  DurationSeconds = 800, DistanceMetres = 10000 },
-            new TripleTestShot { Id = Guid.NewGuid(), SessionId = sessionId, ShotIndex = 1, OffsetSeconds = 20, FiredAt = now.AddSeconds(20), IsSuccess = false, DurationSeconds = null, DistanceMetres = null, ErrorCode = "PROVIDER_ERROR" },
+        db.AddRange(new[] { , ,  }), IsSuccess = false, DurationSeconds = null, DistanceMetres = null, ErrorCode = "PROVIDER_ERROR" },
             new TripleTestShot { Id = Guid.NewGuid(), SessionId = sessionId, ShotIndex = 2, OffsetSeconds = 40, FiredAt = now.AddSeconds(40), IsSuccess = true,  DurationSeconds = 600, DistanceMetres = 10000 },
         ]);
         await db.SaveChangesAsync();
@@ -246,11 +232,10 @@ public sealed class TripleTestHandlerTests
     public async Task GetTripleTestSession_WhenAllShotsFail_IdealShotIndexIsNull()
     {
         // Arrange
-        string dbName = Guid.NewGuid().ToString();
-        await using PoTrafficDbContext db = CreateDb(dbName);
+        await using TableStorageContext db = CreateDb();
 
         Guid sessionId = Guid.NewGuid();
-        db.TripleTestSessions.Add(new TripleTestSession
+        db.Add(new TripleTestSession
         {
             Id = sessionId,
             OriginAddress = "A",
@@ -262,10 +247,7 @@ public sealed class TripleTestHandlerTests
             CreatedAt = DateTimeOffset.UtcNow
         });
 
-        db.TripleTestShots.AddRange([
-            new TripleTestShot { Id = Guid.NewGuid(), SessionId = sessionId, ShotIndex = 0, OffsetSeconds = 0,  FiredAt = DateTimeOffset.UtcNow, IsSuccess = false, ErrorCode = "PROVIDER_ERROR" },
-            new TripleTestShot { Id = Guid.NewGuid(), SessionId = sessionId, ShotIndex = 1, OffsetSeconds = 20, FiredAt = DateTimeOffset.UtcNow, IsSuccess = false, ErrorCode = "PROVIDER_ERROR" },
-            new TripleTestShot { Id = Guid.NewGuid(), SessionId = sessionId, ShotIndex = 2, OffsetSeconds = 40, FiredAt = DateTimeOffset.UtcNow, IsSuccess = false, ErrorCode = "PROVIDER_ERROR" },
+        db.AddRange(new[] { , ,  }), SessionId = sessionId, ShotIndex = 2, OffsetSeconds = 40, FiredAt = DateTimeOffset.UtcNow, IsSuccess = false, ErrorCode = "PROVIDER_ERROR" },
         ]);
         await db.SaveChangesAsync();
 
@@ -284,8 +266,7 @@ public sealed class TripleTestHandlerTests
     public async Task GetTripleTestSession_WhenSessionNotFound_ReturnsNull()
     {
         // Arrange
-        string dbName = Guid.NewGuid().ToString();
-        await using PoTrafficDbContext db = CreateDb(dbName);
+        await using TableStorageContext db = CreateDb();
         var handler = new GetTripleTestSessionQueryHandler(db);
 
         // Act
@@ -299,11 +280,10 @@ public sealed class TripleTestHandlerTests
     public async Task GetTripleTestSession_WhenPartiallyCompleted_ReturnsPartialAverages()
     {
         // Arrange — only 1 of 3 shots complete
-        string dbName = Guid.NewGuid().ToString();
-        await using PoTrafficDbContext db = CreateDb(dbName);
+        await using TableStorageContext db = CreateDb();
 
         Guid sessionId = Guid.NewGuid();
-        db.TripleTestSessions.Add(new TripleTestSession
+        db.Add(new TripleTestSession
         {
             Id = sessionId,
             OriginAddress = "A",
@@ -315,10 +295,7 @@ public sealed class TripleTestHandlerTests
             CreatedAt = DateTimeOffset.UtcNow
         });
 
-        db.TripleTestShots.AddRange([
-            new TripleTestShot { Id = Guid.NewGuid(), SessionId = sessionId, ShotIndex = 0, OffsetSeconds = 0,  FiredAt = DateTimeOffset.UtcNow, IsSuccess = true, DurationSeconds = 400, DistanceMetres = 8000 },
-            new TripleTestShot { Id = Guid.NewGuid(), SessionId = sessionId, ShotIndex = 1, OffsetSeconds = 20 },  // pending
-            new TripleTestShot { Id = Guid.NewGuid(), SessionId = sessionId, ShotIndex = 2, OffsetSeconds = 40 },  // pending
+        db.AddRange(new[] { , ,  }), SessionId = sessionId, ShotIndex = 2, OffsetSeconds = 40 },  // pending
         ]);
         await db.SaveChangesAsync();
 

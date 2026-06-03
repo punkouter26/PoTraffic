@@ -16,7 +16,7 @@ public sealed class AdminLoginScenarios : PlaywrightTestBase
     /// Reads from E2E_API_URL environment variable; defaults to http://localhost:5150.
     /// </summary>
     private static string ApiBaseUrl =>
-        Environment.GetEnvironmentVariable("E2E_API_URL") ?? "http://localhost:5150";
+        Environment.GetEnvironmentVariable("E2E_API_URL") ?? "http://localhost:5000";
 
     private const string TestEmail = "admin@potraffic.dev";
     private const string TestPassword = "Admin123!";

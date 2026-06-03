@@ -20,7 +20,7 @@ public abstract class PlaywrightTestBase : IAsyncLifetime
     /// (the API project which hosts the Blazor WASM client via UseBlazorFrameworkFiles).
     /// </summary>
     protected static string BaseUrl =>
-        Environment.GetEnvironmentVariable("E2E_BASE_URL") ?? "http://localhost:5150";
+        Environment.GetEnvironmentVariable("E2E_BASE_URL") ?? "http://localhost:5000";
 
     public async Task InitializeAsync()
     {

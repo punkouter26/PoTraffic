@@ -1,10 +1,9 @@
 using FluentAssertions;
 using Hangfire;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using PoTraffic.Api.Features.Routes;
-using PoTraffic.Api.Infrastructure.Data;
+using PoTraffic.Api.Infrastructure.Storage;
 
 using PoTraffic.Shared.Enums;
 
@@ -17,25 +16,21 @@ namespace PoTraffic.UnitTests.Features.Routes;
 /// </summary>
 public sealed class DeleteRouteHandlerTests
 {
-    private static PoTrafficDbContext CreateDb(string name)
+    private static TableStorageContext CreateDb()
     {
-        DbContextOptions<PoTrafficDbContext> opts = new DbContextOptionsBuilder<PoTrafficDbContext>()
-            .UseInMemoryDatabase(name)
-            .Options;
-        return new PoTrafficDbContext(opts);
+        return new TableStorageContext();
     }
 
     [Fact]
     public async Task DeleteRoute_SoftDeletesRoute_AndReturnsTrue()
     {
         // Arrange
-        string dbName = Guid.NewGuid().ToString();
-        using PoTrafficDbContext db = CreateDb(dbName);
+        using TableStorageContext db = CreateDb();
 
         Guid routeId = Guid.NewGuid();
         Guid userId = Guid.NewGuid();
 
-        db.Routes.Add(new EntityRoute
+        db.Add(new EntityRoute
         {
             Id = routeId,
             UserId = userId,
@@ -56,7 +51,7 @@ public sealed class DeleteRouteHandlerTests
         // Assert
         result.Should().BeTrue();
 
-        EntityRoute? route = await db.Routes.FindAsync(routeId);
+        EntityRoute? route = await db.Routes.FirstOrDefault(x => x.Id == userId);
         route!.MonitoringStatus.Should().Be((int)MonitoringStatus.Deleted, "route must be soft-deleted");
         route.HangfireJobChainId.Should().BeNull("HangfireJobChainId must be cleared on soft-delete");
     }
@@ -65,14 +60,13 @@ public sealed class DeleteRouteHandlerTests
     public async Task DeleteRoute_CancelsHangfireJob_WhenJobChainIdIsSet()
     {
         // Arrange
-        string dbName = Guid.NewGuid().ToString();
-        using PoTrafficDbContext db = CreateDb(dbName);
+        using TableStorageContext db = CreateDb();
 
         Guid routeId = Guid.NewGuid();
         Guid userId = Guid.NewGuid();
         const string jobId = "hangfire-job-42";
 
-        db.Routes.Add(new EntityRoute
+        db.Add(new EntityRoute
         {
             Id = routeId,
             UserId = userId,
@@ -102,8 +96,7 @@ public sealed class DeleteRouteHandlerTests
     public async Task DeleteRoute_WhenRouteNotFound_ReturnsFalse()
     {
         // Arrange
-        string dbName = Guid.NewGuid().ToString();
-        using PoTrafficDbContext db = CreateDb(dbName);
+        using TableStorageContext db = CreateDb();
 
         IBackgroundJobClient jobClient = Substitute.For<IBackgroundJobClient>();
         var handler = new DeleteRouteCommandHandler(db, jobClient, NullLogger<DeleteRouteCommandHandler>.Instance);
@@ -120,13 +113,12 @@ public sealed class DeleteRouteHandlerTests
     public async Task DeleteRoute_WhenRouteOwnedByDifferentUser_ReturnsFalse()
     {
         // Arrange
-        string dbName = Guid.NewGuid().ToString();
-        using PoTrafficDbContext db = CreateDb(dbName);
+        using TableStorageContext db = CreateDb();
 
         Guid routeId = Guid.NewGuid();
         Guid realOwner = Guid.NewGuid();
 
-        db.Routes.Add(new EntityRoute
+        db.Add(new EntityRoute
         {
             Id = routeId,
             UserId = realOwner,
@@ -148,7 +140,7 @@ public sealed class DeleteRouteHandlerTests
         // Assert — ownership check must block unauthorised deletion
         result.Should().BeFalse("a user must not be able to delete another user's route");
 
-        EntityRoute? route = await db.Routes.FindAsync(routeId);
+        EntityRoute? route = await db.Routes.FirstOrDefault(x => x.Id == userId);
         route!.MonitoringStatus.Should().Be((int)MonitoringStatus.Active, "route must remain intact");
     }
 }

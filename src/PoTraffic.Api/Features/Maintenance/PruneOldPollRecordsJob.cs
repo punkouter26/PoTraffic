@@ -29,8 +29,7 @@ public sealed class PruneOldPollRecordsCommandHandler
         DateTime cutoff = DateTime.UtcNow.AddDays(-90);
 
         // IgnoreQueryFilters to bypass global soft-delete filter (FR-020)
-        List<PollRecord> oldRecords = await _db.PollRecord
-            .IgnoreQueryFilters()
+        List<PollRecord> oldRecords = _db.PollRecords
             .Where(p => !p.IsDeleted && p.PolledAt < cutoff)
             .ToList();
 

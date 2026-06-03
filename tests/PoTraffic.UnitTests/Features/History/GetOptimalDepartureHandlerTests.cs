@@ -1,10 +1,9 @@
 using FluentAssertions;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using PoTraffic.Api.Features.History;
-using PoTraffic.Api.Infrastructure.Data;
+using PoTraffic.Api.Infrastructure.Storage;
 
-using PoTraffic.Api.Infrastructure.Data.Projections;
+using PoTraffic.Shared.DTOs.History;
 using PoTraffic.Shared.Enums;
 
 namespace PoTraffic.UnitTests.Features.History;
@@ -16,12 +15,9 @@ namespace PoTraffic.UnitTests.Features.History;
 /// </summary>
 public sealed class GetOptimalDepartureHandlerTests
 {
-    private static PoTrafficDbContext CreateDb(string name)
+    private static TableStorageContext CreateDb()
     {
-        DbContextOptions<PoTrafficDbContext> opts = new DbContextOptionsBuilder<PoTrafficDbContext>()
-            .UseInMemoryDatabase(name)
-            .Options;
-        return new PoTrafficDbContext(opts);
+        return new TableStorageContext();
     }
 
     /// <summary>
@@ -35,8 +31,7 @@ public sealed class GetOptimalDepartureHandlerTests
         // via a known baseline simulation. The handler logic finds the minimum mean duration slot
         // and returns the contiguous run within 5% of that minimum.
         // We verify the handler does NOT throw and returns a non-null result when sufficient baseline data exists.
-        string dbName = Guid.NewGuid().ToString();
-        PoTrafficDbContext db = CreateDb(dbName);
+        TableStorageContext db = CreateDb();
         Guid routeId = Guid.NewGuid();
 
         var handler = new GetOptimalDepartureQueryHandler(db, NullLogger<GetOptimalDepartureQueryHandler>.Instance);
@@ -55,8 +50,7 @@ public sealed class GetOptimalDepartureHandlerTests
     public async Task GetOptimalDeparture_WithNoSessions_ReturnsNull()
     {
         // Arrange
-        string dbName = Guid.NewGuid().ToString();
-        PoTrafficDbContext db = CreateDb(dbName);
+        TableStorageContext db = CreateDb();
 
         var handler = new GetOptimalDepartureQueryHandler(db, NullLogger<GetOptimalDepartureQueryHandler>.Instance);
 

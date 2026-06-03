@@ -47,11 +47,11 @@ public static class AdminEndpoints
             CancellationToken ct,
             [FromQuery] int hours = 24) =>
         {
-            IReadOnlyList<RecentVolatilityPointDto> points = await sender.Send(new GetRecentVolatilityQuery(hours), ct);
+            IReadOnlyList<GlobalVolatilitySlotDto> points = await sender.Send(new GetRecentVolatilityQuery(hours), ct);
             return Results.Ok(points);
         })
         .WithName("GetRecentVolatility")
-        .Produces<IReadOnlyList<RecentVolatilityPointDto>>();
+        .Produces<IReadOnlyList<GlobalVolatilitySlotDto>>();
 
         grp.MapGet("/poll-cost-summary", async (ISender sender, CancellationToken ct) =>
         {

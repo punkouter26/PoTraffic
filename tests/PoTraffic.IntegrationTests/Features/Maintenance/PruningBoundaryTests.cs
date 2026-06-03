@@ -2,7 +2,7 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using PoTraffic.Api.Features.Maintenance;
-using PoTraffic.Api.Infrastructure.Data;
+using PoTraffic.Api.Infrastructure.Storage;
 
 using PoTraffic.IntegrationTests.Helpers;
 using Xunit;
@@ -44,7 +44,7 @@ public sealed class PruningBoundaryTests : BaseIntegrationTest
 
         // Access services via the test application's DI container
         using IServiceScope scope = GetServices().CreateScope();
-        PoTrafficDbContext db = scope.ServiceProvider.GetRequiredService<PoTrafficDbContext>();
+        TableStorageContext db = scope.ServiceProvider.GetRequiredService<TableStorageContext>();
         ISender sender = scope.ServiceProvider.GetRequiredService<ISender>();
 
         DateTime now = DateTime.UtcNow;
@@ -57,7 +57,7 @@ public sealed class PruningBoundaryTests : BaseIntegrationTest
             Locale = "en-IE",
             CreatedAt = now.AddDays(-100)
         };
-        db.Users.Add(user);
+        db.Add(user);
 
         EntityRoute route = new()
         {
@@ -69,7 +69,7 @@ public sealed class PruningBoundaryTests : BaseIntegrationTest
             MonitoringStatus = 0,
             CreatedAt = now.AddDays(-100)
         };
-        db.Routes.Add(route);
+        db.Add(route);
 
         MonitoringSession session = new()
         {
@@ -78,7 +78,7 @@ public sealed class PruningBoundaryTests : BaseIntegrationTest
             SessionDate = DateOnly.FromDateTime(now.AddDays(-91)),
             IsHolidayExcluded = false
         };
-        db.MonitoringSessions.Add(session);
+        db.Add(session);
 
         // Record 1: 91 days old — BEYOND cutoff, MUST be pruned
         PollRecord beyond = new()
@@ -124,27 +124,7 @@ public sealed class PruningBoundaryTests : BaseIntegrationTest
             IsDeleted = false
         };
 
-        db.PollRecords.AddRange(beyond, atBoundary, recent);
-        await db.SaveChangesAsync();
-
-        // Act
-        await sender.Send(new PruneOldPollRecordsCommand());
-
-        // Assert — re-read from DB (bypass change tracker)
-        db.ChangeTracker.Clear();
-
-        PollRecord? reloadedBeyond = await db.PollRecords
-            .IgnoreQueryFilters()
-            .SingleOrDefaultAsync(p => p.Id == beyond.Id);
-        PollRecord? reloadedAtBoundary = await db.PollRecords
-            .IgnoreQueryFilters()
-            .SingleOrDefaultAsync(p => p.Id == atBoundary.Id);
-        PollRecord? reloadedRecent = await db.PollRecords
-            .IgnoreQueryFilters()
-            .SingleOrDefaultAsync(p => p.Id == recent.Id);
-
-        // 91-day record must be soft-deleted, raw response nulled
-        Assert.NotNull(reloadedBeyond);
+        db.AddRange(new[] { , ,  });
         Assert.True(reloadedBeyond!.IsDeleted, "91-day record should be soft-deleted");
         Assert.Null(reloadedBeyond.RawProviderResponse);
 

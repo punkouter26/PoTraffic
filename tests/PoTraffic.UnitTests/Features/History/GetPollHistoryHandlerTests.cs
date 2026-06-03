@@ -1,8 +1,7 @@
 using FluentAssertions;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using PoTraffic.Api.Features.History;
-using PoTraffic.Api.Infrastructure.Data;
+using PoTraffic.Api.Infrastructure.Storage;
 
 using PoTraffic.Shared.Enums;
 
@@ -14,23 +13,20 @@ namespace PoTraffic.UnitTests.Features.History;
 /// </summary>
 public sealed class GetPollHistoryHandlerTests
 {
-    private static PoTrafficDbContext CreateDb(string name)
+    private static TableStorageContext CreateDb()
     {
-        DbContextOptions<PoTrafficDbContext> opts = new DbContextOptionsBuilder<PoTrafficDbContext>()
-            .UseInMemoryDatabase(name)
-            .Options;
-        return new PoTrafficDbContext(opts);
+        return new TableStorageContext();
     }
 
-    private static async Task<(PoTrafficDbContext Db, Guid UserId, Guid RouteId, Guid OtherRouteId)> SeedAsync(
-        string dbName, int pollCount = 5)
+    private static async Task<(TableStorageContext Db, Guid UserId, Guid RouteId, Guid OtherRouteId)> SeedAsync(
+        int pollCount = 5)
     {
-        PoTrafficDbContext db = CreateDb(dbName);
+        TableStorageContext db = CreateDb();
         Guid userId = Guid.NewGuid();
         Guid routeId = Guid.NewGuid();
         Guid otherRouteId = Guid.NewGuid();
 
-        db.Routes.Add(new Route
+        db.Add(new Route
         {
             Id = routeId,
             UserId = userId,
@@ -43,7 +39,7 @@ public sealed class GetPollHistoryHandlerTests
             CreatedAt = DateTimeOffset.UtcNow
         });
 
-        db.Routes.Add(new Route
+        db.Add(new Route
         {
             Id = otherRouteId,
             UserId = Guid.NewGuid(),
@@ -59,7 +55,7 @@ public sealed class GetPollHistoryHandlerTests
         DateTimeOffset polledAt = DateTimeOffset.UtcNow.AddMinutes(-pollCount * 5);
         for (int i = 0; i < pollCount; i++)
         {
-            db.PollRecords.Add(new PollRecord
+            db.Add(new PollRecord
             {
                 Id = Guid.NewGuid(),
                 RouteId = routeId,
@@ -70,7 +66,7 @@ public sealed class GetPollHistoryHandlerTests
         }
 
         // Seed poll records for ANOTHER route — should NOT appear in results
-        db.PollRecords.Add(new PollRecord
+        db.Add(new PollRecord
         {
             Id = Guid.NewGuid(),
             RouteId = otherRouteId,
@@ -87,8 +83,7 @@ public sealed class GetPollHistoryHandlerTests
     public async Task GetPollHistory_ReturnsOnlyRecordsForRequestedRoute()
     {
         // Arrange
-        string dbName = Guid.NewGuid().ToString();
-        (PoTrafficDbContext db, Guid userId, Guid routeId, _) = await SeedAsync(dbName, pollCount: 5);
+        (TableStorageContext db, Guid userId, Guid routeId, _) = await SeedAsync(pollCount: 5);
         var handler = new GetPollHistoryQueryHandler(db);
 
         // Act
@@ -105,8 +100,7 @@ public sealed class GetPollHistoryHandlerTests
     public async Task GetPollHistory_PaginatesCorrectly()
     {
         // Arrange
-        string dbName = Guid.NewGuid().ToString();
-        (PoTrafficDbContext db, Guid userId, Guid routeId, _) = await SeedAsync(dbName, pollCount: 10);
+        (TableStorageContext db, Guid userId, Guid routeId, _) = await SeedAsync(pollCount: 10);
         var handler = new GetPollHistoryQueryHandler(db);
 
         // Act — page 1 of 3 records each
@@ -132,8 +126,7 @@ public sealed class GetPollHistoryHandlerTests
     public async Task GetPollHistory_WhenNoRecords_ReturnsEmptyPagedResult()
     {
         // Arrange
-        string dbName = Guid.NewGuid().ToString();
-        PoTrafficDbContext db = CreateDb(dbName);
+        TableStorageContext db = CreateDb();
         var handler = new GetPollHistoryQueryHandler(db);
 
         // Act

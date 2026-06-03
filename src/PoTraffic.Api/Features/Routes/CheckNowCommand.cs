@@ -42,7 +42,7 @@ public sealed class CheckNowCommandHandler : IRequestHandler<CheckNowCommand, Ch
     public async Task<CheckNowResult> Handle(CheckNowCommand command, CancellationToken ct)
     {
         // Verify ownership
-        EntityRoute? route = _db.EntityRoute
+        EntityRoute? route = _db.Routes
             .FirstOrDefault(r => r.Id == command.RouteId && r.UserId == command.UserId);
 
         if (route is null)

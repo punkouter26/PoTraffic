@@ -1,10 +1,9 @@
 using FluentAssertions;
 using Hangfire;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using PoTraffic.Api.Features.MonitoringWindows;
-using PoTraffic.Api.Infrastructure.Data;
+using PoTraffic.Api.Infrastructure.Storage;
 
 using PoTraffic.Shared.Constants;
 using PoTraffic.Shared.Enums;
@@ -17,24 +16,20 @@ namespace PoTraffic.UnitTests.Features.MonitoringWindows;
 /// </summary>
 public sealed class StartWindowHandlerTests
 {
-    private static PoTrafficDbContext CreateDb(string name)
+    private static TableStorageContext CreateDb()
     {
-        DbContextOptions<PoTrafficDbContext> opts = new DbContextOptionsBuilder<PoTrafficDbContext>()
-            .UseInMemoryDatabase(name)
-            .Options;
-        return new PoTrafficDbContext(opts);
+        return new TableStorageContext();
     }
 
-    private static async Task<(PoTrafficDbContext Db, Guid UserId, Guid WindowId)> SeedWithSessionsAsync(
-        string dbName,
+    private static async Task<(TableStorageContext Db, Guid UserId, Guid WindowId)> SeedWithSessionsAsync(
         int sessionCount)
     {
-        PoTrafficDbContext db = CreateDb(dbName);
+        TableStorageContext db = CreateDb();
         Guid userId = Guid.NewGuid();
         Guid routeId = Guid.NewGuid();
         Guid windowId = Guid.NewGuid();
 
-        db.Users.Add(new User
+        db.Add(new User
         {
             Id = userId,
             Email = $"user-{userId}@test.com",
@@ -43,7 +38,7 @@ public sealed class StartWindowHandlerTests
         });
 
         // The target route that the test will attempt to start
-        db.Routes.Add(new Route
+        db.Add(new Route
         {
             Id = routeId,
             UserId = userId,
@@ -56,7 +51,7 @@ public sealed class StartWindowHandlerTests
             CreatedAt = DateTimeOffset.UtcNow
         });
 
-        db.MonitoringWindows.Add(new MonitoringWindow
+        db.Add(new MonitoringWindow
         {
             Id = windowId,
             RouteId = routeId,
@@ -72,7 +67,7 @@ public sealed class StartWindowHandlerTests
         for (int i = 0; i < sessionCount; i++)
         {
             Guid otherRouteId = Guid.NewGuid();
-            db.Routes.Add(new Route
+            db.Add(new Route
             {
                 Id = otherRouteId,
                 UserId = userId,
@@ -84,7 +79,7 @@ public sealed class StartWindowHandlerTests
                 MonitoringStatus = (int)MonitoringStatus.Active,
                 CreatedAt = DateTimeOffset.UtcNow
             });
-            db.MonitoringSessions.Add(new MonitoringSession
+            db.Add(new MonitoringSession
             {
                 Id = Guid.NewGuid(),
                 RouteId = otherRouteId,
@@ -101,9 +96,8 @@ public sealed class StartWindowHandlerTests
     public async Task StartWindow_WhenQuotaExhausted_ReturnsQuotaExceededError()
     {
         // Arrange — seed exactly DefaultDailyQuota sessions for today
-        string dbName = Guid.NewGuid().ToString();
-        (PoTrafficDbContext db, Guid userId, Guid windowId) =
-            await SeedWithSessionsAsync(dbName, QuotaConstants.DefaultDailyQuota);
+        (TableStorageContext db, Guid userId, Guid windowId) =
+            await SeedWithSessionsAsync(QuotaConstants.DefaultDailyQuota);
 
         IBackgroundJobClient jobClient = Substitute.For<IBackgroundJobClient>();
         var handler = new StartWindowCommandHandler(db, jobClient, NullLogger<StartWindowCommandHandler>.Instance);
@@ -119,7 +113,7 @@ public sealed class StartWindowHandlerTests
 
         // Verify that no new MonitoringSession was created
         int newSessionCount = await db.MonitoringSessions
-            .CountAsync(s => s.RouteId != Guid.Empty);
+            .Count(s => s.RouteId != Guid.Empty);
         newSessionCount.Should().Be(QuotaConstants.DefaultDailyQuota,
             "no additional session should be created when quota is exceeded (FR-003)");
 
@@ -132,9 +126,8 @@ public sealed class StartWindowHandlerTests
     public async Task StartWindow_WhenQuotaNotExhausted_CreatesSessionAndEnqueuesJob()
     {
         // Arrange — seed DefaultDailyQuota - 1 sessions (one slot remaining)
-        string dbName = Guid.NewGuid().ToString();
-        (PoTrafficDbContext db, Guid userId, Guid windowId) =
-            await SeedWithSessionsAsync(dbName, QuotaConstants.DefaultDailyQuota - 1);
+        (TableStorageContext db, Guid userId, Guid windowId) =
+            await SeedWithSessionsAsync(QuotaConstants.DefaultDailyQuota - 1);
 
         IBackgroundJobClient jobClient = Substitute.For<IBackgroundJobClient>();
         // Note: BackgroundJobClientExtensions.Enqueue<T> is an extension method that ultimately calls
@@ -158,8 +151,7 @@ public sealed class StartWindowHandlerTests
     public async Task StartWindow_WhenWindowNotFound_ReturnsNotFoundError()
     {
         // Arrange
-        string dbName = Guid.NewGuid().ToString();
-        PoTrafficDbContext db = CreateDb(dbName);
+        TableStorageContext db = CreateDb();
 
         IBackgroundJobClient jobClient = Substitute.For<IBackgroundJobClient>();
         var handler = new StartWindowCommandHandler(db, jobClient, NullLogger<StartWindowCommandHandler>.Instance);
@@ -179,21 +171,20 @@ public sealed class StartWindowHandlerTests
         // Arrange — create route+window, manually seed a session for it today (simulates CreateRoute having
         // already started monitoring), then call Start again for the same window.
         // Idempotent guard — Strategy pattern: swaps quota-check path for existing-session-return path.
-        string dbName = Guid.NewGuid().ToString();
-        PoTrafficDbContext db = CreateDb(dbName);
+        TableStorageContext db = CreateDb();
         Guid userId = Guid.NewGuid();
         Guid routeId = Guid.NewGuid();
         Guid windowId = Guid.NewGuid();
         Guid existingSessionId = Guid.NewGuid();
 
-        db.Users.Add(new User
+        db.Add(new User
         {
             Id = userId,
             Email = $"user-{userId}@test.com",
             PasswordHash = "hash",
             Locale = "Europe/London"
         });
-        db.Routes.Add(new Route
+        db.Add(new Route
         {
             Id = routeId,
             UserId = userId,
@@ -205,7 +196,7 @@ public sealed class StartWindowHandlerTests
             MonitoringStatus = (int)MonitoringStatus.Active,
             CreatedAt = DateTimeOffset.UtcNow
         });
-        db.MonitoringWindows.Add(new MonitoringWindow
+        db.Add(new MonitoringWindow
         {
             Id = windowId,
             RouteId = routeId,
@@ -213,7 +204,7 @@ public sealed class StartWindowHandlerTests
             EndTime = new TimeOnly(9, 0),
             DaysOfWeekMask = 0b01111110
         });
-        db.MonitoringSessions.Add(new MonitoringSession
+        db.Add(new MonitoringSession
         {
             Id = existingSessionId,
             RouteId = routeId,
@@ -233,7 +224,7 @@ public sealed class StartWindowHandlerTests
         result.IsSuccess.Should().BeTrue("duplicate start requests should be idempotent (FR-004)");
         result.ErrorCode.Should().BeNull();
         result.SessionId.Should().Be(existingSessionId);
-        int totalSessions = await db.MonitoringSessions.CountAsync();
+        int totalSessions = await db.MonitoringSessions.Count();
         totalSessions.Should().Be(1, "no duplicate session should be inserted");
     }
 }

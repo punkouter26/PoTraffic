@@ -26,20 +26,20 @@ public sealed class UpdateSystemConfigurationHandler : IRequestHandler<UpdateSys
 
     public UpdateSystemConfigurationHandler(TableStorageContext db) => _db = db;
 
-    public Task<SystemConfigDto?> Handle(UpdateSystemConfigurationCommand command, CancellationToken ct)
+    public async Task<SystemConfigDto?> Handle(UpdateSystemConfigurationCommand command, CancellationToken ct)
     {
         SystemConfiguration? config =
             _db.SystemConfigurations.FirstOrDefault(c => c.Key == command.Key);
 
-        if (config is null) return Task.FromResult<SystemConfigDto?>(null);
+        if (config is null) return null;
 
         config.Value = command.Value;
         await _db.SaveChangesAsync(ct);
 
-        return Task.FromResult<SystemConfigDto?>(new SystemConfigDto(
+        return new SystemConfigDto(
             Key: config.Key,
             Value: config.IsSensitive ? GetSystemConfigurationHandler.Mask(config.Value) : config.Value,
             Description: config.Description,
-            IsSensitive: config.IsSensitive));
+            IsSensitive: config.IsSensitive);
     }
 }

@@ -25,13 +25,14 @@ public sealed class GetUsersHandler : IRequestHandler<GetUsersQuery, IReadOnlyLi
         DateTimeOffset dayStart = DateTimeOffset.UtcNow.Date;
         DateTimeOffset dayEnd = dayStart.AddDays(1);
 
-        // Load all users with their today's poll records
-        List<User> users = await _db.Users
-            
-            .ThenInclude(r => r.PollRecords.Where(p => p.PolledAt >= dayStart && p.PolledAt < dayEnd))
-            .ToList();
+        List<User> users = _db.Users.ToList();
 
-        // Load cost rates from configuration
+        // Load today's poll records across all routes
+        Dictionary<Guid, List<PollRecord>> pollsByRoute = _db.PollRecords
+            .Where(p => p.PolledAt >= dayStart && p.PolledAt < dayEnd && !p.IsDeleted)
+            .GroupBy(p => p.RouteId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
         List<SystemConfiguration> configs = _db.SystemConfigurations
             .Where(c => c.Key.StartsWith("cost.perpoll."))
             .ToList();
@@ -41,15 +42,19 @@ public sealed class GetUsersHandler : IRequestHandler<GetUsersQuery, IReadOnlyLi
 
         return users.Select(u =>
         {
-            IEnumerable<PollRecord> todayPolls = u.Routes.SelectMany(r => r.PollRecords);
+            IEnumerable<PollRecord> todayPolls = u.Routes
+                .Where(r => r.MonitoringStatus != (int)MonitoringStatus.Deleted)
+                .SelectMany(r => pollsByRoute.TryGetValue(r.Id, out var polls) ? polls : []);
             int totalCount = todayPolls.Count();
 
-            // Build provider breakdown per route provider
             var breakdown = u.Routes
+                .Where(r => r.MonitoringStatus != (int)MonitoringStatus.Deleted)
                 .GroupBy(r => (RouteProvider)r.Provider)
                 .Select(grp =>
                 {
-                    int pollCount = grp.SelectMany(r => r.PollRecords).Count();
+                    int pollCount = grp
+                        .SelectMany(r => pollsByRoute.TryGetValue(r.Id, out var p) ? p : [])
+                        .Count();
                     double costPerPoll = grp.Key == RouteProvider.TomTom ? tomtomCost : googleCost;
                     return new ProviderBreakdownDto(grp.Key, pollCount, pollCount * costPerPoll);
                 })

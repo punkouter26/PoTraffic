@@ -18,7 +18,7 @@ public sealed class GetSystemConfigurationHandler : IRequestHandler<GetSystemCon
     public async Task<IReadOnlyList<SystemConfigDto>> Handle(GetSystemConfigurationQuery query, CancellationToken ct)
     {
         List<SystemConfiguration> configs =
-            await _db.SystemConfigurations.OrderBy(c => c.Key).ToList();
+            _db.SystemConfigurations.OrderBy(c => c.Key).ToList();
 
         return configs.Select(c => new SystemConfigDto(
             Key: c.Key,

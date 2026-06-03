@@ -2,7 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
-using PoTraffic.Api.Infrastructure.Data;
+using PoTraffic.Api.Infrastructure.Storage;
 using PoTraffic.IntegrationTests.Helpers;
 using PoTraffic.Shared.DTOs.Auth;
 using PoTraffic.Shared.DTOs.Routes;
@@ -60,8 +60,8 @@ public sealed class CreateRouteIntegrationTests : BaseIntegrationTest
 
         // Verify row exists in DB
         using IServiceScope scope = GetServices().CreateScope();
-        PoTrafficDbContext db = scope.ServiceProvider.GetRequiredService<PoTrafficDbContext>();
-        var route = await db.Routes.FindAsync(body.Id);
+        TableStorageContext db = scope.ServiceProvider.GetRequiredService<TableStorageContext>();
+        var route = await db.Routes.FirstOrDefault(x => x.Id == userId);
         route.Should().NotBeNull("route must be persisted to database");
 
         bool windowExists = db.MonitoringWindows.Any(w => w.RouteId == body.Id);
@@ -112,7 +112,7 @@ public sealed class CreateRouteIntegrationTests : BaseIntegrationTest
 
         // Verify in DB
         using IServiceScope scope = GetServices().CreateScope();
-        PoTrafficDbContext db = scope.ServiceProvider.GetRequiredService<PoTrafficDbContext>();
+        TableStorageContext db = scope.ServiceProvider.GetRequiredService<TableStorageContext>();
         bool exists = db.MonitoringWindows.Any(w => w.RouteId == route.Id && w.IsActive);
         exists.Should().BeTrue("monitoring window must be persisted to database");
     }

@@ -33,7 +33,7 @@ public sealed class SeedDatabaseHandler(
 
         foreach (var u in sampleUsers)
         {
-            User? user = await db.Users.FirstOrDefault(x => x.Email == u.Email);
+            User? user = db.Users.FirstOrDefault(x => x.Email == u.Email);
             if (user == null)
             {
                 user = new User
@@ -46,12 +46,12 @@ public sealed class SeedDatabaseHandler(
                     IsEmailVerified = true,
                     CreatedAt = DateTimeOffset.UtcNow
                 };
-                db.Users.Add(user);
+                db.Add(user);
                 usersCreatedCount++;
             }
 
             // 2. Add sample routes for this user if they don't have any
-            bool hasRoutes = await db.Routes.Any(r => r.UserId == user.Id);
+            bool hasRoutes = db.Routes.Any(r => r.UserId == user.Id);
             if (!hasRoutes)
             {
                 var routes = new[]
@@ -75,7 +75,7 @@ public sealed class SeedDatabaseHandler(
                         MonitoringStatus = 0,
                         CreatedAt = DateTimeOffset.UtcNow
                     };
-                    db.Routes.Add(route);
+                    db.Add(route);
                     routesCreatedCount++;
 
                     // 3. Seed historical polls for this route to generate volatility visualizations
@@ -105,7 +105,7 @@ public sealed class SeedDatabaseHandler(
                                 int duration = baselineSeconds + random.Next(-300, 300);
                                 if (isAnomalous) duration += 1200;
 
-                                db.PollRecords.Add(new PollRecord
+                                db.Add(new PollRecord
                                 {
                                     Id = Guid.NewGuid(),
                                     RouteId = route.Id,

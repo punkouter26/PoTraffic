@@ -1,11 +1,10 @@
 using FluentAssertions;
 using Hangfire;
 using Hangfire.States;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using PoTraffic.Api.Features.MonitoringWindows;
-using PoTraffic.Api.Infrastructure.Data;
+using PoTraffic.Api.Infrastructure.Storage;
 
 using PoTraffic.Shared.Enums;
 
@@ -17,24 +16,20 @@ namespace PoTraffic.UnitTests.Features.MonitoringWindows;
 /// </summary>
 public sealed class WindowLifecycleTests
 {
-    private static PoTrafficDbContext CreateDb(string name)
+    private static TableStorageContext CreateDb()
     {
-        DbContextOptions<PoTrafficDbContext> opts = new DbContextOptionsBuilder<PoTrafficDbContext>()
-            .UseInMemoryDatabase(name)
-            .Options;
-        return new PoTrafficDbContext(opts);
+        return new TableStorageContext();
     }
 
-    private static async Task<(PoTrafficDbContext Db, Guid SessionId, Guid RouteId, Guid UserId)> SeedActiveSessionAsync(
-        string dbName,
+    private static async Task<(TableStorageContext Db, Guid SessionId, Guid RouteId, Guid UserId)> SeedActiveSessionAsync(
         string? hangfireJobChainId = "job-abc-123")
     {
-        PoTrafficDbContext db = CreateDb(dbName);
+        TableStorageContext db = CreateDb();
         Guid userId = Guid.NewGuid();
         Guid routeId = Guid.NewGuid();
         Guid sessionId = Guid.NewGuid();
 
-        db.Users.Add(new User
+        db.Add(new User
         {
             Id = userId,
             Email = $"user-{userId}@test.com",
@@ -42,7 +37,7 @@ public sealed class WindowLifecycleTests
             Locale = "Europe/London"
         });
 
-        db.Routes.Add(new Route
+        db.Add(new Route
         {
             Id = routeId,
             UserId = userId,
@@ -56,7 +51,7 @@ public sealed class WindowLifecycleTests
             CreatedAt = DateTimeOffset.UtcNow
         });
 
-        db.MonitoringSessions.Add(new MonitoringSession
+        db.Add(new MonitoringSession
         {
             Id = sessionId,
             RouteId = routeId,
@@ -72,9 +67,8 @@ public sealed class WindowLifecycleTests
     public async Task StopWindow_TransitionsSessionToCompleted()
     {
         // Arrange
-        string dbName = Guid.NewGuid().ToString();
-        (PoTrafficDbContext db, Guid sessionId, _, Guid userId) =
-            await SeedActiveSessionAsync(dbName, "hangfire-job-1");
+        (TableStorageContext db, Guid sessionId, _, Guid userId) =
+            await SeedActiveSessionAsync("hangfire-job-1");
 
         IBackgroundJobClient jobClient = Substitute.For<IBackgroundJobClient>();
         var handler = new StopWindowCommandHandler(db, jobClient, NullLogger<StopWindowCommandHandler>.Instance);
@@ -85,7 +79,7 @@ public sealed class WindowLifecycleTests
         // Assert
         result.Should().BeTrue();
 
-        MonitoringSession? session = await db.MonitoringSessions.FindAsync(sessionId);
+        MonitoringSession? session = await db.MonitoringSessions.FirstOrDefault(x => x.Id == userId);
         session.Should().NotBeNull();
         session!.State.Should().Be((int)SessionState.Completed,
             "StopWindowCommand must transition session to Completed state");
@@ -96,9 +90,8 @@ public sealed class WindowLifecycleTests
     {
         // Arrange
         const string jobId = "hangfire-job-42";
-        string dbName = Guid.NewGuid().ToString();
-        (PoTrafficDbContext db, Guid sessionId, _, Guid userId) =
-            await SeedActiveSessionAsync(dbName, jobId);
+        (TableStorageContext db, Guid sessionId, _, Guid userId) =
+            await SeedActiveSessionAsync(jobId);
 
         IBackgroundJobClient jobClient = Substitute.For<IBackgroundJobClient>();
         // BackgroundJobClientExtensions.Delete is an extension method that calls ChangeState internally.
@@ -120,9 +113,8 @@ public sealed class WindowLifecycleTests
     {
         // Arrange
         const string jobId = "hangfire-job-99";
-        string dbName = Guid.NewGuid().ToString();
-        (PoTrafficDbContext db, Guid sessionId, Guid routeId, Guid userId) =
-            await SeedActiveSessionAsync(dbName, jobId);
+        (TableStorageContext db, Guid sessionId, Guid routeId, Guid userId) =
+            await SeedActiveSessionAsync(jobId);
 
         IBackgroundJobClient jobClient = Substitute.For<IBackgroundJobClient>();
         var handler = new StopWindowCommandHandler(db, jobClient, NullLogger<StopWindowCommandHandler>.Instance);
@@ -131,7 +123,7 @@ public sealed class WindowLifecycleTests
         await handler.Handle(new StopWindowCommand(sessionId, userId), CancellationToken.None);
 
         // Assert — HangfireJobChainId should be nulled out
-        Route? route = await db.Routes.FindAsync(routeId);
+        Route? route = await db.Routes.FirstOrDefault(x => x.Id == userId);
         route.Should().NotBeNull();
         route!.HangfireJobChainId.Should().BeNull(
             "after stopping monitoring, HangfireJobChainId should be cleared to prevent orphaned chains");
@@ -141,8 +133,7 @@ public sealed class WindowLifecycleTests
     public async Task StopWindow_WhenSessionNotFound_ReturnsFalse()
     {
         // Arrange
-        string dbName = Guid.NewGuid().ToString();
-        PoTrafficDbContext db = CreateDb(dbName);
+        TableStorageContext db = CreateDb();
 
         IBackgroundJobClient jobClient = Substitute.For<IBackgroundJobClient>();
         var handler = new StopWindowCommandHandler(db, jobClient, NullLogger<StopWindowCommandHandler>.Instance);
@@ -161,9 +152,8 @@ public sealed class WindowLifecycleTests
     public async Task StopWindow_WhenNoHangfireJobId_DoesNotCallDelete()
     {
         // Arrange — route has no HangfireJobChainId
-        string dbName = Guid.NewGuid().ToString();
-        (PoTrafficDbContext db, Guid sessionId, _, Guid userId) =
-            await SeedActiveSessionAsync(dbName, hangfireJobChainId: null);
+        (TableStorageContext db, Guid sessionId, _, Guid userId) =
+            await SeedActiveSessionAsync(hangfireJobChainId: null);
 
         IBackgroundJobClient jobClient = Substitute.For<IBackgroundJobClient>();
         var handler = new StopWindowCommandHandler(db, jobClient, NullLogger<StopWindowCommandHandler>.Instance);

@@ -25,8 +25,7 @@ public sealed class ExecutePollCommandHandler(
     public async Task<bool> Handle(ExecutePollCommand cmd, CancellationToken ct)
     {
         // 1. Load Route + active MonitoringSession for today
-        EntityRoute? route = await db.Routes
-            
+        EntityRoute? route = db.Routes
             .FirstOrDefault(r => r.Id == cmd.RouteId
                 && r.MonitoringStatus != (int)MonitoringStatus.Deleted);
 
@@ -38,7 +37,7 @@ public sealed class ExecutePollCommandHandler(
 
         DateOnly today = DateOnly.FromDateTime(DateTimeOffset.UtcNow.Date);
 
-        MonitoringSession? session = await db.MonitoringSessions
+        MonitoringSession? session = db.MonitoringSessions
             .FirstOrDefault(s => s.RouteId == cmd.RouteId
                 && s.SessionDate == today
                 && s.State == (int)SessionState.Active);
@@ -89,7 +88,7 @@ public sealed class ExecutePollCommandHandler(
         };
 
         // 6. Reroute detection
-        List<PollRecord> priorRecords = await db.PollRecords
+        List<PollRecord> priorRecords = db.PollRecords
             .Where(p => p.SessionId == session.Id && !p.IsDeleted)
             .OrderByDescending(p => p.PolledAt)
             .ToList();
@@ -112,7 +111,7 @@ public sealed class ExecutePollCommandHandler(
             }
         }
 
-        db.PollRecords.Add(record);
+        db.Add(record);
 
         // 7. Update session statistics
         session.LastPollAt = record.PolledAt;

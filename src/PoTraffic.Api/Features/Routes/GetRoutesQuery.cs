@@ -19,19 +19,17 @@ public sealed class GetRoutesQueryHandler(TableStorageContext db) : IRequestHand
     public async Task<PagedResult<RouteDto>> Handle(GetRoutesQuery q, CancellationToken ct)
     {
         IQueryable<EntityRoute> baseQuery = db.Routes
-            .Where(r => r.UserId == q.UserId && r.MonitoringStatus != (int)MonitoringStatus.Deleted)
-            ;
+            .Where(r => r.UserId == q.UserId && r.MonitoringStatus != (int)MonitoringStatus.Deleted);
 
-        int total = await baseQuery.Count();
+        int total = baseQuery.Count();
 
         int page = q.Page < 1 ? 1 : q.Page;
         int pageSize = q.PageSize < 1 ? 20 : q.PageSize > 100 ? 100 : q.PageSize;
 
-        List<EntityRoute> routes = await baseQuery
+        List<EntityRoute> routes = baseQuery
             .OrderByDescending(r => r.CreatedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            
             .ToList();
 
         IReadOnlyList<RouteDto> items = routes

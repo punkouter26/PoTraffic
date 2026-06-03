@@ -61,7 +61,7 @@ public sealed class PollRouteJob
         // Update route HangfireJobChainId with successor job ID
         using IServiceScope updateScope = _scopeFactory.CreateScope();
         TableStorageContext db = updateScope.ServiceProvider.GetRequiredService<TableStorageContext>();
-        EntityRoute? route = await db.Routes.FirstOrDefault(r => r.Id == routeId);
+        EntityRoute? route = db.Routes.FirstOrDefault(r => r.Id == routeId);
         if (route is not null)
         {
             route.HangfireJobChainId = nextJobId;

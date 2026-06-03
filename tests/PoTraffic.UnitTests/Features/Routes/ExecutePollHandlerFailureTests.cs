@@ -1,11 +1,10 @@
 using FluentAssertions;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 using PoTraffic.Api.Features.Routes;
-using PoTraffic.Api.Infrastructure.Data;
+using PoTraffic.Api.Infrastructure.Storage;
 
 using PoTraffic.Api.Infrastructure.Providers;
 using PoTraffic.Shared.Enums;
@@ -19,12 +18,9 @@ namespace PoTraffic.UnitTests.Features.Routes;
 /// </summary>
 public sealed class ExecutePollHandlerFailureTests
 {
-    private static PoTrafficDbContext CreateDb(string name)
+    private static TableStorageContext CreateDb()
     {
-        DbContextOptions<PoTrafficDbContext> opts = new DbContextOptionsBuilder<PoTrafficDbContext>()
-            .UseInMemoryDatabase(name)
-            .Options;
-        return new PoTrafficDbContext(opts);
+        return new TableStorageContext();
     }
 
     private static ITrafficProviderFactory BuildProviderFactory(ITrafficProvider provider)
@@ -35,13 +31,13 @@ public sealed class ExecutePollHandlerFailureTests
         return factory;
     }
 
-    private static async Task<(PoTrafficDbContext Db, Guid RouteId, Guid SessionId)> SeedAsync(string dbName)
+    private static async Task<(TableStorageContext Db, Guid RouteId, Guid SessionId)> SeedAsync()
     {
-        PoTrafficDbContext db = CreateDb(dbName);
+        TableStorageContext db = CreateDb();
         Guid routeId = Guid.NewGuid();
         Guid sessionId = Guid.NewGuid();
 
-        db.Routes.Add(new Route
+        db.Add(new Route
         {
             Id = routeId,
             UserId = Guid.NewGuid(),
@@ -54,7 +50,7 @@ public sealed class ExecutePollHandlerFailureTests
             CreatedAt = DateTimeOffset.UtcNow
         });
 
-        db.MonitoringSessions.Add(new MonitoringSession
+        db.Add(new MonitoringSession
         {
             Id = sessionId,
             RouteId = routeId,
@@ -71,8 +67,7 @@ public sealed class ExecutePollHandlerFailureTests
     public async Task WhenProviderThrowsHttpRequestException_ReturnsFalse_NoPollRecordInserted()
     {
         // Arrange
-        string dbName = Guid.NewGuid().ToString();
-        (PoTrafficDbContext db, Guid routeId, Guid sessionId) = await SeedAsync(dbName);
+        (TableStorageContext db, Guid routeId, Guid sessionId) = await SeedAsync();
 
         ITrafficProvider mockProvider = Substitute.For<ITrafficProvider>();
         mockProvider
@@ -89,7 +84,7 @@ public sealed class ExecutePollHandlerFailureTests
         // Assert — FR-005: returns false, no exception propagated
         result.Should().BeFalse("provider errors must not propagate to Hangfire caller (FR-005)");
 
-        int pollCount = await db.PollRecords.CountAsync(p => p.RouteId == routeId);
+        int pollCount = await db.PollRecords.Count(p => p.RouteId == routeId);
         pollCount.Should().Be(0, "no PollRecord should be inserted when provider throws (FR-005)");
     }
 
@@ -97,8 +92,7 @@ public sealed class ExecutePollHandlerFailureTests
     public async Task WhenProviderThrowsHttpRequestException_PollCountUnchanged()
     {
         // Arrange
-        string dbName = Guid.NewGuid().ToString();
-        (PoTrafficDbContext db, Guid routeId, Guid sessionId) = await SeedAsync(dbName);
+        (TableStorageContext db, Guid routeId, Guid sessionId) = await SeedAsync();
 
         ITrafficProvider mockProvider = Substitute.For<ITrafficProvider>();
         mockProvider
@@ -113,7 +107,7 @@ public sealed class ExecutePollHandlerFailureTests
         await handler.Handle(new ExecutePollCommand(routeId), CancellationToken.None);
 
         // Assert — session's PollCount must not be incremented on failure (FR-005)
-        MonitoringSession? session = await db.MonitoringSessions.FindAsync(sessionId);
+        MonitoringSession? session = await db.MonitoringSessions.FirstOrDefault(x => x.Id == userId);
         session.Should().NotBeNull();
         session!.PollCount.Should().Be(3, "PollCount must remain unchanged when provider throws (FR-005)");
     }
@@ -122,8 +116,7 @@ public sealed class ExecutePollHandlerFailureTests
     public async Task WhenProviderThrowsHttpRequestException_WarningIsLogged()
     {
         // Arrange
-        string dbName = Guid.NewGuid().ToString();
-        (PoTrafficDbContext db, Guid routeId, _) = await SeedAsync(dbName);
+        (TableStorageContext db, Guid routeId, _) = await SeedAsync();
 
         ITrafficProvider mockProvider = Substitute.For<ITrafficProvider>();
         mockProvider
@@ -150,8 +143,7 @@ public sealed class ExecutePollHandlerFailureTests
     public async Task WhenProviderThrowsHttpRequestException_NoExceptionPropagates()
     {
         // Arrange
-        string dbName = Guid.NewGuid().ToString();
-        (PoTrafficDbContext db, Guid routeId, _) = await SeedAsync(dbName);
+        (TableStorageContext db, Guid routeId, _) = await SeedAsync();
 
         ITrafficProvider mockProvider = Substitute.For<ITrafficProvider>();
         mockProvider

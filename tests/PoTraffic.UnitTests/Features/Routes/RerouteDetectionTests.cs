@@ -1,10 +1,9 @@
 using FluentAssertions;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using PoTraffic.Api.Features.Routes;
-using PoTraffic.Api.Infrastructure.Data;
+using PoTraffic.Api.Infrastructure.Storage;
 
 using PoTraffic.Api.Infrastructure.Providers;
 using PoTraffic.Shared.Constants;
@@ -19,12 +18,9 @@ namespace PoTraffic.UnitTests.Features.Routes;
 /// </summary>
 public sealed class RerouteDetectionTests
 {
-    private static PoTrafficDbContext CreateDb(string name)
+    private static TableStorageContext CreateDb()
     {
-        DbContextOptions<PoTrafficDbContext> opts = new DbContextOptionsBuilder<PoTrafficDbContext>()
-            .UseInMemoryDatabase(name)
-            .Options;
-        return new PoTrafficDbContext(opts);
+        return new TableStorageContext();
     }
 
     private static ITrafficProviderFactory BuildProviderFactory(ITrafficProvider provider)
@@ -35,15 +31,14 @@ public sealed class RerouteDetectionTests
         return factory;
     }
 
-    private static async Task<(PoTrafficDbContext Db, Guid RouteId, Guid SessionId)> SeedBaseAsync(
-        string dbName,
+    private static async Task<(TableStorageContext Db, Guid RouteId, Guid SessionId)> SeedBaseAsync(
         IEnumerable<int> priorDistances)
     {
-        PoTrafficDbContext db = CreateDb(dbName);
+        TableStorageContext db = CreateDb();
         Guid routeId = Guid.NewGuid();
         Guid sessionId = Guid.NewGuid();
 
-        db.Routes.Add(new Route
+        db.Add(new Route
         {
             Id = routeId,
             UserId = Guid.NewGuid(),
@@ -56,7 +51,7 @@ public sealed class RerouteDetectionTests
             CreatedAt = DateTimeOffset.UtcNow
         });
 
-        db.MonitoringSessions.Add(new MonitoringSession
+        db.Add(new MonitoringSession
         {
             Id = sessionId,
             RouteId = routeId,
@@ -68,7 +63,7 @@ public sealed class RerouteDetectionTests
         DateTimeOffset polledBase = DateTimeOffset.UtcNow.AddMinutes(-priorDistances.Count() * 5);
         foreach (int dist in priorDistances)
         {
-            db.PollRecords.Add(new PollRecord
+            db.Add(new PollRecord
             {
                 Id = Guid.NewGuid(),
                 RouteId = routeId,
@@ -94,8 +89,7 @@ public sealed class RerouteDetectionTests
         // Prior reading (most recent) = 6000 m (elevated)
         // Current poll: 6200 m (elevated) — second consecutive → IsRerouted = true
         int[] priorDistances = [5000, 5000, 5000, 5000, 5000, 5000, 5000, 5000, 5000, 6000];
-        string dbName = Guid.NewGuid().ToString();
-        (PoTrafficDbContext db, Guid routeId, Guid sessionId) = await SeedBaseAsync(dbName, priorDistances);
+        (TableStorageContext db, Guid routeId, Guid sessionId) = await SeedBaseAsync(priorDistances);
 
         // Current poll returns 6200 m — elevated
         ITrafficProvider mockProvider = Substitute.For<ITrafficProvider>();
@@ -113,7 +107,7 @@ public sealed class RerouteDetectionTests
         result.Should().BeTrue();
         PollRecord? newRecord = await db.PollRecords
             .OrderByDescending(p => p.PolledAt)
-            .FirstOrDefaultAsync(p => p.DistanceMetres == 6200);
+            .FirstOrDefault(p => p.DistanceMetres == 6200);
         newRecord.Should().NotBeNull();
         newRecord!.IsRerouted.Should().BeTrue(
             "two consecutive readings ≥15% above median should flag a reroute (FR-006)");
@@ -127,8 +121,7 @@ public sealed class RerouteDetectionTests
         // Prior reading (most recent) = 5000 m (normal)
         // Current poll: 6200 m (elevated but FIRST elevated) — only one → IsRerouted = false
         int[] priorDistances = [5000, 5000, 5000, 5000, 5000, 5000, 5000, 5000, 5000, 5000];
-        string dbName = Guid.NewGuid().ToString();
-        (PoTrafficDbContext db, Guid routeId, _) = await SeedBaseAsync(dbName, priorDistances);
+        (TableStorageContext db, Guid routeId, _) = await SeedBaseAsync(priorDistances);
 
         ITrafficProvider mockProvider = Substitute.For<ITrafficProvider>();
         mockProvider
@@ -145,7 +138,7 @@ public sealed class RerouteDetectionTests
         result.Should().BeTrue();
         PollRecord? newRecord = await db.PollRecords
             .OrderByDescending(p => p.PolledAt)
-            .FirstOrDefaultAsync(p => p.DistanceMetres == 6200);
+            .FirstOrDefault(p => p.DistanceMetres == 6200);
         newRecord.Should().NotBeNull();
         newRecord!.IsRerouted.Should().BeFalse(
             "a single elevated reading without a prior elevated reading should NOT flag a reroute (FR-006)");
@@ -156,8 +149,7 @@ public sealed class RerouteDetectionTests
     {
         // Arrange — only one prior record (need ≥2 to evaluate reroute)
         int[] priorDistances = [5000];
-        string dbName = Guid.NewGuid().ToString();
-        (PoTrafficDbContext db, Guid routeId, _) = await SeedBaseAsync(dbName, priorDistances);
+        (TableStorageContext db, Guid routeId, _) = await SeedBaseAsync(priorDistances);
 
         ITrafficProvider mockProvider = Substitute.For<ITrafficProvider>();
         mockProvider
@@ -174,7 +166,7 @@ public sealed class RerouteDetectionTests
         result.Should().BeTrue();
         PollRecord? newRecord = await db.PollRecords
             .OrderByDescending(p => p.PolledAt)
-            .FirstOrDefaultAsync(p => p.DistanceMetres == 6200);
+            .FirstOrDefault(p => p.DistanceMetres == 6200);
         newRecord.Should().NotBeNull();
         newRecord!.IsRerouted.Should().BeFalse(
             "fewer than 2 prior records are insufficient to evaluate reroute detection (FR-006)");

@@ -1,10 +1,9 @@
 using FluentAssertions;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using PoTraffic.Api.Features.Routes;
-using PoTraffic.Api.Infrastructure.Data;
+using PoTraffic.Api.Infrastructure.Storage;
 
 using PoTraffic.Api.Infrastructure.Providers;
 using PoTraffic.Shared.Enums;
@@ -18,12 +17,9 @@ namespace PoTraffic.UnitTests.Features.Routes;
 /// </summary>
 public sealed class RerouteAccuracyTheoryTests
 {
-    private static PoTrafficDbContext CreateDb(string name)
+    private static TableStorageContext CreateDb()
     {
-        DbContextOptions<PoTrafficDbContext> opts = new DbContextOptionsBuilder<PoTrafficDbContext>()
-            .UseInMemoryDatabase(name)
-            .Options;
-        return new PoTrafficDbContext(opts);
+        return new TableStorageContext();
     }
 
     private static ITrafficProviderFactory BuildProviderFactory(ITrafficProvider provider)
@@ -100,12 +96,11 @@ public sealed class RerouteAccuracyTheoryTests
         bool expectedIsRerouted)
     {
         // Arrange
-        string dbName = Guid.NewGuid().ToString();
-        PoTrafficDbContext db = CreateDb(dbName);
+        TableStorageContext db = CreateDb();
         Guid routeId = Guid.NewGuid();
         Guid sessionId = Guid.NewGuid();
 
-        db.Routes.Add(new Route
+        db.Add(new Route
         {
             Id = routeId,
             UserId = Guid.NewGuid(),
@@ -118,7 +113,7 @@ public sealed class RerouteAccuracyTheoryTests
             CreatedAt = DateTimeOffset.UtcNow
         });
 
-        db.MonitoringSessions.Add(new MonitoringSession
+        db.Add(new MonitoringSession
         {
             Id = sessionId,
             RouteId = routeId,
@@ -130,7 +125,7 @@ public sealed class RerouteAccuracyTheoryTests
         DateTimeOffset polledAt = DateTimeOffset.UtcNow.AddMinutes(-(priorDistances.Length * 5));
         foreach (int dist in priorDistances)
         {
-            db.PollRecords.Add(new PollRecord
+            db.Add(new PollRecord
             {
                 Id = Guid.NewGuid(),
                 RouteId = routeId,
@@ -161,7 +156,7 @@ public sealed class RerouteAccuracyTheoryTests
 
         PollRecord? record = await db.PollRecords
             .OrderByDescending(p => p.PolledAt)
-            .FirstOrDefaultAsync(p => p.DistanceMetres == currentDistance);
+            .FirstOrDefault(p => p.DistanceMetres == currentDistance);
 
         record.Should().NotBeNull();
         record!.IsRerouted.Should().Be(expectedIsRerouted,
@@ -185,12 +180,11 @@ public sealed class RerouteAccuracyTheoryTests
 
         foreach ((int[] priorDistances, int currentDistance, bool expected) in scenarios)
         {
-            string dbName = Guid.NewGuid().ToString();
-            PoTrafficDbContext db = CreateDb(dbName);
+            TableStorageContext db = CreateDb();
             Guid routeId = Guid.NewGuid();
             Guid sessionId = Guid.NewGuid();
 
-            db.Routes.Add(new Route
+            db.Add(new Route
             {
                 Id = routeId,
                 UserId = Guid.NewGuid(),
@@ -203,7 +197,7 @@ public sealed class RerouteAccuracyTheoryTests
                 CreatedAt = DateTimeOffset.UtcNow
             });
 
-            db.MonitoringSessions.Add(new MonitoringSession
+            db.Add(new MonitoringSession
             {
                 Id = sessionId,
                 RouteId = routeId,
@@ -214,7 +208,7 @@ public sealed class RerouteAccuracyTheoryTests
             DateTimeOffset polledAt = DateTimeOffset.UtcNow.AddMinutes(-(priorDistances.Length * 5));
             foreach (int dist in priorDistances)
             {
-                db.PollRecords.Add(new PollRecord
+                db.Add(new PollRecord
                 {
                     Id = Guid.NewGuid(),
                     RouteId = routeId,
@@ -241,7 +235,7 @@ public sealed class RerouteAccuracyTheoryTests
 
             PollRecord? record = await db.PollRecords
                 .OrderByDescending(p => p.PolledAt)
-                .FirstOrDefaultAsync(p => p.DistanceMetres == currentDistance);
+                .FirstOrDefault(p => p.DistanceMetres == currentDistance);
 
             if (record is not null && record.IsRerouted == expected)
                 correctPredictions++;

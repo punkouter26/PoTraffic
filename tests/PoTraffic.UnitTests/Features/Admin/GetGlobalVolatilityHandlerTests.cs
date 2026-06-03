@@ -1,8 +1,7 @@
 using FluentAssertions;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using PoTraffic.Api.Features.Admin;
-using PoTraffic.Api.Infrastructure.Data;
+using PoTraffic.Api.Infrastructure.Storage;
 
 using PoTraffic.Shared.DTOs.Admin;
 
@@ -15,26 +14,22 @@ namespace PoTraffic.UnitTests.Features.Admin;
 /// </summary>
 public sealed class GetGlobalVolatilityHandlerTests
 {
-    private static PoTrafficDbContext CreateDb(string name)
+    private static TableStorageContext CreateDb()
     {
-        DbContextOptions<PoTrafficDbContext> opts = new DbContextOptionsBuilder<PoTrafficDbContext>()
-            .UseInMemoryDatabase(name)
-            .Options;
-        return new PoTrafficDbContext(opts);
+        return new TableStorageContext();
     }
 
     [Fact]
     public async Task GetGlobalVolatility_GroupsByDayOfWeekAndSlot()
     {
         // Arrange
-        string dbName = Guid.NewGuid().ToString();
-        await using PoTrafficDbContext db = CreateDb(dbName);
+        await using TableStorageContext db = CreateDb();
 
         Guid userId = Guid.NewGuid();
         Guid routeId = Guid.NewGuid();
 
-        db.Users.Add(new User { Id = userId, Email = "test@test.com", PasswordHash = "x", Locale = "en-IE", CreatedAt = DateTimeOffset.UtcNow });
-        db.Routes.Add(new EntityRoute
+        db.Add(new User { Id = userId, Email = "test@test.com", PasswordHash = "x", Locale = "en-IE", CreatedAt = DateTimeOffset.UtcNow });
+        db.Add(new EntityRoute
         {
             Id = routeId,
             UserId = userId,
@@ -50,9 +45,7 @@ public sealed class GetGlobalVolatilityHandlerTests
         DateTimeOffset monday0800 = GetNextMonday().AddHours(8);
         DateTimeOffset monday0805 = monday0800.AddMinutes(5);
 
-        db.PollRecords.AddRange([
-            new PollRecord { Id = Guid.NewGuid(), RouteId = routeId, PolledAt = monday0800, TravelDurationSeconds = 300, DistanceMetres = 5000 },
-            new PollRecord { Id = Guid.NewGuid(), RouteId = routeId, PolledAt = monday0800.AddDays(-7), TravelDurationSeconds = 320, DistanceMetres = 5000 }, // prev Monday same slot
+        db.AddRange(new[] { , ,  }), TravelDurationSeconds = 320, DistanceMetres = 5000 }, // prev Monday same slot
             new PollRecord { Id = Guid.NewGuid(), RouteId = routeId, PolledAt = monday0805, TravelDurationSeconds = 360, DistanceMetres = 5000 },
         ]);
         await db.SaveChangesAsync();
@@ -72,8 +65,7 @@ public sealed class GetGlobalVolatilityHandlerTests
     [Fact]
     public async Task GetGlobalVolatility_WhenNoRecords_ReturnsEmpty()
     {
-        string dbName = Guid.NewGuid().ToString();
-        await using PoTrafficDbContext db = CreateDb(dbName);
+        await using TableStorageContext db = CreateDb();
 
         var handler = new GetGlobalVolatilityHandler(db, NullLogger<GetGlobalVolatilityHandler>.Instance);
 

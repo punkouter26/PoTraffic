@@ -1,7 +1,6 @@
 using FluentAssertions;
-using Microsoft.EntityFrameworkCore;
 using PoTraffic.Api.Features.Routes;
-using PoTraffic.Api.Infrastructure.Data;
+using PoTraffic.Api.Infrastructure.Storage;
 
 using PoTraffic.Shared.Enums;
 
@@ -14,33 +13,21 @@ namespace PoTraffic.UnitTests.Features.Routes;
 /// </summary>
 public sealed class GetRoutesHandlerTests
 {
-    private static PoTrafficDbContext CreateDb(string name)
+    private static TableStorageContext CreateDb()
     {
-        DbContextOptions<PoTrafficDbContext> opts = new DbContextOptionsBuilder<PoTrafficDbContext>()
-            .UseInMemoryDatabase(name)
-            .Options;
-        return new PoTrafficDbContext(opts);
+        return new TableStorageContext();
     }
 
     [Fact]
     public async Task GetRoutes_ReturnsOnlyRoutesForRequestedUser()
     {
         // Arrange
-        string dbName = Guid.NewGuid().ToString();
-        using PoTrafficDbContext db = CreateDb(dbName);
+        using TableStorageContext db = CreateDb();
 
         Guid userId = Guid.NewGuid();
         Guid otherId = Guid.NewGuid();
 
-        db.Routes.AddRange(
-            new EntityRoute
-            {
-                Id = Guid.NewGuid(),
-                UserId = userId,
-                OriginAddress = "A",
-                DestinationAddress = "B",
-                Provider = (int)RouteProvider.GoogleMaps,
-                MonitoringStatus = (int)MonitoringStatus.Active,
+        db.AddRange(new[] { , ,  })MonitoringStatus.Active,
                 CreatedAt = DateTimeOffset.UtcNow
             },
             new EntityRoute
@@ -70,20 +57,11 @@ public sealed class GetRoutesHandlerTests
     public async Task GetRoutes_ExcludesSoftDeletedRoutes()
     {
         // Arrange
-        string dbName = Guid.NewGuid().ToString();
-        using PoTrafficDbContext db = CreateDb(dbName);
+        using TableStorageContext db = CreateDb();
 
         Guid userId = Guid.NewGuid();
 
-        db.Routes.AddRange(
-            new EntityRoute
-            {
-                Id = Guid.NewGuid(),
-                UserId = userId,
-                OriginAddress = "A",
-                DestinationAddress = "B",
-                Provider = (int)RouteProvider.GoogleMaps,
-                MonitoringStatus = (int)MonitoringStatus.Active,
+        db.AddRange(new[] { , ,  })MonitoringStatus.Active,
                 CreatedAt = DateTimeOffset.UtcNow
             },
             new EntityRoute
@@ -112,8 +90,7 @@ public sealed class GetRoutesHandlerTests
     public async Task GetRoutes_ReturnsEmptyPage_WhenUserHasNoRoutes()
     {
         // Arrange
-        string dbName = Guid.NewGuid().ToString();
-        using PoTrafficDbContext db = CreateDb(dbName);
+        using TableStorageContext db = CreateDb();
 
         var handler = new GetRoutesQueryHandler(db);
 
@@ -129,14 +106,13 @@ public sealed class GetRoutesHandlerTests
     public async Task GetRoutes_PaginatesCorrectly()
     {
         // Arrange
-        string dbName = Guid.NewGuid().ToString();
-        using PoTrafficDbContext db = CreateDb(dbName);
+        using TableStorageContext db = CreateDb();
 
         Guid userId = Guid.NewGuid();
 
         for (int i = 0; i < 5; i++)
         {
-            db.Routes.Add(new EntityRoute
+            db.Add(new EntityRoute
             {
                 Id = Guid.NewGuid(),
                 UserId = userId,

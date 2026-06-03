@@ -80,16 +80,6 @@ public sealed class AuthScenarios : PlaywrightTestBase
     }
 
     [SkipUnlessE2EReady]
-    public async Task DeleteAccount_ShowsConfirmDialog_RedirectsToLogin_ReLoginFails()
-    {
-        // Log in, navigate to /account/settings
-        // Click Delete Account → RadzenConfirmDialog appears → confirm
-        // Assert redirect to /login
-        // Attempt re-login with same credentials → 401
-        await Task.CompletedTask;
-    }
-
-    [SkipUnlessE2EReady]
     public async Task LoginPage_ShowsGoogleAndMicrosoftButtons()
     {
         // ── Pre-condition — skip if no OAuth providers configured in this env ────

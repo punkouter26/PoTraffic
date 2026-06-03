@@ -3,7 +3,7 @@ using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
-using PoTraffic.Api.Infrastructure.Data;
+using PoTraffic.Api.Infrastructure.Storage;
 
 using PoTraffic.IntegrationTests.Helpers;
 using PoTraffic.Shared.DTOs.Admin;
@@ -29,30 +29,8 @@ public sealed class SensitiveMaskingIntegrationTests : BaseIntegrationTest
         // Arrange — seed a sensitive and a non-sensitive config entry via DB
         using (IServiceScope scope = GetServices().CreateScope())
         {
-            PoTrafficDbContext db = scope.ServiceProvider.GetRequiredService<PoTrafficDbContext>();
-            db.SystemConfigurations.AddRange(
-                new SystemConfiguration
-                {
-                    Key = "test.api.key",
-                    Value = "super-secret-value-1234",
-                    Description = "Sensitive API key",
-                    IsSensitive = true
-                },
-                new SystemConfiguration
-                {
-                    Key = "test.poll.interval",
-                    Value = "60",
-                    Description = "Non-sensitive polling interval",
-                    IsSensitive = false
-                });
-            await db.SaveChangesAsync();
-        }
-
-        HttpClient client = CreateClient();
-
-        // Obtain an admin JWT via the Testing-only dev-login endpoint
-        HttpResponseMessage loginResponse = await client.PostAsJsonAsync(
-            "/e2e/dev-login", new { Email = "admin@test.invalid", Role = "Administrator" });
+            TableStorageContext db = scope.ServiceProvider.GetRequiredService<TableStorageContext>();
+            db.AddRange(new[] { , ,  });
         loginResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
         DevLoginResponse? loginDto = await loginResponse.Content.ReadFromJsonAsync<DevLoginResponse>();

@@ -2,7 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
-using PoTraffic.Api.Infrastructure.Data;
+using PoTraffic.Api.Infrastructure.Storage;
 using PoTraffic.IntegrationTests.Helpers;
 using PoTraffic.Shared.DTOs.Auth;
 
@@ -46,7 +46,7 @@ public sealed class DeleteAccountIntegrationTests : BaseIntegrationTest
 
         // Verify — user row is permanently removed from the database
         using IServiceScope scope = GetServices().CreateScope();
-        PoTrafficDbContext db = scope.ServiceProvider.GetRequiredService<PoTrafficDbContext>();
+        TableStorageContext db = scope.ServiceProvider.GetRequiredService<TableStorageContext>();
         bool userExists = db.Users.Any(u => u.Id == userId);
         userExists.Should().BeFalse("user row must be hard-deleted after account deletion (FR-031 / GDPR Art. 17)");
     }

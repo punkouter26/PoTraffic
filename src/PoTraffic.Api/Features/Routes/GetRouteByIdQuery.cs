@@ -19,8 +19,7 @@ public sealed class GetRouteByIdQueryHandler(TableStorageContext db)
 {
     public async Task<RouteDto?> Handle(GetRouteByIdQuery q, CancellationToken ct)
     {
-        EntityRoute? route = await db.Routes
-            
+        EntityRoute? route = db.Routes
             .FirstOrDefault(r =>
                 r.Id == q.RouteId
                 && r.UserId == q.UserId

@@ -92,30 +92,7 @@ public sealed class StartWindowCommandHandler : IRequestHandler<StartWindowComma
 
         _db.Add(session);
 
-        // 5. Persist session FIRST — the unique index IX_MonitoringSessions_RouteId_SessionDate
-        //    acts as a database-level guard against concurrent quota-race inserts.
-        try
-        {
-            await _db.SaveChangesAsync(ct);
-        }
-        catch (DbUpdateException ex)
-            when (ex.InnerException is SqlException { Number: 2627 or 2601 })
-        {
-            // A concurrent StartWindow request already created the session for today.
-            // Return idempotent success instead of propagating the constraint violation.
-            _logger.LogInformation(
-                "Concurrent StartWindow for route {RouteId} on {Date} — session already created by peer request",
-                window.Route.Id, today);
-            MonitoringSession? concurrent = _db.MonitoringSessions
-                .FirstOrDefault(s => s.RouteId == window.Route.Id && s.SessionDate == today);
-            if (concurrent is not null)
-            {
-                int usedByNow = _db.MonitoringSessions
-                    .Count(s => s.Route.UserId == cmd.UserId && s.SessionDate == today);
-                return new StartWindowResult(true, null, Math.Max(0, QuotaConstants.DefaultDailyQuota - usedByNow), concurrent.Id);
-            }
-            throw;
-        }
+        await _db.SaveChangesAsync(ct);
 
         // 6. Enqueue AFTER successful DB save — ensures no orphan job if SaveChanges fails.
         string jobId = _jobClient.Enqueue<PollRouteJob>(j => j.Execute(window.Route.Id));

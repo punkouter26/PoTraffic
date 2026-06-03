@@ -1,7 +1,6 @@
 using FluentAssertions;
-using Microsoft.EntityFrameworkCore;
 using PoTraffic.Api.Features.Account;
-using PoTraffic.Api.Infrastructure.Data;
+using PoTraffic.Api.Infrastructure.Storage;
 
 
 
@@ -13,26 +12,22 @@ namespace PoTraffic.UnitTests.Features.Account;
 /// </summary>
 public sealed class DeleteAccountCommandTests
 {
-    private static PoTrafficDbContext CreateDb(string name)
+    private static TableStorageContext CreateDb()
     {
-        DbContextOptions<PoTrafficDbContext> opts = new DbContextOptionsBuilder<PoTrafficDbContext>()
-            .UseInMemoryDatabase(name)
-            .Options;
-        return new PoTrafficDbContext(opts);
+        return new TableStorageContext();
     }
 
     [Fact]
     public async Task DeleteAccount_RemovesUserAndCascadeRoutes()
     {
         // Arrange
-        string dbName = Guid.NewGuid().ToString();
-        await using PoTrafficDbContext db = CreateDb(dbName);
+        await using TableStorageContext db = CreateDb();
 
         Guid userId = Guid.NewGuid();
         Guid routeId = Guid.NewGuid();
 
-        db.Users.Add(new User { Id = userId, Email = "del@test.com", PasswordHash = "h", Locale = "en-IE", CreatedAt = DateTimeOffset.UtcNow });
-        db.Routes.Add(new EntityRoute
+        db.Add(new User { Id = userId, Email = "del@test.com", PasswordHash = "h", Locale = "en-IE", CreatedAt = DateTimeOffset.UtcNow });
+        db.Add(new EntityRoute
         {
             Id = routeId,
             UserId = userId,
@@ -50,14 +45,13 @@ public sealed class DeleteAccountCommandTests
 
         // Assert
         result.Should().BeTrue("user existed and was deleted");
-        (await db.Users.FindAsync(userId)).Should().BeNull("user row must be hard-deleted (FR-031)");
+        (await db.Users.FirstOrDefault(x => x.Id == userId)).Should().BeNull("user row must be hard-deleted (FR-031)");
     }
 
     [Fact]
     public async Task DeleteAccount_WhenUserNotFound_ReturnsFalse()
     {
-        string dbName = Guid.NewGuid().ToString();
-        await using PoTrafficDbContext db = CreateDb(dbName);
+        await using TableStorageContext db = CreateDb();
 
         var handler = new DeleteAccountCommandHandler(db);
 

@@ -28,25 +28,24 @@ public sealed class RefreshTokenCommandHandler : IRequestHandler<RefreshTokenCom
         _jwt = jwt;
     }
 
-    public Task<RefreshTokenResult> Handle(RefreshTokenCommand command, CancellationToken ct)
+    public async Task<RefreshTokenResult> Handle(RefreshTokenCommand command, CancellationToken ct)
     {
         User? user = _db.Users
             .FirstOrDefault(u => u.RefreshToken == command.RefreshToken
                                  && u.RefreshTokenExpiry > DateTimeOffset.UtcNow);
 
         if (user is null)
-            return Task.FromResult(new RefreshTokenResult(false, null, "INVALID_REFRESH_TOKEN"));
+            return new RefreshTokenResult(false, null, "INVALID_REFRESH_TOKEN");
 
         (string accessToken, string newRefreshToken, DateTimeOffset expiresAt) = _jwt.GenerateTokens(user);
 
-        // Rotate refresh token
         user.RefreshToken = newRefreshToken;
         user.RefreshTokenExpiry = DateTimeOffset.UtcNow.AddDays(_jwt.RefreshTokenExpiryDays);
         await _db.SaveChangesAsync(ct);
 
-        return Task.FromResult(new RefreshTokenResult(
+        return new RefreshTokenResult(
             true,
             new AuthResponse(accessToken, newRefreshToken, expiresAt, user.Id, user.Role),
-            null));
+            null);
     }
 }

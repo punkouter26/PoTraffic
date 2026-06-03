@@ -2,9 +2,7 @@ using FluentAssertions;
 using FluentValidation.Results;
 using NSubstitute;
 using PoTraffic.Api.Features.Auth;
-using PoTraffic.Api.Infrastructure.Data;
-
-using Microsoft.EntityFrameworkCore;
+using PoTraffic.Api.Infrastructure.Storage;
 
 namespace PoTraffic.UnitTests.Features.Auth;
 
@@ -18,10 +16,7 @@ public sealed class AuthValidatorTests
     public async Task RegisterValidator_WithDuplicateEmail_ReturnsValidationError()
     {
         // Arrange — seed in-memory DB with existing user
-        DbContextOptions<PoTrafficDbContext> opts = new DbContextOptionsBuilder<PoTrafficDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
-            .Options;
-        await using PoTrafficDbContext db = new(opts);
+        await using TableStorageContext db = new();
         db.Set<User>().Add(new User
         {
             Id = Guid.NewGuid(),
@@ -47,10 +42,7 @@ public sealed class AuthValidatorTests
     [Fact]
     public async Task RegisterValidator_WithNewEmail_Passes()
     {
-        DbContextOptions<PoTrafficDbContext> opts = new DbContextOptionsBuilder<PoTrafficDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
-            .Options;
-        await using PoTrafficDbContext db = new(opts);
+        await using TableStorageContext db = new();
         var validator = new RegisterCommandValidator(db);
         var command = new RegisterCommand("new@example.com", "Password1!", "en-US");
 
@@ -62,10 +54,7 @@ public sealed class AuthValidatorTests
     [Fact]
     public async Task RegisterValidator_WithEmptyPassword_Fails()
     {
-        DbContextOptions<PoTrafficDbContext> opts = new DbContextOptionsBuilder<PoTrafficDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
-            .Options;
-        await using PoTrafficDbContext db = new(opts);
+        await using TableStorageContext db = new();
         var validator = new RegisterCommandValidator(db);
         var command = new RegisterCommand("user@example.com", "", "Europe/London");
 

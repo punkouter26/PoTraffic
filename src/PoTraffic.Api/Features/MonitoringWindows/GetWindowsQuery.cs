@@ -14,13 +14,12 @@ public sealed class GetWindowsQueryHandler(TableStorageContext db)
 {
     public async Task<IReadOnlyList<MonitoringWindowDto>?> Handle(GetWindowsQuery q, CancellationToken ct)
     {
-        // Verify route ownership before returning windows
-        bool routeExists = await db.Routes
+        bool routeExists = db.Routes
             .Any(r => r.Id == q.RouteId && r.UserId == q.UserId);
 
         if (!routeExists) return null;
 
-        return await db.MonitoringWindows
+        return db.MonitoringWindows
             .Where(w => w.RouteId == q.RouteId)
             .OrderBy(w => w.StartTime)
             .Select(w => new MonitoringWindowDto(

@@ -112,7 +112,7 @@ public sealed class CreateRouteCommandHandler(
             CreatedAt = DateTimeOffset.UtcNow
         });
 
-        db.Routes.Add(route);
+        db.Add(route);
         await db.SaveChangesAsync(ct);
 
         logger.LogInformation("Route {RouteId} created for user {UserId} with monitoring window {Start}–{End}",

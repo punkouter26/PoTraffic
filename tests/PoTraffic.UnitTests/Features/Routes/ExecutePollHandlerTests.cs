@@ -1,10 +1,9 @@
 using FluentAssertions;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using PoTraffic.Api.Features.Routes;
-using PoTraffic.Api.Infrastructure.Data;
+using PoTraffic.Api.Infrastructure.Storage;
 
 using PoTraffic.Api.Infrastructure.Providers;
 using PoTraffic.Shared.Enums;
@@ -13,12 +12,9 @@ namespace PoTraffic.UnitTests.Features.Routes;
 
 public sealed class ExecutePollHandlerTests
 {
-    private static PoTrafficDbContext CreateDb(string name)
+    private static TableStorageContext CreateDb()
     {
-        DbContextOptions<PoTrafficDbContext> opts = new DbContextOptionsBuilder<PoTrafficDbContext>()
-            .UseInMemoryDatabase(name)
-            .Options;
-        return new PoTrafficDbContext(opts);
+        return new TableStorageContext();
     }
 
     private static ITrafficProviderFactory BuildProviderFactory(ITrafficProvider provider)
@@ -32,13 +28,12 @@ public sealed class ExecutePollHandlerTests
     public async Task ExecutePollHandler_WhenProviderSucceeds_RecordsPollData()
     {
         // Arrange
-        string dbName = Guid.NewGuid().ToString();
-        using PoTrafficDbContext db = CreateDb(dbName);
+        using TableStorageContext db = CreateDb();
 
         Guid routeId = Guid.NewGuid();
         Guid sessionId = Guid.NewGuid();
 
-        db.Routes.Add(new Route
+        db.Add(new Route
         {
             Id = routeId,
             UserId = Guid.NewGuid(),
@@ -51,7 +46,7 @@ public sealed class ExecutePollHandlerTests
             CreatedAt = DateTimeOffset.UtcNow
         });
 
-        db.MonitoringSessions.Add(new MonitoringSession
+        db.Add(new MonitoringSession
         {
             Id = sessionId,
             RouteId = routeId,
@@ -76,7 +71,7 @@ public sealed class ExecutePollHandlerTests
         // Assert
         result.Should().BeTrue();
 
-        PollRecord? record = await db.PollRecords.FirstOrDefaultAsync(p => p.RouteId == routeId);
+        PollRecord? record = await db.PollRecords.FirstOrDefault(p => p.RouteId == routeId);
         record.Should().NotBeNull();
         record!.TravelDurationSeconds.Should().Be(300);
         record.DistanceMetres.Should().Be(5000);

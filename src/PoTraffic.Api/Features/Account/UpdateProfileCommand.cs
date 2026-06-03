@@ -29,22 +29,22 @@ public sealed class UpdateProfileHandler : IRequestHandler<UpdateProfileCommand,
 
     public UpdateProfileHandler(TableStorageContext db) => _db = db;
 
-    public Task<ProfileDto?> Handle(UpdateProfileCommand command, CancellationToken ct)
+    public async Task<ProfileDto?> Handle(UpdateProfileCommand command, CancellationToken ct)
     {
         User? user = _db.Users
             .FirstOrDefault(u => u.Id == command.UserId);
 
-        if (user is null) return Task.FromResult<ProfileDto?>(null);
+        if (user is null) return null;
 
         user.Locale = command.Locale;
         await _db.SaveChangesAsync(ct);
 
-        return Task.FromResult<ProfileDto?>(new ProfileDto(
+        return new ProfileDto(
             UserId: user.Id,
             Email: user.Email,
             Locale: user.Locale,
             CreatedAt: user.CreatedAt,
             LastLoginAt: user.LastLoginAt,
-            Role: user.Role));
+            Role: user.Role);
     }
 }
