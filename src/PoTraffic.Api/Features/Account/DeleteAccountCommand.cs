@@ -1,6 +1,6 @@
 using MediatR;
-using Microsoft.EntityFrameworkCore;
-using PoTraffic.Api.Infrastructure.Data;
+using PoTraffic.Api.Infrastructure.Storage;
+
 
 
 namespace PoTraffic.Api.Features.Account;
@@ -10,20 +10,19 @@ public sealed record DeleteAccountCommand(Guid UserId) : IRequest<bool>;
 
 public sealed class DeleteAccountCommandHandler : IRequestHandler<DeleteAccountCommand, bool>
 {
-    private readonly PoTrafficDbContext _db;
+    private readonly TableStorageContext _db;
 
-    public DeleteAccountCommandHandler(PoTrafficDbContext db) => _db = db;
+    public DeleteAccountCommandHandler(TableStorageContext db) => _db = db;
 
-    public async Task<bool> Handle(DeleteAccountCommand command, CancellationToken ct)
+    public Task<bool> Handle(DeleteAccountCommand command, CancellationToken ct)
     {
-        User? user = await _db.Users.FindAsync([command.UserId], ct);
+        User? user = _db.Users.FirstOrDefault(u => u.Id == command.UserId);
 
-        if (user is null) return false;
+        if (user is null) return Task.FromResult(false);
 
-        // Hard delete — EF cascade handles Routes → MonitoringWindows → PollRecords
-        _db.Users.Remove(user);
-        await _db.SaveChangesAsync(ct);
+        // Hard delete — in-process store, no cascade needed.
+        _db.Remove(user);
 
-        return true;
+        return Task.FromResult(true);
     }
 }

@@ -1,7 +1,9 @@
 using FluentValidation;
+using PoTraffic.Api.Infrastructure.Storage;
+
 using MediatR;
-using Microsoft.EntityFrameworkCore;
-using PoTraffic.Api.Infrastructure.Data;
+
+
 using PoTraffic.Shared.DTOs.Admin;
 
 namespace PoTraffic.Api.Features.Admin;
@@ -20,24 +22,24 @@ public sealed class UpdateSystemConfigurationValidator : AbstractValidator<Updat
 
 public sealed class UpdateSystemConfigurationHandler : IRequestHandler<UpdateSystemConfigurationCommand, SystemConfigDto?>
 {
-    private readonly PoTrafficDbContext _db;
+    private readonly TableStorageContext _db;
 
-    public UpdateSystemConfigurationHandler(PoTrafficDbContext db) => _db = db;
+    public UpdateSystemConfigurationHandler(TableStorageContext db) => _db = db;
 
-    public async Task<SystemConfigDto?> Handle(UpdateSystemConfigurationCommand command, CancellationToken ct)
+    public Task<SystemConfigDto?> Handle(UpdateSystemConfigurationCommand command, CancellationToken ct)
     {
         SystemConfiguration? config =
-            await _db.SystemConfigurations.FirstOrDefaultAsync(c => c.Key == command.Key, ct);
+            _db.SystemConfigurations.FirstOrDefault(c => c.Key == command.Key);
 
-        if (config is null) return null;
+        if (config is null) return Task.FromResult<SystemConfigDto?>(null);
 
         config.Value = command.Value;
         await _db.SaveChangesAsync(ct);
 
-        return new SystemConfigDto(
+        return Task.FromResult<SystemConfigDto?>(new SystemConfigDto(
             Key: config.Key,
             Value: config.IsSensitive ? GetSystemConfigurationHandler.Mask(config.Value) : config.Value,
             Description: config.Description,
-            IsSensitive: config.IsSensitive);
+            IsSensitive: config.IsSensitive));
     }
 }

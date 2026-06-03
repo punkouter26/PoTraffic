@@ -1,8 +1,13 @@
 using Hangfire;
+using PoTraffic.Api.Infrastructure.Storage;
+
 using MediatR;
+
 using Microsoft.Extensions.DependencyInjection;
+
 using Microsoft.Extensions.Logging;
-using PoTraffic.Api.Infrastructure.Data;
+
+
 
 using PoTraffic.Shared.Constants;
 
@@ -55,8 +60,8 @@ public sealed class PollRouteJob
 
         // Update route HangfireJobChainId with successor job ID
         using IServiceScope updateScope = _scopeFactory.CreateScope();
-        PoTrafficDbContext db = updateScope.ServiceProvider.GetRequiredService<PoTrafficDbContext>();
-        EntityRoute? route = await db.Routes.FindAsync(routeId);
+        TableStorageContext db = updateScope.ServiceProvider.GetRequiredService<TableStorageContext>();
+        EntityRoute? route = await db.Routes.FirstOrDefault(r => r.Id == routeId);
         if (route is not null)
         {
             route.HangfireJobChainId = nextJobId;

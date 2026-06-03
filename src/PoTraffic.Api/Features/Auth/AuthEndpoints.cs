@@ -1,9 +1,13 @@
 using MediatR;
+using PoTraffic.Api.Infrastructure.Storage;
+
 using Microsoft.AspNetCore.Http;
+
 using Microsoft.AspNetCore.Mvc;
+
 using Microsoft.AspNetCore.Routing;
-using Microsoft.EntityFrameworkCore;
-using PoTraffic.Api.Infrastructure.Data;
+
+
 
 using PoTraffic.Shared.DTOs.Auth;
 
@@ -69,9 +73,9 @@ public static class AuthEndpoints
         return result.IsSuccess ? Results.Ok(result.Response) : Results.Unauthorized();
     }
 
-    private static async Task<IResult> ConfirmEmail([FromQuery] string token, PoTrafficDbContext db)
+    private static async Task<IResult> ConfirmEmail([FromQuery] string token, TableStorageContext db)
     {
-        User? user = await db.Set<User>().FirstOrDefaultAsync(u => u.EmailVerificationToken == token);
+        User? user = db.Users.FirstOrDefault(u => u.EmailVerificationToken == token);
         if (user is null) return Results.NotFound();
         user.IsEmailVerified = true;
         user.EmailVerificationToken = null;

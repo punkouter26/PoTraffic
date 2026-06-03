@@ -1,6 +1,7 @@
 using MediatR;
-using Microsoft.EntityFrameworkCore;
-using PoTraffic.Api.Infrastructure.Data;
+using PoTraffic.Api.Infrastructure.Storage;
+
+
 using PoTraffic.Shared.DTOs.Routes;
 
 namespace PoTraffic.Api.Features.MonitoringWindows;
@@ -8,14 +9,14 @@ namespace PoTraffic.Api.Features.MonitoringWindows;
 /// <summary>Efficient direct query for a route's windows — avoids loading all user routes.</summary>
 public sealed record GetWindowsQuery(Guid RouteId, Guid UserId) : IRequest<IReadOnlyList<MonitoringWindowDto>?>;
 
-public sealed class GetWindowsQueryHandler(PoTrafficDbContext db)
+public sealed class GetWindowsQueryHandler(TableStorageContext db)
     : IRequestHandler<GetWindowsQuery, IReadOnlyList<MonitoringWindowDto>?>
 {
     public async Task<IReadOnlyList<MonitoringWindowDto>?> Handle(GetWindowsQuery q, CancellationToken ct)
     {
         // Verify route ownership before returning windows
         bool routeExists = await db.Routes
-            .AnyAsync(r => r.Id == q.RouteId && r.UserId == q.UserId, ct);
+            .Any(r => r.Id == q.RouteId && r.UserId == q.UserId);
 
         if (!routeExists) return null;
 
@@ -28,7 +29,7 @@ public sealed class GetWindowsQueryHandler(PoTrafficDbContext db)
                 w.EndTime.ToString("HH:mm"),
                 DecodeDaysOfWeek(w.DaysOfWeekMask),
                 w.IsActive))
-            .ToListAsync(ct);
+            .ToList();
     }
 
     private static IReadOnlyList<string> DecodeDaysOfWeek(byte mask)

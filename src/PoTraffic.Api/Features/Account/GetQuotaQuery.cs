@@ -1,6 +1,7 @@
 using MediatR;
-using Microsoft.EntityFrameworkCore;
-using PoTraffic.Api.Infrastructure.Data;
+using PoTraffic.Api.Infrastructure.Storage;
+
+
 using PoTraffic.Shared.DTOs.Account;
 
 namespace PoTraffic.Api.Features.Account;
@@ -9,21 +10,21 @@ public sealed record GetQuotaQuery(Guid UserId) : IRequest<QuotaDto?>;
 
 public sealed class GetQuotaHandler : IRequestHandler<GetQuotaQuery, QuotaDto?>
 {
-    private readonly PoTrafficDbContext _db;
+    private readonly TableStorageContext _db;
 
-    public GetQuotaHandler(PoTrafficDbContext db) => _db = db;
+    public GetQuotaHandler(TableStorageContext db) => _db = db;
 
     public async Task<QuotaDto?> Handle(GetQuotaQuery query, CancellationToken ct)
     {
         // Check user exists
-        bool userExists = await _db.Users.AnyAsync(u => u.Id == query.UserId, ct);
+        bool userExists = _db.Users.Any(u => u.Id == query.UserId);
         if (!userExists) return null;
 
         // Load daily quota limit from SystemConfiguration
-        string? limitValue = await _db.SystemConfigurations
+        string? limitValue = _db.SystemConfigurations
             .Where(c => c.Key == "quota.daily.default")
             .Select(c => c.Value)
-            .FirstOrDefaultAsync(ct);
+            .FirstOrDefault();
 
         int dailyLimit = int.TryParse(limitValue, out int lim) ? lim : 10;
 
@@ -31,11 +32,11 @@ public sealed class GetQuotaHandler : IRequestHandler<GetQuotaQuery, QuotaDto?>
         DateTimeOffset dayStart = DateTimeOffset.UtcNow.Date;
         DateTimeOffset dayEnd = dayStart.AddDays(1);
 
-        int usedToday = await _db.MonitoringSessions
-            .CountAsync(s =>
+        int usedToday = _db.MonitoringSessions
+            .Count(s =>
                 s.Route.UserId == query.UserId &&
                 s.SessionDate >= DateOnly.FromDateTime(dayStart.UtcDateTime) &&
-                s.SessionDate <= DateOnly.FromDateTime(dayEnd.UtcDateTime), ct);
+                s.SessionDate <= DateOnly.FromDateTime(dayEnd.UtcDateTime));
 
         int remaining = Math.Max(0, dailyLimit - usedToday);
 

@@ -1,10 +1,16 @@
 using System.Text;
+using PoTraffic.Api.Infrastructure.Storage;
+
 using System.Security.Claims;
+
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+
 using Microsoft.AspNetCore.DataProtection;
+
 using Microsoft.IdentityModel.Tokens;
+
 using PoTraffic.Api.Features.Auth;
-using PoTraffic.Api.Infrastructure.Data;
+
 
 namespace PoTraffic.Api.Infrastructure.Security;
 
@@ -58,12 +64,17 @@ internal static class SecurityExtensions
         });
 
         services.AddSingleton<JwtTokenService>();
-        // Persist Data Protection keys to SQL so they survive app restarts and deployments.
-        // Without persistence, the encrypted OAuth state (nonce) cannot be decrypted after
-        // a restart, causing INVALID_STATE errors on the external login callback.
+        // Persist Data Protection keys to the local file system. Post-refactor: the
+        // in-process Table Storage backend isn't durable across restarts, so file-system
+        // persistence is the simplest option. For multi-instance deployments a Table
+        // Storage key ring would be the follow-up.
         services.AddDataProtection()
             .SetApplicationName("PoTraffic")
-            .PersistKeysToDbContext<PoTrafficDbContext>();
+            .PersistKeysToFileSystem(
+                new System.IO.DirectoryInfo(
+                    System.IO.Path.Combine(
+                        System.IO.Directory.GetCurrentDirectory(),
+                        "keys")));
         services.AddHttpClient();
         services.AddScoped<IExternalIdentityProvider, GoogleExternalIdentityProvider>();
         services.AddScoped<IExternalIdentityProvider, MicrosoftExternalIdentityProvider>();

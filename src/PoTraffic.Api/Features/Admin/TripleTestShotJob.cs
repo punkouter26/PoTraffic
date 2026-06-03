@@ -1,9 +1,12 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using PoTraffic.Api.Infrastructure.Storage;
+
 using Microsoft.Extensions.Logging;
-using PoTraffic.Api.Infrastructure.Data;
+
+
 
 using PoTraffic.Api.Infrastructure.Providers;
+
 using PoTraffic.Shared.Enums;
 
 namespace PoTraffic.Api.Features.Admin;
@@ -31,11 +34,9 @@ public sealed class TripleTestShotJob
             "TripleTestShotJob executing session {SessionId} shot {ShotIndex}", sessionId, shotIndex);
 
         using IServiceScope scope = _scopeFactory.CreateScope();
-        PoTrafficDbContext db = scope.ServiceProvider.GetRequiredService<PoTrafficDbContext>();
+        TableStorageContext db = scope.ServiceProvider.GetRequiredService<TableStorageContext>();
 
-        TripleTestSession? session = await db.TripleTestSessions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(s => s.Id == sessionId);
+        TripleTestSession? session = db.TripleTestSessions.FirstOrDefault(s => s.Id == sessionId);
 
         if (session is null)
         {
@@ -50,8 +51,8 @@ public sealed class TripleTestShotJob
         ITrafficProvider trafficProvider = scope.ServiceProvider
             .GetRequiredKeyedService<ITrafficProvider>(provider);
 
-        TripleTestShot? shot = await db.TripleTestShots
-            .FirstOrDefaultAsync(s => s.SessionId == sessionId && s.ShotIndex == shotIndex);
+        TripleTestShot? shot = db.TripleTestShots
+            .FirstOrDefault(s => s.SessionId == sessionId && s.ShotIndex == shotIndex);
 
         if (shot is null)
         {

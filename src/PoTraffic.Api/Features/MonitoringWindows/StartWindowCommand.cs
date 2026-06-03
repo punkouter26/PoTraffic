@@ -1,12 +1,17 @@
 using Hangfire;
+using PoTraffic.Api.Infrastructure.Storage;
+
 using MediatR;
-using Microsoft.Data.SqlClient;
-using Microsoft.EntityFrameworkCore;
+
+
 using Microsoft.Extensions.Logging;
-using PoTraffic.Api.Infrastructure.Data;
+
+
 
 using PoTraffic.Api.Features.Routes;
+
 using PoTraffic.Shared.Constants;
+
 using PoTraffic.Shared.Enums;
 
 namespace PoTraffic.Api.Features.MonitoringWindows;
@@ -23,12 +28,12 @@ public sealed record StartWindowResult(
 
 public sealed class StartWindowCommandHandler : IRequestHandler<StartWindowCommand, StartWindowResult>
 {
-    private readonly PoTrafficDbContext _db;
+    private readonly TableStorageContext _db;
     private readonly IBackgroundJobClient _jobClient;
     private readonly ILogger<StartWindowCommandHandler> _logger;
 
     public StartWindowCommandHandler(
-        PoTrafficDbContext db,
+        TableStorageContext db,
         IBackgroundJobClient jobClient,
         ILogger<StartWindowCommandHandler> logger)
     {
@@ -40,11 +45,10 @@ public sealed class StartWindowCommandHandler : IRequestHandler<StartWindowComma
     public async Task<StartWindowResult> Handle(StartWindowCommand cmd, CancellationToken ct)
     {
         // 1. Load window + route, verify ownership
-        MonitoringWindow? window = await _db.MonitoringWindows
-            .Include(w => w.Route)
-            .FirstOrDefaultAsync(w => w.Id == cmd.WindowId
+        MonitoringWindow? window = _db.MonitoringWindows
+            .FirstOrDefault(w => w.Id == cmd.WindowId
                 && w.Route.UserId == cmd.UserId
-                && w.Route.MonitoringStatus != (int)MonitoringStatus.Deleted, ct);
+                && w.Route.MonitoringStatus != (int)MonitoringStatus.Deleted);
 
         if (window is null)
             return new StartWindowResult(false, "NOT_FOUND", 0, null);
@@ -52,22 +56,22 @@ public sealed class StartWindowCommandHandler : IRequestHandler<StartWindowComma
         DateOnly today = DateOnly.FromDateTime(DateTimeOffset.UtcNow.Date);
 
         // 2. Idempotent guard — return existing session if one already exists for this route today
-        MonitoringSession? existingSession = await _db.MonitoringSessions
-            .FirstOrDefaultAsync(s => s.RouteId == window.Route.Id && s.SessionDate == today, ct);
+        MonitoringSession? existingSession = _db.MonitoringSessions
+            .FirstOrDefault(s => s.RouteId == window.Route.Id && s.SessionDate == today);
 
         if (existingSession is not null)
         {
             _logger.LogInformation(
                 "Start called for window {WindowId} but session {SessionId} already exists for today — idempotent return",
                 cmd.WindowId, existingSession.Id);
-            int quotaUsed = await _db.MonitoringSessions
-                .CountAsync(s => s.Route.UserId == cmd.UserId && s.SessionDate == today, ct);
+            int quotaUsed = _db.MonitoringSessions
+                .Count(s => s.Route.UserId == cmd.UserId && s.SessionDate == today);
             return new StartWindowResult(true, null, Math.Max(0, QuotaConstants.DefaultDailyQuota - quotaUsed), existingSession.Id);
         }
 
         // 3. Count today's sessions for this user across all their routes
-        int todaySessionCount = await _db.MonitoringSessions
-            .CountAsync(s => s.Route.UserId == cmd.UserId && s.SessionDate == today, ct);
+        int todaySessionCount = _db.MonitoringSessions
+            .Count(s => s.Route.UserId == cmd.UserId && s.SessionDate == today);
 
         if (todaySessionCount >= QuotaConstants.DefaultDailyQuota)
         {
@@ -86,7 +90,7 @@ public sealed class StartWindowCommandHandler : IRequestHandler<StartWindowComma
             PollCount = 0
         };
 
-        _db.MonitoringSessions.Add(session);
+        _db.Add(session);
 
         // 5. Persist session FIRST — the unique index IX_MonitoringSessions_RouteId_SessionDate
         //    acts as a database-level guard against concurrent quota-race inserts.
@@ -102,12 +106,12 @@ public sealed class StartWindowCommandHandler : IRequestHandler<StartWindowComma
             _logger.LogInformation(
                 "Concurrent StartWindow for route {RouteId} on {Date} — session already created by peer request",
                 window.Route.Id, today);
-            MonitoringSession? concurrent = await _db.MonitoringSessions
-                .FirstOrDefaultAsync(s => s.RouteId == window.Route.Id && s.SessionDate == today, ct);
+            MonitoringSession? concurrent = _db.MonitoringSessions
+                .FirstOrDefault(s => s.RouteId == window.Route.Id && s.SessionDate == today);
             if (concurrent is not null)
             {
-                int usedByNow = await _db.MonitoringSessions
-                    .CountAsync(s => s.Route.UserId == cmd.UserId && s.SessionDate == today, ct);
+                int usedByNow = _db.MonitoringSessions
+                    .Count(s => s.Route.UserId == cmd.UserId && s.SessionDate == today);
                 return new StartWindowResult(true, null, Math.Max(0, QuotaConstants.DefaultDailyQuota - usedByNow), concurrent.Id);
             }
             throw;

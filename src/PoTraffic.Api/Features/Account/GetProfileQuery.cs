@@ -1,6 +1,7 @@
 using MediatR;
-using Microsoft.EntityFrameworkCore;
-using PoTraffic.Api.Infrastructure.Data;
+using PoTraffic.Api.Infrastructure.Storage;
+
+
 using PoTraffic.Shared.DTOs.Account;
 
 namespace PoTraffic.Api.Features.Account;
@@ -9,15 +10,15 @@ public sealed record GetProfileQuery(Guid UserId) : IRequest<ProfileDto?>;
 
 public sealed class GetProfileHandler : IRequestHandler<GetProfileQuery, ProfileDto?>
 {
-    private readonly PoTrafficDbContext _db;
+    private readonly TableStorageContext _db;
 
-    public GetProfileHandler(PoTrafficDbContext db) => _db = db;
+    public GetProfileHandler(TableStorageContext db) => _db = db;
 
     public async Task<ProfileDto?> Handle(GetProfileQuery query, CancellationToken ct)
     {
-        User? user = await _db.Users
-            .AsNoTracking()
-            .FirstOrDefaultAsync(u => u.Id == query.UserId, ct);
+        User? user = _db.Users
+            
+            .FirstOrDefault(u => u.Id == query.UserId);
 
         if (user is null) return null;
 

@@ -154,16 +154,21 @@ public sealed class CheckNowScenarios : PlaywrightTestBase
     [SkipUnlessE2EReady]
     public async Task CheckNow_WhenProviderResponds_NotificationShowsDurationAndDistance()
     {
-        // Skip in stub-provider environments
+        // Skip in stub-provider environments — the test asserts a *numeric* duration/distance
+        // which a stub provider cannot produce. Use xUnit's Assert.Skip so the outcome is
+        // recorded as Skipped (not Passed) and shows up correctly in coverage reports.
         bool realProvider = string.Equals(
             Environment.GetEnvironmentVariable("E2E_REAL_PROVIDER"), "true",
             StringComparison.OrdinalIgnoreCase);
 
         if (!realProvider)
         {
-            // Use xUnit's dynamic skip pattern (throw SkipException via Assert.Skip in .NET 8+,
-            // or return early with a recorded skip reason)
-            return;
+            // xUnit v2 (this project) — throw SkippableException so the test
+            // is reported as Skipped in the TRX, not Passed. This avoids the
+            // "false-green" anti-pattern that inflates coverage counts.
+            throw new Helpers.SkippableException(
+                "E2E_REAL_PROVIDER is not set to 'true' — stub providers return fixed/null travel times, " +
+                "so this assertion (numeric duration + distance) cannot run.");
         }
 
         // ── Arrange ──────────────────────────────────────────────────────────────

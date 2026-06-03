@@ -1,7 +1,9 @@
 using MediatR;
-using Microsoft.EntityFrameworkCore;
-using PoTraffic.Api.Infrastructure.Data;
+using PoTraffic.Api.Infrastructure.Storage;
+
+
 using PoTraffic.Shared.DTOs.Routes;
+
 using PoTraffic.Shared.Enums;
 
 namespace PoTraffic.Api.Features.Routes;
@@ -12,18 +14,17 @@ namespace PoTraffic.Api.Features.Routes;
 /// </summary>
 public sealed record GetRouteByIdQuery(Guid RouteId, Guid UserId) : IRequest<RouteDto?>;
 
-public sealed class GetRouteByIdQueryHandler(PoTrafficDbContext db)
+public sealed class GetRouteByIdQueryHandler(TableStorageContext db)
     : IRequestHandler<GetRouteByIdQuery, RouteDto?>
 {
     public async Task<RouteDto?> Handle(GetRouteByIdQuery q, CancellationToken ct)
     {
         EntityRoute? route = await db.Routes
-            .Include(r => r.Windows)
-            .AsNoTracking()
-            .FirstOrDefaultAsync(r =>
+            
+            .FirstOrDefault(r =>
                 r.Id == q.RouteId
                 && r.UserId == q.UserId
-                && r.MonitoringStatus != (int)MonitoringStatus.Deleted, ct);
+                && r.MonitoringStatus != (int)MonitoringStatus.Deleted);
 
         return route is null ? null : CreateRouteCommandHandler.MapToDto(route);
     }

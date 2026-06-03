@@ -26,7 +26,7 @@ public static class HistoryEndpoints
             [FromQuery] int pageSize = 50,
             [FromQuery] DateTime? sinceUtc = null) =>
         {
-            Guid userId = ctx.User.GetUserId();
+            Guid userId = _db.Users.GetUserId();
             var result = await sender.Send(
                 new GetPollHistoryQuery(routeId, userId, page, pageSize, sinceUtc));
             return Results.Ok(result);
@@ -39,7 +39,7 @@ public static class HistoryEndpoints
             HttpContext ctx,
             [FromQuery] string dayOfWeek = "Monday") =>
         {
-            Guid userId = ctx.User.GetUserId();
+            Guid userId = _db.Users.GetUserId();
             var result = await sender.Send(new GetBaselineQuery(routeId, userId, dayOfWeek));
             return Results.Ok(result);
         });
@@ -50,7 +50,7 @@ public static class HistoryEndpoints
             ISender sender,
             HttpContext ctx) =>
         {
-            Guid userId = ctx.User.GetUserId();
+            Guid userId = _db.Users.GetUserId();
             var result = await sender.Send(new GetSessionsQuery(routeId, userId));
             return Results.Ok(result);
         });
@@ -62,7 +62,7 @@ public static class HistoryEndpoints
             HttpContext ctx,
             [FromQuery] string dayOfWeek = "Monday") =>
         {
-            Guid userId = ctx.User.GetUserId();
+            Guid userId = _db.Users.GetUserId();
             var result = await sender.Send(new GetOptimalDepartureQuery(routeId, userId, dayOfWeek));
             return result is null ? Results.NoContent() : Results.Ok(result);
         });

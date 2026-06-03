@@ -1,7 +1,9 @@
 using MediatR;
-using Microsoft.EntityFrameworkCore;
-using PoTraffic.Api.Infrastructure.Data;
+using PoTraffic.Api.Infrastructure.Storage;
+
+
 using PoTraffic.Shared.DTOs.History;
+
 using PoTraffic.Shared.DTOs.Routes;
 
 namespace PoTraffic.Api.Features.History;
@@ -16,9 +18,9 @@ public sealed record GetPollHistoryQuery(
 public sealed class GetPollHistoryQueryHandler
     : IRequestHandler<GetPollHistoryQuery, PagedResult<PollRecordDto>>
 {
-    private readonly PoTrafficDbContext _db;
+    private readonly TableStorageContext _db;
 
-    public GetPollHistoryQueryHandler(PoTrafficDbContext db)
+    public GetPollHistoryQueryHandler(TableStorageContext db)
     {
         _db = db;
     }
@@ -36,9 +38,9 @@ public sealed class GetPollHistoryQueryHandler
                 && (query.SinceUtc == null || p.PolledAt >= query.SinceUtc))
             .OrderByDescending(p => p.PolledAt);
 
-        int total = await baseQuery.CountAsync(ct);
+        int total = baseQuery.Count();
 
-        List<PollRecordDto> items = await baseQuery
+        List<PollRecordDto> items = baseQuery
             .Skip(skip)
             .Take(query.PageSize)
             .Select(p => new PollRecordDto(
@@ -49,7 +51,7 @@ public sealed class GetPollHistoryQueryHandler
                 p.DistanceMetres,
                 (PoTraffic.Shared.Enums.RouteProvider)p.Route.Provider,
                 p.IsRerouted))
-            .ToListAsync(ct);
+            .ToList();
 
         return new PagedResult<PollRecordDto>(query.Page, query.PageSize, total, items);
     }

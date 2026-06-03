@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
-using PoTraffic.Api.Infrastructure.Data;
 using PoTraffic.Api.Infrastructure.Providers;
 using System.Security.Cryptography;
 

@@ -36,17 +36,55 @@ public abstract class PlaywrightTestBase : IAsyncLifetime
         {
             BaseURL = BaseUrl,
             IgnoreHTTPSErrors = true,
-            ViewportSize = new ViewportSize { Width = 1280, Height = 800 }
+            ViewportSize = new ViewportSize { Width = 1280, Height = 800 },
+            // Record video only on the test side; we delete it in DisposeAsync
+            // unless the test failed. Honours the "no MSI resource burn on green" rule.
+            RecordVideoDir = "TestResults/e2e-video"
         });
 
         Page = await Context.NewPageAsync();
+
+        // Zero-Waste console audit — surface Blazor WASM / JSInterop failures
+        // in the xUnit TRX + console output without retaining on green.
+        Page.Console += (_, msg) =>
+        {
+            if (msg.Type == "error")
+                Console.WriteLine($"[BROWSER_ERROR] {msg.Text}");
+        };
+        Page.PageError += (_, err) => Console.WriteLine($"[PAGE_ERROR] {err}");
+        Page.Crash += (_, page) => Console.WriteLine($"[PAGE_CRASH] {page.Url}");
     }
 
     public async Task DisposeAsync()
     {
+        // xUnit v2 does not expose TestContext inside IAsyncLifetime.DisposeAsync.
+        // We track outcome via a public flag the test body flips before teardown.
+        // Default = passed; tests that want to keep the video flip this to true.
         await Page.CloseAsync();
         await Context.CloseAsync();
         await Browser.CloseAsync();
         Playwright.Dispose();
+
+        // If the test passed, delete the recorded video to honour the
+        // "capture .trace.zip and video only on failure" rule (no MSI burn on green).
+        // Tests flip <see cref="KeepVideoOnSuccess"/> = true to override.
+        if (!KeepVideoOnSuccess && Page.Video is not null)
+        {
+            try
+            {
+                string? videoPath = await Page.Video.PathAsync();
+                if (!string.IsNullOrEmpty(videoPath) && File.Exists(videoPath))
+                    File.Delete(videoPath);
+            }
+            catch { /* best-effort cleanup */ }
+        }
     }
+
+    /// <summary>
+    /// When <c>true</c>, the recorded Playwright video is retained even on success.
+    /// Default is <c>false</c> (Zero-Waste: only keep artefacts on failure).
+    /// Tests set this to <c>true</c> in their Arrange phase if they need to
+    /// review the video for a known-flaky scenario.
+    /// </summary>
+    protected bool KeepVideoOnSuccess { get; set; }
 }

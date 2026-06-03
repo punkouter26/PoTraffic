@@ -1,10 +1,15 @@
 using System.IdentityModel.Tokens.Jwt;
+using PoTraffic.Api.Infrastructure.Storage;
+
 using System.Security.Claims;
+
 using System.Text;
+
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+
 using Microsoft.IdentityModel.Tokens;
-using PoTraffic.Api.Infrastructure.Data;
+
+
 
 using PoTraffic.Api.Infrastructure.Security;
 
@@ -101,17 +106,17 @@ public static class TestingEndpoints
     /// Returns the credentials so tests don't hard-code them.
     /// </summary>
     private static async Task<IResult> SeedAdmin(
-        PoTrafficDbContext db,
+        TableStorageContext db,
         ILogger<LogCategory> logger,
         CancellationToken ct)
     {
         const string adminEmail = "admin@potraffic.dev";
         const string adminPassword = "Admin123!";
 
-        bool exists = await db.Set<User>().AnyAsync(u => u.Email == adminEmail, ct);
+        bool exists = db.Users.Any(u => u.Email == adminEmail);
         if (!exists)
         {
-            db.Set<User>().Add(new User
+            db.Add(new User
             {
                 Id = Guid.NewGuid(),
                 Email = adminEmail,
@@ -136,21 +141,21 @@ public static class TestingEndpoints
     /// </summary>
     private static async Task<IResult> SeedRoute(
         [FromBody] SeedRouteRequest request,
-        PoTrafficDbContext db,
+        TableStorageContext db,
         ILogger<LogCategory> logger,
         CancellationToken ct)
     {
-        User? user = await db.Set<User>().FirstOrDefaultAsync(u => u.Email == request.UserEmail, ct);
+        User? user = db.Users.FirstOrDefault(u => u.Email == request.UserEmail);
         if (user is null)
             return Results.NotFound(new { error = $"User '{request.UserEmail}' not found." });
 
         // T105: Idempotent - return existing route if user already has it to avoid 409/duplicate errors
-        EntityRoute? existing = await db.Set<EntityRoute>().FirstOrDefaultAsync(r =>
+        EntityRoute? existing = db.Routes.FirstOrDefault(r =>
             r.UserId == user.Id &&
             r.OriginAddress == request.OriginAddress &&
             r.DestinationAddress == request.DestinationAddress &&
             r.Provider == request.Provider &&
-            r.MonitoringStatus != 2, ct);
+            r.MonitoringStatus != 2);
 
         if (existing != null)
         {
@@ -171,7 +176,7 @@ public static class TestingEndpoints
             CreatedAt = DateTimeOffset.UtcNow
         };
 
-        db.Set<EntityRoute>().Add(route);
+        db.Add(route);
         await db.SaveChangesAsync(ct);
 
         logger.LogInformation("[E2E] Seeded route {RouteId} for user {Email}.", route.Id, user.Email);

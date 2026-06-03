@@ -1,8 +1,10 @@
 using MediatR;
-using Microsoft.EntityFrameworkCore;
-using PoTraffic.Api.Infrastructure.Data;
+using PoTraffic.Api.Infrastructure.Storage;
+
+
 
 using PoTraffic.Shared.DTOs.Admin;
+
 using PoTraffic.Shared.Enums;
 
 namespace PoTraffic.Api.Features.Admin;
@@ -11,15 +13,14 @@ public sealed record GetTripleTestSessionQuery(Guid SessionId) : IRequest<Triple
 
 public sealed class GetTripleTestSessionQueryHandler : IRequestHandler<GetTripleTestSessionQuery, TripleTestSessionDto?>
 {
-    private readonly PoTrafficDbContext _db;
+    private readonly TableStorageContext _db;
 
-    public GetTripleTestSessionQueryHandler(PoTrafficDbContext db) => _db = db;
+    public GetTripleTestSessionQueryHandler(TableStorageContext db) => _db = db;
 
     public async Task<TripleTestSessionDto?> Handle(GetTripleTestSessionQuery query, CancellationToken ct)
     {
-        TripleTestSession? session = await _db.TripleTestSessions
-            .Include(s => s.Shots.OrderBy(sh => sh.ShotIndex))
-            .FirstOrDefaultAsync(s => s.Id == query.SessionId, ct);
+        TripleTestSession? session = _db.TripleTestSessions
+            .FirstOrDefault(s => s.Id == query.SessionId);
 
         if (session is null)
             return null;

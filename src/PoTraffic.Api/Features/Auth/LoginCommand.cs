@@ -1,10 +1,14 @@
 using FluentValidation;
+using PoTraffic.Api.Infrastructure.Storage;
+
 using MediatR;
-using Microsoft.EntityFrameworkCore;
+
 using Microsoft.Extensions.Logging;
-using PoTraffic.Api.Infrastructure.Data;
+
+
 
 using PoTraffic.Api.Infrastructure.Security;
+
 using PoTraffic.Shared.DTOs.Auth;
 
 namespace PoTraffic.Api.Features.Auth;
@@ -29,12 +33,12 @@ public sealed class LoginCommandValidator : AbstractValidator<LoginCommand>
 
 public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, LoginResult>
 {
-    private readonly PoTrafficDbContext _db;
+    private readonly TableStorageContext _db;
     private readonly JwtTokenService _jwt;
     private readonly ILogger<LoginCommandHandler> _logger;
 
     public LoginCommandHandler(
-        PoTrafficDbContext db,
+        TableStorageContext db,
         JwtTokenService jwt,
         ILogger<LoginCommandHandler> logger)
     {
@@ -45,8 +49,8 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, LoginRes
 
     public async Task<LoginResult> Handle(LoginCommand command, CancellationToken ct)
     {
-        User? user = await _db.Set<User>()
-            .FirstOrDefaultAsync(u => u.Email == command.Email, ct);
+        User? user = _db.Users
+            .FirstOrDefault(u => u.Email == command.Email);
 
         if (user is null || !BCrypt.Net.BCrypt.Verify(command.Password, user.PasswordHash))
             return new LoginResult(false, null, "INVALID_CREDENTIALS");

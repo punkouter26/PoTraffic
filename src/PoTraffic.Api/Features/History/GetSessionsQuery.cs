@@ -1,7 +1,9 @@
 using MediatR;
-using Microsoft.EntityFrameworkCore;
-using PoTraffic.Api.Infrastructure.Data;
+using PoTraffic.Api.Infrastructure.Storage;
+
+
 using PoTraffic.Shared.DTOs.History;
+
 using PoTraffic.Shared.Enums;
 
 namespace PoTraffic.Api.Features.History;
@@ -13,9 +15,9 @@ public sealed record GetSessionsQuery(
 public sealed class GetSessionsQueryHandler
     : IRequestHandler<GetSessionsQuery, IReadOnlyList<SessionDto>>
 {
-    private readonly PoTrafficDbContext _db;
+    private readonly TableStorageContext _db;
 
-    public GetSessionsQueryHandler(PoTrafficDbContext db)
+    public GetSessionsQueryHandler(TableStorageContext db)
     {
         _db = db;
     }
@@ -24,7 +26,7 @@ public sealed class GetSessionsQueryHandler
         GetSessionsQuery query,
         CancellationToken ct)
     {
-        return await _db.MonitoringSessions
+        return _db.MonitoringSessions
             .Where(s => s.RouteId == query.RouteId && s.Route.UserId == query.UserId)
             .OrderByDescending(s => s.SessionDate)
             .Select(s => new SessionDto(
@@ -37,6 +39,6 @@ public sealed class GetSessionsQueryHandler
                 s.PollCount,
                 s.QuotaConsumed,
                 s.IsHolidayExcluded))
-            .ToListAsync(ct);
+            .ToList();
     }
 }

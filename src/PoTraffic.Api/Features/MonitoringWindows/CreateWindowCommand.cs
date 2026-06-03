@@ -1,8 +1,11 @@
 using FluentValidation;
+using PoTraffic.Api.Infrastructure.Storage;
+
 using MediatR;
-using Microsoft.EntityFrameworkCore;
+
 using Microsoft.Extensions.Logging;
-using PoTraffic.Api.Infrastructure.Data;
+
+
 
 using PoTraffic.Shared.Enums;
 
@@ -35,11 +38,11 @@ public sealed class CreateWindowValidator : AbstractValidator<CreateWindowComman
 
 public sealed class CreateWindowCommandHandler : IRequestHandler<CreateWindowCommand, CreateWindowResult>
 {
-    private readonly PoTrafficDbContext _db;
+    private readonly TableStorageContext _db;
     private readonly ILogger<CreateWindowCommandHandler> _logger;
 
     public CreateWindowCommandHandler(
-        PoTrafficDbContext db,
+        TableStorageContext db,
         ILogger<CreateWindowCommandHandler> logger)
     {
         _db = db;
@@ -49,17 +52,17 @@ public sealed class CreateWindowCommandHandler : IRequestHandler<CreateWindowCom
     public async Task<CreateWindowResult> Handle(CreateWindowCommand cmd, CancellationToken ct)
     {
         // Verify route ownership
-        bool routeExists = await _db.Routes.AnyAsync(
+        bool routeExists = _db.Routes.Any(
             r => r.Id == cmd.RouteId
                 && r.UserId == cmd.UserId
-                && r.MonitoringStatus != (int)MonitoringStatus.Deleted, ct);
+                && r.MonitoringStatus != (int)MonitoringStatus.Deleted);
 
         if (!routeExists)
             return new CreateWindowResult(false, "NOT_FOUND", null);
 
         // Only one active window per route is supported
-        bool activeWindowExists = await _db.MonitoringWindows
-            .AnyAsync(w => w.RouteId == cmd.RouteId && w.IsActive, ct);
+        bool activeWindowExists = _db.MonitoringWindows
+            .Any(w => w.RouteId == cmd.RouteId && w.IsActive);
 
         if (activeWindowExists)
             return new CreateWindowResult(false, "WINDOW_ALREADY_ACTIVE", null);
@@ -74,7 +77,7 @@ public sealed class CreateWindowCommandHandler : IRequestHandler<CreateWindowCom
             CreatedAt = DateTimeOffset.UtcNow
         };
 
-        _db.MonitoringWindows.Add(window);
+        _db.Add(window);
         await _db.SaveChangesAsync(ct);
 
         _logger.LogInformation("MonitoringWindow {WindowId} created for route {RouteId}", window.Id, cmd.RouteId);

@@ -1,6 +1,6 @@
 using MediatR;
-using Microsoft.EntityFrameworkCore;
-using PoTraffic.Api.Infrastructure.Data;
+using PoTraffic.Api.Infrastructure.Storage;
+
 
 
 namespace PoTraffic.Api.Features.Admin;
@@ -14,7 +14,7 @@ public sealed record SeedDatabaseCommand(int RouteCount = 3, int DaysOfHistory =
 public sealed record SeedDatabaseResult(int UsersCreated, int RoutesCreated, int PollsCreated);
 
 public sealed class SeedDatabaseHandler(
-    PoTrafficDbContext db,
+    TableStorageContext db,
     ILogger<SeedDatabaseHandler> logger)
     : IRequestHandler<SeedDatabaseCommand, SeedDatabaseResult>
 {
@@ -33,7 +33,7 @@ public sealed class SeedDatabaseHandler(
 
         foreach (var u in sampleUsers)
         {
-            User? user = await db.Users.FirstOrDefaultAsync(x => x.Email == u.Email, ct);
+            User? user = await db.Users.FirstOrDefault(x => x.Email == u.Email);
             if (user == null)
             {
                 user = new User
@@ -51,7 +51,7 @@ public sealed class SeedDatabaseHandler(
             }
 
             // 2. Add sample routes for this user if they don't have any
-            bool hasRoutes = await db.Routes.AnyAsync(r => r.UserId == user.Id, ct);
+            bool hasRoutes = await db.Routes.Any(r => r.UserId == user.Id);
             if (!hasRoutes)
             {
                 var routes = new[]

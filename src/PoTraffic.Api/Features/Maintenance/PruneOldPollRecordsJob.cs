@@ -1,7 +1,8 @@
 using MediatR;
-using Microsoft.EntityFrameworkCore;
+using PoTraffic.Api.Infrastructure.Storage;
+
 using Microsoft.Extensions.Logging;
-using PoTraffic.Api.Infrastructure.Data;
+
 
 
 namespace PoTraffic.Api.Features.Maintenance;
@@ -12,11 +13,11 @@ public sealed record PruneOldPollRecordsCommand : IRequest<int>;
 public sealed class PruneOldPollRecordsCommandHandler
     : IRequestHandler<PruneOldPollRecordsCommand, int>
 {
-    private readonly PoTrafficDbContext _db;
+    private readonly TableStorageContext _db;
     private readonly ILogger<PruneOldPollRecordsCommandHandler> _logger;
 
     public PruneOldPollRecordsCommandHandler(
-        PoTrafficDbContext db,
+        TableStorageContext db,
         ILogger<PruneOldPollRecordsCommandHandler> logger)
     {
         _db = db;
@@ -28,10 +29,10 @@ public sealed class PruneOldPollRecordsCommandHandler
         DateTime cutoff = DateTime.UtcNow.AddDays(-90);
 
         // IgnoreQueryFilters to bypass global soft-delete filter (FR-020)
-        List<PollRecord> oldRecords = await _db.Set<PollRecord>()
+        List<PollRecord> oldRecords = await _db.PollRecord
             .IgnoreQueryFilters()
             .Where(p => !p.IsDeleted && p.PolledAt < cutoff)
-            .ToListAsync(ct);
+            .ToList();
 
         if (oldRecords.Count == 0)
             return 0;

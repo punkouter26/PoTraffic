@@ -1,11 +1,16 @@
 using MediatR;
-using Microsoft.EntityFrameworkCore;
+using PoTraffic.Api.Infrastructure.Storage;
+
 using Microsoft.Extensions.DependencyInjection;
+
 using Microsoft.Extensions.Logging;
-using PoTraffic.Api.Infrastructure.Data;
+
+
 
 using PoTraffic.Api.Infrastructure.Providers;
+
 using PoTraffic.Shared.Constants;
+
 using PoTraffic.Shared.Enums;
 
 namespace PoTraffic.Api.Features.Routes;
@@ -13,7 +18,7 @@ namespace PoTraffic.Api.Features.Routes;
 public sealed record ExecutePollCommand(Guid RouteId) : IRequest<bool>;
 
 public sealed class ExecutePollCommandHandler(
-    PoTrafficDbContext db,
+    TableStorageContext db,
     ITrafficProviderFactory providerFactory,
     ILogger<ExecutePollCommandHandler> logger) : IRequestHandler<ExecutePollCommand, bool>
 {
@@ -21,9 +26,9 @@ public sealed class ExecutePollCommandHandler(
     {
         // 1. Load Route + active MonitoringSession for today
         EntityRoute? route = await db.Routes
-            .AsNoTracking()
-            .FirstOrDefaultAsync(r => r.Id == cmd.RouteId
-                && r.MonitoringStatus != (int)MonitoringStatus.Deleted, ct);
+            
+            .FirstOrDefault(r => r.Id == cmd.RouteId
+                && r.MonitoringStatus != (int)MonitoringStatus.Deleted);
 
         if (route is null)
         {
@@ -34,9 +39,9 @@ public sealed class ExecutePollCommandHandler(
         DateOnly today = DateOnly.FromDateTime(DateTimeOffset.UtcNow.Date);
 
         MonitoringSession? session = await db.MonitoringSessions
-            .FirstOrDefaultAsync(s => s.RouteId == cmd.RouteId
+            .FirstOrDefault(s => s.RouteId == cmd.RouteId
                 && s.SessionDate == today
-                && s.State == (int)SessionState.Active, ct);
+                && s.State == (int)SessionState.Active);
 
         // 2. If no active session, log and return false
         if (session is null)
@@ -87,7 +92,7 @@ public sealed class ExecutePollCommandHandler(
         List<PollRecord> priorRecords = await db.PollRecords
             .Where(p => p.SessionId == session.Id && !p.IsDeleted)
             .OrderByDescending(p => p.PolledAt)
-            .ToListAsync(ct);
+            .ToList();
 
         if (priorRecords.Count >= 2)
         {

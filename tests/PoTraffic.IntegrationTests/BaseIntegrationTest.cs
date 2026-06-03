@@ -65,6 +65,12 @@ public abstract class BaseIntegrationTest : IAsyncLifetime
         _factory = new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder =>
             {
+                // Force "Testing" environment so Program.cs' static-web-assets branch
+                // (UseStaticWebAssets + the WebRootFileProvider fix-up) runs. Without
+                // this, WebApplicationFactory<Program> boots the Production path,
+                // TestServer.Application never initialises, and CreateClient() throws
+                // "The server has not been started or no web application was configured".
+                builder.UseEnvironment("Testing");
 
                 // Replace real traffic providers with a fake that returns
                 // deterministic geocode coordinates (avoids GEOCODE_FAILED 422)

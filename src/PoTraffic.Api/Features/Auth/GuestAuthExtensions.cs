@@ -1,8 +1,11 @@
 using MediatR;
-using Microsoft.EntityFrameworkCore;
+using PoTraffic.Api.Infrastructure.Storage;
+
 using Microsoft.Extensions.Logging;
-using PoTraffic.Api.Infrastructure.Data;
+
+
 using PoTraffic.Api.Infrastructure.Security;
+
 using PoTraffic.Shared.DTOs.Auth;
 
 namespace PoTraffic.Api.Features.Auth;
@@ -70,12 +73,12 @@ public sealed record GuestLoginResult(
 
 public sealed class GuestLoginCommandHandler : IRequestHandler<GuestLoginCommand, GuestLoginResult>
 {
-    private readonly PoTrafficDbContext _db;
+    private readonly TableStorageContext _db;
     private readonly JwtTokenService _jwt;
     private readonly ILogger<GuestLoginCommandHandler> _logger;
 
     public GuestLoginCommandHandler(
-        PoTrafficDbContext db,
+        TableStorageContext db,
         JwtTokenService jwt,
         ILogger<GuestLoginCommandHandler> logger)
     {
@@ -94,7 +97,7 @@ public sealed class GuestLoginCommandHandler : IRequestHandler<GuestLoginCommand
         string guestEmail = $"{GuestAuthExtensions.GuestEmailPrefix}{suffix}{GuestAuthExtensions.GuestEmailDomain}";
 
         // Ensure no accidental collision — retry once if needed
-        bool exists = await _db.Set<User>().AnyAsync(u => u.Email == guestEmail, ct);
+        bool exists = _db.Users.Any(u => u.Email == guestEmail);
         if (exists)
         {
             suffix = Random.Shared.Next(min, max);
@@ -114,7 +117,7 @@ public sealed class GuestLoginCommandHandler : IRequestHandler<GuestLoginCommand
             CreatedAt = DateTimeOffset.UtcNow
         };
 
-        _db.Set<User>().Add(guestUser);
+        _db.Add(guestUser);
         await _db.SaveChangesAsync(ct);
 
         (string accessToken, string refreshToken, DateTimeOffset expiresAt) = _jwt.GenerateTokens(guestUser);

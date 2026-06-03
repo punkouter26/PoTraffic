@@ -1,12 +1,18 @@
 using Hangfire;
+using PoTraffic.Api.Infrastructure.Storage;
+
 using MediatR;
-using Microsoft.EntityFrameworkCore;
+
 using Microsoft.Extensions.DependencyInjection;
+
 using Microsoft.Extensions.Logging;
-using PoTraffic.Api.Infrastructure.Data;
+
+
 
 using PoTraffic.Api.Infrastructure.Providers;
+
 using PoTraffic.Shared.DTOs.Routes;
+
 using PoTraffic.Shared.Enums;
 
 namespace PoTraffic.Api.Features.Routes;
@@ -24,17 +30,16 @@ public sealed record UpdateRouteResult(
     RouteDto? Route);
 
 public sealed class UpdateRouteCommandHandler(
-    PoTrafficDbContext db,
+    TableStorageContext db,
     ITrafficProviderFactory providerFactory,
     IBackgroundJobClient jobClient,
     ILogger<UpdateRouteCommandHandler> logger) : IRequestHandler<UpdateRouteCommand, UpdateRouteResult>
 {
     public async Task<UpdateRouteResult> Handle(UpdateRouteCommand cmd, CancellationToken ct)
     {
-        EntityRoute? route = await db.Routes
-            .Include(r => r.Windows)
-            .FirstOrDefaultAsync(r => r.Id == cmd.RouteId && r.UserId == cmd.UserId
-                && r.MonitoringStatus != (int)MonitoringStatus.Deleted, ct);
+        EntityRoute? route = db.Routes
+            .FirstOrDefault(r => r.Id == cmd.RouteId && r.UserId == cmd.UserId
+                && r.MonitoringStatus != (int)MonitoringStatus.Deleted);
 
         if (route is null)
             return new UpdateRouteResult(false, "NOT_FOUND", null);

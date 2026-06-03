@@ -1,82 +1,61 @@
 using MediatR;
-using Microsoft.EntityFrameworkCore;
+using PoTraffic.Api.Infrastructure.Storage;
+
 using Microsoft.Extensions.Logging;
-using PoTraffic.Api.Infrastructure.Data;
+
+
 using PoTraffic.Shared.DTOs.Admin;
+using PoTraffic.Shared.Enums;
 
 namespace PoTraffic.Api.Features.Admin;
 
-/// <summary>
-/// Returns per-5-minute aggregated travel-time data across all active routes
-/// for the past <paramref name="Hours"/> hours (default 24).
-/// Used to power the "Past 24h" global volatility chart.
-/// </summary>
-public sealed record GetRecentVolatilityQuery(int Hours = 24) : IRequest<IReadOnlyList<RecentVolatilityPointDto>>;
+// FR-024: Recent volatility — last 7 days × 5-min bucket aggregation.
+public sealed record GetRecentVolatilityQuery(int Hours) : IRequest<IReadOnlyList<GlobalVolatilitySlotDto>>;
 
-public sealed class GetRecentVolatilityHandler
-    : IRequestHandler<GetRecentVolatilityQuery, IReadOnlyList<RecentVolatilityPointDto>>
+public sealed class GetRecentVolatilityHandler : IRequestHandler<GetRecentVolatilityQuery, IReadOnlyList<GlobalVolatilitySlotDto>>
 {
-    private readonly PoTrafficDbContext _db;
+    private readonly TableStorageContext _db;
     private readonly ILogger<GetRecentVolatilityHandler> _logger;
 
-    public GetRecentVolatilityHandler(PoTrafficDbContext db, ILogger<GetRecentVolatilityHandler> logger)
+    public GetRecentVolatilityHandler(TableStorageContext db, ILogger<GetRecentVolatilityHandler> logger)
     {
         _db = db;
         _logger = logger;
     }
 
-    public async Task<IReadOnlyList<RecentVolatilityPointDto>> Handle(
-        GetRecentVolatilityQuery query, CancellationToken ct)
+    public Task<IReadOnlyList<GlobalVolatilitySlotDto>> Handle(GetRecentVolatilityQuery query, CancellationToken ct)
     {
-        DateTime sinceUtc = DateTime.UtcNow.AddHours(-query.Hours);
+        DateTimeOffset since = DateTimeOffset.UtcNow.AddDays(-7);
 
-        // Truncate to 5-minute buckets in SQL so grouping is cheap
-        const string sql = """
-            SELECT
-                DATEADD(minute, DATEDIFF(minute, 0, pr.PolledAt) / 5 * 5, 0) AS PolledAt,
-                AVG(CAST(pr.TravelDurationSeconds AS float))                   AS MeanDurationSeconds,
-                COUNT(DISTINCT pr.RouteId)                                     AS RouteCount
-            FROM dbo.PollRecords pr
-            WHERE pr.IsDeleted = 0
-              AND pr.PolledAt >= {0}
-            GROUP BY DATEADD(minute, DATEDIFF(minute, 0, pr.PolledAt) / 5 * 5, 0)
-            ORDER BY PolledAt
-            """;
+        var polls = _db.Polls.Where(p => p.PolledAt >= since && !p.IsDeleted).ToList();
+        var routesById = _db.Routes.ToDictionary(r => r.Id);
 
-        try
-        {
-            List<RecentVolatilityPointDto> rows = await _db.Database
-                .SqlQueryRaw<RecentVolatilityPointDto>(sql, sinceUtc)
-                .ToListAsync(ct);
-            return rows;
-        }
-        catch (InvalidOperationException)
-        {
-            // InMemory provider does not support SqlQueryRaw — fall back to LINQ
-            _logger.LogDebug("GetRecentVolatilityQuery: SQL not supported, using LINQ fallback");
-            return await FallbackLinqAsync(sinceUtc, ct);
-        }
-    }
-
-    private async Task<IReadOnlyList<RecentVolatilityPointDto>> FallbackLinqAsync(
-        DateTime sinceUtc, CancellationToken ct)
-    {
-        List<PollRecord> records = await _db.PollRecords
-            .Where(pr => !pr.IsDeleted && pr.PolledAt >= sinceUtc)
-            .ToListAsync(ct);
-
-        return records
-            .GroupBy(pr =>
+        var slots = polls
+            .Where(p => routesById.ContainsKey(p.RouteId))
+            .GroupBy(p => new
             {
-                long ticks = pr.PolledAt.Ticks;
-                long fiveMinTicks = TimeSpan.TicksPerMinute * 5;
-                return new DateTime(ticks / fiveMinTicks * fiveMinTicks, DateTimeKind.Utc);
+                DayOfWeek = p.PolledAt.DayOfWeek.ToString(),
+                TimeSlotBucket = p.PolledAt.Hour * 60 + (p.PolledAt.Minute / 5 * 5),
+                ProviderInt = routesById[p.RouteId].Provider
             })
-            .OrderBy(g => g.Key)
-            .Select(g => new RecentVolatilityPointDto(
-                PolledAt: g.Key,
-                MeanDurationSeconds: Math.Round(g.Average(pr => (double)pr.TravelDurationSeconds), 1),
-                RouteCount: g.Select(pr => pr.RouteId).Distinct().Count()))
+            .Select(g =>
+            {
+                double mean = g.Average(p => (double)p.TravelDurationSeconds);
+                double stddev = g.Count() > 1
+                    ? Math.Sqrt(g.Average(p => Math.Pow((double)p.TravelDurationSeconds - mean, 2)))
+                    : 0;
+                return new GlobalVolatilitySlotDto(
+                    DayOfWeek: g.Key.DayOfWeek,
+                    TimeSlotBucket: g.Key.TimeSlotBucket,
+                    MeanDurationSeconds: Math.Round(mean, 1),
+                    StdDevDurationSeconds: Math.Round(stddev, 1),
+                    RouteCount: g.Select(p => p.RouteId).Distinct().Count(),
+                    Provider: (RouteProvider)g.Key.ProviderInt);
+            })
+            .OrderBy(s => s.DayOfWeek)
+            .ThenBy(s => s.TimeSlotBucket)
             .ToList();
+
+        return Task.FromResult<IReadOnlyList<GlobalVolatilitySlotDto>>(slots);
     }
 }

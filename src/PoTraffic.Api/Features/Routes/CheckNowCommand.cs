@@ -1,8 +1,11 @@
 using MediatR;
-using Microsoft.EntityFrameworkCore;
+using PoTraffic.Api.Infrastructure.Storage;
+
 using Microsoft.Extensions.Logging;
-using PoTraffic.Api.Infrastructure.Data;
+
+
 using PoTraffic.Api.Infrastructure.Providers;
+
 using PoTraffic.Shared.Enums;
 namespace PoTraffic.Api.Features.Routes;
 
@@ -22,12 +25,12 @@ public sealed record CheckNowResult(
 // Command pattern — encapsulates transient provider call as a discrete MediatR command
 public sealed class CheckNowCommandHandler : IRequestHandler<CheckNowCommand, CheckNowResult>
 {
-    private readonly PoTrafficDbContext _db;
+    private readonly TableStorageContext _db;
     private readonly ITrafficProviderFactory _providerFactory;
     private readonly ILogger<CheckNowCommandHandler> _logger;
 
     public CheckNowCommandHandler(
-        PoTrafficDbContext db,
+        TableStorageContext db,
         ITrafficProviderFactory providerFactory,
         ILogger<CheckNowCommandHandler> logger)
     {
@@ -39,8 +42,8 @@ public sealed class CheckNowCommandHandler : IRequestHandler<CheckNowCommand, Ch
     public async Task<CheckNowResult> Handle(CheckNowCommand command, CancellationToken ct)
     {
         // Verify ownership
-        EntityRoute? route = await _db.Set<EntityRoute>()
-            .FirstOrDefaultAsync(r => r.Id == command.RouteId && r.UserId == command.UserId, ct);
+        EntityRoute? route = _db.EntityRoute
+            .FirstOrDefault(r => r.Id == command.RouteId && r.UserId == command.UserId);
 
         if (route is null)
             return new CheckNowResult(false, null, null, "NOT_FOUND");

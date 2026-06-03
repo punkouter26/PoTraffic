@@ -1,9 +1,12 @@
 using FluentValidation;
+using PoTraffic.Api.Infrastructure.Storage;
+
 using MediatR;
-using Microsoft.EntityFrameworkCore;
-using PoTraffic.Api.Infrastructure.Data;
+
+
 
 using PoTraffic.Shared.DTOs.Admin;
+
 using PoTraffic.Shared.Enums;
 
 namespace PoTraffic.Api.Features.Admin;
@@ -13,9 +16,9 @@ public sealed record GetUsersQuery : IRequest<IReadOnlyList<UserDailyUsageDto>>;
 
 public sealed class GetUsersHandler : IRequestHandler<GetUsersQuery, IReadOnlyList<UserDailyUsageDto>>
 {
-    private readonly PoTrafficDbContext _db;
+    private readonly TableStorageContext _db;
 
-    public GetUsersHandler(PoTrafficDbContext db) => _db = db;
+    public GetUsersHandler(TableStorageContext db) => _db = db;
 
     public async Task<IReadOnlyList<UserDailyUsageDto>> Handle(GetUsersQuery query, CancellationToken ct)
     {
@@ -24,15 +27,14 @@ public sealed class GetUsersHandler : IRequestHandler<GetUsersQuery, IReadOnlyLi
 
         // Load all users with their today's poll records
         List<User> users = await _db.Users
-            .AsNoTracking()
-            .Include(u => u.Routes)
-                .ThenInclude(r => r.PollRecords.Where(p => p.PolledAt >= dayStart && p.PolledAt < dayEnd))
-            .ToListAsync(ct);
+            
+            .ThenInclude(r => r.PollRecords.Where(p => p.PolledAt >= dayStart && p.PolledAt < dayEnd))
+            .ToList();
 
         // Load cost rates from configuration
-        List<SystemConfiguration> configs = await _db.SystemConfigurations
+        List<SystemConfiguration> configs = _db.SystemConfigurations
             .Where(c => c.Key.StartsWith("cost.perpoll."))
-            .ToListAsync(ct);
+            .ToList();
 
         double googleCost = GetCost(configs, "cost.perpoll.googlemaps");
         double tomtomCost = GetCost(configs, "cost.perpoll.tomtom");

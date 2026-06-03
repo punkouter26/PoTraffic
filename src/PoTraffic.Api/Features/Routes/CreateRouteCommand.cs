@@ -1,13 +1,20 @@
 using FluentValidation;
+using PoTraffic.Api.Infrastructure.Storage;
+
 using MediatR;
-using Microsoft.EntityFrameworkCore;
+
 using Microsoft.Extensions.DependencyInjection;
+
 using Microsoft.Extensions.Logging;
-using PoTraffic.Api.Infrastructure.Data;
+
+
 
 using PoTraffic.Api.Infrastructure.Providers;
+
 using PoTraffic.Shared.Constants;
+
 using PoTraffic.Shared.DTOs.Routes;
+
 using PoTraffic.Shared.Enums;
 
 namespace PoTraffic.Api.Features.Routes;
@@ -57,7 +64,7 @@ public sealed class CreateRouteValidator : AbstractValidator<CreateRouteCommand>
 }
 
 public sealed class CreateRouteCommandHandler(
-    PoTrafficDbContext db,
+    TableStorageContext db,
     ITrafficProviderFactory providerFactory,
     ILogger<CreateRouteCommandHandler> logger) : IRequestHandler<CreateRouteCommand, CreateRouteResult>
 {

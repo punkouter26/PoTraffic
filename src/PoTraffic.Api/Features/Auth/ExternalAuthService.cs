@@ -1,14 +1,22 @@
 using System.Security.Cryptography;
+using PoTraffic.Api.Infrastructure.Storage;
+
 using System.Text;
+
 using System.Text.Encodings.Web;
+
 using System.Text.Json;
+
 using Microsoft.AspNetCore.DataProtection;
-using Microsoft.EntityFrameworkCore;
+
 using Microsoft.Extensions.Configuration;
+
 using Microsoft.Extensions.Logging;
+
 using PoTraffic.Shared.DTOs.Auth;
 
-using PoTraffic.Api.Infrastructure.Data;
+
+
 using PoTraffic.Api.Infrastructure.Security;
 
 namespace PoTraffic.Api.Features.Auth;
@@ -17,7 +25,7 @@ public sealed class ExternalAuthService
 {
     private readonly IEnumerable<IExternalIdentityProvider> _providers;
     private readonly IDataProtector _stateProtector;
-    private readonly PoTrafficDbContext _db;
+    private readonly TableStorageContext _db;
     private readonly JwtTokenService _jwt;
     private readonly IConfiguration _configuration;
     private readonly ILogger<ExternalAuthService> _logger;
@@ -25,7 +33,7 @@ public sealed class ExternalAuthService
     public ExternalAuthService(
         IEnumerable<IExternalIdentityProvider> providers,
         IDataProtectionProvider dataProtectionProvider,
-        PoTrafficDbContext db,
+        TableStorageContext db,
         JwtTokenService jwt,
         IConfiguration configuration,
         ILogger<ExternalAuthService> logger)
@@ -84,7 +92,7 @@ public sealed class ExternalAuthService
             return new ExternalAuthCompletionResult(false, payload.ReturnPath, null, "EXTERNAL_IDENTITY_UNAVAILABLE");
 
         string normalizedEmail = identity.Email.Trim().ToLowerInvariant();
-        User? user = await _db.Set<User>().FirstOrDefaultAsync(u => u.Email == normalizedEmail, ct);
+        User? user = _db.Users.FirstOrDefault(u => u.Email == normalizedEmail);
 
         // Admin email promotion — configured in Auth:AdminEmail (non-sensitive, stored in appsettings)
         string? adminEmail = _configuration["Auth:AdminEmail"];
@@ -105,7 +113,7 @@ public sealed class ExternalAuthService
                 CreatedAt = DateTimeOffset.UtcNow,
                 LastLoginAt = DateTimeOffset.UtcNow
             };
-            _db.Set<User>().Add(user);
+            _db.Add(user);
         }
         else
         {

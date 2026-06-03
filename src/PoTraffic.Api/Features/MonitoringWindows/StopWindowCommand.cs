@@ -1,8 +1,11 @@
 using Hangfire;
+using PoTraffic.Api.Infrastructure.Storage;
+
 using MediatR;
-using Microsoft.EntityFrameworkCore;
+
 using Microsoft.Extensions.Logging;
-using PoTraffic.Api.Infrastructure.Data;
+
+
 
 using PoTraffic.Shared.Enums;
 
@@ -14,12 +17,12 @@ public sealed record StopWindowCommand(
 
 public sealed class StopWindowCommandHandler : IRequestHandler<StopWindowCommand, bool>
 {
-    private readonly PoTrafficDbContext _db;
+    private readonly TableStorageContext _db;
     private readonly IBackgroundJobClient _jobClient;
     private readonly ILogger<StopWindowCommandHandler> _logger;
 
     public StopWindowCommandHandler(
-        PoTrafficDbContext db,
+        TableStorageContext db,
         IBackgroundJobClient jobClient,
         ILogger<StopWindowCommandHandler> logger)
     {
@@ -31,11 +34,10 @@ public sealed class StopWindowCommandHandler : IRequestHandler<StopWindowCommand
     public async Task<bool> Handle(StopWindowCommand cmd, CancellationToken ct)
     {
         // Load session + route, verify ownership
-        MonitoringSession? session = await _db.MonitoringSessions
-            .Include(s => s.Route)
-            .FirstOrDefaultAsync(s => s.Id == cmd.SessionId
+        MonitoringSession? session = _db.MonitoringSessions
+            .FirstOrDefault(s => s.Id == cmd.SessionId
                 && s.Route.UserId == cmd.UserId
-                && s.State == (int)SessionState.Active, ct);
+                && s.State == (int)SessionState.Active);
 
         if (session is null)
             return false;

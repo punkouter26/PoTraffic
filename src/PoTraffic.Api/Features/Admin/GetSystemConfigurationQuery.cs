@@ -1,6 +1,7 @@
 using MediatR;
-using Microsoft.EntityFrameworkCore;
-using PoTraffic.Api.Infrastructure.Data;
+using PoTraffic.Api.Infrastructure.Storage;
+
+
 using PoTraffic.Shared.DTOs.Admin;
 
 namespace PoTraffic.Api.Features.Admin;
@@ -10,14 +11,14 @@ public sealed record GetSystemConfigurationQuery : IRequest<IReadOnlyList<System
 
 public sealed class GetSystemConfigurationHandler : IRequestHandler<GetSystemConfigurationQuery, IReadOnlyList<SystemConfigDto>>
 {
-    private readonly PoTrafficDbContext _db;
+    private readonly TableStorageContext _db;
 
-    public GetSystemConfigurationHandler(PoTrafficDbContext db) => _db = db;
+    public GetSystemConfigurationHandler(TableStorageContext db) => _db = db;
 
     public async Task<IReadOnlyList<SystemConfigDto>> Handle(GetSystemConfigurationQuery query, CancellationToken ct)
     {
         List<SystemConfiguration> configs =
-            await _db.SystemConfigurations.AsNoTracking().OrderBy(c => c.Key).ToListAsync(ct);
+            await _db.SystemConfigurations.OrderBy(c => c.Key).ToList();
 
         return configs.Select(c => new SystemConfigDto(
             Key: c.Key,

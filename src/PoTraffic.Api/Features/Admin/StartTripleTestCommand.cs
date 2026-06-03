@@ -1,10 +1,16 @@
 using FluentValidation;
+using PoTraffic.Api.Infrastructure.Storage;
+
 using Hangfire;
+
 using MediatR;
+
 using Microsoft.Extensions.Logging;
-using PoTraffic.Api.Infrastructure.Data;
+
+
 
 using PoTraffic.Api.Infrastructure.Providers;
+
 using PoTraffic.Shared.Enums;
 
 namespace PoTraffic.Api.Features.Admin;
@@ -39,13 +45,13 @@ public sealed class StartTripleTestValidator : AbstractValidator<StartTripleTest
 
 public sealed class StartTripleTestCommandHandler : IRequestHandler<StartTripleTestCommand, StartTripleTestResult>
 {
-    private readonly PoTrafficDbContext _db;
+    private readonly TableStorageContext _db;
     private readonly ITrafficProviderFactory _providerFactory;
     private readonly IBackgroundJobClient _jobClient;
     private readonly ILogger<StartTripleTestCommandHandler> _logger;
 
     public StartTripleTestCommandHandler(
-        PoTrafficDbContext db,
+        TableStorageContext db,
         ITrafficProviderFactory providerFactory,
         IBackgroundJobClient jobClient,
         ILogger<StartTripleTestCommandHandler> logger)
@@ -105,7 +111,7 @@ public sealed class StartTripleTestCommandHandler : IRequestHandler<StartTripleT
             });
         }
 
-        _db.TripleTestSessions.Add(session);
+        _db.Add(session);
         await _db.SaveChangesAsync(ct);
 
         // Schedule 3 independent Hangfire jobs — mirrors PollRouteJob scheduling pattern

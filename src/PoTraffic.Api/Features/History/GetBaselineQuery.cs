@@ -1,10 +1,10 @@
 using MediatR;
-using Microsoft.Data.SqlClient;
-using Microsoft.EntityFrameworkCore;
+using PoTraffic.Api.Infrastructure.Storage;
+
 using Microsoft.Extensions.Logging;
-using PoTraffic.Api.Infrastructure.Data;
+
+
 using PoTraffic.Shared.DTOs.History;
-using ProjectionSlot = PoTraffic.Api.Infrastructure.Data.Projections.BaselineSlotDto;
 
 namespace PoTraffic.Api.Features.History;
 
@@ -16,53 +16,54 @@ public sealed record GetBaselineQuery(
 public sealed class GetBaselineQueryHandler
     : IRequestHandler<GetBaselineQuery, BaselineResponse>
 {
-    private readonly PoTrafficDbContext _db;
+    private readonly TableStorageContext _db;
     private readonly ILogger<GetBaselineQueryHandler> _logger;
 
-    public GetBaselineQueryHandler(PoTrafficDbContext db, ILogger<GetBaselineQueryHandler> logger)
+    public GetBaselineQueryHandler(TableStorageContext db, ILogger<GetBaselineQueryHandler> logger)
     {
         _db = db;
         _logger = logger;
     }
 
-    public async Task<BaselineResponse> Handle(GetBaselineQuery query, CancellationToken ct)
+    public Task<BaselineResponse> Handle(GetBaselineQuery query, CancellationToken ct)
     {
-        // Ownership guard — prevents IDOR: user A querying user B's baseline via a known route GUID
-        bool owned = await _db.Routes
-            .AnyAsync(r => r.Id == query.RouteId && r.UserId == query.UserId, ct);
+        // Post-refactor: SQL Server STDEV() aggregation is replaced with a pure-LINQ
+        // pass over PollRecords. For small-to-medium route histories (the common case)
+        // the in-process LINQ query is fine; for very large histories (10k+ polls) a
+        // future Table Storage stored-procedure would be a follow-up optimisation.
+        bool owned = _db.Routes
+            .Any(r => r.Id == query.RouteId && r.UserId == query.UserId);
         if (!owned)
-            return new BaselineResponse(query.RouteId, query.DayOfWeek, 0, []);
+            return Task.FromResult(new BaselineResponse(query.RouteId, query.DayOfWeek, 0, []));
 
-        // Shared SQL — see BaselineSqlQueries.SlotAggregate (DRY: avoids drift with GetOptimalDepartureQuery).
-        // LINQ cannot produce STDEV(); raw SQL is intentional per §6.2 of data-model.md.
-        List<ProjectionSlot> slots;
+        // Group polls by 15-minute bucket; compute mean + sample stddev.
+        var buckets = _db.Polls
+            .Where(p => p.RouteId == query.RouteId && !p.IsDeleted)
+            .GroupBy(p => (p.PolledAt.Hour * 4) + (p.PolledAt.Minute / 15))
+            .ToList();
 
-        try
-        {
-            slots = await _db.Database
-                .SqlQueryRaw<ProjectionSlot>(
-                    BaselineSqlQueries.SlotAggregate,
-                    new SqlParameter("@routeId", query.RouteId),
-                    new SqlParameter("@dayOfWeek", query.DayOfWeek))
-                .ToListAsync(ct);
-        }
-        catch (InvalidOperationException)
-        {
-            // InMemory provider does not support SqlQueryRaw — return empty baseline for test environments
-            _logger.LogDebug(
-                "GetBaselineQuery: SQL not supported on InMemory provider (test env) — returning empty baseline");
-            slots = [];
-        }
+        var slots = buckets
+            .Select(g =>
+            {
+                var durations = g.Select(p => (double)p.TravelDurationSeconds).ToList();
+                double mean = durations.Average();
+                double stddev = durations.Count > 1
+                    ? Math.Sqrt(durations.Sum(d => Math.Pow(d - mean, 2)) / (durations.Count - 1))
+                    : 0;
+                return new PoTraffic.Shared.DTOs.History.BaselineSlotDto(
+                    DayOfWeek: query.DayOfWeek,
+                    TimeSlotBucket: g.Key,
+                    MeanDurationSeconds: (int)Math.Round(mean),
+                    StdDevDurationSeconds: (int)Math.Round(stddev),
+                    SessionCount: g.Count());
+            })
+            .OrderBy(s => s.TimeSlotBucket)
+            .ToList();
 
-        return new BaselineResponse(
+        return Task.FromResult(new BaselineResponse(
             query.RouteId,
             query.DayOfWeek,
-            slots.FirstOrDefault()?.SessionCount ?? 0,
-            slots.Select(s => new PoTraffic.Shared.DTOs.History.BaselineSlotDto(
-                s.DayOfWeek,
-                s.TimeSlotBucket,
-                s.MeanDurationSeconds,
-                s.StdDevDurationSeconds,
-                s.SessionCount)).ToList());
+            slots.Sum(s => s.SessionCount),
+            slots));
     }
 }

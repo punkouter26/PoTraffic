@@ -1,7 +1,8 @@
 using FluentValidation;
+using PoTraffic.Api.Infrastructure.Storage;
+
 using MediatR;
-using Microsoft.EntityFrameworkCore;
-using PoTraffic.Api.Infrastructure.Data;
+
 
 namespace PoTraffic.Api.Features.Account;
 
@@ -20,14 +21,14 @@ public sealed class ChangePasswordValidator : AbstractValidator<ChangePasswordCo
 
 public sealed class ChangePasswordHandler : IRequestHandler<ChangePasswordCommand, ChangePasswordResult>
 {
-    private readonly PoTrafficDbContext _db;
+    private readonly TableStorageContext _db;
 
-    public ChangePasswordHandler(PoTrafficDbContext db) => _db = db;
+    public ChangePasswordHandler(TableStorageContext db) => _db = db;
 
     public async Task<ChangePasswordResult> Handle(ChangePasswordCommand command, CancellationToken ct)
     {
-        User? user = await _db.Users
-            .FirstOrDefaultAsync(u => u.Id == command.UserId, ct);
+        User? user = _db.Users
+            .FirstOrDefault(u => u.Id == command.UserId);
 
         if (user is null) return new ChangePasswordResult(false, "USER_NOT_FOUND");
 

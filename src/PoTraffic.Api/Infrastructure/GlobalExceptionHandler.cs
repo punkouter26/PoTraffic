@@ -1,8 +1,6 @@
 using System.Net;
 using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics;
-using Microsoft.Data.SqlClient;
-using Microsoft.EntityFrameworkCore;
 
 namespace PoTraffic.Api.Infrastructure;
 
@@ -41,10 +39,14 @@ public sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logge
             return true;
         }
 
-        if (exception is DbUpdateException dbEx && dbEx.InnerException is SqlException sqlEx && sqlEx.Number == 2601)
+        // Post-refactor: SQL-specific duplicate-key detection (DbUpdateException + SqlException 2601)
+        // is gone. The in-memory Table Storage backend has no equivalent exception; uniqueness is
+        // enforced by the handler-level guards (see e.g. CreateRouteCommand). We keep a fallback
+        // here for any future storage that surfaces InvalidOperationException with "duplicate" in
+        // its message.
+        if (exception is InvalidOperationException iopex && iopex.Message.Contains("duplicate", StringComparison.OrdinalIgnoreCase))
         {
-            // Error 2601: Cannot insert duplicate key row in object with unique index.
-            logger.LogWarning("Conflict detected at {Path}: {Message}", httpContext.Request.Path, sqlEx.Message);
+            logger.LogWarning("Conflict detected at {Path}: {Message}", httpContext.Request.Path, iopex.Message);
 
             httpContext.Response.StatusCode = (int)HttpStatusCode.Conflict;
             await httpContext.Response.WriteAsJsonAsync(new

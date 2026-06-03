@@ -1,7 +1,9 @@
 using FluentValidation;
+using PoTraffic.Api.Infrastructure.Storage;
+
 using MediatR;
-using Microsoft.EntityFrameworkCore;
-using PoTraffic.Api.Infrastructure.Data;
+
+
 using PoTraffic.Shared.DTOs.Account;
 
 namespace PoTraffic.Api.Features.Account;
@@ -23,26 +25,26 @@ public sealed class UpdateProfileValidator : AbstractValidator<UpdateProfileComm
 
 public sealed class UpdateProfileHandler : IRequestHandler<UpdateProfileCommand, ProfileDto?>
 {
-    private readonly PoTrafficDbContext _db;
+    private readonly TableStorageContext _db;
 
-    public UpdateProfileHandler(PoTrafficDbContext db) => _db = db;
+    public UpdateProfileHandler(TableStorageContext db) => _db = db;
 
-    public async Task<ProfileDto?> Handle(UpdateProfileCommand command, CancellationToken ct)
+    public Task<ProfileDto?> Handle(UpdateProfileCommand command, CancellationToken ct)
     {
-        User? user = await _db.Users
-            .FirstOrDefaultAsync(u => u.Id == command.UserId, ct);
+        User? user = _db.Users
+            .FirstOrDefault(u => u.Id == command.UserId);
 
-        if (user is null) return null;
+        if (user is null) return Task.FromResult<ProfileDto?>(null);
 
         user.Locale = command.Locale;
         await _db.SaveChangesAsync(ct);
 
-        return new ProfileDto(
+        return Task.FromResult<ProfileDto?>(new ProfileDto(
             UserId: user.Id,
             Email: user.Email,
             Locale: user.Locale,
             CreatedAt: user.CreatedAt,
             LastLoginAt: user.LastLoginAt,
-            Role: user.Role);
+            Role: user.Role));
     }
 }

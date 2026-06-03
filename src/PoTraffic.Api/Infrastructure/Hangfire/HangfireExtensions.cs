@@ -9,10 +9,15 @@ namespace PoTraffic.Api.Infrastructure.Hangfire;
 internal static class HangfireExtensions
 {
     /// <summary>
-    /// Registers Hangfire with SQL Server storage and wires job classes into DI.
-    /// Adapter pattern — HangfireJobActivator bridges Hangfire job activation to ASP.NET Core DI scope lifecycle.
+    /// Registers Hangfire with SQL Server storage, the background server (worker
+    /// thread), and the job classes. The background server is only registered
+    /// when <c>Hangfire:DisableServer</c> is false (the default) — set that flag
+    /// when SQL is unreachable so the app can boot in dev-table-storage-only
+    /// mode without the worker thread crashing on its first SQL connection.
     /// </summary>
-    internal static IServiceCollection AddHangfireServices(this IServiceCollection services, IConfiguration configuration)
+    internal static IServiceCollection AddHangfireServices(
+        this IServiceCollection services,
+        IConfiguration configuration)
     {
         string connectionString = configuration.GetConnectionString("Default")
             ?? throw new InvalidOperationException("Default connection string is missing.");
@@ -32,8 +37,12 @@ internal static class HangfireExtensions
                     DisableGlobalLocks = true
                 }));
 
-        services.AddHangfireServer((sp, options) =>
-            options.Activator = new HangfireJobActivator(sp.GetRequiredService<IServiceScopeFactory>()));
+        bool disableServer = configuration.GetValue("Hangfire:DisableServer", false);
+        if (!disableServer)
+        {
+            services.AddHangfireServer((sp, options) =>
+                options.Activator = new HangfireJobActivator(sp.GetRequiredService<IServiceScopeFactory>()));
+        }
 
         // Register Hangfire job classes in DI so HangfireJobActivator can resolve them
         services.AddScoped<PollRouteJob>();

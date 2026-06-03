@@ -1,11 +1,16 @@
 using FluentValidation;
+using PoTraffic.Api.Infrastructure.Storage;
+
 using MediatR;
-using Microsoft.EntityFrameworkCore;
+
 using Microsoft.Extensions.Logging;
+
 using Microsoft.Extensions.Options;
-using PoTraffic.Api.Infrastructure.Data;
+
+
 
 using PoTraffic.Api.Infrastructure.Security;
+
 using PoTraffic.Shared.DTOs.Auth;
 
 namespace PoTraffic.Api.Features.Auth;
@@ -24,9 +29,9 @@ public sealed class RegisterCommandValidator : AbstractValidator<RegisterCommand
 {
     private static readonly HashSet<string> _validLocales = ["en-IE", "en-GB", "en-US", "de-DE", "fr-FR"];
 
-    private readonly PoTrafficDbContext _db;
+    private readonly TableStorageContext _db;
 
-    public RegisterCommandValidator(PoTrafficDbContext db)
+    public RegisterCommandValidator(TableStorageContext db)
     {
         _db = db;
 
@@ -47,17 +52,17 @@ public sealed class RegisterCommandValidator : AbstractValidator<RegisterCommand
     }
 
     private async Task<bool> BeUnique(string email, CancellationToken ct)
-        => !await _db.Set<User>().AnyAsync(u => u.Email == email, ct);
+        => !_db.Set<User>().Any(u => u.Email == email);
 }
 
 public sealed class RegisterCommandHandler : IRequestHandler<RegisterCommand, RegisterResult>
 {
-    private readonly PoTrafficDbContext _db;
+    private readonly TableStorageContext _db;
     private readonly JwtTokenService _jwt;
     private readonly ILogger<RegisterCommandHandler> _logger;
 
     public RegisterCommandHandler(
-        PoTrafficDbContext db,
+        TableStorageContext db,
         JwtTokenService jwt,
         ILogger<RegisterCommandHandler> logger)
     {
@@ -84,18 +89,17 @@ public sealed class RegisterCommandHandler : IRequestHandler<RegisterCommand, Re
             CreatedAt = DateTimeOffset.UtcNow
         };
 
-        _db.Set<User>().Add(user);
+        _db.Add(user);
 
         try
         {
             await _db.SaveChangesAsync(ct);
         }
-        catch (DbUpdateException ex) when (
-            ex.InnerException?.Message.Contains("UX_Users_Email", StringComparison.OrdinalIgnoreCase) == true
-            || ex.InnerException?.Message.Contains("IX_Users_Email", StringComparison.OrdinalIgnoreCase) == true)
+        catch (Exception ex) when (
+            ex.Message.Contains("UX_Users_Email", StringComparison.OrdinalIgnoreCase) == true
+            || ex.Message.Contains("duplicate", StringComparison.OrdinalIgnoreCase) == true)
         {
-            // Defense-in-depth: validator (BeUnique) already checks uniqueness,
-            // but a race condition can still cause a constraint violation.
+            // Defense-in-depth: validator (BeUnique) already checks uniqueness.
             _logger.LogWarning(ex, "Duplicate email race condition for {Email}", command.Email);
             return new RegisterResult(false, null, "DUPLICATE_EMAIL");
         }

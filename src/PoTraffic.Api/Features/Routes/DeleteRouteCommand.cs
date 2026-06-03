@@ -1,8 +1,11 @@
 using Hangfire;
+using PoTraffic.Api.Infrastructure.Storage;
+
 using MediatR;
-using Microsoft.EntityFrameworkCore;
+
 using Microsoft.Extensions.Logging;
-using PoTraffic.Api.Infrastructure.Data;
+
+
 
 using PoTraffic.Shared.Enums;
 
@@ -14,12 +17,12 @@ public sealed record DeleteRouteCommand(
 
 public sealed class DeleteRouteCommandHandler : IRequestHandler<DeleteRouteCommand, bool>
 {
-    private readonly PoTrafficDbContext _db;
+    private readonly TableStorageContext _db;
     private readonly IBackgroundJobClient _jobClient;
     private readonly ILogger<DeleteRouteCommandHandler> _logger;
 
     public DeleteRouteCommandHandler(
-        PoTrafficDbContext db,
+        TableStorageContext db,
         IBackgroundJobClient jobClient,
         ILogger<DeleteRouteCommandHandler> logger)
     {
@@ -30,9 +33,9 @@ public sealed class DeleteRouteCommandHandler : IRequestHandler<DeleteRouteComma
 
     public async Task<bool> Handle(DeleteRouteCommand cmd, CancellationToken ct)
     {
-        EntityRoute? route = await _db.Routes
-            .FirstOrDefaultAsync(r => r.Id == cmd.RouteId && r.UserId == cmd.UserId
-                && r.MonitoringStatus != (int)MonitoringStatus.Deleted, ct);
+        EntityRoute? route = _db.Routes
+            .FirstOrDefault(r => r.Id == cmd.RouteId && r.UserId == cmd.UserId
+                && r.MonitoringStatus != (int)MonitoringStatus.Deleted);
 
         if (route is null)
             return false;

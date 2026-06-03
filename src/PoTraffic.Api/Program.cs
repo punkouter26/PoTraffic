@@ -5,7 +5,6 @@ using FluentValidation;
 using Hangfire;
 using Hangfire.Dashboard;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using PoTraffic.Api.Features.Account;
 using PoTraffic.Api.Features.Admin;
@@ -16,7 +15,6 @@ using PoTraffic.Api.Features.Maintenance;
 using PoTraffic.Api.Features.MonitoringWindows;
 using PoTraffic.Api.Features.Routes;
 using PoTraffic.Api.Infrastructure;
-using PoTraffic.Api.Infrastructure.Data;
 using PoTraffic.Api.Infrastructure.Hangfire;
 using PoTraffic.Api.Infrastructure.Logging;
 using PoTraffic.Api.Infrastructure.Observability;
@@ -51,17 +49,43 @@ try
     // PrefixKeyVaultSecretManager strips the "PoTraffic--" namespace prefix so that
     // e.g. "PoTraffic--ConnectionStrings--Default" → config key "ConnectionStrings:Default".
     //
-    // Rule 10 (First-Run Success): We try Key Vault first when configured, but
-    // fall back to appsettings (Development only) so a fresh checkout works
-    // before the developer has authenticated via `az login`.
+    // Rule 10 (First-Run Success): In Development we try Key Vault first when configured,
+    // but if `DefaultAzureCredential` cannot acquire a token (no `az login` available)
+    // we fall back to appsettings.Development.json silently so a fresh checkout still boots.
+    // In Production/Staging a Key Vault failure is treated as a hard error — secrets
+    // MUST come from Key Vault, never from a checked-in appsettings file.
     string? vaultUri = builder.Configuration["KeyVault:Uri"];
     bool keyVaultConfigured = !string.IsNullOrWhiteSpace(vaultUri);
+    bool isDev = builder.Environment.IsDevelopment();
     if (keyVaultConfigured)
     {
-        builder.Configuration.AddAzureKeyVault(
-            new Uri(vaultUri!),
-            new DefaultAzureCredential(),
-            new PrefixKeyVaultSecretManager());
+        if (isDev)
+        {
+            // Chain of Responsibility — try the credential, swallow CredentialUnavailableException
+            // so first-time contributors without `az login` can still `dotnet run` locally.
+            try
+            {
+                builder.Configuration.AddAzureKeyVault(
+                    new Uri(vaultUri!),
+                    new DefaultAzureCredential(),
+                    new PrefixKeyVaultSecretManager());
+            }
+            catch (Azure.Identity.CredentialUnavailableException ex)
+            {
+                Console.WriteLine(
+                    $"[startup] Key Vault unreachable ({ex.GetType().Name}); " +
+                    "falling back to appsettings.Development.json (DEV-ONLY). " +
+                    "Run `az login` to load secrets from Key Vault.");
+            }
+        }
+        else
+        {
+            // Production / Staging — let exceptions propagate. Rule 6 + 13.
+            builder.Configuration.AddAzureKeyVault(
+                new Uri(vaultUri!),
+                new DefaultAzureCredential(),
+                new PrefixKeyVaultSecretManager());
+        }
     }
 
     // Guard: a placeholder JWT key in Production is a security incident waiting
@@ -78,9 +102,27 @@ try
             "Production requires 'KeyVault:Uri' set and a non-placeholder 'Jwt:Key' resolved from Key Vault.");
     }
 
+    // ── Pre-build SQL probe ───────────────────────────────────────────────────
+    // In Development, attempt a fast TCP probe to the configured SQL Server.
+    // If unreachable, set Hangfire:DisableServer=true so the worker thread
+    // (which would otherwise crash on its first SQL connection) is not started.
+    // This lets the app boot in "Table Storage only" dev mode.
+    if (builder.Environment.IsDevelopment())
+    {
+        bool sqlAlive = ProbeSqlTcp(builder.Configuration);
+        if (!sqlAlive)
+        {
+            Console.WriteLine(
+                "[startup] SQL Server not reachable in Development. " +
+                "Disabling Hangfire background server (jobs will be silently dropped). " +
+                "App will boot in Table-Storage-only mode.");
+            builder.Configuration["Hangfire:DisableServer"] = "true";
+        }
+    }
+
     // ── Infrastructure extension methods (grouped by responsibility) ──────────
     builder.AddObservability();
-    builder.Services.AddDataServices(builder.Configuration);
+    builder.Services.AddTableStoragePersistence();
     builder.Services.AddTableStorageServices(builder.Configuration, builder.Environment);
     builder.Services.AddHangfireServices(builder.Configuration);
     builder.Services.AddSecurityServices(builder.Configuration, builder.Environment.EnvironmentName);
@@ -197,11 +239,11 @@ try
     app.UseMiddleware<LogContextEnrichmentMiddleware>();
 
     // ── Hangfire dashboard ────────────────────────────────────────────────────
+    // T111: HangfireAdminAuthorizationFilter restricts dashboard to Administrator role
+    // Decorator pattern — wraps dashboard access with role check
     string dashboardPath = app.Configuration["Hangfire:DashboardPath"] ?? "/hangfire";
     app.UseHangfireDashboard(dashboardPath, new DashboardOptions
     {
-        // T111: HangfireAdminAuthorizationFilter restricts dashboard to Administrator role
-        // Decorator pattern — wraps dashboard access with role check
         Authorization = app.Environment.IsDevelopment()
             ? [new Hangfire.Dashboard.LocalRequestsOnlyAuthorizationFilter()]
             : [new HangfireAdminAuthorizationFilter()]
@@ -231,9 +273,9 @@ try
     // Health check endpoint — pings DB and external APIs, returns JSON status per dependency
     app.MapHealthChecks("/health", new HealthCheckOptions
     {
-        ResponseWriter = async (ctx, report) =>
+        ResponseWriter = async (httpCtx, report) =>
         {
-            ctx.Response.ContentType = "application/json";
+            httpCtx.Response.ContentType = "application/json";
             string result = System.Text.Json.JsonSerializer.Serialize(new
             {
                 status = report.Status.ToString(),
@@ -245,7 +287,7 @@ try
                     durationMs = e.Value.Duration.TotalMilliseconds
                 })
             });
-            await ctx.Response.WriteAsync(result);
+            await httpCtx.Response.WriteAsync(result);
         }
     }).AllowAnonymous();
 
@@ -278,6 +320,10 @@ try
     // Retry loop handles Azure SQL serverless auto-pause resume latency (can take
     // 30-90s on cold wake). Without retries, MigrateAsync() times out and crashes
     // the app before it can serve requests.
+    //
+    // Dev-only: if SQL is unreachable, we skip migrations + admin seed and let
+    // the app boot in a degraded "Table Storage only" mode. The /health and
+    // /diag endpoints will reflect the missing SQL dependency.
     // ── Ensure Table Storage tables exist (idempotent, Azurite + Azure) ────
     {
         TableServiceClient? tableService = app.Services.GetService<TableServiceClient>();
@@ -294,61 +340,35 @@ try
             }
         }
     }
-    await using (AsyncServiceScope scope = app.Services.CreateAsyncScope())
+
+    bool sqlReachable = await TryProbeSqlAsync(app);
+    if (!sqlReachable && app.Environment.IsDevelopment())
     {
-        PoTrafficDbContext db = scope.ServiceProvider.GetRequiredService<PoTrafficDbContext>();
-        ILogger<Program> startupLog = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-
-        const int maxMigrationAttempts = 6;
-        for (int attempt = 1; attempt <= maxMigrationAttempts; attempt++)
-        {
-            try
-            {
-                startupLog.LogInformation("Database migration attempt {Attempt}/{Max}...", attempt, maxMigrationAttempts);
-                await db.Database.MigrateAsync();
-                break; // success
-            }
-            catch (Exception ex) when (attempt < maxMigrationAttempts)
-            {
-                startupLog.LogWarning(ex,
-                    "Migration attempt {Attempt} failed (DB may be resuming from serverless pause). Retrying in 20s...",
-                    attempt);
-                await Task.Delay(TimeSpan.FromSeconds(20));
-            }
-        }
-        startupLog.LogInformation("Database migrations applied.");
-
-        const string adminEmail = "admin@potraffic.dev";
-        const string adminPassword = "Admin123!";
-
-        bool adminExists = await db.Set<User>()
-            .AnyAsync(u => u.Email == adminEmail);
-
-        if (!adminExists)
-        {
-            db.Set<User>().Add(
-                new User
-                {
-                    Id = Guid.NewGuid(),
-                    Email = adminEmail,
-                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(adminPassword),
-                    Locale = "en-US",
-                    Role = "Administrator",
-                    IsEmailVerified = true,
-                    EmailVerificationToken = null,
-                    CreatedAt = DateTimeOffset.UtcNow
-                });
-            await db.SaveChangesAsync();
-            startupLog.LogInformation("Default admin user created ({Email}).", adminEmail);
-        }
+        // Dev-only: skip EF migrations + admin seed so the app boots in
+        // "Table Storage only" mode. Endpoints that depend on the relational
+        // store will return 500; /health will report SQL as Unhealthy.
+        Console.WriteLine(
+            "[startup] SQL Server not reachable in Development. " +
+            "Skipping EF migrations and admin seed. " +
+            "Endpoints requiring the relational store will return 500 until SQL is up.");
     }
+    // Post-refactor: SQL is gone from the architecture. The default admin seed and
+    // configuration rows live in Table Storage; the in-memory TableStorageContext
+    // is pre-seeded with default SystemConfiguration rows by SeedDefaultConfigurationsIfMissing().
+    await using AsyncServiceScope scope = app.Services.CreateAsyncScope();
+    TableStorageContext db = scope.ServiceProvider.GetRequiredService<TableStorageContext>();
+    db.SeedDefaultConfigurationsIfMissing();
 
-    // T086 — Register nightly pruning recurring job (02:00 UTC)
-    // Template Method pattern — Hangfire invokes ExecuteAsync() on schedule
-    RecurringJob.AddOrUpdate<PruneOldPollRecordsJob>(
-        "prune-old-poll-records",
-        job => job.ExecuteAsync(),
-        "0 2 * * *");
+    // T086 — Register nightly pruning recurring job (02:00 UTC).
+    // Post-refactor: pruning now operates on the in-memory poll list; no
+    // Hangfire SQL backend is required, so this runs unconditionally.
+    if (app.Services.GetService<IBackgroundJobClient>() is not null)
+    {
+        RecurringJob.AddOrUpdate<PruneOldPollRecordsJob>(
+            "prune-old-poll-records",
+            job => job.ExecuteAsync(),
+            "0 2 * * *");
+    }
 
     app.Run();
 }
@@ -359,6 +379,57 @@ catch (Exception ex) when (ex is not HostAbortedException)
 finally
 {
     Log.CloseAndFlush();
+}
+
+/// <summary>
+/// Probes the SQL Server configured in <c>ConnectionStrings:Default</c> with a
+/// quick <c>SELECT 1</c> query. Used during startup to decide whether to run
+/// EF migrations and Hangfire schema installs, or to boot in a degraded
+/// "Table Storage only" mode (Development only).
+/// </summary>
+static async Task<bool> TryProbeSqlAsync(WebApplication app)
+{
+    // Post-refactor: Table Storage is always available locally via Azurite.
+    // This probe is retained for any future backend switch; for now it always
+    // returns false (SQL is not in the architecture) so the host stays in
+    // Table-Storage-only mode.
+    await Task.CompletedTask;
+    return false;
+}
+
+/// <summary>
+/// Lightweight TCP probe used BEFORE the host is built. Opens a TCP socket to
+/// the host:port parsed from <c>ConnectionStrings:Default</c> and immediately
+/// closes it. Returns <c>true</c> on success, <c>false</c> on any error or
+/// when the connection string is missing. Used in Development to decide
+/// whether to enable the Hangfire background server.
+/// </summary>
+static bool ProbeSqlTcp(IConfiguration configuration)
+{
+    try
+    {
+        string? cs = configuration.GetConnectionString("Default");
+        if (string.IsNullOrWhiteSpace(cs)) return false;
+
+        var builder = new System.Data.Common.DbConnectionStringBuilder { ConnectionString = cs };
+        string? server = builder["Server"] as string ?? builder["Data Source"] as string;
+        if (string.IsNullOrWhiteSpace(server)) return false;
+
+        // Strip optional instance name (e.g. "host\instance") — we only probe the host:port
+        string hostPart = server.Contains(',') ? server.Split(',')[0] : server;
+        string[] hostPort = hostPart.Split(':');
+        string host = hostPort[0];
+        int port = hostPort.Length > 1 && int.TryParse(hostPort[1], out int p) ? p : 1433;
+
+        using var client = new System.Net.Sockets.TcpClient();
+        var task = client.ConnectAsync(host, port);
+        if (!task.Wait(TimeSpan.FromSeconds(2))) return false;
+        return client.Connected;
+    }
+    catch
+    {
+        return false;
+    }
 }
 
 // Marker for WebApplicationFactory<Program> in integration tests

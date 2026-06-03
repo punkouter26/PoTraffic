@@ -1,7 +1,8 @@
 using MediatR;
-using Microsoft.EntityFrameworkCore;
+using PoTraffic.Api.Infrastructure.Storage;
+
 using Microsoft.Extensions.Logging;
-using PoTraffic.Api.Infrastructure.Data;
+
 
 namespace PoTraffic.Api.Features.MonitoringWindows;
 
@@ -11,11 +12,11 @@ public sealed record DeleteWindowCommand(
 
 public sealed class DeleteWindowCommandHandler : IRequestHandler<DeleteWindowCommand, bool>
 {
-    private readonly PoTrafficDbContext _db;
+    private readonly TableStorageContext _db;
     private readonly ILogger<DeleteWindowCommandHandler> _logger;
 
     public DeleteWindowCommandHandler(
-        PoTrafficDbContext db,
+        TableStorageContext db,
         ILogger<DeleteWindowCommandHandler> logger)
     {
         _db = db;
@@ -24,11 +25,10 @@ public sealed class DeleteWindowCommandHandler : IRequestHandler<DeleteWindowCom
 
     public async Task<bool> Handle(DeleteWindowCommand cmd, CancellationToken ct)
     {
-        var window = await _db.MonitoringWindows
-            .Include(w => w.Route)
-            .FirstOrDefaultAsync(w => w.Id == cmd.WindowId
+        var window = _db.MonitoringWindows
+            .FirstOrDefault(w => w.Id == cmd.WindowId
                 && w.Route.UserId == cmd.UserId
-                && w.IsActive, ct);
+                && w.IsActive);
 
         if (window is null)
             return false;
