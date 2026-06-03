@@ -34,7 +34,7 @@ public sealed class CheckNowHandlerTests
     public async Task CheckNow_WhenProviderSucceeds_ReturnsTravelData_NoPollRecordInserted()
     {
         // Arrange
-        using TableStorageContext db = CreateDb();
+        TableStorageContext db = CreateDb();
 
         Guid routeId = Guid.NewGuid();
         Guid userId = Guid.NewGuid();
@@ -71,7 +71,7 @@ public sealed class CheckNowHandlerTests
         result.ErrorCode.Should().BeNull();
 
         // FR-016: no PollRecord must be persisted
-        int pollCount = await db.PollRecords.Count();
+        int pollCount = db.PollRecords.Count();
         pollCount.Should().Be(0, "FR-016: CheckNow must never insert a PollRecord or consume quota");
     }
 
@@ -79,7 +79,7 @@ public sealed class CheckNowHandlerTests
     public async Task CheckNow_WhenRouteNotFound_ReturnsNotFoundError()
     {
         // Arrange
-        using TableStorageContext db = CreateDb();
+        TableStorageContext db = CreateDb();
 
         ITrafficProvider mockProvider = Substitute.For<ITrafficProvider>();
         var handler = new CheckNowCommandHandler(db, BuildProviderFactory(mockProvider),
@@ -98,7 +98,7 @@ public sealed class CheckNowHandlerTests
     public async Task CheckNow_WhenProviderReturnsNull_ReturnsProviderError()
     {
         // Arrange
-        using TableStorageContext db = CreateDb();
+        TableStorageContext db = CreateDb();
 
         Guid routeId = Guid.NewGuid();
         Guid userId = Guid.NewGuid();
@@ -137,7 +137,7 @@ public sealed class CheckNowHandlerTests
     public async Task CheckNow_WhenRouteBelongsToDifferentUser_ReturnsNotFoundError()
     {
         // Arrange
-        using TableStorageContext db = CreateDb();
+        TableStorageContext db = CreateDb();
 
         Guid routeId = Guid.NewGuid();
         Guid realOwner = Guid.NewGuid();

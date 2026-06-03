@@ -102,29 +102,11 @@ try
             "Production requires 'KeyVault:Uri' set and a non-placeholder 'Jwt:Key' resolved from Key Vault.");
     }
 
-    // ── Pre-build SQL probe ───────────────────────────────────────────────────
-    // In Development, attempt a fast TCP probe to the configured SQL Server.
-    // If unreachable, set Hangfire:DisableServer=true so the worker thread
-    // (which would otherwise crash on its first SQL connection) is not started.
-    // This lets the app boot in "Table Storage only" dev mode.
-    if (builder.Environment.IsDevelopment())
-    {
-        bool sqlAlive = ProbeSqlTcp(builder.Configuration);
-        if (!sqlAlive)
-        {
-            Console.WriteLine(
-                "[startup] SQL Server not reachable in Development. " +
-                "Disabling Hangfire background server (jobs will be silently dropped). " +
-                "App will boot in Table-Storage-only mode.");
-            builder.Configuration["Hangfire:DisableServer"] = "true";
-        }
-    }
-
     // ── Infrastructure extension methods (grouped by responsibility) ──────────
     builder.AddObservability();
     builder.Services.AddTableStoragePersistence();
     builder.Services.AddTableStorageServices(builder.Configuration, builder.Environment);
-    builder.Services.AddHangfireServices(builder.Configuration);
+    builder.Services.AddHangfireServices(builder.Configuration, builder.Environment);
     builder.Services.AddSecurityServices(builder.Configuration, builder.Environment.EnvironmentName);
     builder.Services.AddTrafficProviders(builder.Configuration, builder.Environment);
 
@@ -152,6 +134,9 @@ try
     builder.Services.AddProblemDetails();
     // Chain of Responsibility pattern — GlobalExceptionHandler maps ValidationException → 422
     builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+
+    // ── Health checks ──────────────────────────────────────────────────────────
+    builder.Services.AddHealthChecks();
 
     // ── OpenAPI (Scalar UI) ───────────────────────────────────────────────────
     builder.Services.AddOpenApi();
@@ -241,13 +226,17 @@ try
     // ── Hangfire dashboard ────────────────────────────────────────────────────
     // T111: HangfireAdminAuthorizationFilter restricts dashboard to Administrator role
     // Decorator pattern — wraps dashboard access with role check
-    string dashboardPath = app.Configuration["Hangfire:DashboardPath"] ?? "/hangfire";
-    app.UseHangfireDashboard(dashboardPath, new DashboardOptions
+    // Skip in Testing where SQL Server storage is not configured.
+    if (!app.Environment.IsEnvironment("Testing"))
     {
-        Authorization = app.Environment.IsDevelopment()
-            ? [new Hangfire.Dashboard.LocalRequestsOnlyAuthorizationFilter()]
-            : [new HangfireAdminAuthorizationFilter()]
-    });
+        string dashboardPath = app.Configuration["Hangfire:DashboardPath"] ?? "/hangfire";
+        app.UseHangfireDashboard(dashboardPath, new DashboardOptions
+        {
+            Authorization = app.Environment.IsDevelopment()
+                ? [new Hangfire.Dashboard.LocalRequestsOnlyAuthorizationFilter()]
+                : [new HangfireAdminAuthorizationFilter()]
+        });
+    }
 
     // ── API endpoints ─────────────────────────────────────────────────────────
     app.MapClientLogEndpoints();
@@ -341,17 +330,6 @@ try
         }
     }
 
-    bool sqlReachable = await TryProbeSqlAsync(app);
-    if (!sqlReachable && app.Environment.IsDevelopment())
-    {
-        // Dev-only: skip EF migrations + admin seed so the app boots in
-        // "Table Storage only" mode. Endpoints that depend on the relational
-        // store will return 500; /health will report SQL as Unhealthy.
-        Console.WriteLine(
-            "[startup] SQL Server not reachable in Development. " +
-            "Skipping EF migrations and admin seed. " +
-            "Endpoints requiring the relational store will return 500 until SQL is up.");
-    }
     // Post-refactor: SQL is gone from the architecture. The default admin seed and
     // configuration rows live in Table Storage; the in-memory TableStorageContext
     // is pre-seeded with default SystemConfiguration rows by SeedDefaultConfigurationsIfMissing().
@@ -379,57 +357,6 @@ catch (Exception ex) when (ex is not HostAbortedException)
 finally
 {
     Log.CloseAndFlush();
-}
-
-/// <summary>
-/// Probes the SQL Server configured in <c>ConnectionStrings:Default</c> with a
-/// quick <c>SELECT 1</c> query. Used during startup to decide whether to run
-/// EF migrations and Hangfire schema installs, or to boot in a degraded
-/// "Table Storage only" mode (Development only).
-/// </summary>
-static async Task<bool> TryProbeSqlAsync(WebApplication app)
-{
-    // Post-refactor: Table Storage is always available locally via Azurite.
-    // This probe is retained for any future backend switch; for now it always
-    // returns false (SQL is not in the architecture) so the host stays in
-    // Table-Storage-only mode.
-    await Task.CompletedTask;
-    return false;
-}
-
-/// <summary>
-/// Lightweight TCP probe used BEFORE the host is built. Opens a TCP socket to
-/// the host:port parsed from <c>ConnectionStrings:Default</c> and immediately
-/// closes it. Returns <c>true</c> on success, <c>false</c> on any error or
-/// when the connection string is missing. Used in Development to decide
-/// whether to enable the Hangfire background server.
-/// </summary>
-static bool ProbeSqlTcp(IConfiguration configuration)
-{
-    try
-    {
-        string? cs = configuration.GetConnectionString("Default");
-        if (string.IsNullOrWhiteSpace(cs)) return false;
-
-        var builder = new System.Data.Common.DbConnectionStringBuilder { ConnectionString = cs };
-        string? server = builder["Server"] as string ?? builder["Data Source"] as string;
-        if (string.IsNullOrWhiteSpace(server)) return false;
-
-        // Strip optional instance name (e.g. "host\instance") — we only probe the host:port
-        string hostPart = server.Contains(',') ? server.Split(',')[0] : server;
-        string[] hostPort = hostPart.Split(':');
-        string host = hostPort[0];
-        int port = hostPort.Length > 1 && int.TryParse(hostPort[1], out int p) ? p : 1433;
-
-        using var client = new System.Net.Sockets.TcpClient();
-        var task = client.ConnectAsync(host, port);
-        if (!task.Wait(TimeSpan.FromSeconds(2))) return false;
-        return client.Connected;
-    }
-    catch
-    {
-        return false;
-    }
 }
 
 // Marker for WebApplicationFactory<Program> in integration tests

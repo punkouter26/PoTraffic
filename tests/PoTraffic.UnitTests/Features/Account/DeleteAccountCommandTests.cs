@@ -21,7 +21,7 @@ public sealed class DeleteAccountCommandTests
     public async Task DeleteAccount_RemovesUserAndCascadeRoutes()
     {
         // Arrange
-        await using TableStorageContext db = CreateDb();
+        TableStorageContext db = CreateDb();
 
         Guid userId = Guid.NewGuid();
         Guid routeId = Guid.NewGuid();
@@ -45,13 +45,13 @@ public sealed class DeleteAccountCommandTests
 
         // Assert
         result.Should().BeTrue("user existed and was deleted");
-        (await db.Users.FirstOrDefault(x => x.Id == userId)).Should().BeNull("user row must be hard-deleted (FR-031)");
+        (db.Users.FirstOrDefault(x => x.Id == userId)).Should().BeNull("user row must be hard-deleted (FR-031)");
     }
 
     [Fact]
     public async Task DeleteAccount_WhenUserNotFound_ReturnsFalse()
     {
-        await using TableStorageContext db = CreateDb();
+        TableStorageContext db = CreateDb();
 
         var handler = new DeleteAccountCommandHandler(db);
 

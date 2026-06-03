@@ -29,19 +29,21 @@ public sealed class StartWindowHandlerTests
         Guid routeId = Guid.NewGuid();
         Guid windowId = Guid.NewGuid();
 
-        db.Add(new User
+        var user = new User
         {
             Id = userId,
             Email = $"user-{userId}@test.com",
             PasswordHash = "hash",
             Locale = "Europe/London"
-        });
+        };
+        db.Add(user);
 
         // The target route that the test will attempt to start
-        db.Add(new Route
+        var route = new Route
         {
             Id = routeId,
             UserId = userId,
+            User = user,
             OriginAddress = "A",
             OriginCoordinates = "1.0,1.0",
             DestinationAddress = "B",
@@ -49,28 +51,33 @@ public sealed class StartWindowHandlerTests
             Provider = (int)RouteProvider.GoogleMaps,
             MonitoringStatus = (int)MonitoringStatus.Active,
             CreatedAt = DateTimeOffset.UtcNow
-        });
+        };
+        db.Add(route);
 
-        db.Add(new MonitoringWindow
+        var window = new MonitoringWindow
         {
             Id = windowId,
             RouteId = routeId,
+            Route = route,
             StartTime = new TimeOnly(7, 0),
             EndTime = new TimeOnly(9, 0),
             DaysOfWeekMask = 0b01111110 // Mon-Fri
-        });
+        };
+        db.Add(window);
 
         // Seed today's sessions on DIFFERENT routes for the same user.
         // Each route can only have one session per day (UNIQUE RouteId+SessionDate constraint),
         // so quota consumption is modelled as one session per distinct route.
         DateOnly today = DateOnly.FromDateTime(DateTime.UtcNow);
+
         for (int i = 0; i < sessionCount; i++)
         {
             Guid otherRouteId = Guid.NewGuid();
-            db.Add(new Route
+            var otherRoute = new Route
             {
                 Id = otherRouteId,
                 UserId = userId,
+                User = user,
                 OriginAddress = $"X{i}",
                 OriginCoordinates = $"{i}.0,{i}.0",
                 DestinationAddress = $"Y{i}",
@@ -78,11 +85,13 @@ public sealed class StartWindowHandlerTests
                 Provider = (int)RouteProvider.GoogleMaps,
                 MonitoringStatus = (int)MonitoringStatus.Active,
                 CreatedAt = DateTimeOffset.UtcNow
-            });
+            };
+            db.Add(otherRoute);
             db.Add(new MonitoringSession
             {
                 Id = Guid.NewGuid(),
                 RouteId = otherRouteId,
+                Route = otherRoute,
                 SessionDate = today,
                 State = (int)SessionState.Completed
             });
@@ -112,7 +121,7 @@ public sealed class StartWindowHandlerTests
         result.QuotaRemaining.Should().Be(0);
 
         // Verify that no new MonitoringSession was created
-        int newSessionCount = await db.MonitoringSessions
+        int newSessionCount = db.MonitoringSessions
             .Count(s => s.RouteId != Guid.Empty);
         newSessionCount.Should().Be(QuotaConstants.DefaultDailyQuota,
             "no additional session should be created when quota is exceeded (FR-003)");
@@ -177,17 +186,19 @@ public sealed class StartWindowHandlerTests
         Guid windowId = Guid.NewGuid();
         Guid existingSessionId = Guid.NewGuid();
 
-        db.Add(new User
+        var user = new User
         {
             Id = userId,
             Email = $"user-{userId}@test.com",
             PasswordHash = "hash",
             Locale = "Europe/London"
-        });
-        db.Add(new Route
+        };
+        db.Add(user);
+        var route = new Route
         {
             Id = routeId,
             UserId = userId,
+            User = user,
             OriginAddress = "A",
             OriginCoordinates = "1.0,1.0",
             DestinationAddress = "B",
@@ -195,11 +206,13 @@ public sealed class StartWindowHandlerTests
             Provider = (int)RouteProvider.GoogleMaps,
             MonitoringStatus = (int)MonitoringStatus.Active,
             CreatedAt = DateTimeOffset.UtcNow
-        });
+        };
+        db.Add(route);
         db.Add(new MonitoringWindow
         {
             Id = windowId,
             RouteId = routeId,
+            Route = route,
             StartTime = new TimeOnly(7, 0),
             EndTime = new TimeOnly(9, 0),
             DaysOfWeekMask = 0b01111110
@@ -208,6 +221,7 @@ public sealed class StartWindowHandlerTests
         {
             Id = existingSessionId,
             RouteId = routeId,
+            Route = route,
             SessionDate = DateOnly.FromDateTime(DateTime.UtcNow),
             State = (int)SessionState.Active
         });
@@ -224,7 +238,7 @@ public sealed class StartWindowHandlerTests
         result.IsSuccess.Should().BeTrue("duplicate start requests should be idempotent (FR-004)");
         result.ErrorCode.Should().BeNull();
         result.SessionId.Should().Be(existingSessionId);
-        int totalSessions = await db.MonitoringSessions.Count();
+        int totalSessions = db.MonitoringSessions.Count();
         totalSessions.Should().Be(1, "no duplicate session should be inserted");
     }
 }

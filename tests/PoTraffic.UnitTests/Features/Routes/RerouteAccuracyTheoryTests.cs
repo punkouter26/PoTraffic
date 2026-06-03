@@ -154,7 +154,7 @@ public sealed class RerouteAccuracyTheoryTests
         // Assert
         success.Should().BeTrue();
 
-        PollRecord? record = await db.PollRecords
+        PollRecord? record = db.PollRecords
             .OrderByDescending(p => p.PolledAt)
             .FirstOrDefault(p => p.DistanceMetres == currentDistance);
 
@@ -233,7 +233,7 @@ public sealed class RerouteAccuracyTheoryTests
 
             await handler.Handle(new ExecutePollCommand(routeId), CancellationToken.None);
 
-            PollRecord? record = await db.PollRecords
+            PollRecord? record = db.PollRecords
                 .OrderByDescending(p => p.PolledAt)
                 .FirstOrDefault(p => p.DistanceMetres == currentDistance);
 

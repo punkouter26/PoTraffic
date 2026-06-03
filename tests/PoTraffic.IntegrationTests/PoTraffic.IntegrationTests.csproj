@@ -20,7 +20,6 @@
     <PackageReference Include="NSubstitute" />
     <PackageReference Include="FluentAssertions" />
     <!-- Testcontainers 3.x (not 4.x - WepApplicationFactory compat issue in 4.x as of Feb 2026) -->
-    <PackageReference Include="Testcontainers.MsSql" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
   </ItemGroup>
 

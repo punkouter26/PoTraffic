@@ -16,8 +16,8 @@ public sealed class AuthValidatorTests
     public async Task RegisterValidator_WithDuplicateEmail_ReturnsValidationError()
     {
         // Arrange — seed in-memory DB with existing user
-        await using TableStorageContext db = new();
-        db.Set<User>().Add(new User
+        TableStorageContext db = new();
+        db.Add(new User
         {
             Id = Guid.NewGuid(),
             Email = "existing@example.com",
@@ -42,7 +42,7 @@ public sealed class AuthValidatorTests
     [Fact]
     public async Task RegisterValidator_WithNewEmail_Passes()
     {
-        await using TableStorageContext db = new();
+        TableStorageContext db = new();
         var validator = new RegisterCommandValidator(db);
         var command = new RegisterCommand("new@example.com", "Password1!", "en-US");
 
@@ -54,7 +54,7 @@ public sealed class AuthValidatorTests
     [Fact]
     public async Task RegisterValidator_WithEmptyPassword_Fails()
     {
-        await using TableStorageContext db = new();
+        TableStorageContext db = new();
         var validator = new RegisterCommandValidator(db);
         var command = new RegisterCommand("user@example.com", "", "Europe/London");
 

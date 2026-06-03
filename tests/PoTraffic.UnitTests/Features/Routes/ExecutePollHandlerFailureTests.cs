@@ -84,7 +84,7 @@ public sealed class ExecutePollHandlerFailureTests
         // Assert — FR-005: returns false, no exception propagated
         result.Should().BeFalse("provider errors must not propagate to Hangfire caller (FR-005)");
 
-        int pollCount = await db.PollRecords.Count(p => p.RouteId == routeId);
+        int pollCount = db.PollRecords.Count(p => p.RouteId == routeId);
         pollCount.Should().Be(0, "no PollRecord should be inserted when provider throws (FR-005)");
     }
 
@@ -107,7 +107,7 @@ public sealed class ExecutePollHandlerFailureTests
         await handler.Handle(new ExecutePollCommand(routeId), CancellationToken.None);
 
         // Assert — session's PollCount must not be incremented on failure (FR-005)
-        MonitoringSession? session = await db.MonitoringSessions.FirstOrDefault(x => x.Id == userId);
+        MonitoringSession? session = db.MonitoringSessions.FirstOrDefault(x => x.Id == sessionId);
         session.Should().NotBeNull();
         session!.PollCount.Should().Be(3, "PollCount must remain unchanged when provider throws (FR-005)");
     }

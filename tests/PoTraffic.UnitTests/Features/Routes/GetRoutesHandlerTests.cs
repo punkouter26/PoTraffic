@@ -22,12 +22,21 @@ public sealed class GetRoutesHandlerTests
     public async Task GetRoutes_ReturnsOnlyRoutesForRequestedUser()
     {
         // Arrange
-        using TableStorageContext db = CreateDb();
+        TableStorageContext db = CreateDb();
 
         Guid userId = Guid.NewGuid();
         Guid otherId = Guid.NewGuid();
 
-        db.AddRange(new[] { , ,  })MonitoringStatus.Active,
+        db.AddRange(new EntityRoute[]
+        {
+            new EntityRoute
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                OriginAddress = "A",
+                DestinationAddress = "B",
+                Provider = (int)RouteProvider.GoogleMaps,
+                MonitoringStatus = (int)MonitoringStatus.Active,
                 CreatedAt = DateTimeOffset.UtcNow
             },
             new EntityRoute
@@ -39,7 +48,8 @@ public sealed class GetRoutesHandlerTests
                 Provider = (int)RouteProvider.TomTom,
                 MonitoringStatus = (int)MonitoringStatus.Active,
                 CreatedAt = DateTimeOffset.UtcNow
-            });
+            }
+        });
         await db.SaveChangesAsync();
 
         var handler = new GetRoutesQueryHandler(db);
@@ -57,11 +67,20 @@ public sealed class GetRoutesHandlerTests
     public async Task GetRoutes_ExcludesSoftDeletedRoutes()
     {
         // Arrange
-        using TableStorageContext db = CreateDb();
+        TableStorageContext db = CreateDb();
 
         Guid userId = Guid.NewGuid();
 
-        db.AddRange(new[] { , ,  })MonitoringStatus.Active,
+        db.AddRange(new EntityRoute[]
+        {
+            new EntityRoute
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                OriginAddress = "A",
+                DestinationAddress = "B",
+                Provider = (int)RouteProvider.GoogleMaps,
+                MonitoringStatus = (int)MonitoringStatus.Active,
                 CreatedAt = DateTimeOffset.UtcNow
             },
             new EntityRoute
@@ -73,7 +92,8 @@ public sealed class GetRoutesHandlerTests
                 Provider = (int)RouteProvider.GoogleMaps,
                 MonitoringStatus = (int)MonitoringStatus.Deleted,
                 CreatedAt = DateTimeOffset.UtcNow
-            });
+            }
+        });
         await db.SaveChangesAsync();
 
         var handler = new GetRoutesQueryHandler(db);
@@ -90,7 +110,7 @@ public sealed class GetRoutesHandlerTests
     public async Task GetRoutes_ReturnsEmptyPage_WhenUserHasNoRoutes()
     {
         // Arrange
-        using TableStorageContext db = CreateDb();
+        TableStorageContext db = CreateDb();
 
         var handler = new GetRoutesQueryHandler(db);
 
@@ -106,7 +126,7 @@ public sealed class GetRoutesHandlerTests
     public async Task GetRoutes_PaginatesCorrectly()
     {
         // Arrange
-        using TableStorageContext db = CreateDb();
+        TableStorageContext db = CreateDb();
 
         Guid userId = Guid.NewGuid();
 

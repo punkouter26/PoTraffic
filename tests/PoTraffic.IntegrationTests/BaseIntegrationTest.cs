@@ -51,7 +51,6 @@ public abstract class BaseIntegrationTest : IAsyncLifetime
     {
         _factory?.Dispose();
 
-        Environment.SetEnvironmentVariable("ConnectionStrings__Default", null);
         Environment.SetEnvironmentVariable("AzureKeyVault__VaultUri", null);
         Environment.SetEnvironmentVariable("KeyVault__Uri", null);
 

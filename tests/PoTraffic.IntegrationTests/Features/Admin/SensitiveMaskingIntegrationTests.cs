@@ -30,7 +30,17 @@ public sealed class SensitiveMaskingIntegrationTests : BaseIntegrationTest
         using (IServiceScope scope = GetServices().CreateScope())
         {
             TableStorageContext db = scope.ServiceProvider.GetRequiredService<TableStorageContext>();
-            db.AddRange(new[] { , ,  });
+            db.AddRange(new SystemConfiguration[]
+            {
+                new SystemConfiguration { Key = "test.api.key", Value = "super-secret-value-1234", IsSensitive = true, Description = "Test sensitive" },
+                new SystemConfiguration { Key = "test.poll.interval", Value = "60", IsSensitive = false, Description = "Test non-sensitive" }
+            });
+            db.SaveChangesAsync().GetAwaiter().GetResult();
+        }
+
+        // Log in as admin via the testing endpoint
+        using HttpClient client = CreateClient();
+        HttpResponseMessage loginResponse = await client.PostAsJsonAsync("/e2e/dev-login", new { email = "admin@test.invalid", role = "Administrator" });
         loginResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
         DevLoginResponse? loginDto = await loginResponse.Content.ReadFromJsonAsync<DevLoginResponse>();

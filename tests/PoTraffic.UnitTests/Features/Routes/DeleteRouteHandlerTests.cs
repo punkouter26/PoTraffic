@@ -25,7 +25,7 @@ public sealed class DeleteRouteHandlerTests
     public async Task DeleteRoute_SoftDeletesRoute_AndReturnsTrue()
     {
         // Arrange
-        using TableStorageContext db = CreateDb();
+        TableStorageContext db = CreateDb();
 
         Guid routeId = Guid.NewGuid();
         Guid userId = Guid.NewGuid();
@@ -51,7 +51,7 @@ public sealed class DeleteRouteHandlerTests
         // Assert
         result.Should().BeTrue();
 
-        EntityRoute? route = await db.Routes.FirstOrDefault(x => x.Id == userId);
+        EntityRoute? route = db.Routes.FirstOrDefault(x => x.Id == routeId);
         route!.MonitoringStatus.Should().Be((int)MonitoringStatus.Deleted, "route must be soft-deleted");
         route.HangfireJobChainId.Should().BeNull("HangfireJobChainId must be cleared on soft-delete");
     }
@@ -60,7 +60,7 @@ public sealed class DeleteRouteHandlerTests
     public async Task DeleteRoute_CancelsHangfireJob_WhenJobChainIdIsSet()
     {
         // Arrange
-        using TableStorageContext db = CreateDb();
+        TableStorageContext db = CreateDb();
 
         Guid routeId = Guid.NewGuid();
         Guid userId = Guid.NewGuid();
@@ -96,7 +96,7 @@ public sealed class DeleteRouteHandlerTests
     public async Task DeleteRoute_WhenRouteNotFound_ReturnsFalse()
     {
         // Arrange
-        using TableStorageContext db = CreateDb();
+        TableStorageContext db = CreateDb();
 
         IBackgroundJobClient jobClient = Substitute.For<IBackgroundJobClient>();
         var handler = new DeleteRouteCommandHandler(db, jobClient, NullLogger<DeleteRouteCommandHandler>.Instance);
@@ -113,7 +113,7 @@ public sealed class DeleteRouteHandlerTests
     public async Task DeleteRoute_WhenRouteOwnedByDifferentUser_ReturnsFalse()
     {
         // Arrange
-        using TableStorageContext db = CreateDb();
+        TableStorageContext db = CreateDb();
 
         Guid routeId = Guid.NewGuid();
         Guid realOwner = Guid.NewGuid();
@@ -140,7 +140,7 @@ public sealed class DeleteRouteHandlerTests
         // Assert — ownership check must block unauthorised deletion
         result.Should().BeFalse("a user must not be able to delete another user's route");
 
-        EntityRoute? route = await db.Routes.FirstOrDefault(x => x.Id == userId);
+        EntityRoute? route = db.Routes.FirstOrDefault(x => x.Id == routeId);
         route!.MonitoringStatus.Should().Be((int)MonitoringStatus.Active, "route must remain intact");
     }
 }

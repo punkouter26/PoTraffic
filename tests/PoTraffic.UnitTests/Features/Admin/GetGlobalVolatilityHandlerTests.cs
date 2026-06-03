@@ -23,7 +23,7 @@ public sealed class GetGlobalVolatilityHandlerTests
     public async Task GetGlobalVolatility_GroupsByDayOfWeekAndSlot()
     {
         // Arrange
-        await using TableStorageContext db = CreateDb();
+        TableStorageContext db = CreateDb();
 
         Guid userId = Guid.NewGuid();
         Guid routeId = Guid.NewGuid();
@@ -45,9 +45,12 @@ public sealed class GetGlobalVolatilityHandlerTests
         DateTimeOffset monday0800 = GetNextMonday().AddHours(8);
         DateTimeOffset monday0805 = monday0800.AddMinutes(5);
 
-        db.AddRange(new[] { , ,  }), TravelDurationSeconds = 320, DistanceMetres = 5000 }, // prev Monday same slot
-            new PollRecord { Id = Guid.NewGuid(), RouteId = routeId, PolledAt = monday0805, TravelDurationSeconds = 360, DistanceMetres = 5000 },
-        ]);
+        db.AddRange(new PollRecord[]
+        {
+            new PollRecord { Id = Guid.NewGuid(), RouteId = routeId, PolledAt = monday0800, TravelDurationSeconds = 300, DistanceMetres = 5000 },
+            new PollRecord { Id = Guid.NewGuid(), RouteId = routeId, PolledAt = monday0800.AddDays(-7), TravelDurationSeconds = 320, DistanceMetres = 5000 },
+            new PollRecord { Id = Guid.NewGuid(), RouteId = routeId, PolledAt = monday0805, TravelDurationSeconds = 360, DistanceMetres = 5000 }
+        });
         await db.SaveChangesAsync();
 
         var handler = new GetGlobalVolatilityHandler(db, NullLogger<GetGlobalVolatilityHandler>.Instance);
@@ -65,7 +68,7 @@ public sealed class GetGlobalVolatilityHandlerTests
     [Fact]
     public async Task GetGlobalVolatility_WhenNoRecords_ReturnsEmpty()
     {
-        await using TableStorageContext db = CreateDb();
+        TableStorageContext db = CreateDb();
 
         var handler = new GetGlobalVolatilityHandler(db, NullLogger<GetGlobalVolatilityHandler>.Instance);
 

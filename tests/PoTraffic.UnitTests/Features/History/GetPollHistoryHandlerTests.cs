@@ -26,7 +26,7 @@ public sealed class GetPollHistoryHandlerTests
         Guid routeId = Guid.NewGuid();
         Guid otherRouteId = Guid.NewGuid();
 
-        db.Add(new Route
+        var route = new Route
         {
             Id = routeId,
             UserId = userId,
@@ -37,9 +37,10 @@ public sealed class GetPollHistoryHandlerTests
             Provider = (int)RouteProvider.GoogleMaps,
             MonitoringStatus = (int)MonitoringStatus.Active,
             CreatedAt = DateTimeOffset.UtcNow
-        });
+        };
+        db.Add(route);
 
-        db.Add(new Route
+        var otherRoute = new Route
         {
             Id = otherRouteId,
             UserId = Guid.NewGuid(),
@@ -50,7 +51,8 @@ public sealed class GetPollHistoryHandlerTests
             Provider = (int)RouteProvider.TomTom,
             MonitoringStatus = (int)MonitoringStatus.Active,
             CreatedAt = DateTimeOffset.UtcNow
-        });
+        };
+        db.Add(otherRoute);
 
         DateTimeOffset polledAt = DateTimeOffset.UtcNow.AddMinutes(-pollCount * 5);
         for (int i = 0; i < pollCount; i++)
@@ -59,6 +61,7 @@ public sealed class GetPollHistoryHandlerTests
             {
                 Id = Guid.NewGuid(),
                 RouteId = routeId,
+                Route = route,
                 PolledAt = polledAt.AddMinutes(i * 5),
                 TravelDurationSeconds = 300 + i,
                 DistanceMetres = 5000
@@ -70,6 +73,7 @@ public sealed class GetPollHistoryHandlerTests
         {
             Id = Guid.NewGuid(),
             RouteId = otherRouteId,
+            Route = otherRoute,
             PolledAt = DateTimeOffset.UtcNow,
             TravelDurationSeconds = 999,
             DistanceMetres = 9999

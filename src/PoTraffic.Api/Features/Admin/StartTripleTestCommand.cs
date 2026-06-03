@@ -112,6 +112,8 @@ public sealed class StartTripleTestCommandHandler : IRequestHandler<StartTripleT
         }
 
         _db.Add(session);
+        foreach (TripleTestShot shot in session.Shots)
+            _db.Add(shot);
         await _db.SaveChangesAsync(ct);
 
         // Schedule 3 independent Hangfire jobs — mirrors PollRouteJob scheduling pattern

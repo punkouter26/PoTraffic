@@ -96,7 +96,7 @@ public sealed class MonitoringWindowScenarios : PlaywrightTestBase
         // Radzen 10.x RadzenCheckBox renders a native <input type="checkbox"> that reflects
         // the bound value. Use Playwright's CSS :checked pseudo-class to count checked inputs.
         // The fieldset has 7 day checkboxes; Mon–Fri (5) should be checked by default.
-        int checkedDays = await fieldset.Locator("input[type='checkbox']:checked").Count();
+        int checkedDays = await fieldset.Locator("input[type='checkbox']:checked").CountAsync();
         Assert.True(checkedDays >= 5, $"Expected at least 5 days (Mon–Fri) checked by default, but found {checkedDays} checked.");
 
         // ── Click Save ────────────────────────────────────────────────────────────

@@ -105,7 +105,7 @@ public sealed class RerouteDetectionTests
 
         // Assert
         result.Should().BeTrue();
-        PollRecord? newRecord = await db.PollRecords
+        PollRecord? newRecord = db.PollRecords
             .OrderByDescending(p => p.PolledAt)
             .FirstOrDefault(p => p.DistanceMetres == 6200);
         newRecord.Should().NotBeNull();
@@ -136,7 +136,7 @@ public sealed class RerouteDetectionTests
 
         // Assert
         result.Should().BeTrue();
-        PollRecord? newRecord = await db.PollRecords
+        PollRecord? newRecord = db.PollRecords
             .OrderByDescending(p => p.PolledAt)
             .FirstOrDefault(p => p.DistanceMetres == 6200);
         newRecord.Should().NotBeNull();
@@ -164,7 +164,7 @@ public sealed class RerouteDetectionTests
 
         // Assert
         result.Should().BeTrue();
-        PollRecord? newRecord = await db.PollRecords
+        PollRecord? newRecord = db.PollRecords
             .OrderByDescending(p => p.PolledAt)
             .FirstOrDefault(p => p.DistanceMetres == 6200);
         newRecord.Should().NotBeNull();

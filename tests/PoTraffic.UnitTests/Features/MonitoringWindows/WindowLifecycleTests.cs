@@ -29,18 +29,20 @@ public sealed class WindowLifecycleTests
         Guid routeId = Guid.NewGuid();
         Guid sessionId = Guid.NewGuid();
 
-        db.Add(new User
+        var user = new User
         {
             Id = userId,
             Email = $"user-{userId}@test.com",
             PasswordHash = "hash",
             Locale = "Europe/London"
-        });
+        };
+        db.Add(user);
 
-        db.Add(new Route
+        var route = new Route
         {
             Id = routeId,
             UserId = userId,
+            User = user,
             OriginAddress = "A",
             OriginCoordinates = "1.0,1.0",
             DestinationAddress = "B",
@@ -49,12 +51,14 @@ public sealed class WindowLifecycleTests
             MonitoringStatus = (int)MonitoringStatus.Active,
             HangfireJobChainId = hangfireJobChainId,
             CreatedAt = DateTimeOffset.UtcNow
-        });
+        };
+        db.Add(route);
 
         db.Add(new MonitoringSession
         {
             Id = sessionId,
             RouteId = routeId,
+            Route = route,
             SessionDate = DateOnly.FromDateTime(DateTime.UtcNow),
             State = (int)SessionState.Active
         });
@@ -79,7 +83,7 @@ public sealed class WindowLifecycleTests
         // Assert
         result.Should().BeTrue();
 
-        MonitoringSession? session = await db.MonitoringSessions.FirstOrDefault(x => x.Id == userId);
+        MonitoringSession? session = db.MonitoringSessions.FirstOrDefault(x => x.Id == sessionId);
         session.Should().NotBeNull();
         session!.State.Should().Be((int)SessionState.Completed,
             "StopWindowCommand must transition session to Completed state");
@@ -123,7 +127,7 @@ public sealed class WindowLifecycleTests
         await handler.Handle(new StopWindowCommand(sessionId, userId), CancellationToken.None);
 
         // Assert — HangfireJobChainId should be nulled out
-        Route? route = await db.Routes.FirstOrDefault(x => x.Id == userId);
+        Route? route = db.Routes.FirstOrDefault(x => x.Id == routeId);
         route.Should().NotBeNull();
         route!.HangfireJobChainId.Should().BeNull(
             "after stopping monitoring, HangfireJobChainId should be cleared to prevent orphaned chains");

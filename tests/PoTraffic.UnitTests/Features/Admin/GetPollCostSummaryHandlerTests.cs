@@ -23,7 +23,7 @@ public sealed class GetPollCostSummaryHandlerTests
     public async Task GetPollCostSummary_ComputesCorrectCost_ForGoogleMaps()
     {
         // Arrange
-        await using TableStorageContext db = CreateDb();
+        TableStorageContext db = CreateDb();
 
         Guid userId = Guid.NewGuid();
         Guid routeId = Guid.NewGuid();
@@ -43,9 +43,12 @@ public sealed class GetPollCostSummaryHandlerTests
         });
 
         // Manually seed cost config (EnsureCreated may not run HasData in InMemory)
-        db.AddRange(new[] { , ,  }), TravelDurationSeconds = 300, DistanceMetres = 5000 },
-            new PollRecord { Id = Guid.NewGuid(), RouteId = routeId, PolledAt = todayStart.AddHours(9), TravelDurationSeconds = 310, DistanceMetres = 5000 },
-        ]);
+        db.AddRange(new PollRecord[]
+        {
+            new PollRecord { Id = Guid.NewGuid(), RouteId = routeId, PolledAt = todayStart.AddHours(8), TravelDurationSeconds = 300, DistanceMetres = 5000 },
+            new PollRecord { Id = Guid.NewGuid(), RouteId = routeId, PolledAt = todayStart.AddHours(9), TravelDurationSeconds = 310, DistanceMetres = 5000 }
+        });
+        db.SeedDefaultConfigurationsIfMissing();
         await db.SaveChangesAsync();
 
         var handler = new GetPollCostSummaryHandler(db, NullLogger<GetPollCostSummaryHandler>.Instance);
@@ -63,7 +66,7 @@ public sealed class GetPollCostSummaryHandlerTests
     [Fact]
     public async Task GetPollCostSummary_WhenNoPollsToday_ReturnsSummaryWithZeroCost()
     {
-        await using TableStorageContext db = CreateDb();
+        TableStorageContext db = CreateDb();
 
         var handler = new GetPollCostSummaryHandler(db, NullLogger<GetPollCostSummaryHandler>.Instance);
 

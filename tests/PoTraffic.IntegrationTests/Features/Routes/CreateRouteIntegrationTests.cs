@@ -61,7 +61,7 @@ public sealed class CreateRouteIntegrationTests : BaseIntegrationTest
         // Verify row exists in DB
         using IServiceScope scope = GetServices().CreateScope();
         TableStorageContext db = scope.ServiceProvider.GetRequiredService<TableStorageContext>();
-        var route = await db.Routes.FirstOrDefault(x => x.Id == userId);
+        var route = db.Routes.FirstOrDefault(x => x.Id == body.Id);
         route.Should().NotBeNull("route must be persisted to database");
 
         bool windowExists = db.MonitoringWindows.Any(w => w.RouteId == body.Id);

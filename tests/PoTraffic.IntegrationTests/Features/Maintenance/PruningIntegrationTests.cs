@@ -1,5 +1,4 @@
 using MediatR;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using PoTraffic.Api.Features.Maintenance;
 using PoTraffic.Api.Infrastructure.Storage;
@@ -87,7 +86,28 @@ public sealed class PruningIntegrationTests : BaseIntegrationTest
             IsDeleted = false
         }).ToList();
 
-        db.AddRange(new[] { , ,  }) should NOT be pruned");
+        db.AddRange(oldRecords);
+        db.AddRange(recentRecords);
+        await db.SaveChangesAsync();
+
+        // Act
+        await sender.Send(new PruneOldPollRecordsCommand());
+
+        // Assert — old records should be soft-deleted
+        foreach (PollRecord old in oldRecords)
+        {
+            PollRecord? reloaded = db.PollRecords.FirstOrDefault(r => r.Id == old.Id);
+            Assert.NotNull(reloaded);
+            Assert.True(reloaded!.IsDeleted, "91-day record should be soft-deleted");
+            Assert.Null(reloaded.RawProviderResponse);
+        }
+
+        // Assert — recent records should NOT be pruned
+        foreach (PollRecord recent in recentRecords)
+        {
+            PollRecord? reloaded = db.PollRecords.FirstOrDefault(r => r.Id == recent.Id);
+            Assert.NotNull(reloaded);
+            Assert.False(reloaded!.IsDeleted, "89-day record should NOT be pruned");
             Assert.NotNull(reloaded.RawProviderResponse);
         }
     }

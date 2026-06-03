@@ -28,7 +28,7 @@ public sealed class ExecutePollHandlerTests
     public async Task ExecutePollHandler_WhenProviderSucceeds_RecordsPollData()
     {
         // Arrange
-        using TableStorageContext db = CreateDb();
+        TableStorageContext db = CreateDb();
 
         Guid routeId = Guid.NewGuid();
         Guid sessionId = Guid.NewGuid();
@@ -71,7 +71,7 @@ public sealed class ExecutePollHandlerTests
         // Assert
         result.Should().BeTrue();
 
-        PollRecord? record = await db.PollRecords.FirstOrDefault(p => p.RouteId == routeId);
+        PollRecord? record = db.PollRecords.FirstOrDefault(p => p.RouteId == routeId);
         record.Should().NotBeNull();
         record!.TravelDurationSeconds.Should().Be(300);
         record.DistanceMetres.Should().Be(5000);
