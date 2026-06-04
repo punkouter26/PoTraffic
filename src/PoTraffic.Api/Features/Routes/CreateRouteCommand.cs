@@ -92,6 +92,7 @@ public sealed class CreateRouteCommandHandler(
 
         var route = new EntityRoute
         {
+            Id = Guid.NewGuid(),
             UserId = cmd.UserId,
             OriginAddress = cmd.OriginAddress,
             OriginCoordinates = originCoords,
@@ -105,6 +106,8 @@ public sealed class CreateRouteCommandHandler(
         // Add the initial monitoring window inline so the route is immediately schedulable.
         route.Windows.Add(new MonitoringWindow
         {
+            Id = Guid.NewGuid(),
+            RouteId = route.Id,
             StartTime = TimeOnly.Parse(cmd.StartTime),
             EndTime = TimeOnly.Parse(cmd.EndTime),
             DaysOfWeekMask = cmd.DaysOfWeekMask,
@@ -130,7 +133,7 @@ public sealed class CreateRouteCommandHandler(
         r.DestinationCoordinates,
         (RouteProvider)r.Provider,
         (MonitoringStatus)r.MonitoringStatus,
-        r.HangfireJobChainId,
+        r.JobChainId,
         r.CreatedAt,
         r.Windows.Select(w => new MonitoringWindowDto(
             w.Id,

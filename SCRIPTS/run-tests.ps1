@@ -1,5 +1,5 @@
 # run-tests.ps1 — Run Unit, Integration, and E2E tests in sequence.
-# Requires Docker Desktop (for integration Testcontainers) and the app running on port 5000 for E2E.
+# Requires Docker Desktop (for Azurite Table Storage) and the app running on port 5000 for E2E.
 # Run from repo root: ./SCRIPTS/run-tests.ps1
 
 [CmdletBinding()]
@@ -42,6 +42,24 @@ function Warmup-App {
     return $false
 }
 
+function Test-AzuriteHealth {
+    # Check if Azurite Table service is responding on port 10002
+    try {
+        $tcp = New-Object System.Net.Sockets.TcpClient
+        $result = $tcp.BeginConnect("127.0.0.1", 10002, $null, $null)
+        $wait = $result.AsyncWaitHandle.WaitOne(2000, $false)
+        if ($wait -and $tcp.Connected) {
+            $tcp.EndConnect($result)
+            $tcp.Close()
+            return $true
+        }
+        $tcp.Close()
+        return $false
+    } catch {
+        return $false
+    }
+}
+
 Write-Host "`n=== PoTraffic Test Run ===" -ForegroundColor Cyan
 
 # Build everything first
@@ -54,6 +72,23 @@ if (!$UnitOnly        -and !$E2eOnly) { Run-Suite 'IntegrationTests' 'tests/PoTr
 if (!$UnitOnly -and !$IntegrationOnly) {
     Write-Host "`n--- E2E (Playwright) ---" -ForegroundColor Cyan
     Write-Host "  NOTE: API must be running on $e2eBaseUrl (start-dev.ps1)." -ForegroundColor Yellow
+
+    # Ensure Azurite is running (E2E tests need Table Storage)
+    if (!(Test-AzuriteHealth)) {
+        Write-Host "  Azurite not running — starting via docker compose..." -ForegroundColor Yellow
+        Push-Location $root
+        docker compose up -d
+        Pop-Location
+        Start-Sleep -Seconds 5
+
+        if (Test-AzuriteHealth) {
+            Write-Host "  Azurite started successfully on port 10002." -ForegroundColor Green
+        } else {
+            Write-Warning "Azurite still not reachable after docker compose up. E2E tests may fail."
+        }
+    } else {
+        Write-Host "  Azurite Table service is healthy on port 10002." -ForegroundColor Green
+    }
 
     # Warm-up ping to trigger JIT/AOT compilation before Playwright launches.
     # Prevents first-test timeout failures from cold-start latency.

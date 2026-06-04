@@ -11,14 +11,14 @@ PowerShell / Python utility scripts for local development and CI. Run all script
 | `setup.ps1` | First-time setup: installs missing tools via `winget` (.NET SDK, Docker Desktop, Azure CLI), checks `az login`, verifies Key Vault access, and starts Azurite. (Rule 9) |
 | `start-dev.ps1` | Starts all local dependencies (Azurite via Docker) and then launches the PoTraffic API + Blazor client. Kills any existing `dotnet` processes on port 5000/5001 first. |
 | `stop-dev.ps1` | Stops and removes the local Docker containers (Azurite). |
-| `run-tests.ps1` | Runs Unit → Integration → E2E tests in order. Integration tests require Docker (Azurite + SQL via Testcontainers). E2E tests require the API to be running on port 5150 (`Testing` profile). |
+| `run-tests.ps1` | Runs Unit → Integration → E2E tests in order. Integration tests use in-memory persistence (no external dependencies). E2E tests require the API to be running on port 5000 (`Testing` profile). |
 
 ---
 
 ## Prerequisites
 
 - .NET 10 SDK (`global.json` pins the version)
-- Docker Desktop (for Azurite in `docker-compose.yml` and Testcontainers)
+- Docker Desktop (for Azurite storage emulator in `docker-compose.yml`)
 - PowerShell 7+
 
 ---

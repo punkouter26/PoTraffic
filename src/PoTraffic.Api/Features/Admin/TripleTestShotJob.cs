@@ -12,7 +12,7 @@ using PoTraffic.Shared.Enums;
 namespace PoTraffic.Api.Features.Admin;
 
 /// <summary>
-/// Hangfire job that fires a single shot of a Triple Test session.
+/// Job that fires a single shot of a Triple Test session.
 /// Mirrors PollRouteJob — resolved via DI scope, writes result back to DB.
 /// </summary>
 public sealed class TripleTestShotJob

@@ -1,19 +1,18 @@
 using FluentAssertions;
-using Hangfire;
-using Hangfire.Common;
-using Hangfire.States;
+using System.Linq.Expressions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using PoTraffic.Api.Features.Admin;
 using PoTraffic.Api.Infrastructure.Storage;
 using PoTraffic.Api.Infrastructure.Providers;
+using PoTraffic.Api.Infrastructure.Scheduling;
 using PoTraffic.Shared.Enums;
 
 namespace PoTraffic.UnitTests.Features.Admin;
 
 /// <summary>
 /// Unit tests for <see cref="StartTripleTestCommandHandler"/> and <see cref="GetTripleTestSessionQueryHandler"/>.
-/// FR-TT: Triple Test schedules 3 independent Hangfire shots and returns winner based on shortest duration.
+/// FR-TT: Triple Test schedules 3 independent shots and returns winner based on shortest duration.
 /// </summary>
 public sealed class TripleTestHandlerTests
 {
@@ -41,9 +40,10 @@ public sealed class TripleTestHandlerTests
             .Returns((string?)null);  // geocode always fails
 
         ITrafficProviderFactory factory = BuildProviderFactory(fakeProvider);
-        IBackgroundJobClient jobClient = Substitute.For<IBackgroundJobClient>();
+        IJobScheduler scheduler = Substitute.For<IJobScheduler>();
+        scheduler.Schedule(Arg.Any<Expression<Func<Task>>>(), Arg.Any<TimeSpan>()).Returns("fake-job-id");
         var handler = new StartTripleTestCommandHandler(
-            db, factory, jobClient, NullLogger<StartTripleTestCommandHandler>.Instance);
+            db, factory, scheduler, NullLogger<StartTripleTestCommandHandler>.Instance);
 
         var command = new StartTripleTestCommand("Bad Origin", "Dest", RouteProvider.GoogleMaps, null);
 
@@ -66,9 +66,10 @@ public sealed class TripleTestHandlerTests
         fakeProvider.GeocodeAsync("BadDest", Arg.Any<CancellationToken>()).Returns((string?)null);
 
         ITrafficProviderFactory factory = BuildProviderFactory(fakeProvider);
-        IBackgroundJobClient jobClient = Substitute.For<IBackgroundJobClient>();
+        IJobScheduler scheduler = Substitute.For<IJobScheduler>();
+        scheduler.Schedule(Arg.Any<Expression<Func<Task>>>(), Arg.Any<TimeSpan>()).Returns("fake-job-id");
         var handler = new StartTripleTestCommandHandler(
-            db, factory, jobClient, NullLogger<StartTripleTestCommandHandler>.Instance);
+            db, factory, scheduler, NullLogger<StartTripleTestCommandHandler>.Instance);
 
         var command = new StartTripleTestCommand("Origin", "BadDest", RouteProvider.GoogleMaps, null);
 
@@ -90,11 +91,11 @@ public sealed class TripleTestHandlerTests
         fakeProvider.GeocodeAsync("B", Arg.Any<CancellationToken>()).Returns("2.0,2.0");
 
         ITrafficProviderFactory factory = BuildProviderFactory(fakeProvider);
-        IBackgroundJobClient jobClient = Substitute.For<IBackgroundJobClient>();
-        jobClient.Create(Arg.Any<Job>(), Arg.Any<IState>()).Returns("fake-job-id");
+        IJobScheduler scheduler = Substitute.For<IJobScheduler>();
+        scheduler.Schedule(Arg.Any<Expression<Func<Task>>>(), Arg.Any<TimeSpan>()).Returns("fake-job-id");
 
         var handler = new StartTripleTestCommandHandler(
-            db, factory, jobClient, NullLogger<StartTripleTestCommandHandler>.Instance);
+            db, factory, scheduler, NullLogger<StartTripleTestCommandHandler>.Instance);
 
         var command = new StartTripleTestCommand("A", "B", RouteProvider.GoogleMaps, null);
 
@@ -124,8 +125,8 @@ public sealed class TripleTestHandlerTests
             .Any(s => s.IsSuccess != null);
         anyFired.Should().BeFalse("shots should be unfired stubs");
 
-        // Assert — 3 Hangfire jobs were scheduled
-        jobClient.Received(3).Create(Arg.Any<Job>(), Arg.Any<IState>());
+        // Assert — 3 jobs were scheduled
+        scheduler.Received(3).Schedule(Arg.Any<Expression<Func<Task>>>(), Arg.Any<TimeSpan>());
     }
 
     [Fact]
@@ -138,9 +139,9 @@ public sealed class TripleTestHandlerTests
             .Returns("1.0,1.0");  // both addresses resolve to same coords
 
         ITrafficProviderFactory factory = BuildProviderFactory(fakeProvider);
-        IBackgroundJobClient jobClient = Substitute.For<IBackgroundJobClient>();
+        IJobScheduler scheduler = Substitute.For<IJobScheduler>();
         var handler = new StartTripleTestCommandHandler(
-            db, factory, jobClient, NullLogger<StartTripleTestCommandHandler>.Instance);
+            db, factory, scheduler, NullLogger<StartTripleTestCommandHandler>.Instance);
 
         var command = new StartTripleTestCommand("Same Place", "Same Place", RouteProvider.GoogleMaps, null);
 

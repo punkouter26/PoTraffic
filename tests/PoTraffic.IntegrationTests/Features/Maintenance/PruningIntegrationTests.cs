@@ -14,7 +14,7 @@ namespace PoTraffic.IntegrationTests.Features.Maintenance;
 /// </summary>
 public sealed class PruningIntegrationTests : BaseIntegrationTest
 {
-    [SkipUnlessDockerAvailable]
+    [SkipUnlessAzuriteAvailable]
     public async Task PruneJob_DeletesOldRecords_LeavesRecentRecordsUntouched()
     {
         await ApplyMigrationsAsync();

@@ -1,4 +1,4 @@
-using Hangfire;
+using PoTraffic.Api.Infrastructure.Scheduling;
 using PoTraffic.Api.Infrastructure.Storage;
 
 using MediatR;
@@ -17,16 +17,16 @@ namespace PoTraffic.Api.Features.Routes;
 public sealed class PollRouteJob
 {
     private readonly IServiceScopeFactory _scopeFactory;
-    private readonly IBackgroundJobClient _jobClient;
+    private readonly IJobScheduler _scheduler;
     private readonly ILogger<PollRouteJob> _logger;
 
     public PollRouteJob(
         IServiceScopeFactory scopeFactory,
-        IBackgroundJobClient jobClient,
+        IJobScheduler scheduler,
         ILogger<PollRouteJob> logger)
     {
         _scopeFactory = scopeFactory;
-        _jobClient = jobClient;
+        _scheduler = scheduler;
         _logger = logger;
     }
 
@@ -45,26 +45,26 @@ public sealed class PollRouteJob
             }
             catch (Exception ex)
             {
-                // Log but do not rethrow — Hangfire must not retry on handler errors
+                // Log but do not rethrow — scheduler must not retry on handler errors
                 _logger.LogError(ex, "PollRouteJob: Unhandled error for route {RouteId}", routeId);
             }
         }
 
         // Schedule next execution — Chain of Responsibility enqueues its own successor
-        string nextJobId = _jobClient.Schedule<PollRouteJob>(
-            job => job.Execute(routeId),
+        string nextJobId = _scheduler.Schedule(
+            () => Execute(routeId),
             TimeSpan.FromMinutes(QuotaConstants.PollIntervalMinutes));
 
         _logger.LogInformation(
             "PollRouteJob: Next poll for route {RouteId} scheduled as job {JobId}", routeId, nextJobId);
 
-        // Update route HangfireJobChainId with successor job ID
+        // Update route JobChainId with successor job ID
         using IServiceScope updateScope = _scopeFactory.CreateScope();
         TableStorageContext db = updateScope.ServiceProvider.GetRequiredService<TableStorageContext>();
         EntityRoute? route = db.Routes.FirstOrDefault(r => r.Id == routeId);
         if (route is not null)
         {
-            route.HangfireJobChainId = nextJobId;
+            route.JobChainId = nextJobId;
             await db.SaveChangesAsync();
         }
     }

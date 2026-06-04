@@ -21,7 +21,7 @@ public sealed class SensitiveMaskingIntegrationTests : BaseIntegrationTest
     protected override void ConfigureHost(IWebHostBuilder builder) =>
         builder.UseEnvironment("Testing");
 
-    [SkipUnlessDockerAvailable]
+    [SkipUnlessAzuriteAvailable]
     public async Task GetConfiguration_SensitiveValues_AreMasked()
     {
         await ApplyMigrationsAsync();

@@ -1,9 +1,9 @@
 using FluentAssertions;
-using Hangfire;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using PoTraffic.Api.Features.Routes;
 using PoTraffic.Api.Infrastructure.Storage;
+using PoTraffic.Api.Infrastructure.Scheduling;
 
 using PoTraffic.Shared.Enums;
 
@@ -12,7 +12,7 @@ namespace PoTraffic.UnitTests.Features.Routes;
 
 /// <summary>
 /// Unit tests for <see cref="DeleteRouteCommandHandler"/>.
-/// Verifies soft-delete semantics, Hangfire job cancellation, and ownership enforcement.
+/// Verifies soft-delete semantics, job cancellation, and ownership enforcement.
 /// </summary>
 public sealed class DeleteRouteHandlerTests
 {
@@ -42,8 +42,8 @@ public sealed class DeleteRouteHandlerTests
         });
         await db.SaveChangesAsync();
 
-        IBackgroundJobClient jobClient = Substitute.For<IBackgroundJobClient>();
-        var handler = new DeleteRouteCommandHandler(db, jobClient, NullLogger<DeleteRouteCommandHandler>.Instance);
+        IJobScheduler scheduler = Substitute.For<IJobScheduler>();
+        var handler = new DeleteRouteCommandHandler(db, scheduler, NullLogger<DeleteRouteCommandHandler>.Instance);
 
         // Act
         bool result = await handler.Handle(new DeleteRouteCommand(routeId, userId), CancellationToken.None);
@@ -53,18 +53,18 @@ public sealed class DeleteRouteHandlerTests
 
         EntityRoute? route = db.Routes.FirstOrDefault(x => x.Id == routeId);
         route!.MonitoringStatus.Should().Be((int)MonitoringStatus.Deleted, "route must be soft-deleted");
-        route.HangfireJobChainId.Should().BeNull("HangfireJobChainId must be cleared on soft-delete");
+        route.JobChainId.Should().BeNull("JobChainId must be cleared on soft-delete");
     }
 
     [Fact]
-    public async Task DeleteRoute_CancelsHangfireJob_WhenJobChainIdIsSet()
+    public async Task DeleteRoute_CancelsJob_WhenJobChainIdIsSet()
     {
         // Arrange
         TableStorageContext db = CreateDb();
 
         Guid routeId = Guid.NewGuid();
         Guid userId = Guid.NewGuid();
-        const string jobId = "hangfire-job-42";
+        const string jobId = "job-42";
 
         db.Add(new EntityRoute
         {
@@ -74,22 +74,19 @@ public sealed class DeleteRouteHandlerTests
             DestinationAddress = "B",
             Provider = (int)RouteProvider.GoogleMaps,
             MonitoringStatus = (int)MonitoringStatus.Active,
-            HangfireJobChainId = jobId,
+            JobChainId = jobId,
             CreatedAt = DateTimeOffset.UtcNow
         });
         await db.SaveChangesAsync();
 
-        IBackgroundJobClient jobClient = Substitute.For<IBackgroundJobClient>();
-        var handler = new DeleteRouteCommandHandler(db, jobClient, NullLogger<DeleteRouteCommandHandler>.Instance);
+        IJobScheduler scheduler = Substitute.For<IJobScheduler>();
+        var handler = new DeleteRouteCommandHandler(db, scheduler, NullLogger<DeleteRouteCommandHandler>.Instance);
 
         // Act
         await handler.Handle(new DeleteRouteCommand(routeId, userId), CancellationToken.None);
 
-        // Assert — Hangfire job must be cancelled.
-        // IBackgroundJobClient.Delete() is an extension method (not interceptable); verify the
-        // underlying ChangeState call that the extension delegates to. Proxy pattern — NSubstitute
-        // can only capture virtual/interface members.
-        jobClient.Received(1).ChangeState(jobId, Arg.Any<Hangfire.States.IState>(), Arg.Any<string>());
+        // Assert — job must be cancelled
+        scheduler.Received(1).Cancel(jobId);
     }
 
     [Fact]
@@ -98,8 +95,8 @@ public sealed class DeleteRouteHandlerTests
         // Arrange
         TableStorageContext db = CreateDb();
 
-        IBackgroundJobClient jobClient = Substitute.For<IBackgroundJobClient>();
-        var handler = new DeleteRouteCommandHandler(db, jobClient, NullLogger<DeleteRouteCommandHandler>.Instance);
+        IJobScheduler scheduler = Substitute.For<IJobScheduler>();
+        var handler = new DeleteRouteCommandHandler(db, scheduler, NullLogger<DeleteRouteCommandHandler>.Instance);
 
         // Act — no routes in DB
         bool result = await handler.Handle(
@@ -130,8 +127,8 @@ public sealed class DeleteRouteHandlerTests
         });
         await db.SaveChangesAsync();
 
-        IBackgroundJobClient jobClient = Substitute.For<IBackgroundJobClient>();
-        var handler = new DeleteRouteCommandHandler(db, jobClient, NullLogger<DeleteRouteCommandHandler>.Instance);
+        IJobScheduler scheduler = Substitute.For<IJobScheduler>();
+        var handler = new DeleteRouteCommandHandler(db, scheduler, NullLogger<DeleteRouteCommandHandler>.Instance);
 
         // Act — different user ID
         bool result = await handler.Handle(

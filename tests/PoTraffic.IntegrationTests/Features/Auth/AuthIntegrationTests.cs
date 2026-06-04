@@ -13,7 +13,7 @@ namespace PoTraffic.IntegrationTests.Features.Auth;
 /// </summary>
 public sealed class AuthIntegrationTests : BaseIntegrationTest
 {
-    [SkipUnlessDockerAvailable]
+    [SkipUnlessAzuriteAvailable]
     public async Task Register_CreatesUser_Login_ReturnsJwt_Refresh_ReturnsNewToken()
     {
         await ApplyMigrationsAsync();
@@ -49,7 +49,7 @@ public sealed class AuthIntegrationTests : BaseIntegrationTest
         refreshAuth!.AccessToken.Should().NotBe(loginAuth.AccessToken, "new access token must differ from old");
     }
 
-    [SkipUnlessDockerAvailable]
+    [SkipUnlessAzuriteAvailable]
     public async Task Register_DuplicateEmail_Returns409()
     {
         await ApplyMigrationsAsync();
@@ -64,7 +64,7 @@ public sealed class AuthIntegrationTests : BaseIntegrationTest
             "FR-013: duplicate email registration must be rejected with 409");
     }
 
-    [SkipUnlessDockerAvailable]
+    [SkipUnlessAzuriteAvailable]
     public async Task Login_InvalidCredentials_Returns401()
     {
         await ApplyMigrationsAsync();
@@ -79,7 +79,7 @@ public sealed class AuthIntegrationTests : BaseIntegrationTest
             "invalid credentials must return 401");
     }
 
-    [SkipUnlessDockerAvailable]
+    [SkipUnlessAzuriteAvailable]
     public async Task ExternalGoogleLogin_StartAndCallback_ReturnsCompletionRedirectWithAccessToken()
     {
         await ApplyMigrationsAsync();

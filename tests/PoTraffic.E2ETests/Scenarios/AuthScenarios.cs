@@ -35,7 +35,7 @@ public sealed class AuthScenarios : PlaywrightTestBase
         Page.PageError += (_, err) => consoleMessages.Add($"[PAGE ERROR] {err}");
 
         // ── Act — navigate to login and submit credentials ────────────────────
-        // Do NOT use WaitUntil=NetworkIdle — Hangfire background polling keeps
+        // Do NOT use WaitUntil=NetworkIdle — background polling keeps
         // the connection alive indefinitely, so NetworkIdle never resolves.
         // Default Load state is sufficient; WaitForAsync handles WASM hydration.
         await Page.GotoAsync($"{BaseUrl}/login");

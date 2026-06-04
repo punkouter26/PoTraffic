@@ -10,7 +10,7 @@ public sealed record RouteDto(
     string DestinationCoordinates,
     RouteProvider Provider,
     MonitoringStatus MonitoringStatus,
-    string? HangfireJobChainId,
+    string? JobChainId,
     DateTimeOffset CreatedAt,
     IReadOnlyList<MonitoringWindowDto> Windows);
 

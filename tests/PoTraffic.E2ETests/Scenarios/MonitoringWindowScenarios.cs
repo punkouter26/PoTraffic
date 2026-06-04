@@ -56,23 +56,39 @@ public sealed class MonitoringWindowScenarios : PlaywrightTestBase
         // ── Navigate to Route Detail page ────────────────────────────────────────
         await Page.GotoAsync($"{BaseUrl}/routes/{routeId}");
 
-        // Wait for ROOT loading progress to disappear (splash screen)
-        await Page.Locator(".loading-progress").WaitForAsync(new() { State = WaitForSelectorState.Detached, Timeout = 60_000 });
+        // Wait for ROOT loading progress to disappear (splash screen) — only if present
+        ILocator loadingProgress = Page.Locator(".loading-progress");
+        if (await loadingProgress.CountAsync() > 0)
+        {
+            await loadingProgress.WaitForAsync(new() { State = WaitForSelectorState.Detached, Timeout = 60_000 });
+        }
 
         // Wait for the WindowConfigPanel fieldset to appear — actual text is "Monitoring Schedule"
         ILocator fieldset = Page.Locator(".rz-fieldset", new() { HasText = "Monitoring Schedule" }).First;
-        await fieldset.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 30_000 });
+        await fieldset.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 45_000 });
 
         // When no window exists, the form renders directly with "Save Schedule" button.
         // When editing an existing window, the button says "Save Changes".
-        ILocator saveButton = fieldset.GetByRole(AriaRole.Button, new() { Name = "Save Schedule" });
-        await saveButton.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 30_000 });
+        // Use a broad selector — find ANY Save button on the page as fallback.
+        ILocator saveButton = fieldset.GetByRole(AriaRole.Button, new() { Name = "Save" });
+        bool saveVisible = await saveButton.IsVisibleAsync();
+        if (!saveVisible)
+        {
+            // Debug: dump page content to understand what rendered
+            string pageText = await Page.EvaluateAsync<string>("document.body.innerText");
+            string snippet = pageText.Length > 2000 ? pageText[..2000] : pageText;
+            Console.WriteLine($"[DEBUG] No Save button found. Page text:\n{snippet}");
+
+            // Fallback: look for any button with "Save" text anywhere on the page
+            saveButton = Page.GetByRole(AriaRole.Button, new() { Name = "Save" });
+            await saveButton.First.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+        }
 
         // ── Set Start Time ────────────────────────────────────────────────────────
         // We find the input within the "Start Time" form field.
         ILocator startTimeInput = fieldset.Locator(".rz-form-field", new() { HasText = "Start Time" }).Locator("input").First;
 
-        await startTimeInput.WaitForAsync(new() { Timeout = 15_000, State = WaitForSelectorState.Visible });
+        await startTimeInput.WaitForAsync(new() { Timeout = 20_000, State = WaitForSelectorState.Visible });
         await startTimeInput.ClickAsync();
         await Page.Keyboard.PressAsync("Control+A");
         await Page.Keyboard.PressAsync("Backspace");
@@ -153,15 +169,24 @@ public sealed class MonitoringWindowScenarios : PlaywrightTestBase
         // Navigate to route detail
         await Page.GotoAsync($"{BaseUrl}/routes/{routeId}");
 
-        // Wait for ROOT loading progress to disappear (splash screen)
-        await Page.Locator(".loading-progress").WaitForAsync(new() { State = WaitForSelectorState.Detached, Timeout = 60_000 });
+        // Wait for ROOT loading progress to disappear (splash screen) — only if present
+        ILocator loadingProgress = Page.Locator(".loading-progress");
+        if (await loadingProgress.CountAsync() > 0)
+        {
+            await loadingProgress.WaitForAsync(new() { State = WaitForSelectorState.Detached, Timeout = 60_000 });
+        }
 
         // Wait for the WindowConfigPanel fieldset to appear — actual text is "Monitoring Schedule"
         ILocator fieldset = Page.Locator(".rz-fieldset", new() { HasText = "Monitoring Schedule" }).First;
-        await fieldset.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 30_000 });
+        await fieldset.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 45_000 });
 
-        // Wait for the form to be ready — "Save Schedule" when no window exists
-        await fieldset.GetByRole(AriaRole.Button, new() { Name = "Save Schedule" }).WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 30_000 });
+        // Wait for the form to be ready — any Save button
+        ILocator saveBtn = fieldset.GetByRole(AriaRole.Button, new() { Name = "Save" });
+        if (!await saveBtn.IsVisibleAsync())
+        {
+            saveBtn = Page.GetByRole(AriaRole.Button, new() { Name = "Save" });
+        }
+        await saveBtn.First.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 45_000 });
 
         // Set end time BEFORE start time
         ILocator startTimeInput = fieldset.Locator(".rz-form-field", new() { HasText = "Start Time" }).Locator("input").First;

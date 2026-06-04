@@ -1,8 +1,10 @@
+using System.Linq.Expressions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using PoTraffic.Api.Features.Auth;
 using PoTraffic.Api.Infrastructure.Providers;
+using PoTraffic.Api.Infrastructure.Scheduling;
 using PoTraffic.IntegrationTests.Helpers;
 using PoTraffic.Shared.Enums;
 using PoTraffic.Api.Infrastructure.Storage;
@@ -37,6 +39,10 @@ public abstract class BaseIntegrationTest : IAsyncLifetime
                     services.AddKeyedScoped<ITrafficProvider, FakeTrafficProvider>(RouteProvider.TomTom);
                     services.AddScoped<IExternalIdentityProvider>(_ => new FakeExternalIdentityProvider("google"));
                     services.AddScoped<IExternalIdentityProvider>(_ => new FakeExternalIdentityProvider("microsoft"));
+
+                    // Register a no-op IJobScheduler for handlers that depend on it
+                    // (BackgroundSchedulerService is skipped in Testing env)
+                    services.AddSingleton<IJobScheduler>(new NoOpJobScheduler());
                 });
 
                 ConfigureHost(builder);
@@ -115,8 +121,21 @@ public abstract class BaseIntegrationTest : IAsyncLifetime
     }
 
     /// <summary>
-    /// No-op — the in-memory <see cref="TableStorageContext"/> does not require migrations.
+    /// No-op — the in-memory <see cref="TableStorageContext"/> does not require schema migrations.
     /// Kept so existing integration tests compile without change.
     /// </summary>
     protected Task ApplyMigrationsAsync() => Task.CompletedTask;
+}
+
+/// <summary>
+/// No-op IJobScheduler for integration tests. Handlers that inject IJobScheduler
+/// (e.g. StartTripleTestCommandHandler) can resolve without requiring a running Azurite instance.
+/// </summary>
+internal sealed class NoOpJobScheduler : IJobScheduler
+{
+    public string Enqueue(Expression<Func<Task>> job) => "noop-enqueue";
+    public string Schedule(Expression<Func<Task>> job, TimeSpan delay) => "noop-schedule";
+    public void Cancel(string jobId) { }
+    public void ScheduleRecurring(string jobId, Func<Task> job, string cronExpression) { }
+    public void CancelRecurring(string jobId) { }
 }

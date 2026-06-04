@@ -35,7 +35,29 @@ if ($LASTEXITCODE -ne 0) {
     Write-Error "docker compose up failed. Is Docker Desktop running?"
 }
 
-# 3. Launch API (Development profile, HTTPS)
+# 3. Wait for Azurite Table service to be healthy
+Write-Host "Waiting for Azurite Table service on port 10002..." -ForegroundColor Yellow
+$maxRetries = 20
+for ($i = 1; $i -le $maxRetries; $i++) {
+    try {
+        $tcp = New-Object System.Net.Sockets.TcpClient
+        $result = $tcp.BeginConnect("127.0.0.1", 10002, $null, $null)
+        $wait = $result.AsyncWaitHandle.WaitOne(1000, $false)
+        if ($wait -and $tcp.Connected) {
+            $tcp.EndConnect($result)
+            $tcp.Close()
+            Write-Host "  Azurite is ready (attempt $i)." -ForegroundColor Green
+            break
+        }
+        $tcp.Close()
+    } catch { }
+    if ($i -eq $maxRetries) {
+        Write-Warning "Azurite not ready after $maxRetries attempts — continuing anyway."
+    }
+    Start-Sleep -Seconds 1
+}
+
+# 4. Launch API (Development profile, HTTPS)
 Write-Host "`nLaunching PoTraffic API on https://localhost:5001 ..." -ForegroundColor Green
 Set-Location (Join-Path $PSScriptRoot '..' 'src' 'PoTraffic.Api')
 dotnet run --launch-profile https

@@ -1,4 +1,4 @@
-using Hangfire;
+using PoTraffic.Api.Infrastructure.Scheduling;
 using PoTraffic.Api.Infrastructure.Storage;
 
 using MediatR;
@@ -32,7 +32,7 @@ public sealed record UpdateRouteResult(
 public sealed class UpdateRouteCommandHandler(
     TableStorageContext db,
     ITrafficProviderFactory providerFactory,
-    IBackgroundJobClient jobClient,
+    IJobScheduler scheduler,
     ILogger<UpdateRouteCommandHandler> logger) : IRequestHandler<UpdateRouteCommand, UpdateRouteResult>
 {
     public async Task<UpdateRouteResult> Handle(UpdateRouteCommand cmd, CancellationToken ct)
@@ -69,17 +69,17 @@ public sealed class UpdateRouteCommandHandler(
         if (route.OriginCoordinates == route.DestinationCoordinates)
             return new UpdateRouteResult(false, "SAME_COORDINATES", null);
 
-        // Cancel + restart Hangfire chain if provider changes
+        // Cancel + restart job chain if provider changes
         if (cmd.Provider.HasValue && (int)cmd.Provider.Value != route.Provider)
         {
-            if (route.HangfireJobChainId is not null)
+            if (route.JobChainId is not null)
             {
-                jobClient.Delete(route.HangfireJobChainId);
-                logger.LogInformation("Cancelled Hangfire job chain {JobId} for route {RouteId} due to provider change",
-                    route.HangfireJobChainId, route.Id);
+                scheduler.Cancel(route.JobChainId);
+                logger.LogInformation("Cancelled job chain {JobId} for route {RouteId} due to provider change",
+                    route.JobChainId, route.Id);
             }
             route.Provider = (int)cmd.Provider.Value;
-            route.HangfireJobChainId = null;
+            route.JobChainId = null;
         }
 
         await db.SaveChangesAsync(ct);

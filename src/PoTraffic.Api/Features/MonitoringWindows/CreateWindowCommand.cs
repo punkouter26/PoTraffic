@@ -69,6 +69,7 @@ public sealed class CreateWindowCommandHandler : IRequestHandler<CreateWindowCom
 
         var window = new MonitoringWindow
         {
+            Id = Guid.NewGuid(),
             RouteId = cmd.RouteId,
             StartTime = cmd.StartTime,
             EndTime = cmd.EndTime,

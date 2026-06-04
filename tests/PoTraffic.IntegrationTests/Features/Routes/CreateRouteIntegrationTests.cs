@@ -29,7 +29,7 @@ public sealed class CreateRouteIntegrationTests : BaseIntegrationTest
         return auth;
     }
 
-    [SkipUnlessDockerAvailable]
+    [SkipUnlessAzuriteAvailable]
     public async Task PostRoutes_CreatesRouteRow()
     {
         await ApplyMigrationsAsync();
@@ -68,7 +68,7 @@ public sealed class CreateRouteIntegrationTests : BaseIntegrationTest
         windowExists.Should().BeTrue("monitoring window must be persisted to database");
     }
 
-    [SkipUnlessDockerAvailable]
+    [SkipUnlessAzuriteAvailable]
     public async Task PostRoutesWindows_CreatesMonitoringWindowRow()
     {
         await ApplyMigrationsAsync();

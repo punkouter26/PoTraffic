@@ -26,11 +26,14 @@ public sealed class DeleteWindowCommandHandler : IRequestHandler<DeleteWindowCom
     public async Task<bool> Handle(DeleteWindowCommand cmd, CancellationToken ct)
     {
         var window = _db.MonitoringWindows
-            .FirstOrDefault(w => w.Id == cmd.WindowId
-                && w.Route.UserId == cmd.UserId
-                && w.IsActive);
+            .FirstOrDefault(w => w.Id == cmd.WindowId && w.IsActive);
 
         if (window is null)
+            return false;
+
+        // Verify ownership via the route (avoids null navigation property in in-memory context)
+        bool isOwned = _db.Routes.Any(r => r.Id == window.RouteId && r.UserId == cmd.UserId);
+        if (!isOwned)
             return false;
 
         window.IsActive = false;

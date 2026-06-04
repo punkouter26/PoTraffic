@@ -24,7 +24,7 @@ public sealed class AdminAuthorizationIntegrationTests : BaseIntegrationTest
     protected override void ConfigureHost(IWebHostBuilder builder) =>
         builder.UseEnvironment("Testing");
 
-    [SkipUnlessDockerAvailable]
+    [SkipUnlessAzuriteAvailable]
     public async Task AdminEndpoint_WithCommuterJwt_Returns403()
     {
         await ApplyMigrationsAsync();
@@ -48,7 +48,7 @@ public sealed class AdminAuthorizationIntegrationTests : BaseIntegrationTest
             "non-admin JWTs must be rejected with 403 on /api/admin/* (FR-022)");
     }
 
-    [SkipUnlessDockerAvailable]
+    [SkipUnlessAzuriteAvailable]
     public async Task AdminEndpoint_WithAdministratorJwt_Returns200()
     {
         await ApplyMigrationsAsync();
@@ -72,7 +72,7 @@ public sealed class AdminAuthorizationIntegrationTests : BaseIntegrationTest
             "Administrator-role JWTs must be accepted on /api/admin/* (FR-022)");
     }
 
-    [SkipUnlessDockerAvailable]
+    [SkipUnlessAzuriteAvailable]
     public async Task AdminEndpoint_WithMalformedRoleClaim_Returns403()
     {
         await ApplyMigrationsAsync();

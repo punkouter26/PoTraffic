@@ -1,9 +1,10 @@
 using FluentAssertions;
-using Hangfire;
+using System.Linq.Expressions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using PoTraffic.Api.Features.MonitoringWindows;
 using PoTraffic.Api.Infrastructure.Storage;
+using PoTraffic.Api.Infrastructure.Scheduling;
 
 using PoTraffic.Shared.Constants;
 using PoTraffic.Shared.Enums;
@@ -66,8 +67,6 @@ public sealed class StartWindowHandlerTests
         db.Add(window);
 
         // Seed today's sessions on DIFFERENT routes for the same user.
-        // Each route can only have one session per day (UNIQUE RouteId+SessionDate constraint),
-        // so quota consumption is modelled as one session per distinct route.
         DateOnly today = DateOnly.FromDateTime(DateTime.UtcNow);
 
         for (int i = 0; i < sessionCount; i++)
@@ -108,8 +107,8 @@ public sealed class StartWindowHandlerTests
         (TableStorageContext db, Guid userId, Guid windowId) =
             await SeedWithSessionsAsync(QuotaConstants.DefaultDailyQuota);
 
-        IBackgroundJobClient jobClient = Substitute.For<IBackgroundJobClient>();
-        var handler = new StartWindowCommandHandler(db, jobClient, NullLogger<StartWindowCommandHandler>.Instance);
+        IJobScheduler scheduler = Substitute.For<IJobScheduler>();
+        var handler = new StartWindowCommandHandler(db, scheduler, NullLogger<StartWindowCommandHandler>.Instance);
 
         // Act
         StartWindowResult result = await handler.Handle(
@@ -125,10 +124,6 @@ public sealed class StartWindowHandlerTests
             .Count(s => s.RouteId != Guid.Empty);
         newSessionCount.Should().Be(QuotaConstants.DefaultDailyQuota,
             "no additional session should be created when quota is exceeded (FR-003)");
-
-        // Verify that no Hangfire job was enqueued by checking the route's HangfireJobChainId remains null
-        // (BackgroundJobClientExtensions.Enqueue is an extension method - cannot verify via NSubstitute)
-        // The handler only sets HangfireJobChainId when a job IS enqueued; on QUOTA_EXCEEDED it returns early.
     }
 
     [Fact]
@@ -138,12 +133,10 @@ public sealed class StartWindowHandlerTests
         (TableStorageContext db, Guid userId, Guid windowId) =
             await SeedWithSessionsAsync(QuotaConstants.DefaultDailyQuota - 1);
 
-        IBackgroundJobClient jobClient = Substitute.For<IBackgroundJobClient>();
-        // Note: BackgroundJobClientExtensions.Enqueue<T> is an extension method that ultimately calls
-        // IBackgroundJobClient.Create(job, state). The mock returns null by default which is acceptable here —
-        // the handler stores HangfireJobChainId = null when no Hangfire server is connected in tests.
+        IJobScheduler scheduler = Substitute.For<IJobScheduler>();
+        scheduler.Enqueue(Arg.Any<Expression<Func<Task>>>()).Returns("fake-job-id");
 
-        var handler = new StartWindowCommandHandler(db, jobClient, NullLogger<StartWindowCommandHandler>.Instance);
+        var handler = new StartWindowCommandHandler(db, scheduler, NullLogger<StartWindowCommandHandler>.Instance);
 
         // Act
         StartWindowResult result = await handler.Handle(
@@ -162,8 +155,8 @@ public sealed class StartWindowHandlerTests
         // Arrange
         TableStorageContext db = CreateDb();
 
-        IBackgroundJobClient jobClient = Substitute.For<IBackgroundJobClient>();
-        var handler = new StartWindowCommandHandler(db, jobClient, NullLogger<StartWindowCommandHandler>.Instance);
+        IJobScheduler scheduler = Substitute.For<IJobScheduler>();
+        var handler = new StartWindowCommandHandler(db, scheduler, NullLogger<StartWindowCommandHandler>.Instance);
 
         // Act
         StartWindowResult result = await handler.Handle(
@@ -177,9 +170,7 @@ public sealed class StartWindowHandlerTests
     [Fact]
     public async Task StartWindow_WhenSessionAlreadyExistsForRouteToday_ReturnsExistingSessionIdempotently()
     {
-        // Arrange — create route+window, manually seed a session for it today (simulates CreateRoute having
-        // already started monitoring), then call Start again for the same window.
-        // Idempotent guard — Strategy pattern: swaps quota-check path for existing-session-return path.
+        // Arrange — create route+window, manually seed a session for it today
         TableStorageContext db = CreateDb();
         Guid userId = Guid.NewGuid();
         Guid routeId = Guid.NewGuid();
@@ -227,8 +218,8 @@ public sealed class StartWindowHandlerTests
         });
         await db.SaveChangesAsync();
 
-        IBackgroundJobClient jobClient = Substitute.For<IBackgroundJobClient>();
-        var handler = new StartWindowCommandHandler(db, jobClient, NullLogger<StartWindowCommandHandler>.Instance);
+        IJobScheduler scheduler = Substitute.For<IJobScheduler>();
+        var handler = new StartWindowCommandHandler(db, scheduler, NullLogger<StartWindowCommandHandler>.Instance);
 
         // Act — second call for same route, same day
         StartWindowResult result = await handler.Handle(

@@ -82,7 +82,7 @@ public sealed class ExecutePollHandlerFailureTests
         bool result = await handler.Handle(new ExecutePollCommand(routeId), CancellationToken.None);
 
         // Assert — FR-005: returns false, no exception propagated
-        result.Should().BeFalse("provider errors must not propagate to Hangfire caller (FR-005)");
+        result.Should().BeFalse("provider errors must not propagate to caller (FR-005)");
 
         int pollCount = db.PollRecords.Count(p => p.RouteId == routeId);
         pollCount.Should().Be(0, "no PollRecord should be inserted when provider throws (FR-005)");
@@ -154,11 +154,11 @@ public sealed class ExecutePollHandlerFailureTests
         var handler = new ExecutePollCommandHandler(
             db, providerFactory, Substitute.For<ILogger<ExecutePollCommandHandler>>());
 
-        // Act — must not throw; Hangfire cannot handle uncaught exceptions in this design
+        // Act — must not throw; scheduler cannot handle uncaught exceptions in this design
         Func<Task> act = async () =>
             await handler.Handle(new ExecutePollCommand(routeId), CancellationToken.None);
 
         await act.Should().NotThrowAsync(
-            "provider errors must be swallowed inside the handler so Hangfire does not retry the job (FR-005)");
+            "provider errors must be swallowed inside the handler so the scheduler does not retry the job (FR-005)");
     }
 }

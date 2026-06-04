@@ -2,8 +2,6 @@ using Azure.Extensions.AspNetCore.Configuration.Secrets;
 using Azure.Data.Tables;
 using Azure.Identity;
 using FluentValidation;
-using Hangfire;
-using Hangfire.Dashboard;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using PoTraffic.Api.Features.Account;
@@ -15,10 +13,10 @@ using PoTraffic.Api.Features.Maintenance;
 using PoTraffic.Api.Features.MonitoringWindows;
 using PoTraffic.Api.Features.Routes;
 using PoTraffic.Api.Infrastructure;
-using PoTraffic.Api.Infrastructure.Hangfire;
 using PoTraffic.Api.Infrastructure.Logging;
 using PoTraffic.Api.Infrastructure.Observability;
 using PoTraffic.Api.Infrastructure.Providers;
+using PoTraffic.Api.Infrastructure.Scheduling;
 using PoTraffic.Api.Infrastructure.Security;
 using PoTraffic.Api.Infrastructure.Storage;
 using PoTraffic.Api.Infrastructure.Testing;
@@ -106,7 +104,7 @@ try
     builder.AddObservability();
     builder.Services.AddTableStoragePersistence();
     builder.Services.AddTableStorageServices(builder.Configuration, builder.Environment);
-    builder.Services.AddHangfireServices(builder.Configuration, builder.Environment);
+    builder.Services.AddBackgroundJobScheduler(builder.Environment);
     builder.Services.AddSecurityServices(builder.Configuration, builder.Environment.EnvironmentName);
     builder.Services.AddTrafficProviders(builder.Configuration, builder.Environment);
 
@@ -223,21 +221,6 @@ try
     // Ensures Serilog + OTel log entries carry these properties in all sinks.
     app.UseMiddleware<LogContextEnrichmentMiddleware>();
 
-    // ── Hangfire dashboard ────────────────────────────────────────────────────
-    // T111: HangfireAdminAuthorizationFilter restricts dashboard to Administrator role
-    // Decorator pattern — wraps dashboard access with role check
-    // Skip in Testing where SQL Server storage is not configured.
-    if (!app.Environment.IsEnvironment("Testing"))
-    {
-        string dashboardPath = app.Configuration["Hangfire:DashboardPath"] ?? "/hangfire";
-        app.UseHangfireDashboard(dashboardPath, new DashboardOptions
-        {
-            Authorization = app.Environment.IsDevelopment()
-                ? [new Hangfire.Dashboard.LocalRequestsOnlyAuthorizationFilter()]
-                : [new HangfireAdminAuthorizationFilter()]
-        });
-    }
-
     // ── API endpoints ─────────────────────────────────────────────────────────
     app.MapClientLogEndpoints();
     app.MapAccountEndpoints();
@@ -303,17 +286,8 @@ try
         app.MapFallbackToFile("index.html");
     }
 
-    // ── Startup: run EF Core migrations, seed admin user, ensure Table Storage tables ──
-    // Ensures schema is always current and an Administrator account exists on
-    // every cold-start (idempotent — safe to run against an existing database).
-    // Retry loop handles Azure SQL serverless auto-pause resume latency (can take
-    // 30-90s on cold wake). Without retries, MigrateAsync() times out and crashes
-    // the app before it can serve requests.
-    //
-    // Dev-only: if SQL is unreachable, we skip migrations + admin seed and let
-    // the app boot in a degraded "Table Storage only" mode. The /health and
-    // /diag endpoints will reflect the missing SQL dependency.
-    // ── Ensure Table Storage tables exist (idempotent, Azurite + Azure) ────
+    // ── Startup: ensure Table Storage tables exist + seed configuration ──────
+    // Idempotent — safe to run on every cold-start.
     {
         TableServiceClient? tableService = app.Services.GetService<TableServiceClient>();
         if (tableService is not null)
@@ -330,22 +304,29 @@ try
         }
     }
 
-    // Post-refactor: SQL is gone from the architecture. The default admin seed and
-    // configuration rows live in Table Storage; the in-memory TableStorageContext
-    // is pre-seeded with default SystemConfiguration rows by SeedDefaultConfigurationsIfMissing().
+    // Seed default SystemConfiguration rows (cost rates, daily quota) in the in-memory store.
     await using AsyncServiceScope scope = app.Services.CreateAsyncScope();
     TableStorageContext db = scope.ServiceProvider.GetRequiredService<TableStorageContext>();
     db.SeedDefaultConfigurationsIfMissing();
 
     // T086 — Register nightly pruning recurring job (02:00 UTC).
-    // Post-refactor: pruning now operates on the in-memory poll list; no
-    // Hangfire SQL backend is required, so this runs unconditionally.
-    if (app.Services.GetService<IBackgroundJobClient>() is not null)
+    // Skipped in Testing where IJobScheduler is not registered.
+    IJobScheduler? scheduler = app.Services.GetService<IJobScheduler>();
+    try
     {
-        RecurringJob.AddOrUpdate<PruneOldPollRecordsJob>(
+        scheduler?.ScheduleRecurring(
             "prune-old-poll-records",
-            job => job.ExecuteAsync(),
+            async () =>
+            {
+                using AsyncServiceScope jobScope = app.Services.CreateAsyncScope();
+                PruneOldPollRecordsJob job = jobScope.ServiceProvider.GetRequiredService<PruneOldPollRecordsJob>();
+                await job.ExecuteAsync();
+            },
             "0 2 * * *");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[startup] Recurring job registration failed — pruning will not run. {ex.Message}");
     }
 
     app.Run();

@@ -1,7 +1,7 @@
 using FluentValidation;
 using PoTraffic.Api.Infrastructure.Storage;
 
-using Hangfire;
+using PoTraffic.Api.Infrastructure.Scheduling;
 
 using MediatR;
 
@@ -17,7 +17,7 @@ namespace PoTraffic.Api.Features.Admin;
 
 /// <summary>
 /// Geocodes the supplied addresses, persists a TripleTestSession with 3 shot stubs,
-/// then schedules 3 Hangfire jobs at t=0s, t+20s, t+40s.
+/// then schedules 3 jobs at t=0s, t+20s, t+40s.
 /// </summary>
 public sealed record StartTripleTestCommand(
     string OriginAddress,
@@ -47,18 +47,18 @@ public sealed class StartTripleTestCommandHandler : IRequestHandler<StartTripleT
 {
     private readonly TableStorageContext _db;
     private readonly ITrafficProviderFactory _providerFactory;
-    private readonly IBackgroundJobClient _jobClient;
+    private readonly IJobScheduler _scheduler;
     private readonly ILogger<StartTripleTestCommandHandler> _logger;
 
     public StartTripleTestCommandHandler(
         TableStorageContext db,
         ITrafficProviderFactory providerFactory,
-        IBackgroundJobClient jobClient,
+        IJobScheduler scheduler,
         ILogger<StartTripleTestCommandHandler> logger)
     {
         _db = db;
         _providerFactory = providerFactory;
-        _jobClient = jobClient;
+        _scheduler = scheduler;
         _logger = logger;
     }
 
@@ -116,13 +116,15 @@ public sealed class StartTripleTestCommandHandler : IRequestHandler<StartTripleT
             _db.Add(shot);
         await _db.SaveChangesAsync(ct);
 
-        // Schedule 3 independent Hangfire jobs — mirrors PollRouteJob scheduling pattern
+        // Schedule 3 independent jobs — mirrors PollRouteJob scheduling pattern
         TimeSpan startDelay = scheduledAt - DateTimeOffset.UtcNow;
         if (startDelay < TimeSpan.Zero) startDelay = TimeSpan.Zero;
 
-        _jobClient.Schedule<TripleTestShotJob>(j => j.Execute(session.Id, 0), startDelay);
-        _jobClient.Schedule<TripleTestShotJob>(j => j.Execute(session.Id, 1), startDelay + TimeSpan.FromSeconds(20));
-        _jobClient.Schedule<TripleTestShotJob>(j => j.Execute(session.Id, 2), startDelay + TimeSpan.FromSeconds(40));
+        Guid sessionId = session.Id;
+        var shotJob = new TripleTestShotJob(null!, null!);
+        _scheduler.Schedule(() => shotJob.Execute(sessionId, 0), startDelay);
+        _scheduler.Schedule(() => shotJob.Execute(sessionId, 1), startDelay + TimeSpan.FromSeconds(20));
+        _scheduler.Schedule(() => shotJob.Execute(sessionId, 2), startDelay + TimeSpan.FromSeconds(40));
 
         _logger.LogInformation(
             "StartTripleTest: session {SessionId} scheduled at {ScheduledAt} for {Origin} → {Dest}",

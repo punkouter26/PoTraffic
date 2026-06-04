@@ -16,36 +16,86 @@ public sealed class MobileViewportScenarios : PlaywrightTestBase
     [SkipUnlessE2EReady]
     public async Task LoginPage_RendersCorrectly_AtMobileViewport()
     {
-        await Page.GotoAsync("/login");
-        await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        // Create a mobile-sized context (iPhone 14 Pro: 390×844)
+        IBrowserContext mobileContext = await Browser.NewContextAsync(new BrowserNewContextOptions
+        {
+            BaseURL = BaseUrl,
+            IgnoreHTTPSErrors = true,
+            ViewportSize = new ViewportSize { Width = MobileWidth, Height = MobileHeight }
+        });
+        IPage mobilePage = await mobileContext.NewPageAsync();
 
-        bool emailVisible = await Page.IsVisibleAsync("input[type='email']");
-        Assert.True(emailVisible, "Email input should be visible at mobile viewport");
+        try
+        {
+            await mobilePage.GotoAsync($"{BaseUrl}/login");
+            await mobilePage.WaitForLoadStateAsync(LoadState.NetworkIdle);
 
-        int scrollWidth = await Page.EvaluateAsync<int>("document.body.scrollWidth");
-        Assert.True(scrollWidth <= MobileWidth,
-            $"Page has horizontal overflow at mobile width. scrollWidth={scrollWidth}, viewport={MobileWidth}");
+            // Radzen renders email as input.rz-textbox (type="text"), not input[type='email']
+            bool emailVisible = await mobilePage.IsVisibleAsync("input.rz-textbox");
+            Assert.True(emailVisible, "Email input should be visible at mobile viewport");
+
+            int scrollWidth = await mobilePage.EvaluateAsync<int>("document.body.scrollWidth");
+            Assert.True(scrollWidth <= MobileWidth,
+                $"Page has horizontal overflow at mobile width. scrollWidth={scrollWidth}, viewport={MobileWidth}");
+        }
+        finally
+        {
+            await mobilePage.CloseAsync();
+            await mobileContext.CloseAsync();
+        }
     }
 
     [SkipUnlessE2EReady]
     public async Task DashboardRouteCards_StackVertically_AtMobileViewport()
     {
-        await Page.GotoAsync("/login");
-        await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        IBrowserContext mobileContext = await Browser.NewContextAsync(new BrowserNewContextOptions
+        {
+            BaseURL = BaseUrl,
+            IgnoreHTTPSErrors = true,
+            ViewportSize = new ViewportSize { Width = MobileWidth, Height = MobileHeight }
+        });
+        IPage mobilePage = await mobileContext.NewPageAsync();
 
-        Assert.True(true, "Stub — implement after Radzen DataList responsive config is finalised");
+        try
+        {
+            await mobilePage.GotoAsync($"{BaseUrl}/login");
+            await mobilePage.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+            Assert.True(true, "Stub — implement after Radzen DataList responsive config is finalised");
+        }
+        finally
+        {
+            await mobilePage.CloseAsync();
+            await mobileContext.CloseAsync();
+        }
     }
 
     [SkipUnlessE2EReady]
     public async Task AdminPage_RedirectsToLogin_ForUnauthenticatedMobileUser()
     {
-        await Page.GotoAsync("/admin");
-        await Page.WaitForURLAsync("**/login**", new PageWaitForURLOptions
+        IBrowserContext mobileContext = await Browser.NewContextAsync(new BrowserNewContextOptions
         {
-            Timeout = 30_000
+            BaseURL = BaseUrl,
+            IgnoreHTTPSErrors = true,
+            ViewportSize = new ViewportSize { Width = MobileWidth, Height = MobileHeight }
         });
+        IPage mobilePage = await mobileContext.NewPageAsync();
 
-        string currentUrl = Page.Url;
-        Assert.Contains("/login", currentUrl, StringComparison.OrdinalIgnoreCase);
+        try
+        {
+            await mobilePage.GotoAsync($"{BaseUrl}/admin");
+            await mobilePage.WaitForURLAsync("**/login**", new PageWaitForURLOptions
+            {
+                Timeout = 30_000
+            });
+
+            string currentUrl = mobilePage.Url;
+            Assert.Contains("/login", currentUrl, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            await mobilePage.CloseAsync();
+            await mobileContext.CloseAsync();
+        }
     }
 }

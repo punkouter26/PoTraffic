@@ -1,10 +1,9 @@
 using FluentAssertions;
-using Hangfire;
-using Hangfire.States;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using PoTraffic.Api.Features.MonitoringWindows;
 using PoTraffic.Api.Infrastructure.Storage;
+using PoTraffic.Api.Infrastructure.Scheduling;
 
 using PoTraffic.Shared.Enums;
 
@@ -12,7 +11,7 @@ namespace PoTraffic.UnitTests.Features.MonitoringWindows;
 
 /// <summary>
 /// Tests for <see cref="StopWindowCommandHandler"/> lifecycle transitions.
-/// Verifies session transitions to Completed and Hangfire job chain is cancelled.
+/// Verifies session transitions to Completed and job chain is cancelled.
 /// </summary>
 public sealed class WindowLifecycleTests
 {
@@ -22,7 +21,7 @@ public sealed class WindowLifecycleTests
     }
 
     private static async Task<(TableStorageContext Db, Guid SessionId, Guid RouteId, Guid UserId)> SeedActiveSessionAsync(
-        string? hangfireJobChainId = "job-abc-123")
+        string? jobChainId = "job-abc-123")
     {
         TableStorageContext db = CreateDb();
         Guid userId = Guid.NewGuid();
@@ -49,7 +48,7 @@ public sealed class WindowLifecycleTests
             DestinationCoordinates = "2.0,2.0",
             Provider = (int)RouteProvider.GoogleMaps,
             MonitoringStatus = (int)MonitoringStatus.Active,
-            HangfireJobChainId = hangfireJobChainId,
+            JobChainId = jobChainId,
             CreatedAt = DateTimeOffset.UtcNow
         };
         db.Add(route);
@@ -72,10 +71,10 @@ public sealed class WindowLifecycleTests
     {
         // Arrange
         (TableStorageContext db, Guid sessionId, _, Guid userId) =
-            await SeedActiveSessionAsync("hangfire-job-1");
+            await SeedActiveSessionAsync("job-1");
 
-        IBackgroundJobClient jobClient = Substitute.For<IBackgroundJobClient>();
-        var handler = new StopWindowCommandHandler(db, jobClient, NullLogger<StopWindowCommandHandler>.Instance);
+        IJobScheduler scheduler = Substitute.For<IJobScheduler>();
+        var handler = new StopWindowCommandHandler(db, scheduler, NullLogger<StopWindowCommandHandler>.Instance);
 
         // Act
         bool result = await handler.Handle(new StopWindowCommand(sessionId, userId), CancellationToken.None);
@@ -90,47 +89,44 @@ public sealed class WindowLifecycleTests
     }
 
     [Fact]
-    public async Task StopWindow_DeletesHangfireJobChain()
+    public async Task StopWindow_DeletesJobChain()
     {
         // Arrange
-        const string jobId = "hangfire-job-42";
+        const string jobId = "job-42";
         (TableStorageContext db, Guid sessionId, _, Guid userId) =
             await SeedActiveSessionAsync(jobId);
 
-        IBackgroundJobClient jobClient = Substitute.For<IBackgroundJobClient>();
-        // BackgroundJobClientExtensions.Delete is an extension method that calls ChangeState internally.
-        // We verify the underlying ChangeState was invoked (NSubstitute cannot intercept extension methods directly).
-        jobClient.ChangeState(jobId, Arg.Any<Hangfire.States.IState>(), Arg.Any<string>()).Returns(true);
+        IJobScheduler scheduler = Substitute.For<IJobScheduler>();
 
-        var handler = new StopWindowCommandHandler(db, jobClient, NullLogger<StopWindowCommandHandler>.Instance);
+        var handler = new StopWindowCommandHandler(db, scheduler, NullLogger<StopWindowCommandHandler>.Instance);
 
         // Act
         bool result = await handler.Handle(new StopWindowCommand(sessionId, userId), CancellationToken.None);
 
         // Assert
         result.Should().BeTrue();
-        jobClient.Received(1).ChangeState(jobId, Arg.Any<Hangfire.States.IState>(), Arg.Any<string?>());
+        scheduler.Received(1).Cancel(jobId);
     }
 
     [Fact]
-    public async Task StopWindow_ClearsHangfireJobChainIdOnRoute()
+    public async Task StopWindow_ClearsJobChainIdOnRoute()
     {
         // Arrange
-        const string jobId = "hangfire-job-99";
+        const string jobId = "job-99";
         (TableStorageContext db, Guid sessionId, Guid routeId, Guid userId) =
             await SeedActiveSessionAsync(jobId);
 
-        IBackgroundJobClient jobClient = Substitute.For<IBackgroundJobClient>();
-        var handler = new StopWindowCommandHandler(db, jobClient, NullLogger<StopWindowCommandHandler>.Instance);
+        IJobScheduler scheduler = Substitute.For<IJobScheduler>();
+        var handler = new StopWindowCommandHandler(db, scheduler, NullLogger<StopWindowCommandHandler>.Instance);
 
         // Act
         await handler.Handle(new StopWindowCommand(sessionId, userId), CancellationToken.None);
 
-        // Assert — HangfireJobChainId should be nulled out
+        // Assert — JobChainId should be nulled out
         Route? route = db.Routes.FirstOrDefault(x => x.Id == routeId);
         route.Should().NotBeNull();
-        route!.HangfireJobChainId.Should().BeNull(
-            "after stopping monitoring, HangfireJobChainId should be cleared to prevent orphaned chains");
+        route!.JobChainId.Should().BeNull(
+            "after stopping monitoring, JobChainId should be cleared to prevent orphaned chains");
     }
 
     [Fact]
@@ -139,8 +135,8 @@ public sealed class WindowLifecycleTests
         // Arrange
         TableStorageContext db = CreateDb();
 
-        IBackgroundJobClient jobClient = Substitute.For<IBackgroundJobClient>();
-        var handler = new StopWindowCommandHandler(db, jobClient, NullLogger<StopWindowCommandHandler>.Instance);
+        IJobScheduler scheduler = Substitute.For<IJobScheduler>();
+        var handler = new StopWindowCommandHandler(db, scheduler, NullLogger<StopWindowCommandHandler>.Instance);
 
         // Act
         bool result = await handler.Handle(
@@ -148,26 +144,24 @@ public sealed class WindowLifecycleTests
 
         // Assert
         result.Should().BeFalse();
-        // BackgroundJobClientExtensions.Delete calls ChangeState — verify it was NOT called
-        jobClient.DidNotReceive().ChangeState(Arg.Any<string>(), Arg.Any<Hangfire.States.IState>(), Arg.Any<string?>());
+        scheduler.DidNotReceive().Cancel(Arg.Any<string>());
     }
 
     [Fact]
-    public async Task StopWindow_WhenNoHangfireJobId_DoesNotCallDelete()
+    public async Task StopWindow_WhenNoJobId_DoesNotCallCancel()
     {
-        // Arrange — route has no HangfireJobChainId
+        // Arrange — route has no JobChainId
         (TableStorageContext db, Guid sessionId, _, Guid userId) =
-            await SeedActiveSessionAsync(hangfireJobChainId: null);
+            await SeedActiveSessionAsync(jobChainId: null);
 
-        IBackgroundJobClient jobClient = Substitute.For<IBackgroundJobClient>();
-        var handler = new StopWindowCommandHandler(db, jobClient, NullLogger<StopWindowCommandHandler>.Instance);
+        IJobScheduler scheduler = Substitute.For<IJobScheduler>();
+        var handler = new StopWindowCommandHandler(db, scheduler, NullLogger<StopWindowCommandHandler>.Instance);
 
         // Act
         bool result = await handler.Handle(new StopWindowCommand(sessionId, userId), CancellationToken.None);
 
         // Assert
         result.Should().BeTrue("session with no job chain should still stop successfully");
-        // BackgroundJobClientExtensions.Delete calls ChangeState — verify it was NOT called
-        jobClient.DidNotReceive().ChangeState(Arg.Any<string>(), Arg.Any<Hangfire.States.IState>(), Arg.Any<string?>());
+        scheduler.DidNotReceive().Cancel(Arg.Any<string>());
     }
 }

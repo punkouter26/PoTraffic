@@ -20,7 +20,7 @@ public sealed class TripleTestIntegrationTests : BaseIntegrationTest
 
     // ── POST /api/admin/triple-test ──────────────────────────────────────────
 
-    [SkipUnlessDockerAvailable]
+    [SkipUnlessAzuriteAvailable]
     public async Task StartTripleTest_AsAdmin_Returns202WithSessionId()
     {
         await ApplyMigrationsAsync();
@@ -45,7 +45,7 @@ public sealed class TripleTestIntegrationTests : BaseIntegrationTest
         body!.SessionId.Should().NotBe(Guid.Empty, "a new session ID must be returned");
     }
 
-    [SkipUnlessDockerAvailable]
+    [SkipUnlessAzuriteAvailable]
     public async Task StartTripleTest_AsCommuter_Returns403()
     {
         await ApplyMigrationsAsync();
@@ -62,7 +62,7 @@ public sealed class TripleTestIntegrationTests : BaseIntegrationTest
             "FR-TT: non-admin must be rejected with 403");
     }
 
-    [SkipUnlessDockerAvailable]
+    [SkipUnlessAzuriteAvailable]
     public async Task StartTripleTest_Unauthenticated_Returns401()
     {
         await ApplyMigrationsAsync();
@@ -78,7 +78,7 @@ public sealed class TripleTestIntegrationTests : BaseIntegrationTest
 
     // ── GET /api/admin/triple-test/{sessionId} ────────────────────────────────
 
-    [SkipUnlessDockerAvailable]
+    [SkipUnlessAzuriteAvailable]
     public async Task GetTripleTestSession_AfterStart_Returns200WithCorrectShape()
     {
         await ApplyMigrationsAsync();
@@ -116,7 +116,7 @@ public sealed class TripleTestIntegrationTests : BaseIntegrationTest
             "shots should be pending immediately after scheduling");
     }
 
-    [SkipUnlessDockerAvailable]
+    [SkipUnlessAzuriteAvailable]
     public async Task GetTripleTestSession_UnknownId_Returns404()
     {
         await ApplyMigrationsAsync();

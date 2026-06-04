@@ -57,7 +57,7 @@ public sealed class ExecutePollCommandHandler(
 
         try
         {
-            // 4. Call provider — catch all exceptions; Hangfire must not retry on provider errors
+            // 4. Call provider — catch all exceptions; scheduler must not retry on provider errors
             travelResult = await provider.GetTravelTimeAsync(
                 route.OriginCoordinates,
                 route.DestinationCoordinates,
@@ -79,6 +79,7 @@ public sealed class ExecutePollCommandHandler(
         // 5. Create PollRecord
         var record = new PollRecord
         {
+            Id = Guid.NewGuid(),
             RouteId = cmd.RouteId,
             SessionId = session.Id,
             PolledAt = DateTimeOffset.UtcNow,

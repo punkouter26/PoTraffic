@@ -41,8 +41,7 @@ internal static class ObservabilityExtensions
             {
                 tracing
                     .SetSampler(new CompositeRoutingSampler())
-                    .AddAspNetCoreInstrumentation()
-                    .AddSource("Hangfire");
+                    .AddAspNetCoreInstrumentation();
 
                 if (!string.IsNullOrWhiteSpace(appInsightsConnStr))
                     tracing.AddAzureMonitorTraceExporter(opts => opts.ConnectionString = appInsightsConnStr);

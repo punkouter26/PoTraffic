@@ -13,7 +13,7 @@ namespace PoTraffic.IntegrationTests.Features.Routes;
 /// </summary>
 public sealed class RouteCrudIntegrationTests : BaseIntegrationTest
 {
-    [SkipUnlessDockerAvailable]
+    [SkipUnlessAzuriteAvailable]
     public async Task RouteCrud_CreateGetDelete_FullLifecycle()
     {
         await ApplyMigrationsAsync();

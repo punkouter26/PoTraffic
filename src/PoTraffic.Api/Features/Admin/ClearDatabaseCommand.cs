@@ -3,7 +3,7 @@ using PoTraffic.Api.Infrastructure.Storage;
 
 
 
-using Hangfire;
+using PoTraffic.Api.Infrastructure.Scheduling;
 
 namespace PoTraffic.Api.Features.Admin;
 
@@ -17,6 +17,7 @@ public sealed record ClearDatabaseResult(int UsersDeleted, int RoutesDeleted, in
 
 public sealed class ClearDatabaseHandler(
     TableStorageContext db,
+    IJobScheduler scheduler,
     ILogger<ClearDatabaseHandler> logger)
     : IRequestHandler<ClearDatabaseCommand, ClearDatabaseResult>
 {
@@ -27,13 +28,13 @@ public sealed class ClearDatabaseHandler(
         int pollsToDeleteCount = db.PollRecords.Count();
 
         var routesWithJobs = db.Routes
-            .Where(r => r.HangfireJobChainId != null)
-            .Select(r => r.HangfireJobChainId!)
+            .Where(r => r.JobChainId != null)
+            .Select(r => r.JobChainId!)
             .ToList();
 
         foreach (var jobId in routesWithJobs)
         {
-            BackgroundJob.Delete(jobId);
+            scheduler.Cancel(jobId);
         }
 
         db.RemoveRange(db.PollRecords.ToList());

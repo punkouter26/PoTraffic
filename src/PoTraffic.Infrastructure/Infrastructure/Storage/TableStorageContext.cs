@@ -1,3 +1,4 @@
+using System.Reflection;
 using PoTraffic.Api.Features.Admin.Entities;
 using PoTraffic.Api.Features.Auth.Entities;
 using PoTraffic.Api.Features.Config.Entities;
@@ -105,9 +106,92 @@ public sealed class TableStorageContext
 
     // ── Write operations (Add / Update / Remove) ───────────────────────────
 
+    private static readonly Dictionary<Type, PropertyInfo?> s_idProperties = new();
+    private static readonly MethodInfo GetListMethod = typeof(TableStorageContext)
+        .GetMethod(nameof(GetList), BindingFlags.NonPublic | BindingFlags.Instance)!;
+
     public void Add<T>(T entity) where T : class
     {
+        // Auto-generate Guid for Id property if it's Guid.Empty (replaces EF Core auto-gen)
+        Type type = typeof(T);
+        if (!s_idProperties.TryGetValue(type, out PropertyInfo? idProp))
+        {
+            idProp = type.GetProperty("Id");
+            s_idProperties[type] = idProp;
+        }
+
+        if (idProp?.PropertyType == typeof(Guid))
+        {
+            Guid currentId = (Guid)(idProp.GetValue(entity) ?? Guid.Empty);
+            if (currentId == Guid.Empty)
+                idProp.SetValue(entity, Guid.NewGuid());
+        }
+
         lock (_gate) GetList<T>().Add(entity);
+
+        // Cascade: add navigation collection children (replaces EF Core change tracking)
+        AddNavigationChildren(entity, type);
+    }
+
+    private void AddNavigationChildren(object entity, Type type)
+    {
+        foreach (PropertyInfo prop in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        {
+            if (!typeof(System.Collections.IEnumerable).IsAssignableFrom(prop.PropertyType) || prop.PropertyType == typeof(string))
+                continue;
+
+            if (prop.PropertyType.GetGenericArguments().Length != 1)
+                continue;
+
+            Type elementType = prop.PropertyType.GetGenericArguments()[0];
+
+            // Only cascade for known entity types
+            if (!IsKnownEntityType(elementType))
+                continue;
+
+            if (prop.GetValue(entity) is System.Collections.IEnumerable collection)
+            {
+                // Get the backing list for this element type to check for duplicates
+                var existingList = (System.Collections.IList)GetListMethod.MakeGenericMethod(elementType)
+                    .Invoke(this, null)!;
+
+                // Try to find the FK navigation property on the child type that points back to the parent
+                PropertyInfo? fkProp = FindForeignKeyProperty(elementType, type);
+
+                foreach (object child in collection)
+                {
+                    // Set reverse navigation property (e.g. MonitoringWindow.Route = route)
+                    if (fkProp is not null && fkProp.GetValue(child) is null)
+                        fkProp.SetValue(child, entity);
+
+                    // Skip if already added (prevents double-add when handler explicitly adds children)
+                    if (existingList.Contains(child))
+                        continue;
+
+                    MethodInfo addMethod = typeof(TableStorageContext)
+                        .GetMethod(nameof(Add), BindingFlags.Public | BindingFlags.Instance)!
+                        .MakeGenericMethod(elementType);
+                    addMethod.Invoke(this, new[] { child });
+                }
+            }
+        }
+    }
+
+    private static PropertyInfo? FindForeignKeyProperty(Type childType, Type parentType)
+    {
+        // Look for a property whose type matches the parent type (e.g. MonitoringWindow.Route : Route)
+        return childType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .FirstOrDefault(p => p.PropertyType == parentType);
+    }
+
+    private static bool IsKnownEntityType(Type type)
+    {
+        // Only cascade for types that are always added via navigation collections
+        // (not explicitly added by handlers). TripleTestShot is always explicitly
+        // added by StartTripleTestCommandHandler, so we exclude it to prevent double-add.
+        return type == typeof(MonitoringWindow)
+            || type == typeof(MonitoringSession)
+            || type == typeof(PollRecord);
     }
 
     public void AddRange<T>(IEnumerable<T> entities) where T : class

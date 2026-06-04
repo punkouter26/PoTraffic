@@ -53,8 +53,8 @@ public sealed class PruneOldPollRecordsCommandHandler
 }
 
 /// <summary>
-/// Thin Hangfire dispatch wrapper invoked by the recurring job scheduler.
-/// Hangfire resolves this via HangfireJobActivator (DI scope).
+/// Thin dispatch wrapper invoked by the background job scheduler.
+/// Resolved via DI scope.
 /// </summary>
 public sealed class PruneOldPollRecordsJob
 {

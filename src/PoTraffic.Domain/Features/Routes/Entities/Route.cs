@@ -15,7 +15,7 @@ public sealed class Route
     /// <summary>0 = Active, 1 = Paused, 2 = Deleted</summary>
     public int MonitoringStatus { get; set; }
 
-    public string? HangfireJobChainId { get; set; }
+    public string? JobChainId { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
 
     public User User { get; set; } = null!;

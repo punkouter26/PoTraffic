@@ -33,7 +33,7 @@ public sealed class PruningBoundaryTests : BaseIntegrationTest
     /// Then   only the 91-day-old record is soft-deleted (IsDeleted=true, RawProviderResponse=null)
     /// And    the 90-day and 89-day records remain with IsDeleted=false
     /// </summary>
-    [SkipUnlessDockerAvailable]
+    [SkipUnlessAzuriteAvailable]
     public async Task PruneCommand_SoftDeletesRecordsBeyond90Days_PreservesAt90DayBoundary()
     {
         // Arrange — ensure migrations are applied and access DI services

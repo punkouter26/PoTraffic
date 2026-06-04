@@ -1,4 +1,4 @@
-using Hangfire;
+using PoTraffic.Api.Infrastructure.Scheduling;
 using PoTraffic.Api.Infrastructure.Storage;
 
 using MediatR;
@@ -29,16 +29,16 @@ public sealed record StartWindowResult(
 public sealed class StartWindowCommandHandler : IRequestHandler<StartWindowCommand, StartWindowResult>
 {
     private readonly TableStorageContext _db;
-    private readonly IBackgroundJobClient _jobClient;
+    private readonly IJobScheduler _scheduler;
     private readonly ILogger<StartWindowCommandHandler> _logger;
 
     public StartWindowCommandHandler(
         TableStorageContext db,
-        IBackgroundJobClient jobClient,
+        IJobScheduler scheduler,
         ILogger<StartWindowCommandHandler> logger)
     {
         _db = db;
-        _jobClient = jobClient;
+        _scheduler = scheduler;
         _logger = logger;
     }
 
@@ -82,6 +82,7 @@ public sealed class StartWindowCommandHandler : IRequestHandler<StartWindowComma
         // 4. Create MonitoringSession (IsHolidayExcluded always false — PublicHolidays table removed S-09)
         var session = new MonitoringSession
         {
+            Id = Guid.NewGuid(),
             RouteId = window.Route.Id,
             SessionDate = today,
             State = (int)SessionState.Active,
@@ -95,10 +96,11 @@ public sealed class StartWindowCommandHandler : IRequestHandler<StartWindowComma
         await _db.SaveChangesAsync(ct);
 
         // 6. Enqueue AFTER successful DB save — ensures no orphan job if SaveChanges fails.
-        string jobId = _jobClient.Enqueue<PollRouteJob>(j => j.Execute(window.Route.Id));
+        PollRouteJob routeJob = new(null!, null!, null!);
+        string jobId = _scheduler.Enqueue(() => routeJob.Execute(window.Route.Id));
 
         // 7. Store job ID so DeleteRouteCommand can cancel it.
-        window.Route.HangfireJobChainId = jobId;
+        window.Route.JobChainId = jobId;
         await _db.SaveChangesAsync(ct);
 
         _logger.LogInformation(

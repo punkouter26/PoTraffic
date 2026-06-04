@@ -1,4 +1,4 @@
-using Hangfire;
+using PoTraffic.Api.Infrastructure.Scheduling;
 using PoTraffic.Api.Infrastructure.Storage;
 
 using MediatR;
@@ -18,16 +18,16 @@ public sealed record DeleteRouteCommand(
 public sealed class DeleteRouteCommandHandler : IRequestHandler<DeleteRouteCommand, bool>
 {
     private readonly TableStorageContext _db;
-    private readonly IBackgroundJobClient _jobClient;
+    private readonly IJobScheduler _scheduler;
     private readonly ILogger<DeleteRouteCommandHandler> _logger;
 
     public DeleteRouteCommandHandler(
         TableStorageContext db,
-        IBackgroundJobClient jobClient,
+        IJobScheduler scheduler,
         ILogger<DeleteRouteCommandHandler> logger)
     {
         _db = db;
-        _jobClient = jobClient;
+        _scheduler = scheduler;
         _logger = logger;
     }
 
@@ -40,17 +40,17 @@ public sealed class DeleteRouteCommandHandler : IRequestHandler<DeleteRouteComma
         if (route is null)
             return false;
 
-        // Cancel any running Hangfire job chain
-        if (route.HangfireJobChainId is not null)
+        // Cancel any running job chain
+        if (route.JobChainId is not null)
         {
-            _jobClient.Delete(route.HangfireJobChainId);
-            _logger.LogInformation("Cancelled Hangfire job chain {JobId} for soft-deleted route {RouteId}",
-                route.HangfireJobChainId, route.Id);
+            _scheduler.Cancel(route.JobChainId);
+            _logger.LogInformation("Cancelled job chain {JobId} for soft-deleted route {RouteId}",
+                route.JobChainId, route.Id);
         }
 
         // Soft-delete: preserve data for reporting / retention period
         route.MonitoringStatus = (int)MonitoringStatus.Deleted;
-        route.HangfireJobChainId = null;
+        route.JobChainId = null;
 
         await _db.SaveChangesAsync(ct);
         _logger.LogInformation("Route {RouteId} soft-deleted by user {UserId}", route.Id, cmd.UserId);

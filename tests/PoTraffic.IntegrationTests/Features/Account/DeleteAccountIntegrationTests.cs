@@ -15,7 +15,7 @@ namespace PoTraffic.IntegrationTests.Features.Account;
 /// </summary>
 public sealed class DeleteAccountIntegrationTests : BaseIntegrationTest
 {
-    [SkipUnlessDockerAvailable]
+    [SkipUnlessAzuriteAvailable]
     public async Task DeleteAccount_Returns204_AndRemovesUserFromDatabase()
     {
         await ApplyMigrationsAsync();
@@ -51,7 +51,7 @@ public sealed class DeleteAccountIntegrationTests : BaseIntegrationTest
         userExists.Should().BeFalse("user row must be hard-deleted after account deletion (FR-031 / GDPR Art. 17)");
     }
 
-    [SkipUnlessDockerAvailable]
+    [SkipUnlessAzuriteAvailable]
     public async Task DeleteAccount_WhenCalledTwice_Returns404OnSecondCall()
     {
         await ApplyMigrationsAsync();

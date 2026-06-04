@@ -1,4 +1,4 @@
-using Hangfire;
+using PoTraffic.Api.Infrastructure.Scheduling;
 using PoTraffic.Api.Infrastructure.Storage;
 
 using MediatR;
@@ -18,16 +18,16 @@ public sealed record StopWindowCommand(
 public sealed class StopWindowCommandHandler : IRequestHandler<StopWindowCommand, bool>
 {
     private readonly TableStorageContext _db;
-    private readonly IBackgroundJobClient _jobClient;
+    private readonly IJobScheduler _scheduler;
     private readonly ILogger<StopWindowCommandHandler> _logger;
 
     public StopWindowCommandHandler(
         TableStorageContext db,
-        IBackgroundJobClient jobClient,
+        IJobScheduler scheduler,
         ILogger<StopWindowCommandHandler> logger)
     {
         _db = db;
-        _jobClient = jobClient;
+        _scheduler = scheduler;
         _logger = logger;
     }
 
@@ -45,14 +45,14 @@ public sealed class StopWindowCommandHandler : IRequestHandler<StopWindowCommand
         // Transition session to Completed
         session.State = (int)SessionState.Completed;
 
-        // Cancel the Hangfire job chain
-        if (session.Route.HangfireJobChainId is not null)
+        // Cancel the job chain
+        if (session.Route.JobChainId is not null)
         {
-            _jobClient.Delete(session.Route.HangfireJobChainId);
+            _scheduler.Cancel(session.Route.JobChainId);
             _logger.LogInformation(
-                "Cancelled Hangfire job chain {JobId} on stop for route {RouteId}",
-                session.Route.HangfireJobChainId, session.RouteId);
-            session.Route.HangfireJobChainId = null;
+                "Cancelled job chain {JobId} on stop for route {RouteId}",
+                session.Route.JobChainId, session.RouteId);
+            session.Route.JobChainId = null;
         }
 
         await _db.SaveChangesAsync(ct);

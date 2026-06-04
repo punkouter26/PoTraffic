@@ -85,7 +85,27 @@ try {
 Step '5/6' 'Starting Azurite (Table Storage emulator)...'
 try {
     & docker compose up -d
-    if ($LASTEXITCODE -eq 0) { Ok 'Azurite container started (ports 10000/10001/10002).' }
+    if ($LASTEXITCODE -eq 0) {
+        Ok 'Azurite container started (ports 10000/10001/10002).'
+        # Wait for Table service to be ready
+        Write-Host "  Waiting for Azurite Table service..." -ForegroundColor Yellow
+        for ($i = 1; $i -le 15; $i++) {
+            try {
+                $tcp = New-Object System.Net.Sockets.TcpClient
+                $result = $tcp.BeginConnect("127.0.0.1", 10002, $null, $null)
+                $wait = $result.AsyncWaitHandle.WaitOne(1000, $false)
+                if ($wait -and $tcp.Connected) {
+                    $tcp.EndConnect($result)
+                    $tcp.Close()
+                    Ok "Azurite Table service ready on port 10002."
+                    break
+                }
+                $tcp.Close()
+            } catch { }
+            if ($i -eq 15) { Warn "Azurite Table service not yet responsive — may need more time." }
+            Start-Sleep -Seconds 1
+        }
+    }
     else { Warn 'docker compose up failed — check Docker Desktop.' }
 } catch {
     Warn 'Could not start Azurite container.'
