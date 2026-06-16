@@ -25,7 +25,12 @@ public sealed class GetTripleTestSessionQueryHandler : IRequestHandler<GetTriple
         if (session is null)
             return null;
 
-        IReadOnlyList<TripleTestShotDto> shots = session.Shots
+        // Query shots from the store rather than `session.Shots`: TableStorageContext does
+        // not populate that navigation collection, so it holds the stale stubs captured at
+        // session-creation time (no FiredAt/IsSuccess/Duration). TripleTestShotJob writes
+        // results to the persisted _tripleTestShots rows, which is what we read here.
+        IReadOnlyList<TripleTestShotDto> shots = _db.TripleTestShots
+            .Where(sh => sh.SessionId == query.SessionId)
             .OrderBy(sh => sh.ShotIndex)
             .Select(sh => new TripleTestShotDto(
                 sh.ShotIndex,

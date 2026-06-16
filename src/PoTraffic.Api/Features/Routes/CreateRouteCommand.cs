@@ -31,7 +31,7 @@ public sealed record CreateRouteCommand(
 
 public sealed record CreateRouteResult(
     bool IsSuccess,
-    string? ErrorCode,   // "SAME_COORDINATES" | "GEOCODE_FAILED"
+    string? ErrorCode,   // RouteErrorCodes: MAPS_KEY_MISSING | ADDRESS_NOT_FOUND | SAME_COORDINATES
     RouteDto? Route);
 
 public sealed class CreateRouteValidator : AbstractValidator<CreateRouteCommand>
@@ -73,22 +73,33 @@ public sealed class CreateRouteCommandHandler(
         // Strategy pattern — select provider via factory (resolves keyed DI lookup)
         ITrafficProvider provider = providerFactory.GetProvider(cmd.Provider);
 
-        string? originCoords = await provider.GeocodeAsync(cmd.OriginAddress, ct);
-        if (originCoords is null)
+        string? originCoords;
+        string? destCoords;
+        try
         {
-            logger.LogWarning("Geocode failed for origin address {Address}", cmd.OriginAddress);
-            return new CreateRouteResult(false, "GEOCODE_FAILED", null);
-        }
+            originCoords = await provider.GeocodeAsync(cmd.OriginAddress, ct);
+            if (originCoords is null)
+            {
+                logger.LogWarning("Geocode failed for origin address {Address}", cmd.OriginAddress);
+                return new CreateRouteResult(false, RouteErrorCodes.AddressNotFound, null);
+            }
 
-        string? destCoords = await provider.GeocodeAsync(cmd.DestinationAddress, ct);
-        if (destCoords is null)
+            destCoords = await provider.GeocodeAsync(cmd.DestinationAddress, ct);
+            if (destCoords is null)
+            {
+                logger.LogWarning("Geocode failed for destination address {Address}", cmd.DestinationAddress);
+                return new CreateRouteResult(false, RouteErrorCodes.AddressNotFound, null);
+            }
+        }
+        catch (GeocodingConfigurationException ex)
         {
-            logger.LogWarning("Geocode failed for destination address {Address}", cmd.DestinationAddress);
-            return new CreateRouteResult(false, "GEOCODE_FAILED", null);
+            // Server misconfiguration (e.g. missing Maps key) — distinct from a bad address.
+            logger.LogError(ex, "Geocoding is not configured on the server.");
+            return new CreateRouteResult(false, RouteErrorCodes.MapsKeyMissing, null);
         }
 
         if (originCoords == destCoords)
-            return new CreateRouteResult(false, "SAME_COORDINATES", null);
+            return new CreateRouteResult(false, RouteErrorCodes.SameCoordinates, null);
 
         var route = new EntityRoute
         {

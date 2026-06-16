@@ -21,15 +21,9 @@ public sealed class DeleteAccountIntegrationTests : BaseIntegrationTest
         await ApplyMigrationsAsync();
         HttpClient client = CreateClient();
 
-        // Arrange — register a fresh user
-        var registerBody = new
-        {
-            Email = "delete-me@test.invalid",
-            Password = "Test!P@ss99",
-            Locale = "en-IE"
-        };
-        HttpResponseMessage registerResponse = await client.PostAsJsonAsync("/api/auth/register", registerBody);
-        registerResponse.StatusCode.Should().Be(HttpStatusCode.Created, "registration must succeed");
+        // Arrange — guest login creates a fresh real user row
+        HttpResponseMessage registerResponse = await client.PostAsync("/api/auth/guest-login", content: null);
+        registerResponse.StatusCode.Should().Be(HttpStatusCode.OK, "guest login must succeed");
 
         AuthResponse? auth = await registerResponse.Content.ReadFromJsonAsync<AuthResponse>();
         auth.Should().NotBeNull();
@@ -57,14 +51,9 @@ public sealed class DeleteAccountIntegrationTests : BaseIntegrationTest
         await ApplyMigrationsAsync();
         HttpClient client = CreateClient();
 
-        // Arrange — register + authenticate
-        var registerBody = new
-        {
-            Email = "delete-twice@test.invalid",
-            Password = "Test!P@ss99",
-            Locale = "en-IE"
-        };
-        HttpResponseMessage registerResponse = await client.PostAsJsonAsync("/api/auth/register", registerBody);
+        // Arrange — guest login + authenticate
+        HttpResponseMessage registerResponse = await client.PostAsync("/api/auth/guest-login", content: null);
+        registerResponse.StatusCode.Should().Be(HttpStatusCode.OK, "guest login must succeed");
         AuthResponse? auth = await registerResponse.Content.ReadFromJsonAsync<AuthResponse>();
         client.DefaultRequestHeaders.Authorization =
             new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", auth!.AccessToken);

@@ -68,12 +68,18 @@ try
                     new DefaultAzureCredential(),
                     new PrefixKeyVaultSecretManager());
             }
-            catch (Azure.Identity.CredentialUnavailableException ex)
+            catch (Exception ex) when (
+                ex is Azure.Identity.CredentialUnavailableException
+                || ex is Azure.RequestFailedException
+                || ex is AggregateException)
             {
+                // DEV-ONLY: any Key Vault failure (no `az login`, 403/disabled vault,
+                // network unreachable, etc.) must NOT prevent a local boot. Rule 10
+                // (First-Run Success) — fall back to appsettings.Development.json.
                 Console.WriteLine(
-                    $"[startup] Key Vault unreachable ({ex.GetType().Name}); " +
+                    $"[startup] Key Vault unreachable ({ex.GetType().Name}: {ex.Message.Split('\n')[0]}); " +
                     "falling back to appsettings.Development.json (DEV-ONLY). " +
-                    "Run `az login` to load secrets from Key Vault.");
+                    "Run `az login` and ensure the vault subscription is enabled to load secrets from Key Vault.");
             }
         }
         else
@@ -119,11 +125,6 @@ try
 
     // ── FluentValidation ──────────────────────────────────────────────────────
     builder.Services.AddValidatorsFromAssembly(typeof(Program).Assembly);
-
-    // ── CORS (allow WASM client in development) ───────────────────────────────
-    builder.Services.AddCors(opts =>
-        opts.AddDefaultPolicy(p =>
-            p.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()));
 
     // ── HTTP client resilience defaults ───────────────────────────────────────
     builder.Services.ConfigureHttpClientDefaults(http => http.AddStandardResilienceHandler());
@@ -210,7 +211,6 @@ try
 
     // ── Security headers / HTTPS ─────────────────────────────────────────────
     app.UseHttpsRedirection();
-    app.UseCors();
     app.UseSerilogRequestLogging();
 
     // ── Auth middleware ───────────────────────────────────────────────────────
@@ -231,6 +231,12 @@ try
     if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
     {
         app.MapGuestEndpoints();
+    }
+    // Dev-only admin login — lets the seeded dev Administrator (and its sample data)
+    // be exercised offline without Microsoft OAuth. Never registered outside Development.
+    if (app.Environment.IsDevelopment())
+    {
+        app.MapDevAuthEndpoints();
     }
     app.MapRoutesEndpoints();
     app.MapWindowsEndpoints();
@@ -308,6 +314,16 @@ try
     await using AsyncServiceScope scope = app.Services.CreateAsyncScope();
     TableStorageContext db = scope.ServiceProvider.GetRequiredService<TableStorageContext>();
     db.SeedDefaultConfigurationsIfMissing();
+
+    // Development-only: seed a deterministic admin + sample route with poll history so
+    // admin grids, route detail, history and charts are verifiable offline. Idempotent.
+    if (app.Environment.IsDevelopment())
+    {
+        Microsoft.Extensions.Logging.ILogger devSeedLogger = scope.ServiceProvider
+            .GetRequiredService<ILoggerFactory>()
+            .CreateLogger("DevDataSeeder");
+        await PoTraffic.Api.Features.Auth.DevAuthExtensions.SeedDevDataIfMissingAsync(db, devSeedLogger);
+    }
 
     // T086 — Register nightly pruning recurring job (02:00 UTC).
     // Skipped in Testing where IJobScheduler is not registered.

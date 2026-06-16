@@ -1,0 +1,81 @@
+- generic [ref=e7]:
+  - banner [ref=e8]:
+    - navigation "Main navigation" [ref=e9]:
+      - link "PoTraffic" [ref=e10] [cursor=pointer]:
+        - /url: dashboard
+      - generic [ref=e11]:
+        - link "Dashboard" [ref=e13] [cursor=pointer]:
+          - /url: dashboard
+        - button "G GUEST87059212 LOGGED IN ▾" [ref=e15] [cursor=pointer]:
+          - generic [ref=e16]: G
+          - generic [ref=e17]: GUEST87059212 LOGGED IN
+          - generic [ref=e18]: ▾
+  - main [ref=e19]:
+    - article [ref=e20]:
+      - generic [ref=e21]:
+        - heading "Create Monitoring Route" [level=5] [ref=e22]
+        - paragraph [ref=e23]: "One step setup: create route, define monitoring window, and start 5-minute polling."
+        - generic [ref=e69]:
+          - generic [ref=e70]:
+            - generic [ref=e71]: error
+            - generic [ref=e73]: Please enter an origin address.
+          - button "close" [ref=e74] [cursor=pointer]:
+            - generic [ref=e76]: close
+        - generic [ref=e25]:
+          - textbox [ref=e26]:
+            - /placeholder: " "
+          - generic: Origin Address
+        - generic [ref=e28]:
+          - textbox [ref=e29]:
+            - /placeholder: " "
+          - generic: Destination Address
+        - group "Monitoring Schedule" [ref=e30]:
+          - generic [ref=e31]: Monitoring Schedule
+          - region [ref=e32]:
+            - generic [ref=e34]:
+              - generic [ref=e35]:
+                - generic [ref=e37]:
+                  - generic [ref=e38]:
+                    - textbox [ref=e39]:
+                      - /placeholder: " "
+                      - text: 07:30
+                    - button "Toggle" [ref=e40] [cursor=pointer]:
+                      - generic [ref=e41]: schedule
+                    - text: expand_less expand_more expand_less expand_more
+                  - generic: Start Time
+                - generic [ref=e43]:
+                  - generic [ref=e44]:
+                    - textbox [ref=e45]:
+                      - /placeholder: " "
+                      - text: 09:00
+                    - button "Toggle" [ref=e46] [cursor=pointer]:
+                      - generic [ref=e47]: schedule
+                    - text: expand_less expand_more expand_less expand_more
+                  - generic: End Time
+              - text: "Probe on these days:"
+              - generic [ref=e48]:
+                - generic [ref=e49] [cursor=pointer]:
+                  - checkbox "Mon" [checked] [ref=e50]
+                  - text: Mon
+                - generic [ref=e51] [cursor=pointer]:
+                  - checkbox "Tue" [checked] [ref=e52]
+                  - text: Tue
+                - generic [ref=e53] [cursor=pointer]:
+                  - checkbox "Wed" [checked] [ref=e54]
+                  - text: Wed
+                - generic [ref=e55] [cursor=pointer]:
+                  - checkbox "Thu" [checked] [ref=e56]
+                  - text: Thu
+                - generic [ref=e57] [cursor=pointer]:
+                  - checkbox "Fri" [checked] [ref=e58]
+                  - text: Fri
+                - generic [ref=e59] [cursor=pointer]:
+                  - checkbox "Sat" [ref=e60]
+                  - text: Sat
+                - generic [ref=e61] [cursor=pointer]:
+                  - checkbox "Sun" [ref=e62]
+                  - text: Sun
+        - button "Save & Start Monitoring" [active] [ref=e63] [cursor=pointer]:
+          - generic [ref=e65]: Save & Start Monitoring
+        - button "Cancel" [ref=e66] [cursor=pointer]:
+          - generic [ref=e68]: Cancel

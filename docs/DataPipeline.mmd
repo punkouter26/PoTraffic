@@ -4,21 +4,21 @@ graph LR
     end
 
     subgraph Processing [Engine]
-        HF[Hangfire Job]
+        Job[Scheduled Poll Job]
         Prov[ITrafficProvider]
     end
 
     subgraph Storage [Persistence]
-        DB[(SQL Database)]
+        Tables[(Table Storage)]
     end
 
     subgraph Output [Visualization]
         Chart[Radzen Analytics Chart]
     end
 
-    UI --> DB
-    HF -- 'Poll every X min' --> UI
-    HF --> Prov
+    UI --> Tables
+    Job -- 'Poll every X min' --> UI
+    Job --> Prov
     Prov -- 'External API (Google/TomTom)' --> Prov
-    Prov --> DB
-    DB --> Chart
+    Prov --> Tables
+    Tables --> Chart

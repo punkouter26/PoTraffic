@@ -24,8 +24,8 @@ real time.
 |---|---|
 | Front-end | Blazor WebAssembly (.NET 10) + Radzen Blazor |
 | Back-end | ASP.NET Core 10 Minimal API + MediatR (CQRS) |
-| Persistence | Table Storage (Azurite locally, Azure in prod) + EF Core / SQL Server for relational data |
-| Background Jobs | Hangfire (recursive polling + nightly pruning) |
+| Persistence | Table Storage (Azurite locally, Azure in prod) |
+| Background Jobs | Table Storage-backed scheduler (recursive polling + nightly pruning) |
 | Auth | Microsoft OAuth (Prod **required**) + GUEST (Dev/Test only) |
 | Logging | Serilog (Console, File, App Insights) + structured fields |
 | Observability | OpenTelemetry → Azure Monitor / App Insights in `rg-poshared` |
@@ -36,7 +36,7 @@ real time.
 ```
 PoTraffic.Domain          // Pure entities + value objects — no deps
 PoTraffic.Application     // Interfaces + DTOs + validators — depends on Domain
-PoTraffic.Infrastructure  // EF Core, Table Storage, Azure, JWT, external providers
+PoTraffic.Infrastructure  // Table Storage, Azure, JWT, external providers
 PoTraffic.Api             // ASP.NET host — features/ + minimal API endpoints
 PoTraffic.Client          // Blazor WASM — hosted by Api, no CORS
 PoTraffic.Shared          // DTOs/Enums/Constants shared between Api ↔ Client
@@ -151,7 +151,12 @@ dotnet watch --project src/PoTraffic.Api --launch-profile https
 
 ## 11. Skills (Rule 12)
 
-The following awesome-copilot skills are expected in the agent's global config:
+The following project-specific skills are expected in the agent's global config.
+Also install the Addy Osmani `agent-skills` pack from
+`https://github.com/addyosmani/agent-skills`; in Codex these map to the
+general engineering skills such as `using-agent-skills`,
+`incremental-implementation`, `test-driven-development`, `code-review-and-quality`,
+`security-and-hardening`, and `shipping-and-launch`.
 
 | Phase | Skill |
 |---|---|

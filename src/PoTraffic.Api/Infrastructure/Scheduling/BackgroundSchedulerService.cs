@@ -9,7 +9,7 @@ namespace PoTraffic.Api.Infrastructure.Scheduling;
 
 /// <summary>
 /// BackgroundService that ticks every second, queries Azurite for due jobs,
-/// and executes them within a DI scope. Replaces Hangfire's background server.
+/// and executes them within a DI scope.
 /// </summary>
 public sealed class BackgroundSchedulerService : BackgroundService
 {
@@ -17,6 +17,12 @@ public sealed class BackgroundSchedulerService : BackgroundService
     private readonly TableStorageJobScheduler? _tableScheduler;
     private readonly ILogger<BackgroundSchedulerService> _logger;
     private static readonly ActivitySource s_activitySource = new("PoTraffic.Scheduler");
+
+    /// <summary>
+    /// Thread-safe, process-wide snapshot of the scheduler's last tick, surfaced on the
+    /// admin Diagnostics "Connection Health" view so local-dev breakage is visible.
+    /// </summary>
+    public static SchedulerTickStatus LastTick { get; private set; } = SchedulerTickStatus.NotYetRun;
 
     public BackgroundSchedulerService(
         IServiceProvider serviceProvider,
@@ -41,9 +47,11 @@ public sealed class BackgroundSchedulerService : BackgroundService
                 try
                 {
                     await ProcessJobs(stoppingToken);
+                    LastTick = new SchedulerTickStatus(DateTimeOffset.UtcNow, Succeeded: true, Error: null);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
+                    LastTick = new SchedulerTickStatus(DateTimeOffset.UtcNow, Succeeded: false, Error: ex.Message);
                     _logger.LogWarning(ex, "BackgroundSchedulerService tick failed — will retry next tick");
                 }
             }
@@ -146,7 +154,7 @@ public sealed class BackgroundSchedulerService : BackgroundService
             throw new InvalidOperationException(
                 $"Method not found: {job.TypeName}.{job.MethodName}");
 
-        // Create a DI scope for the job (matches Hangfire's HangfireJobActivator behavior)
+        // Create a DI scope so job dependencies use normal scoped lifetimes.
         await using AsyncServiceScope scope = _serviceProvider.CreateAsyncScope();
         object jobInstance = scope.ServiceProvider.GetRequiredService(jobType);
 
@@ -197,4 +205,14 @@ public sealed class BackgroundSchedulerService : BackgroundService
     {
         PropertyNameCaseInsensitive = true
     };
+}
+
+/// <summary>
+/// Immutable snapshot of the background scheduler's most recent tick. Assigned by
+/// reference (atomic in the CLR) so the single writer / many readers pattern is safe.
+/// </summary>
+public sealed record SchedulerTickStatus(DateTimeOffset? LastTickUtc, bool Succeeded, string? Error)
+{
+    /// <summary>Sentinel for "the scheduler has not completed a tick yet".</summary>
+    public static readonly SchedulerTickStatus NotYetRun = new(null, Succeeded: false, Error: null);
 }

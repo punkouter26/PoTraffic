@@ -1,0 +1,30 @@
+- generic [ref=e43]:
+  - banner [ref=e44]:
+    - navigation "Main navigation" [ref=e45]:
+      - link "PoTraffic" [ref=e46] [cursor=pointer]:
+        - /url: dashboard
+      - generic [ref=e47]:
+        - link "Dashboard" [ref=e49] [cursor=pointer]:
+          - /url: dashboard
+        - button "G GUEST65740091 LOGGED IN ▾" [ref=e51] [cursor=pointer]:
+          - generic [ref=e52]: G
+          - generic [ref=e53]: GUEST65740091 LOGGED IN
+          - generic [ref=e54]: ▾
+  - main [ref=e55]:
+    - article [ref=e56]:
+      - generic [ref=e57]:
+        - generic [ref=e58]: 0 of 0 routes active
+        - generic [ref=e60]: ·
+        - generic [ref=e61]: 0 / 10 quota used today
+        - generic [ref=e62]: ·
+        - generic [ref=e63]: Resets midnight UTC
+        - button "+ Add Route" [ref=e65] [cursor=pointer]:
+          - generic [ref=e67]: + Add Route
+      - generic [ref=e68]:
+        - generic [ref=e69]: 🛣️
+        - generic [ref=e70]: No routes yet
+        - generic [ref=e71]: Add your first commute route to start monitoring traffic patterns.
+        - button "add Add Your First Route" [ref=e72] [cursor=pointer]:
+          - generic [ref=e73]:
+            - generic [ref=e74]: add
+            - generic [ref=e75]: Add Your First Route

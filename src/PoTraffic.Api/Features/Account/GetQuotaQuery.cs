@@ -32,11 +32,16 @@ public sealed class GetQuotaHandler : IRequestHandler<GetQuotaQuery, QuotaDto?>
         DateTimeOffset dayStart = DateTimeOffset.UtcNow.Date;
         DateTimeOffset dayEnd = dayStart.AddDays(1);
 
+        // Resolve the user's route IDs explicitly — TableStorageContext has no
+        // navigation property to back the old `s.Route.UserId` access.
+        HashSet<Guid> userRouteIds = _db.GetUserRouteIds(query.UserId);
+
+        // Count today's sessions only. The previous `>= today && <= dayEnd` range was
+        // inclusive of dayEnd (tomorrow), over-counting future-dated sessions; this matches
+        // StartWindowCommand's `SessionDate == today` so the displayed quota equals what is enforced.
+        DateOnly today = DateOnly.FromDateTime(dayStart.UtcDateTime);
         int usedToday = _db.MonitoringSessions
-            .Count(s =>
-                s.Route.UserId == query.UserId &&
-                s.SessionDate >= DateOnly.FromDateTime(dayStart.UtcDateTime) &&
-                s.SessionDate <= DateOnly.FromDateTime(dayEnd.UtcDateTime));
+            .Count(s => userRouteIds.Contains(s.RouteId) && s.SessionDate == today);
 
         int remaining = Math.Max(0, dailyLimit - usedToday);
 

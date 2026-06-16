@@ -57,12 +57,15 @@
 @code {
     private string _origin = string.Empty;
     private string _destination = string.Empty;
-    // Default start = now + 1 minute (truncated to the minute), end = start + 15 minutes
-    private DateTime? _startTime = Truncate(DateTime.Now.AddMinutes(1));
-    private DateTime? _endTime  = Truncate(DateTime.Now.AddMinutes(16));
+    // Default to a sensible morning-commute window (07:30–09:00 local), still editable.
+    private DateTime? _startTime = TimeToday(7, 30);
+    private DateTime? _endTime  = TimeToday(9, 0);
 
-    private static DateTime Truncate(DateTime dt) =>
-        new(dt.Year, dt.Month, dt.Day, dt.Hour, dt.Minute, 0);
+    private static DateTime TimeToday(int hour, int minute)
+    {
+        DateTime now = DateTime.Now;
+        return new DateTime(now.Year, now.Month, now.Day, hour, minute, 0);
+    }
     private string _error = "";
     private bool _loading;
     private readonly int _provider = (int)RouteProvider.GoogleMaps;
@@ -82,7 +85,26 @@
     {
         _error = "";
 
-        // Client-side guard: end must be after start
+        // Client-side validation — run before any API call.
+        if (string.IsNullOrWhiteSpace(_origin))
+        {
+            _error = "Please enter an origin address.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_destination))
+        {
+            _error = "Please enter a destination address.";
+            return;
+        }
+
+        if (_startTime is null || _endTime is null)
+        {
+            _error = "Please set both a start and end time.";
+            return;
+        }
+
+        // End must be after start
         if (_endTime <= _startTime)
         {
             _error = "End time must be after start time.";
@@ -114,7 +136,9 @@
                 string? errorCode = errBody.TryGetProperty("error", out var prop) ? prop.GetString() : null;
                 _error = errorCode switch
                 {
-                    "GEOCODE_FAILED"   => "Address could not be geocoded. Check that the Google Maps API key is configured and the address is valid.",
+                    "MAPS_KEY_MISSING" => "Maps integration is not configured on the server.",
+                    "ADDRESS_NOT_FOUND" => "We couldn't find that address. Please check and try again.",
+                    "GEOCODE_FAILED"   => "We couldn't find that address. Please check and try again.",
                     "SAME_COORDINATES" => "Origin and destination resolve to the same location. Please use different addresses.",
                     _                  => "Failed to create route. Please verify your addresses."
                 };

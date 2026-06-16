@@ -33,26 +33,30 @@ public sealed class StopWindowCommandHandler : IRequestHandler<StopWindowCommand
 
     public async Task<bool> Handle(StopWindowCommand cmd, CancellationToken ct)
     {
-        // Load session + route, verify ownership
+        // Load session, then resolve the owning route explicitly — TableStorageContext
+        // has no navigation property to back the old `s.Route.UserId` access.
         MonitoringSession? session = _db.MonitoringSessions
             .FirstOrDefault(s => s.Id == cmd.SessionId
-                && s.Route.UserId == cmd.UserId
                 && s.State == (int)SessionState.Active);
 
         if (session is null)
+            return false;
+
+        EntityRoute? route = _db.GetOwnedRoute(session.RouteId, cmd.UserId);
+        if (route is null)
             return false;
 
         // Transition session to Completed
         session.State = (int)SessionState.Completed;
 
         // Cancel the job chain
-        if (session.Route.JobChainId is not null)
+        if (route.JobChainId is not null)
         {
-            _scheduler.Cancel(session.Route.JobChainId);
+            _scheduler.Cancel(route.JobChainId);
             _logger.LogInformation(
                 "Cancelled job chain {JobId} on stop for route {RouteId}",
-                session.Route.JobChainId, session.RouteId);
-            session.Route.JobChainId = null;
+                route.JobChainId, session.RouteId);
+            route.JobChainId = null;
         }
 
         await _db.SaveChangesAsync(ct);

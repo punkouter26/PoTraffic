@@ -12,7 +12,18 @@
         <!-- Profile Tab -->
         <Tabs>
             <RadzenTabsItem Text="Profile">
-                @if (_profile is not null)
+                @if (_loading)
+                {
+                    @* TASK #9: Skeleton placeholders while profile loads *@
+                    <div class="pt-skeleton-stack rz-mt-4">
+                        <div class="pt-skeleton-line lg w-40"></div>
+                        <div class="pt-skeleton-line w-70"></div>
+                        <div class="pt-skeleton-line lg w-40"></div>
+                        <div class="pt-skeleton-line w-70"></div>
+                        <div class="pt-skeleton-line w-30"></div>
+                    </div>
+                }
+                else if (_profile is not null)
                 {
                     <RadzenStack Gap="1rem" class="rz-mt-4">
                         <RadzenFormField Text="Email">
@@ -69,7 +80,16 @@
 
             <!-- Quota Tab -->
             <RadzenTabsItem Text="Quota">
-                @if (_quota is not null)
+                @if (_loading)
+                {
+                    @* TASK #9: Skeleton placeholders while quota loads *@
+                    <div class="pt-skeleton-stack rz-mt-4">
+                        <div class="pt-skeleton-line w-50"></div>
+                        <div class="pt-skeleton-line lg w-70"></div>
+                        <div class="pt-skeleton-line w-40"></div>
+                    </div>
+                }
+                else if (_quota is not null)
                 {
                     <RadzenStack Gap="1rem" class="rz-mt-4">
                         <RadzenText>
@@ -104,6 +124,7 @@
     private string _currentPassword = string.Empty;
     private string _newPassword = string.Empty;
     private string _confirmPassword = string.Empty;
+    private bool _loading = true;
     private bool _saving;
     private bool _profileSaved;
     private bool _passwordSaved;
@@ -121,6 +142,7 @@
             _newLocale = _profile?.Locale ?? string.Empty;
         }
         catch { /* handled by null guards */ }
+        finally { _loading = false; }
     }
 
     private async Task SaveProfileAsync()

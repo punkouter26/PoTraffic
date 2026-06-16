@@ -16,8 +16,11 @@ public static class TableStorageExtensions
     /// Connection string for local Azurite development.
     /// Default Azurite endpoints: http://127.0.0.1:10001 for Table, http://127.0.0.1:10000 for Blob/Queue
     /// </summary>
+    // NOTE: the Table endpoint MUST include the account path segment (/devstoreaccount1).
+    // Without it the Azure SDK targets http://127.0.0.1:10002/Tables, which Azurite
+    // rejects with 400 Bad Request — the cause of the every-tick scheduler failures.
     public const string AzuriteConnectionString =
-        "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;TableEndpoint=http://127.0.0.1:10002/";
+        "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;";
 
     /// <summary>
     /// Name of the storage account in Azure.

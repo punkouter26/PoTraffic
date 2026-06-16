@@ -12,53 +12,43 @@
 @inject IWebAssemblyHostEnvironment HostEnvironment
 
 <RadzenCard class="rz-p-6">
-    <RadzenText TextStyle="TextStyle.H5" class="rz-mb-4">Sign In</RadzenText>
+    <RadzenText TextStyle="TextStyle.H5" class="rz-mb-2">Sign In</RadzenText>
+    <RadzenText TextStyle="TextStyle.Body2" class="rz-mb-4" style="color:var(--rz-text-tertiary-color)">
+        Sign in with your Microsoft account to continue.
+    </RadzenText>
 
     @if (!string.IsNullOrEmpty(_error))
     {
         <RadzenAlert AlertStyle="AlertStyle.Danger" class="rz-mb-3">@_error</RadzenAlert>
     }
 
-    <RadzenFormField Text="Email" class="rz-w-100 rz-mb-3">
-        <RadzenTextBox @bind-Value="_email" InputAttributes="@(new Dictionary<string,object>{{"type","email"}})" />
-    </RadzenFormField>
+    @if (_providersLoaded && !_microsoftConfigured)
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Warning" AllowClose="false" class="rz-mb-3">
+            Microsoft sign-in is not configured on this server.
+        </RadzenAlert>
+    }
 
-    <RadzenFormField Text="Password" class="rz-w-100 rz-mb-4">
-        <RadzenPassword @bind-Value="_password" />
-    </RadzenFormField>
-
-    <RadzenButton Text="Sign In" ButtonStyle="ButtonStyle.Primary" class="rz-w-100"
-                  Click="@LoginAsync" IsBusy="_loading" />
+    <RadzenButton Text="🪟  Continue with Microsoft" ButtonStyle="ButtonStyle.Primary"
+                  class="rz-w-100 auth-social-btn"
+                  Click='() => StartExternalLogin("microsoft")'
+                  Disabled="@(_loading || (_providersLoaded && !_microsoftConfigured))" />
 
     @if (HostEnvironment.IsDevelopment())
     {
         <RadzenButton Text="🔓  GUEST (Dev Only)" ButtonStyle="ButtonStyle.Warning" class="rz-w-100 rz-mt-2"
                       Click="@GuestLoginAsync" IsBusy="_loading" />
+        <RadzenButton Text="🔑  Dev Admin (Dev Only)" ButtonStyle="ButtonStyle.Secondary" class="rz-w-100 rz-mt-2"
+                      Click="@DevAdminLoginAsync" IsBusy="_loading" />
     }
-
-    @if (_availableProviders.Contains("google"))
-    {
-        <RadzenButton Text="🔵  Continue with Google" ButtonStyle="ButtonStyle.Light" class="rz-w-100 rz-mt-2 auth-social-btn"
-                      Click='() => StartExternalLogin("google")' Disabled="_loading" />
-    }
-
-    @if (_availableProviders.Contains("microsoft"))
-    {
-        <RadzenButton Text="🪟  Continue with Microsoft" ButtonStyle="ButtonStyle.Light" class="rz-w-100 rz-mt-2 auth-social-btn"
-                      Click='() => StartExternalLogin("microsoft")' Disabled="_loading" />
-    }
-
-    <RadzenText class="rz-mt-3">
-        No account? <a href="/register">Register</a>
-    </RadzenText>
 </RadzenCard>
 
 @code {
-    private string _email = string.Empty;
-    private string _password = string.Empty;
     private string _error = "";
     private bool _loading;
+    private bool _providersLoaded;
     private List<string> _availableProviders = [];
+    private bool _microsoftConfigured => _availableProviders.Contains("microsoft");
 
     protected override async Task OnInitializedAsync()
     {
@@ -70,51 +60,17 @@
         }
         catch
         {
-            // Non-fatal — social login buttons simply won't appear
-        }
-    }
-
-    private async Task LoginAsync()
-    {
-        _error = "";
-        _loading = true;
-
-        try
-        {
-            HttpResponseMessage response = await Http.PostAsJsonAsync(
-                "/api/auth/login",
-                new LoginRequest(_email, _password));
-
-            if (response.IsSuccessStatusCode)
-            {
-                AuthResponse? auth = await response.Content.ReadFromJsonAsync<AuthResponse>();
-                if (auth is not null)
-                {
-                    // Store JWT via the auth state provider and navigate to dashboard
-                    if (AuthStateProvider is JwtAuthenticationStateProvider jwtProvider)
-                    {
-                        await jwtProvider.LoginAsync(auth.AccessToken);
-                    }
-                    Nav.NavigateTo("/dashboard");
-                }
-            }
-            else
-            {
-                _error = "Invalid email or password.";
-            }
-        }
-        catch
-        {
-            _error = "Unable to connect. Please try again.";
+            // Non-fatal — the Microsoft button stays enabled and falls back to a server-side error.
         }
         finally
         {
-            _loading = false;
+            _providersLoaded = true;
         }
     }
 
     private void StartExternalLogin(string provider)
     {
+        _loading = true;
         string encodedReturnUrl = Uri.EscapeDataString("/dashboard");
         Nav.NavigateTo($"/api/auth/external/{provider}/start?returnUrl={encodedReturnUrl}", forceLoad: true);
     }
@@ -143,6 +99,42 @@
             else
             {
                 _error = "GUEST login failed. Check server logs.";
+            }
+        }
+        catch
+        {
+            _error = "Unable to connect. Please try again.";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task DevAdminLoginAsync()
+    {
+        _error = "";
+        _loading = true;
+
+        try
+        {
+            HttpResponseMessage response = await Http.PostAsJsonAsync("/api/auth/dev-admin-login", new { });
+
+            if (response.IsSuccessStatusCode)
+            {
+                AuthResponse? auth = await response.Content.ReadFromJsonAsync<AuthResponse>();
+                if (auth is not null)
+                {
+                    if (AuthStateProvider is JwtAuthenticationStateProvider jwtProvider)
+                    {
+                        await jwtProvider.LoginAsync(auth.AccessToken);
+                    }
+                    Nav.NavigateTo("/dashboard");
+                }
+            }
+            else
+            {
+                _error = "Dev admin login failed. Check server logs.";
             }
         }
         catch

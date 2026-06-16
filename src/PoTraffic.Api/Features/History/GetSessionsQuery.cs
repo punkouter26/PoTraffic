@@ -26,8 +26,13 @@ public sealed class GetSessionsQueryHandler
         GetSessionsQuery query,
         CancellationToken ct)
     {
+        // Ownership check — TableStorageContext has no navigation properties, so the
+        // old `s.Route.UserId` access NREs. Resolve ownership explicitly instead.
+        if (!_db.OwnsRoute(query.RouteId, query.UserId))
+            return Array.Empty<SessionDto>();
+
         return _db.MonitoringSessions
-            .Where(s => s.RouteId == query.RouteId && s.Route.UserId == query.UserId)
+            .Where(s => s.RouteId == query.RouteId)
             .OrderByDescending(s => s.SessionDate)
             .Select(s => new SessionDto(
                 s.Id,

@@ -5,14 +5,13 @@ namespace PoTraffic.Api.Infrastructure.Scheduling;
 
 /// <summary>
 /// DI registration for the custom background job scheduler.
-/// Replaces Hangfire's AddHangfire/AddHangfireServer with a lightweight
-/// Azure Table Storage-backed BackgroundService.
+/// Uses a lightweight Azure Table Storage-backed BackgroundService.
 /// </summary>
 public static class BackgroundSchedulerServiceExtensions
 {
     /// <summary>
     /// Registers the job scheduler, Table Storage persistence, and the background
-    /// worker service. Call this in Program.cs in place of AddHangfireServices.
+    /// worker service.
     /// Skipped in the Testing environment where Azurite is not running.
     /// </summary>
     public static IServiceCollection AddBackgroundJobScheduler(

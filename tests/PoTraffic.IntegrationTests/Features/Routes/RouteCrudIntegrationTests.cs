@@ -19,12 +19,10 @@ public sealed class RouteCrudIntegrationTests : BaseIntegrationTest
         await ApplyMigrationsAsync();
         HttpClient client = CreateClient();
 
-        // Arrange — register a real user to satisfy FK constraints
-        string uniqueEmail = $"crud-{Guid.NewGuid():N}@test.invalid";
-        var registerBody = new { Email = uniqueEmail, Password = "Str0ng!Pass", Locale = "en-IE" };
-        HttpResponseMessage registerResp = await client.PostAsJsonAsync("/api/auth/register", registerBody);
-        registerResp.StatusCode.Should().Be(HttpStatusCode.Created, "user registration must succeed");
-        AuthResponse? auth = await registerResp.Content.ReadFromJsonAsync<AuthResponse>();
+        // Arrange — guest login creates a real user row to satisfy FK constraints
+        HttpResponseMessage guestResp = await client.PostAsync("/api/auth/guest-login", content: null);
+        guestResp.StatusCode.Should().Be(HttpStatusCode.OK, "guest login must succeed");
+        AuthResponse? auth = await guestResp.Content.ReadFromJsonAsync<AuthResponse>();
         client.DefaultRequestHeaders.Authorization =
             new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", auth!.AccessToken);
 

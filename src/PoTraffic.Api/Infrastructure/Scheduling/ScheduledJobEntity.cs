@@ -5,7 +5,7 @@ namespace PoTraffic.Api.Infrastructure.Scheduling;
 
 /// <summary>
 /// Azure Table Storage entity representing a scheduled background job.
-/// Replaces Hangfire's in-memory job storage with durable Azurite/Azure persistence.
+/// Stores durable job state in Azurite locally and Azure Table Storage in production.
 /// </summary>
 public sealed class ScheduledJobEntity : ITableEntity
 {

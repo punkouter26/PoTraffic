@@ -1,28 +1,27 @@
-
 # PoTraffic DevOps & Deployment Strategy
 
 ## Tech Stack
-*   **Hosting**: Azure App Service (B1 Tier minimum)
-*   **Database**: Azure SQL Database (Serverless)
-*   **Job Processing**: Hangfire (Persistence via SQL)
-*   **Logging**: Azure Monitor (App Insights) via Serilog
 
-## CI/CD Pipeline (GitHub Actions)
-1.  **Stage: Build & Test**
-    - dotnet restore
-    - dotnet build --configuration Release
-    - dotnet test (Unit + Integration)
-2.  **Stage: E2E Verification**
-    - Deploy to staging/test environment
-    - Run **Playwright .NET** scenarios against API/Client
-3.  **Stage: Deploy**
-    - dotnet publish
-    - Zip and deploy to Azure App Service via Azure/webapps-deploy
+- **Hosting**: Azure App Service
+- **Storage**: Azure Table Storage, Azurite locally
+- **Job Processing**: Table Storage-backed scheduler
+- **Secrets**: Managed Identity + `kv-poshared`
+- **Logging**: Serilog + Azure Monitor / Application Insights
+
+## CI/CD Pipeline
+
+1. Restore, build, and run unit tests.
+2. Start Azurite and run integration tests.
+3. Start the hosted API/client and run Playwright E2E tests.
+4. Deploy to Azure App Service through `azd`.
 
 ## Environment Secrets
+
 | Key | Purpose |
 |---|---|
-| SQL_CONNECTION_STRING | Link to production Azure SQL |
-| JWT_SECRET | 256-bit key for token signing |
-| GOOGLE_MAPS_API_KEY | External provider access |
-| TOMTOM_API_KEY | External provider access |
+| `PoTraffic--Jwt--Key` | JWT signing key |
+| `PoTraffic--ConnectionStrings--TableStorage` | Azure Table Storage access |
+| `PoTraffic--ExternalAuth--Microsoft--ClientId` | Microsoft OAuth client |
+| `PoTraffic--ExternalAuth--Microsoft--ClientSecret` | Microsoft OAuth secret |
+| `PoTraffic--GoogleMaps--ApiKey` | Google Maps provider access |
+| `PoTraffic--TomTom--ApiKey` | TomTom provider access |

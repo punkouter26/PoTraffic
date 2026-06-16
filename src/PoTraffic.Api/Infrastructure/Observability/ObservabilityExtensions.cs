@@ -1,4 +1,5 @@
 using Azure.Monitor.OpenTelemetry.Exporter;
+using System.Reflection;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Serilog;
@@ -12,6 +13,8 @@ internal static class ObservabilityExtensions
     /// </summary>
     internal static WebApplicationBuilder AddObservability(this WebApplicationBuilder builder)
     {
+        string roleName = Assembly.GetExecutingAssembly().GetName().Name ?? "PoTraffic.Api";
+
         // ── OpenTelemetry logs ────────────────────────────────────────────────
         builder.Logging.AddOpenTelemetry(logging =>
         {
@@ -20,7 +23,7 @@ internal static class ObservabilityExtensions
         });
 
         builder.Services.AddOpenTelemetry()
-            .ConfigureResource(r => r.AddService("PoTraffic.Api"))
+            .ConfigureResource(r => r.AddService(roleName))
             .WithMetrics(metrics => metrics
                 .AddMeter("Microsoft.AspNetCore.Hosting")
                 .AddMeter("Microsoft.AspNetCore.Server.Kestrel"))
@@ -31,12 +34,12 @@ internal static class ObservabilityExtensions
                     .AddHttpClientInstrumentation();
                 if (!string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]))
                     tracing.AddOtlpExporter();
-            });
+        });
 
         // ── Azure Monitor tracing (CompositeRoutingSampler Strategy pattern) ──
-        string? appInsightsConnStr = builder.Configuration["ApplicationInsights:ConnectionString"];
+        string? appInsightsConnStr = ResolveAppInsightsConnectionString(builder.Configuration);
         builder.Services.AddOpenTelemetry()
-            .ConfigureResource(r => r.AddService("PoTraffic.Api"))
+            .ConfigureResource(r => r.AddService(roleName))
             .WithTracing(tracing =>
             {
                 tracing
@@ -57,5 +60,22 @@ internal static class ObservabilityExtensions
         });
 
         return builder;
+    }
+
+    private static string? ResolveAppInsightsConnectionString(IConfiguration configuration)
+    {
+        string? connectionString = configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]
+            ?? configuration["ApplicationInsights:ConnectionString"];
+
+        if (!string.IsNullOrWhiteSpace(connectionString))
+            return connectionString;
+
+        string? instrumentationKey = configuration["APPINSIGHTS_INSTRUMENTATIONKEY"]
+            ?? configuration["ApplicationInsights:InstrumentationKey"];
+
+        if (!string.IsNullOrWhiteSpace(instrumentationKey))
+            return $"InstrumentationKey={instrumentationKey}";
+
+        return configuration["ApplicationInsights:StagingFallbackConnectionString"];
     }
 }

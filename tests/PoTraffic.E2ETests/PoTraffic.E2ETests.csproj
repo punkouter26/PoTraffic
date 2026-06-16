@@ -2,6 +2,8 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>PoTraffic.E2ETests</RootNamespace>
+    <AssemblyName>PoTraffic.E2ETests</AssemblyName>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 

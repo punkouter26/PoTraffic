@@ -1,0 +1,27 @@
+.pt-access-denied {
+    max-width: 32rem;
+    margin: 4rem auto;
+    padding: 2.5rem 2rem;
+    text-align: center;
+    background: var(--rz-card-background-color, #fff);
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.pt-access-denied-icon {
+    font-size: 3rem;
+    line-height: 1;
+    margin-bottom: 0.75rem;
+}
+
+.pt-access-denied h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 0.75rem;
+}
+
+.pt-access-denied p {
+    color: var(--rz-text-secondary-color, #64748b);
+    margin-bottom: 1.5rem;
+    line-height: 1.5;
+}

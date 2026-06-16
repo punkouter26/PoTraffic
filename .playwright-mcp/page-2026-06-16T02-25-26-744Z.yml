@@ -1,0 +1,144 @@
+- generic [ref=e44]:
+  - banner [ref=e45]:
+    - navigation "Main navigation" [ref=e46]:
+      - link "PoTraffic" [ref=e47] [cursor=pointer]:
+        - /url: dashboard
+      - generic [ref=e48]:
+        - generic [ref=e49]:
+          - link "Dashboard" [ref=e50] [cursor=pointer]:
+            - /url: dashboard
+          - link "Admin" [ref=e51] [cursor=pointer]:
+            - /url: admin
+        - button "D dev-admin@potraffic.dev ▾" [ref=e53] [cursor=pointer]:
+          - generic [ref=e54]: D
+          - generic [ref=e55]: dev-admin@potraffic.dev
+          - generic [ref=e56]: ▾
+  - main [ref=e57]:
+    - article [ref=e58]:
+      - navigation "breadcrumb" [ref=e100]:
+        - link "Dashboard" [ref=e101] [cursor=pointer]:
+          - /url: /dashboard
+        - generic [ref=e102]: ›
+        - generic [ref=e103]: Route Detail
+      - generic [ref=e104]:
+        - generic [ref=e105]: ⏰
+        - generic [ref=e106]:
+          - generic [ref=e107]: Best departure today
+          - generic [ref=e108]: "Best departure: 07:45 (~23 min)"
+      - generic [ref=e109]:
+        - heading "Monitoring Snapshot" [level=6] [ref=e110]
+        - generic [ref=e111]:
+          - generic [ref=e112]:
+            - generic [ref=e113]: Latest Sample
+            - generic [ref=e114]: 24m
+            - generic [ref=e115]: at 09:55:00
+          - generic [ref=e116]:
+            - generic [ref=e117]: Samples (24h)
+            - generic [ref=e118]: "72"
+            - generic [ref=e119]: 4 rerouted
+          - generic [ref=e120]:
+            - generic [ref=e121]: Next Poll ETA
+            - generic [ref=e122]: in 695 min
+      - group "Monitoring Schedule" [ref=e123]:
+        - generic [ref=e124]: Monitoring Schedule
+        - region [ref=e125]:
+          - generic [ref=e127]:
+            - text: "Days of week:"
+            - generic [ref=e128]:
+              - generic [ref=e129]:
+                - checkbox "check" [checked] [ref=e130]:
+                  - generic:
+                    - checkbox [checked]
+                  - generic [ref=e132] [cursor=pointer]: check
+                - paragraph [ref=e133] [cursor=pointer]: Mon
+              - generic [ref=e134]:
+                - checkbox "check" [checked] [ref=e135]:
+                  - generic:
+                    - checkbox [checked]
+                  - generic [ref=e137] [cursor=pointer]: check
+                - paragraph [ref=e138] [cursor=pointer]: Tue
+              - generic [ref=e139]:
+                - checkbox "check" [checked] [ref=e140]:
+                  - generic:
+                    - checkbox [checked]
+                  - generic [ref=e142] [cursor=pointer]: check
+                - paragraph [ref=e143] [cursor=pointer]: Wed
+              - generic [ref=e144]:
+                - checkbox "check" [checked] [ref=e145]:
+                  - generic:
+                    - checkbox [checked]
+                  - generic [ref=e147] [cursor=pointer]: check
+                - paragraph [ref=e148] [cursor=pointer]: Thu
+              - generic [ref=e149]:
+                - checkbox "check" [checked] [ref=e150]:
+                  - generic:
+                    - checkbox [checked]
+                  - generic [ref=e152] [cursor=pointer]: check
+                - paragraph [ref=e153] [cursor=pointer]: Fri
+              - generic [ref=e154]:
+                - checkbox [ref=e155]:
+                  - generic:
+                    - checkbox
+                - paragraph [ref=e157] [cursor=pointer]: Sat
+              - generic [ref=e158]:
+                - checkbox [ref=e159]:
+                  - generic:
+                    - checkbox
+                - paragraph [ref=e161] [cursor=pointer]: Sun
+            - generic [ref=e162]:
+              - generic [ref=e164]:
+                - generic [ref=e165]:
+                  - textbox [ref=e166]:
+                    - /placeholder: " "
+                    - text: 07:00
+                  - button "Toggle" [ref=e167] [cursor=pointer]:
+                    - generic [ref=e168]: calendar_today
+                  - text: chevron_left chevron_right arrow_drop_down arrow_drop_down expand_less expand_more expand_less expand_more
+                - generic: Start Time
+              - generic [ref=e170]:
+                - generic [ref=e171]:
+                  - textbox [ref=e172]:
+                    - /placeholder: " "
+                    - text: 09:00
+                  - button "Toggle" [ref=e173] [cursor=pointer]:
+                    - generic [ref=e174]: calendar_today
+                  - text: chevron_left chevron_right arrow_drop_down arrow_drop_down expand_less expand_more expand_less expand_more
+                - generic: End Time
+            - button "Save Schedule" [ref=e176] [cursor=pointer]:
+              - generic [ref=e178]: Save Schedule
+      - generic [ref=e179]:
+        - heading "Travel Time Trend (Past 24h)" [level=6] [ref=e180]
+        - generic [ref=e181]:
+          - generic [ref=e183]:
+            - button "Past 24h Actual" [ref=e184] [cursor=pointer]:
+              - img [ref=e185]
+              - generic [ref=e189]: Past 24h Actual
+            - button "Rerouted" [ref=e190] [cursor=pointer]:
+              - img [ref=e191]
+              - generic [ref=e195]: Rerouted
+            - button "Historical Baseline" [ref=e196] [cursor=pointer]:
+              - img [ref=e197]
+              - generic [ref=e201]: Historical Baseline
+            - button "+1σ" [ref=e202] [cursor=pointer]:
+              - img [ref=e203]
+              - generic [ref=e207]: +1σ
+          - img [ref=e208]:
+            - generic [ref=e209]:
+              - generic [ref=e210]:
+                - generic [ref=e213]: "0"
+                - generic [ref=e216]: "40"
+                - generic [ref=e219]: "80"
+                - generic [ref=e222]: "120"
+                - generic [ref=e224]: Minutes
+              - generic [ref=e225]:
+                - generic [ref=e227]: 00:00
+                - generic [ref=e229]: 04:50
+                - generic [ref=e231]: 09:41
+                - generic [ref=e233]: 14:32
+                - generic [ref=e235]: 19:22
+                - generic [ref=e237]: 00:13
+                - generic [ref=e239]: 05:04
+                - generic [ref=e241]: 09:54
+      - button "› Raw Poll Data (Past 24h · 72 records)" [ref=e399] [cursor=pointer]:
+        - generic [ref=e400]: ›
+        - text: Raw Poll Data (Past 24h · 72 records)

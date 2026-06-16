@@ -2,6 +2,7 @@ using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using PoTraffic.Shared.Constants;
 
 namespace PoTraffic.Api.Infrastructure.Providers;
 
@@ -29,8 +30,10 @@ public sealed class GoogleMapsTrafficProvider : ITrafficProvider
         string? apiKey = _configuration["GoogleMaps:ApiKey"];
         if (string.IsNullOrWhiteSpace(apiKey))
         {
+            // Server misconfiguration — distinct from an unresolvable address (null return).
             _logger.LogError("Google Maps API key is not configured (GoogleMaps:ApiKey).");
-            return null;
+            throw new GeocodingConfigurationException(
+                "Google Maps API key is not configured (GoogleMaps:ApiKey).");
         }
 
         string url = $"{GeocodeBaseUrl}?address={Uri.EscapeDataString(address)}&key={apiKey}";

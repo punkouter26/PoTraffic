@@ -31,9 +31,16 @@ public sealed class GetPollHistoryQueryHandler
     {
         int skip = (query.Page - 1) * query.PageSize;
 
+        // Ownership check (prevents cross-user IDOR). TableStorageContext has no
+        // navigation property, so resolve the route explicitly rather than via
+        // the old `p.Route.UserId` access. The route also carries the Provider
+        // used to project each DTO below.
+        EntityRoute? route = _db.GetOwnedRoute(query.RouteId, query.UserId);
+        if (route is null)
+            return new PagedResult<PollRecordDto>(query.Page, query.PageSize, 0, new List<PollRecordDto>());
+
         var baseQuery = _db.PollRecords
             .Where(p => p.RouteId == query.RouteId
-                && p.Route.UserId == query.UserId   // ownership: prevents cross-user IDOR
                 && !p.IsDeleted
                 && (query.SinceUtc == null || p.PolledAt >= query.SinceUtc))
             .OrderByDescending(p => p.PolledAt);
@@ -49,7 +56,7 @@ public sealed class GetPollHistoryQueryHandler
                 p.PolledAt,
                 p.TravelDurationSeconds,
                 p.DistanceMetres,
-                (PoTraffic.Shared.Enums.RouteProvider)p.Route.Provider,
+                (PoTraffic.Shared.Enums.RouteProvider)route.Provider,
                 p.IsRerouted))
             .ToList();
 

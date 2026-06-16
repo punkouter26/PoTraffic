@@ -76,7 +76,8 @@ internal static class SecurityExtensions
                         System.IO.Directory.GetCurrentDirectory(),
                         "keys")));
         services.AddHttpClient();
-        services.AddScoped<IExternalIdentityProvider, GoogleExternalIdentityProvider>();
+        // Microsoft OAuth is the only external sign-in provider. Local password
+        // login/registration and Google sign-in were removed by design.
         services.AddScoped<IExternalIdentityProvider, MicrosoftExternalIdentityProvider>();
         services.AddScoped<ExternalAuthService>();
 

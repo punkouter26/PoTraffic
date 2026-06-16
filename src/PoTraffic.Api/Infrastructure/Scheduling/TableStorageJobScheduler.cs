@@ -30,10 +30,18 @@ public sealed class TableStorageJobScheduler : IJobScheduler
         {
             tableServiceClient.CreateTableIfNotExists(TableName);
         }
-        catch (RequestFailedException)
+        catch (RequestFailedException ex) when (ex.Status == 409)
         {
-            // Table may already exist or Azurite may return transient errors.
-            // The BackgroundSchedulerService will retry on each tick.
+            // 409 Conflict — table already exists. Benign.
+        }
+        catch (RequestFailedException ex)
+        {
+            // Any other failure (e.g. a malformed endpoint returning 400) must NOT be
+            // swallowed silently — it previously masked the root cause of every-tick
+            // failures. Surface it so the scheduler's broken state is diagnosable.
+            Console.WriteLine(
+                $"[startup] TableStorageJobScheduler could not ensure table '{TableName}' " +
+                $"({ex.Status} {ex.ErrorCode}): {ex.Message.Split('\n')[0]}");
         }
         _tableClient = tableServiceClient.GetTableClient(TableName);
     }

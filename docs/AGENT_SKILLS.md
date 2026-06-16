@@ -4,6 +4,20 @@
 > global config. Install them once in your editor / agent host so they are
 > available alongside the Po* conventions.
 
+## Addy Osmani Agent Skills
+
+Install the full engineering skill pack from:
+
+`https://github.com/addyosmani/agent-skills`
+
+For Codex, the installed pack should expose the 24 lifecycle skills from that
+repository, including `using-agent-skills`, `spec-driven-development`,
+`planning-and-task-breakdown`, `incremental-implementation`,
+`test-driven-development`, `source-driven-development`,
+`browser-testing-with-devtools`, `code-review-and-quality`,
+`security-and-hardening`, `observability-and-instrumentation`, and
+`shipping-and-launch`.
+
 ## Phase 1 — Understand the Codebase (Day 1)
 
 ### 1. `acquire-codebase-knowledge`

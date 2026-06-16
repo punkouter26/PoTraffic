@@ -27,6 +27,15 @@ public sealed class GetUsersHandler : IRequestHandler<GetUsersQuery, IReadOnlyLi
 
         List<User> users = _db.Users.ToList();
 
+        // Routes grouped by owner. TableStorageContext never populates the `User.Routes`
+        // navigation collection (it stays the empty default), so reading `u.Routes` below
+        // silently yielded zero polls/cost for every user — resolve from _db.Routes instead.
+        // Deleted routes are excluded here so the per-user breakdown ignores them.
+        Dictionary<Guid, List<EntityRoute>> routesByUser = _db.Routes
+            .Where(r => r.MonitoringStatus != (int)MonitoringStatus.Deleted)
+            .GroupBy(r => r.UserId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
         // Load today's poll records across all routes
         Dictionary<Guid, List<PollRecord>> pollsByRoute = _db.PollRecords
             .Where(p => p.PolledAt >= dayStart && p.PolledAt < dayEnd && !p.IsDeleted)
@@ -42,13 +51,13 @@ public sealed class GetUsersHandler : IRequestHandler<GetUsersQuery, IReadOnlyLi
 
         return users.Select(u =>
         {
-            IEnumerable<PollRecord> todayPolls = u.Routes
-                .Where(r => r.MonitoringStatus != (int)MonitoringStatus.Deleted)
+            List<EntityRoute> userRoutes = routesByUser.TryGetValue(u.Id, out var rs) ? rs : [];
+
+            IEnumerable<PollRecord> todayPolls = userRoutes
                 .SelectMany(r => pollsByRoute.TryGetValue(r.Id, out var polls) ? polls : []);
             int totalCount = todayPolls.Count();
 
-            var breakdown = u.Routes
-                .Where(r => r.MonitoringStatus != (int)MonitoringStatus.Deleted)
+            var breakdown = userRoutes
                 .GroupBy(r => (RouteProvider)r.Provider)
                 .Select(grp =>
                 {

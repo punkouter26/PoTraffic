@@ -1,0 +1,34 @@
+- generic [ref=e7]:
+  - banner [ref=e8]:
+    - navigation "Main navigation" [ref=e9]:
+      - link "PoTraffic" [ref=e10] [cursor=pointer]:
+        - /url: dashboard
+      - generic [ref=e11]:
+        - link "Dashboard" [ref=e13] [cursor=pointer]:
+          - /url: dashboard
+        - button "G GUEST65740091 LOGGED IN ▾" [ref=e15] [cursor=pointer]:
+          - generic [ref=e16]: G
+          - generic [ref=e17]: GUEST65740091 LOGGED IN
+          - generic [ref=e18]: ▾
+  - main [ref=e19]:
+    - article [ref=e20]:
+      - generic [ref=e21]:
+        - heading "Account Settings" [level=5] [ref=e22]
+        - generic [active] [ref=e23]:
+          - tablist [ref=e24]:
+            - tab "Profile" [ref=e25] [cursor=pointer]:
+              - generic [ref=e26]: Profile
+            - tab "Change Password" [ref=e27] [cursor=pointer]:
+              - generic [ref=e28]: Change Password
+            - tab "Quota" [selected] [ref=e29] [cursor=pointer]:
+              - generic [ref=e30]: Quota
+            - tab "Danger Zone" [ref=e31] [cursor=pointer]:
+              - generic [ref=e32]: Danger Zone
+          - tabpanel "Quota" [ref=e48]:
+            - generic [ref=e49]:
+              - paragraph [ref=e50]: "Used today: 0 / 10 sessions"
+              - progressbar [ref=e51]:
+                - generic [ref=e52]:
+                  - text: 0%
+                  - generic [ref=e53]: 0%
+              - paragraph [ref=e54]: Resets at 00:00 UTC

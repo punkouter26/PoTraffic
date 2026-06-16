@@ -4,8 +4,16 @@
         <Router AppAssembly="@typeof(App).Assembly" NotFoundPage="typeof(Pages.NotFound)">
             <Found Context="routeData">
                 <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)">
-                    <NotAuthorized>
-                        <RedirectToLogin />
+                    <NotAuthorized Context="authState">
+                        @if (authState.User.Identity?.IsAuthenticated == true)
+                        {
+                            @* Authenticated but lacking the required role — don't bounce to login. *@
+                            <AccessDenied />
+                        }
+                        else
+                        {
+                            <RedirectToLogin />
+                        }
                     </NotAuthorized>
                 </AuthorizeRouteView>
                 <FocusOnNavigate RouteData="@routeData" Selector="h1" />

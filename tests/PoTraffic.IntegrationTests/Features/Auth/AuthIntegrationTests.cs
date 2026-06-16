@@ -8,85 +8,45 @@ using PoTraffic.Shared.DTOs.Auth;
 namespace PoTraffic.IntegrationTests.Features.Auth;
 
 /// <summary>
-/// Integration tests for the Auth slice (Register, Login, RefreshToken).
-/// FR-013: email uniqueness; JWT issuance; refresh token rotation.
+/// Integration tests for the surviving Auth slice (guest-login, refresh-token, external Microsoft OAuth).
+/// Email/password register + login were removed — Microsoft OAuth and guest-login are the only sign-in paths.
 /// </summary>
 public sealed class AuthIntegrationTests : BaseIntegrationTest
 {
     [SkipUnlessAzuriteAvailable]
-    public async Task Register_CreatesUser_Login_ReturnsJwt_Refresh_ReturnsNewToken()
+    public async Task GuestLogin_ReturnsJwt_Refresh_ReturnsNewToken()
     {
         await ApplyMigrationsAsync();
         HttpClient client = CreateClient();
 
-        // Act 1 — Register
-        var registerBody = new { Email = "auth-flow@test.invalid", Password = "Str0ng!Pass", Locale = "en-IE" };
-        HttpResponseMessage registerResponse = await client.PostAsJsonAsync("/api/auth/register", registerBody);
-        registerResponse.StatusCode.Should().Be(HttpStatusCode.Created, "registration must succeed");
+        // Act 1 — Guest login creates a real User row and returns tokens.
+        HttpResponseMessage guestResponse = await client.PostAsync("/api/auth/guest-login", content: null);
+        guestResponse.StatusCode.Should().Be(HttpStatusCode.OK, "guest login must succeed in the Testing environment");
 
-        AuthResponse? registerAuth = await registerResponse.Content.ReadFromJsonAsync<AuthResponse>();
-        registerAuth.Should().NotBeNull();
-        registerAuth!.AccessToken.Should().NotBeNullOrWhiteSpace("register should return an access token");
-        registerAuth.RefreshToken.Should().NotBeNullOrWhiteSpace("register should return a refresh token");
+        AuthResponse? guestAuth = await guestResponse.Content.ReadFromJsonAsync<AuthResponse>();
+        guestAuth.Should().NotBeNull();
+        guestAuth!.AccessToken.Should().NotBeNullOrWhiteSpace("guest login should return an access token");
+        guestAuth.RefreshToken.Should().NotBeNullOrWhiteSpace("guest login should return a refresh token");
 
-        // Act 2 — Login with same credentials
-        var loginBody = new { Email = "auth-flow@test.invalid", Password = "Str0ng!Pass" };
-        HttpResponseMessage loginResponse = await client.PostAsJsonAsync("/api/auth/login", loginBody);
-        loginResponse.StatusCode.Should().Be(HttpStatusCode.OK, "login with valid credentials must return 200");
-
-        AuthResponse? loginAuth = await loginResponse.Content.ReadFromJsonAsync<AuthResponse>();
-        loginAuth.Should().NotBeNull();
-        loginAuth!.AccessToken.Should().NotBeNullOrWhiteSpace("login should return an access token");
-
-        // Act 3 — Refresh token rotation
+        // Act 2 — Refresh token rotation
         HttpResponseMessage refreshResponse = await client.PostAsJsonAsync(
             "/api/auth/refresh-token",
-            new { AccessToken = loginAuth.AccessToken, RefreshToken = loginAuth.RefreshToken });
+            new { AccessToken = guestAuth.AccessToken, RefreshToken = guestAuth.RefreshToken });
         refreshResponse.StatusCode.Should().Be(HttpStatusCode.OK, "refresh token rotation must succeed");
 
         AuthResponse? refreshAuth = await refreshResponse.Content.ReadFromJsonAsync<AuthResponse>();
         refreshAuth.Should().NotBeNull();
-        refreshAuth!.AccessToken.Should().NotBe(loginAuth.AccessToken, "new access token must differ from old");
+        refreshAuth!.AccessToken.Should().NotBe(guestAuth.AccessToken, "new access token must differ from old");
     }
 
     [SkipUnlessAzuriteAvailable]
-    public async Task Register_DuplicateEmail_Returns409()
-    {
-        await ApplyMigrationsAsync();
-        HttpClient client = CreateClient();
-
-        var body = new { Email = "dupe@test.invalid", Password = "Str0ng!Pass", Locale = "en-IE" };
-        HttpResponseMessage first = await client.PostAsJsonAsync("/api/auth/register", body);
-        first.StatusCode.Should().Be(HttpStatusCode.Created);
-
-        HttpResponseMessage second = await client.PostAsJsonAsync("/api/auth/register", body);
-        second.StatusCode.Should().Be(HttpStatusCode.Conflict,
-            "FR-013: duplicate email registration must be rejected with 409");
-    }
-
-    [SkipUnlessAzuriteAvailable]
-    public async Task Login_InvalidCredentials_Returns401()
-    {
-        await ApplyMigrationsAsync();
-        HttpClient client = CreateClient();
-
-        var registerBody = new { Email = "badlogin@test.invalid", Password = "Str0ng!Pass", Locale = "en-IE" };
-        await client.PostAsJsonAsync("/api/auth/register", registerBody);
-
-        var loginBody = new { Email = "badlogin@test.invalid", Password = "Wr0ng!Pass" };
-        HttpResponseMessage response = await client.PostAsJsonAsync("/api/auth/login", loginBody);
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized,
-            "invalid credentials must return 401");
-    }
-
-    [SkipUnlessAzuriteAvailable]
-    public async Task ExternalGoogleLogin_StartAndCallback_ReturnsCompletionRedirectWithAccessToken()
+    public async Task ExternalMicrosoftLogin_StartAndCallback_ReturnsCompletionRedirectWithAccessToken()
     {
         await ApplyMigrationsAsync();
         // Use a no-redirect client so we can inspect the 302 Location header directly.
         HttpClient client = CreateClientNoRedirect();
 
-        HttpResponseMessage startResponse = await client.GetAsync("/api/auth/external/google/start?returnUrl=/dashboard");
+        HttpResponseMessage startResponse = await client.GetAsync("/api/auth/external/microsoft/start?returnUrl=/dashboard");
         startResponse.StatusCode.Should().Be(HttpStatusCode.Redirect);
 
         Uri? startLocation = startResponse.Headers.Location;
@@ -99,7 +59,7 @@ public sealed class AuthIntegrationTests : BaseIntegrationTest
         state.Should().NotBeNullOrWhiteSpace();
 
         HttpResponseMessage callbackResponse = await client.GetAsync(
-            $"/api/auth/external/google/callback?code=integration-test-code&state={Uri.EscapeDataString(state!)}");
+            $"/api/auth/external/microsoft/callback?code=integration-test-code&state={Uri.EscapeDataString(state!)}");
 
         callbackResponse.StatusCode.Should().Be(HttpStatusCode.Redirect);
         Uri? callbackLocation = callbackResponse.Headers.Location;

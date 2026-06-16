@@ -27,10 +27,9 @@ public sealed class GetBaselineQueryHandler
 
     public Task<BaselineResponse> Handle(GetBaselineQuery query, CancellationToken ct)
     {
-        // Post-refactor: SQL Server STDEV() aggregation is replaced with a pure-LINQ
-        // pass over PollRecords. For small-to-medium route histories (the common case)
-        // the in-process LINQ query is fine; for very large histories (10k+ polls) a
-        // future Table Storage stored-procedure would be a follow-up optimisation.
+        // For small-to-medium route histories (the common case), the in-process
+        // LINQ query is fine; very large histories can move to a precomputed
+        // Table Storage aggregate in a follow-up optimisation.
         bool owned = _db.Routes
             .Any(r => r.Id == query.RouteId && r.UserId == query.UserId);
         if (!owned)

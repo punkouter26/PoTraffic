@@ -7,7 +7,7 @@ namespace PoTraffic.Api.Infrastructure.Azure;
 /// <summary>
 /// Azure Managed Identity configuration for PoTraffic.
 /// Uses DefaultAzureCredential which tries multiple authentication methods in order:
-/// 1. Managed Identity (Azure App Service, Azure VM, Azure Container Apps)
+/// 1. Managed Identity (Azure App Service, Azure VM)
 /// 2. Visual Studio credentials
 /// 3. Azure CLI credentials
 /// 4. Azure PowerShell credentials

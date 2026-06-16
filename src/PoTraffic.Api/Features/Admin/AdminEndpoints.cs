@@ -2,6 +2,7 @@ using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using PoTraffic.Api.Features.Admin;
+using PoTraffic.Api.Infrastructure.Scheduling;
 using PoTraffic.Shared.DTOs.Admin;
 using PoTraffic.Shared.Enums;
 
@@ -132,14 +133,52 @@ public static class AdminEndpoints
 
         // GET /api/admin/connection-health — live ping status for all external dependencies
         // Re-uses the registered IHealthCheckService; masks no values (statuses only).
-        grp.MapGet("/connection-health", async (HealthCheckService healthCheckService, CancellationToken ct) =>
+        grp.MapGet("/connection-health", async (
+            HealthCheckService healthCheckService,
+            IConfiguration configuration,
+            CancellationToken ct) =>
         {
             HealthReport report = await healthCheckService.CheckHealthAsync(ct);
-            IEnumerable<ConnectionHealthDto> results = report.Entries.Select(e => new ConnectionHealthDto(
+            List<ConnectionHealthDto> results = report.Entries.Select(e => new ConnectionHealthDto(
                 Name: e.Key,
                 Status: e.Value.Status.ToString(),
                 Description: e.Value.Description,
-                DurationMs: e.Value.Duration.TotalMilliseconds));
+                DurationMs: e.Value.Duration.TotalMilliseconds)).ToList();
+
+            // Background scheduler — surface last-tick health (not a ping, but the most
+            // common local-dev breakage). Status maps to the same "Healthy"/other badge.
+            SchedulerTickStatus tick = BackgroundSchedulerService.LastTick;
+            string schedulerStatus;
+            string schedulerDescription;
+            if (tick.LastTickUtc is null)
+            {
+                schedulerStatus = "Unhealthy";
+                schedulerDescription = "Scheduler has not completed a tick yet.";
+            }
+            else if (tick.Succeeded)
+            {
+                schedulerStatus = "Healthy";
+                schedulerDescription = $"Last tick {tick.LastTickUtc:O} succeeded.";
+            }
+            else
+            {
+                schedulerStatus = "Unhealthy";
+                schedulerDescription = $"Last tick {tick.LastTickUtc:O} failed: {tick.Error}";
+            }
+            results.Add(new ConnectionHealthDto(
+                Name: "Background Scheduler",
+                Status: schedulerStatus,
+                Description: schedulerDescription,
+                DurationMs: 0));
+
+            // Google Maps API key — report configured/not without leaking the value.
+            bool mapsKeyConfigured = !string.IsNullOrWhiteSpace(configuration["GoogleMaps:ApiKey"]);
+            results.Add(new ConnectionHealthDto(
+                Name: "Google Maps API Key",
+                Status: mapsKeyConfigured ? "Healthy" : "Unhealthy",
+                Description: mapsKeyConfigured ? "Configured" : "Not configured",
+                DurationMs: 0));
+
             return Results.Ok(results);
         })
         .WithName("GetConnectionHealth")

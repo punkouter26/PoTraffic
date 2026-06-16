@@ -7,7 +7,7 @@ using PoTraffic.Api.Features.MonitoringWindows.Entities;
 namespace PoTraffic.Api.Infrastructure.Storage;
 
 /// <summary>
-/// Drop-in replacement for the old <c>PoTrafficDbContext</c> (EF Core / SQL Server).
+/// Table Storage-backed persistence context for PoTraffic entities.
 /// Exposes the same <c>IQueryable&lt;T&gt;</c> surface handlers used against
 /// <c>DbSet&lt;T&gt;</c>, so most LINQ queries work unchanged.
 ///

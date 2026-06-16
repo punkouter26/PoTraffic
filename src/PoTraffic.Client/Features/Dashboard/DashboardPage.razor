@@ -17,17 +17,27 @@
     @{
         int activeCount = _routes.Count(r => r.MonitoringStatus == MonitoringStatus.Active);
         string dotClass = activeCount > 0 ? "pt-status-dot-green" : "pt-status-dot-amber";
+        int quotaTotal = QuotaConstants.DefaultDailyQuota;
+        double quotaPct = quotaTotal > 0 ? Math.Min(100, (double)_quotaConsumed / quotaTotal * 100) : 0;
+        string quotaColor = quotaPct >= 90 ? "#f43f5e" : quotaPct >= 70 ? "#f59e0b" : "#10b981";
+        string quotaRingStyle = $"--pt-quota-pct:{quotaPct.ToString(System.Globalization.CultureInfo.InvariantCulture)};--pt-quota-color:{quotaColor};";
     }
-    <span class="pt-status-item">
-        <span class="pt-status-dot @dotClass"></span>
-        @activeCount of @_routes.Count routes active
-    </span>
-    <span class="pt-status-sep">·</span>
-    <span class="pt-status-item">
-        @_quotaConsumed / @QuotaConstants.DefaultDailyQuota quota used today
-    </span>
-    <span class="pt-status-sep">·</span>
-    <span class="pt-status-item" style="color:#94a3b8;">Resets midnight UTC</span>
+    <div class="pt-status-metrics">
+        <span class="pt-status-item">
+            <span class="pt-status-dot @dotClass"></span>
+            @activeCount of @_routes.Count routes active
+        </span>
+        <span class="pt-status-item">
+            <span class="pt-quota-chip">
+                <span class="pt-quota-ring" style="@quotaRingStyle"></span>
+                <span class="pt-quota-chip-text">
+                    <span class="pt-quota-chip-value">@_quotaConsumed / @quotaTotal</span>
+                    <span class="pt-quota-chip-label">Quota</span>
+                </span>
+            </span>
+        </span>
+        <span class="pt-status-item" style="color:#94a3b8;">Resets midnight UTC</span>
+    </div>
     <div class="pt-status-bar-actions">
         <RadzenButton Text="+ Add Route" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Small"
                       Click="@(() => Nav.NavigateTo("/routes/create"))" />
@@ -43,7 +53,17 @@
 
 @if (_loading)
 {
-    <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+    @* TASK #9: Skeleton placeholders avoid layout flash while routes load *@
+    <div class="pt-skeleton-stack" aria-busy="true" aria-label="Loading routes">
+        @for (int i = 0; i < 3; i++)
+        {
+            <div class="pt-skeleton-card">
+                <div class="pt-skeleton-line lg w-50"></div>
+                <div class="pt-skeleton-line w-70"></div>
+                <div class="pt-skeleton-line w-30"></div>
+            </div>
+        }
+    </div>
 }
 else if (_routes.Count == 0)
 {

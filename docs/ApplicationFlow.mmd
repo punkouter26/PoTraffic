@@ -2,7 +2,7 @@ sequenceDiagram
     participant U as User
     participant B as Blazor Client
     participant A as API / Auth
-    participant H as Hangfire / Provider
+    participant S as Scheduler / Provider
 
     U->>B: Access Site
     B->>A: POST /api/auth/login
@@ -11,12 +11,12 @@ sequenceDiagram
     
     U->>B: Create New Route
     B->>A: POST /api/routes
-    A->>H: Schedule Polling Jobs
+    A->>S: Schedule Polling Jobs
     A-->>B: Confirm Success
     
     loop Background Polling
-        H->>H: Trigger PollRouteJob
-        H->>A: Store PollRecord
+        S->>S: Trigger PollRouteJob
+        S->>A: Store PollRecord
     end
     
     U->>B: View Route Details

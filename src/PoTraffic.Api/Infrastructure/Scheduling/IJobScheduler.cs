@@ -3,7 +3,7 @@ using System.Linq.Expressions;
 namespace PoTraffic.Api.Infrastructure.Scheduling;
 
 /// <summary>
-/// Abstraction for scheduling background jobs, replacing Hangfire's IBackgroundJobClient.
+/// Abstraction for scheduling background jobs.
 /// Backed by Azure Table Storage (Azurite locally, Azure in prod) for durability.
 /// </summary>
 public interface IJobScheduler

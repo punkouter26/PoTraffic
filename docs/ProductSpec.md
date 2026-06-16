@@ -18,6 +18,6 @@ PoTraffic is a smart commute monitoring engine that helps users understand and o
 - As a user, I want to receive notifications when traffic volatility exceeds a certain threshold.
 
 ## Success Metrics
-*   **System Reliability**: 99.9% uptime for scheduled Hangfire jobs.
+*   **System Reliability**: 99.9% uptime for scheduled polling jobs.
 *   **User Value**: Reduction in average unexpected travel time due to better departure planning.
 *   **Performance**: Dashboard page load time under 1.5 seconds.

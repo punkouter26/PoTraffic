@@ -44,20 +44,26 @@ public sealed class StartWindowCommandHandler : IRequestHandler<StartWindowComma
 
     public async Task<StartWindowResult> Handle(StartWindowCommand cmd, CancellationToken ct)
     {
-        // 1. Load window + route, verify ownership
+        // 1. Load window, then resolve the owning route explicitly — TableStorageContext
+        // has no navigation property to back the old `w.Route.UserId` access.
         MonitoringWindow? window = _db.MonitoringWindows
-            .FirstOrDefault(w => w.Id == cmd.WindowId
-                && w.Route.UserId == cmd.UserId
-                && w.Route.MonitoringStatus != (int)MonitoringStatus.Deleted);
+            .FirstOrDefault(w => w.Id == cmd.WindowId);
 
         if (window is null)
             return new StartWindowResult(false, "NOT_FOUND", 0, null);
 
+        EntityRoute? route = _db.GetOwnedRoute(window.RouteId, cmd.UserId, excludeDeleted: true);
+        if (route is null)
+            return new StartWindowResult(false, "NOT_FOUND", 0, null);
+
         DateOnly today = DateOnly.FromDateTime(DateTimeOffset.UtcNow.Date);
+
+        // The user's route IDs — used for per-user daily quota counting.
+        HashSet<Guid> userRouteIds = _db.GetUserRouteIds(cmd.UserId);
 
         // 2. Idempotent guard — return existing session if one already exists for this route today
         MonitoringSession? existingSession = _db.MonitoringSessions
-            .FirstOrDefault(s => s.RouteId == window.Route.Id && s.SessionDate == today);
+            .FirstOrDefault(s => s.RouteId == route.Id && s.SessionDate == today);
 
         if (existingSession is not null)
         {
@@ -65,13 +71,13 @@ public sealed class StartWindowCommandHandler : IRequestHandler<StartWindowComma
                 "Start called for window {WindowId} but session {SessionId} already exists for today — idempotent return",
                 cmd.WindowId, existingSession.Id);
             int quotaUsed = _db.MonitoringSessions
-                .Count(s => s.Route.UserId == cmd.UserId && s.SessionDate == today);
+                .Count(s => userRouteIds.Contains(s.RouteId) && s.SessionDate == today);
             return new StartWindowResult(true, null, Math.Max(0, QuotaConstants.DefaultDailyQuota - quotaUsed), existingSession.Id);
         }
 
         // 3. Count today's sessions for this user across all their routes
         int todaySessionCount = _db.MonitoringSessions
-            .Count(s => s.Route.UserId == cmd.UserId && s.SessionDate == today);
+            .Count(s => userRouteIds.Contains(s.RouteId) && s.SessionDate == today);
 
         if (todaySessionCount >= QuotaConstants.DefaultDailyQuota)
         {
@@ -83,7 +89,7 @@ public sealed class StartWindowCommandHandler : IRequestHandler<StartWindowComma
         var session = new MonitoringSession
         {
             Id = Guid.NewGuid(),
-            RouteId = window.Route.Id,
+            RouteId = route.Id,
             SessionDate = today,
             State = (int)SessionState.Active,
             IsHolidayExcluded = false,
@@ -97,15 +103,15 @@ public sealed class StartWindowCommandHandler : IRequestHandler<StartWindowComma
 
         // 6. Enqueue AFTER successful DB save — ensures no orphan job if SaveChanges fails.
         PollRouteJob routeJob = new(null!, null!, null!);
-        string jobId = _scheduler.Enqueue(() => routeJob.Execute(window.Route.Id));
+        string jobId = _scheduler.Enqueue(() => routeJob.Execute(route.Id));
 
         // 7. Store job ID so DeleteRouteCommand can cancel it.
-        window.Route.JobChainId = jobId;
+        route.JobChainId = jobId;
         await _db.SaveChangesAsync(ct);
 
         _logger.LogInformation(
             "Monitoring started for window {WindowId}, route {RouteId}, session {SessionId}, job {JobId}",
-            cmd.WindowId, window.Route.Id, session.Id, jobId);
+            cmd.WindowId, route.Id, session.Id, jobId);
 
         int remaining = QuotaConstants.DefaultDailyQuota - todaySessionCount - 1;
         return new StartWindowResult(true, null, remaining, session.Id);
