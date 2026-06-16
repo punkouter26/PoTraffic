@@ -134,8 +134,31 @@ try
     // Chain of Responsibility pattern — GlobalExceptionHandler maps ValidationException → 422
     builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
-    // ── Health checks ──────────────────────────────────────────────────────────
-    builder.Services.AddHealthChecks();
+    // ── Health checks — cheap, no external-quota cost ────────────────────────
+    // "keyvault" proves secrets resolved at runtime (Jwt:Key comes from the
+    // PoTraffic--Jwt--Key vault secret). "trafficProvider" confirms the live
+    // GoogleMaps key is present (i.e. real provider, not the mock path).
+    IConfiguration healthCfg = builder.Configuration;
+    bool usingMockProviders = builder.Environment.IsEnvironment("Testing")
+        || string.Equals(healthCfg["Features:UseMockProviders"], "true", StringComparison.OrdinalIgnoreCase);
+    builder.Services.AddHealthChecks()
+        .AddCheck("keyvault", () =>
+        {
+            string? k = healthCfg["Jwt:Key"];
+            bool resolved = !string.IsNullOrWhiteSpace(k)
+                && !k.StartsWith("REPLACE_WITH", StringComparison.OrdinalIgnoreCase);
+            return resolved
+                ? HealthCheckResult.Healthy("Key Vault secrets resolved")
+                : HealthCheckResult.Unhealthy("Key Vault secret 'Jwt:Key' not resolved");
+        })
+        .AddCheck("trafficProvider", () =>
+        {
+            if (usingMockProviders)
+                return HealthCheckResult.Healthy("Mock provider (test/dev)");
+            return !string.IsNullOrWhiteSpace(healthCfg["GoogleMaps:ApiKey"])
+                ? HealthCheckResult.Healthy("Live GoogleMaps provider configured")
+                : HealthCheckResult.Degraded("GoogleMaps:ApiKey missing — live provider will fail");
+        });
 
     // ── OpenAPI (Scalar UI) ───────────────────────────────────────────────────
     builder.Services.AddOpenApi();
