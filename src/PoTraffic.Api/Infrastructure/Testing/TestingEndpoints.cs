@@ -57,6 +57,7 @@ public static class TestingEndpoints
 
     private static IResult DevLogin(
         [FromBody] DevLoginRequest request,
+        TableStorageContext db,
         IConfiguration configuration)
     {
         JwtConfiguration? jwtConfig = configuration
@@ -69,9 +70,12 @@ public static class TestingEndpoints
         SymmetricSecurityKey key = new(Encoding.UTF8.GetBytes(jwtConfig.Key));
         SigningCredentials creds = new(key, SecurityAlgorithms.HmacSha256);
 
+        User? user = db.Users.FirstOrDefault(u => u.Email == request.Email);
+        Guid userId = user?.Id ?? Guid.NewGuid();
+
         List<Claim> claims =
         [
-            new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
+            new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
             new Claim(ClaimTypes.Email, request.Email),
             new Claim("role", request.Role),
             new Claim("e2e", "true")

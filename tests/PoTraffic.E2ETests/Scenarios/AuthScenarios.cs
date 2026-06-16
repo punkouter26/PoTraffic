@@ -71,6 +71,10 @@ public sealed class AuthScenarios : PlaywrightTestBase
 
         bool isVisible = await statusBar.IsVisibleAsync();
         Assert.True(isVisible, "Dashboard status bar must be visible after admin login.");
+
+        Microsoft.Playwright.ILocator mockDataBadge = Page.Locator(".pt-mock-data-badge");
+        await mockDataBadge.WaitForAsync(new() { Timeout = 15_000 });
+        Assert.Equal("USING MOCK DATA", await mockDataBadge.InnerTextAsync());
     }
 
     [SkipUnlessE2EReady]

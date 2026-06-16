@@ -33,7 +33,10 @@ public sealed class CreateRouteScenarios : PlaywrightTestBase
         TestingApiClient api = new(apiHttp);
 
         // Seed admin user + a route for that user
-        (string email, string password) = await api.SeedAdminAsync();
+        (string email, _) = await api.SeedAdminAsync();
+        string? token = await api.DevLoginAsync(email, role: "Administrator");
+        Assert.False(string.IsNullOrWhiteSpace(token), "dev-login must issue an Administrator JWT");
+
         (_, string origin, string destination) = await api.SeedRouteAsync(
             email, OriginAddress, DestinationAddress);
 
@@ -41,27 +44,8 @@ public sealed class CreateRouteScenarios : PlaywrightTestBase
         Page.Console += (_, msg) => consoleMessages.Add($"[{msg.Type}] {msg.Text}");
         Page.PageError += (_, err) => consoleMessages.Add($"[PAGE ERROR] {err}");
 
-        // ── Act — log in via the UI ──────────────────────────────────────────────
-        await Page.GotoAsync($"{BaseUrl}/login");
-
-        var emailInput = Page.Locator("input.rz-textbox").First;
-        try
-        {
-            await emailInput.WaitForAsync(new() { Timeout = 90_000 });
-        }
-        catch (Exception ex)
-        {
-            string diagnostics = string.Join("\n", consoleMessages.TakeLast(30));
-            throw new InvalidOperationException(
-                $"Login form did not render within 90s.\nURL: {Page.Url}\n" +
-                $"Console (last 30):\n{diagnostics}", ex);
-        }
-
-        await emailInput.FillAsync(email);
-        await Page.Locator("input[type='password']").FillAsync(password);
-        await Page.GetByRole(Microsoft.Playwright.AriaRole.Button, new() { Name = "Sign In" })
-                  .ClickAsync();
-
+        // ── Act — authenticate through the Testing-only token path ──────────────
+        await AuthenticateWithAccessTokenAsync(token!);
         await Page.WaitForURLAsync($"{BaseUrl}/dashboard", new() { Timeout = 30_000 });
 
         // Navigate to /routes — redirects to /dashboard where routes are shown as cards
@@ -106,33 +90,16 @@ public sealed class CreateRouteScenarios : PlaywrightTestBase
         // ── Arrange ─────────────────────────────────────────────────────────────
         using HttpClient apiHttp = new() { BaseAddress = new Uri(BaseUrl) };
         TestingApiClient api = new(apiHttp);
-        (string email, string password) = await api.SeedAdminAsync();
+        (string email, _) = await api.SeedAdminAsync();
+        string? token = await api.DevLoginAsync(email, role: "Administrator");
+        Assert.False(string.IsNullOrWhiteSpace(token), "dev-login must issue an Administrator JWT");
 
         var consoleMessages = new List<string>();
         Page.Console += (_, msg) => consoleMessages.Add($"[{msg.Type}] {msg.Text}");
         Page.PageError += (_, err) => consoleMessages.Add($"[PAGE ERROR] {err}");
 
-        // ── Act — log in then navigate to create-route form ─────────────────────
-        await Page.GotoAsync($"{BaseUrl}/login");
-
-        var emailInput = Page.Locator("input.rz-textbox").First;
-        try
-        {
-            await emailInput.WaitForAsync(new() { Timeout = 90_000 });
-        }
-        catch (Exception ex)
-        {
-            string diagnostics = string.Join("\n", consoleMessages.TakeLast(30));
-            throw new InvalidOperationException(
-                $"Login form did not render.\nURL: {Page.Url}\n" +
-                $"Console (last 30):\n{diagnostics}", ex);
-        }
-
-        await emailInput.FillAsync(email);
-        await Page.Locator("input[type='password']").FillAsync(password);
-        await Page.GetByRole(Microsoft.Playwright.AriaRole.Button, new() { Name = "Sign In" })
-                  .ClickAsync();
-
+        // ── Act — authenticate then navigate to create-route form ───────────────
+        await AuthenticateWithAccessTokenAsync(token!);
         await Page.WaitForURLAsync($"{BaseUrl}/dashboard", new() { Timeout = 30_000 });
 
         await Page.GotoAsync($"{BaseUrl}/routes/create");

@@ -32,7 +32,10 @@ public sealed class MonitoringWindowScenarios : PlaywrightTestBase
         using HttpClient apiHttp = new() { BaseAddress = new Uri(BaseUrl) };
         TestingApiClient api = new(apiHttp);
 
-        (string email, string password) = await api.SeedAdminAsync();
+        (string email, _) = await api.SeedAdminAsync();
+        string? token = await api.DevLoginAsync(email, role: "Administrator");
+        Assert.False(string.IsNullOrWhiteSpace(token), "dev-login must issue an Administrator JWT");
+
         (Guid routeId, _, _) = await api.SeedRouteAsync(email, OriginAddress, DestinationAddress);
 
         var consoleErrors = new List<string>();
@@ -43,14 +46,8 @@ public sealed class MonitoringWindowScenarios : PlaywrightTestBase
         };
         Page.PageError += (_, err) => consoleErrors.Add($"[PAGE ERROR] {err}");
 
-        // ── Act — log in via the UI ──────────────────────────────────────────────
-        await Page.GotoAsync($"{BaseUrl}/login");
-
-        ILocator emailInput = Page.Locator("input.rz-textbox").First;
-        await emailInput.WaitForAsync(new() { Timeout = 90_000 });
-        await emailInput.FillAsync(email);
-        await Page.Locator("input[type='password']").FillAsync(password);
-        await Page.GetByRole(AriaRole.Button, new() { Name = "Sign In" }).ClickAsync();
+        // ── Act — authenticate through the Testing-only token path ──────────────
+        await AuthenticateWithAccessTokenAsync(token!);
         await Page.WaitForURLAsync($"{BaseUrl}/dashboard", new() { Timeout = 30_000 });
 
         // ── Navigate to Route Detail page ────────────────────────────────────────
@@ -146,7 +143,10 @@ public sealed class MonitoringWindowScenarios : PlaywrightTestBase
         using HttpClient apiHttp = new() { BaseAddress = new Uri(BaseUrl) };
         TestingApiClient api = new(apiHttp);
 
-        (string email, string password) = await api.SeedAdminAsync();
+        (string email, _) = await api.SeedAdminAsync();
+        string? token = await api.DevLoginAsync(email, role: "Administrator");
+        Assert.False(string.IsNullOrWhiteSpace(token), "dev-login must issue an Administrator JWT");
+
         (Guid routeId, _, _) = await api.SeedRouteAsync(email, OriginAddress, DestinationAddress);
 
         var consoleErrors = new List<string>();
@@ -157,13 +157,8 @@ public sealed class MonitoringWindowScenarios : PlaywrightTestBase
         };
         Page.PageError += (_, err) => consoleErrors.Add($"[PAGE ERROR] {err}");
 
-        // ── Act — log in ─────────────────────────────────────────────────────────
-        await Page.GotoAsync($"{BaseUrl}/login");
-        ILocator emailInput = Page.Locator("input.rz-textbox").First;
-        await emailInput.WaitForAsync(new() { Timeout = 90_000 });
-        await emailInput.FillAsync(email);
-        await Page.Locator("input[type='password']").FillAsync(password);
-        await Page.GetByRole(AriaRole.Button, new() { Name = "Sign In" }).ClickAsync();
+        // ── Act — authenticate ──────────────────────────────────────────────────
+        await AuthenticateWithAccessTokenAsync(token!);
         await Page.WaitForURLAsync($"{BaseUrl}/dashboard", new() { Timeout = 30_000 });
 
         // Navigate to route detail

@@ -30,9 +30,12 @@ public sealed class MobileViewportScenarios : PlaywrightTestBase
             await mobilePage.GotoAsync($"{BaseUrl}/login");
             await mobilePage.WaitForLoadStateAsync(LoadState.NetworkIdle);
 
-            // Radzen renders email as input.rz-textbox (type="text"), not input[type='email']
-            bool emailVisible = await mobilePage.IsVisibleAsync("input.rz-textbox");
-            Assert.True(emailVisible, "Email input should be visible at mobile viewport");
+            ILocator microsoftButton = mobilePage.GetByRole(AriaRole.Button, new() { Name = "Continue with Microsoft", Exact = false });
+            bool microsoftVisible = await microsoftButton.IsVisibleAsync();
+            Assert.True(microsoftVisible, "Microsoft OAuth button should be visible at mobile viewport.");
+
+            bool guestVisible = await mobilePage.GetByRole(AriaRole.Button, new() { Name = "Guest", Exact = false }).IsVisibleAsync();
+            Assert.False(guestVisible, "Guest login button must not be visible on the normal login page.");
 
             int scrollWidth = await mobilePage.EvaluateAsync<int>("document.body.scrollWidth");
             Assert.True(scrollWidth <= MobileWidth,

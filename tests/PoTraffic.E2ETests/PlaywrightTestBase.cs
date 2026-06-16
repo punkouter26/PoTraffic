@@ -28,6 +28,7 @@ public abstract class PlaywrightTestBase : IAsyncLifetime
         Browser = await Playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
         {
             Headless = true,
+            ExecutablePath = FindCachedChromiumExecutable(),
             // Required on Windows CI / sandboxed environments for WASM-heavy Blazor apps
             Args = ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
         });
@@ -87,4 +88,39 @@ public abstract class PlaywrightTestBase : IAsyncLifetime
     /// review the video for a known-flaky scenario.
     /// </summary>
     protected bool KeepVideoOnSuccess { get; set; }
+
+    protected async Task AuthenticateWithAccessTokenAsync(string accessToken, string destination = "/dashboard", IPage? page = null)
+    {
+        IPage targetPage = page ?? Page;
+        await targetPage.GotoAsync($"{BaseUrl}/login");
+        await targetPage.EvaluateAsync(
+            "([key, value]) => localStorage.setItem(key, value)",
+            new[] { "potraffic_access_token", accessToken });
+        await targetPage.GotoAsync($"{BaseUrl}{destination}");
+    }
+
+    private static string? FindCachedChromiumExecutable()
+    {
+        string localData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        string homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+
+        string[] roots =
+        [
+            Path.Combine(localData, "ms-playwright"),
+            Path.Combine(homeDir, ".cache", "ms-playwright")
+        ];
+
+        foreach (string root in roots.Where(Directory.Exists))
+        {
+            string? executable = Directory
+                .EnumerateFiles(root, OperatingSystem.IsWindows() ? "chrome.exe" : "chrome", SearchOption.AllDirectories)
+                .OrderByDescending(File.GetLastWriteTimeUtc)
+                .FirstOrDefault();
+
+            if (!string.IsNullOrWhiteSpace(executable))
+                return executable;
+        }
+
+        return null;
+    }
 }

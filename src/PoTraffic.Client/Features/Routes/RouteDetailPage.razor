@@ -1,6 +1,8 @@
 @page "/routes/{RouteId:guid}"
 @using PoTraffic.Shared.DTOs.History
 @using PoTraffic.Shared.DTOs.Routes
+@using PoTraffic.Shared.Enums
+@using PoTraffic.Shared.Constants
 @using PoTraffic.Client.Features.MonitoringWindows
 @inherits PollingComponentBase
 @inject HttpClient Http
@@ -61,9 +63,16 @@ else
                     <div style="font-size:0.8rem;color:#64748b;margin-top:0.15rem;">@_todayPolls.Count(p => p.IsRerouted) rerouted</div>
                 }
             </div>
-            <div class="pt-stat-block @(NextPollEtaLabel == "Due now" ? "pt-stat-green" : "pt-stat-amber")">
-                <div class="pt-stat-label">Next Poll ETA</div>
-                <div class="pt-stat-value @(NextPollEtaLabel == "Due now" ? "pt-poll-live" : "")">@NextPollEtaLabel</div>
+            @{
+                NextSampleInfo next = NextSample;
+            }
+            <div class="pt-stat-block @(next.Live ? "pt-stat-green" : "pt-stat-amber")">
+                <div class="pt-stat-label">Next Sample ETA</div>
+                <div class="pt-stat-value @(next.Live ? "pt-poll-live" : "")">@next.Value</div>
+                @if (!string.IsNullOrEmpty(next.Detail))
+                {
+                    <div style="font-size:0.8rem;color:#64748b;margin-top:0.15rem;">@next.Detail</div>
+                }
             </div>
         </div>
     </RadzenCard>
@@ -91,24 +100,53 @@ else
     private List<TravelTimeTrendChart.UpperBandPoint> _chartUpperBand = [];
     private OptimalDepartureDto? _optimalDeparture;
     private string _optimalDepartureLabel = string.Empty;
+    private SessionDto? _activeSession;
     private PollRecordDto? LatestPoll => _todayPolls.OrderByDescending(p => p.PolledAtDateTime).FirstOrDefault();
-    private string NextPollEtaLabel
+
+    private readonly record struct NextSampleInfo(string Value, string Detail, bool Live);
+
+    // Headline + detail describing when the next traffic sample is expected to complete.
+    // Polls run on a self-perpetuating chain every QuotaConstants.PollIntervalMinutes while
+    // a session is active; the first poll is enqueued the moment monitoring starts.
+    private NextSampleInfo NextSample
     {
         get
         {
-            if (LatestPoll is null)
+            const int intervalMin = QuotaConstants.PollIntervalMinutes;
+            bool monitoringActive = _activeSession is { State: SessionState.Active };
+
+            if (!monitoringActive)
             {
-                return "Pending first sample";
+                return new NextSampleInfo("—", "Start monitoring to begin sampling", Live: false);
             }
 
-            DateTime nextPoll = LatestPoll.PolledAtDateTime.AddMinutes(5);
-            TimeSpan remaining = nextPoll - DateTime.Now;
+            // The session's server-recorded last poll is the authoritative cadence anchor;
+            // fall back to the loaded poll list if the session hasn't surfaced it yet.
+            DateTimeOffset? lastPollUtc = _activeSession!.LastPollAt
+                ?? LatestPoll?.PolledAtDateTime;
+
+            if (lastPollUtc is null)
+            {
+                // Active but no sample yet — first poll fires almost immediately, then retries
+                // every interval if the traffic provider is unavailable.
+                return new NextSampleInfo(
+                    "Pending",
+                    $"First sample expected within {intervalMin} min",
+                    Live: true);
+            }
+
+            DateTime nextLocal = lastPollUtc.Value.ToLocalTime().DateTime.AddMinutes(intervalMin);
+            TimeSpan remaining = nextLocal - DateTime.Now;
+
             if (remaining <= TimeSpan.Zero)
             {
-                return "Due now";
+                return new NextSampleInfo("Due now", "expected any moment", Live: true);
             }
 
-            return $"in {Math.Ceiling(remaining.TotalMinutes):F0} min";
+            return new NextSampleInfo(
+                $"in {Math.Ceiling(remaining.TotalMinutes):F0} min",
+                $"~{nextLocal:HH:mm:ss} · every {intervalMin} min",
+                Live: false);
         }
     }
     // Observer pattern — PollingComponentBase base handles the timer loop
@@ -126,6 +164,13 @@ else
         try
         {
             string dayOfWeek = DateTime.Today.DayOfWeek.ToString();
+
+            // Load today's active monitoring session — drives the Next Sample ETA card
+            var sessions = await Http.GetFromJsonAsync<List<SessionDto>>(
+                $"/api/routes/{RouteId}/sessions");
+            DateOnly today = DateOnly.FromDateTime(DateTime.UtcNow.Date);
+            _activeSession = sessions?.FirstOrDefault(
+                s => s.State == SessionState.Active && s.SessionDate == today);
 
             // Load past 24h poll records
             string sinceUtc = Uri.EscapeDataString(DateTime.UtcNow.AddHours(-24).ToString("o"));

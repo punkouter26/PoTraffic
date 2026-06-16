@@ -32,7 +32,10 @@ public sealed class CheckNowScenarios : PlaywrightTestBase
         using HttpClient apiHttp = new() { BaseAddress = new Uri(BaseUrl) };
         TestingApiClient api = new(apiHttp);
 
-        (string email, string password) = await api.SeedAdminAsync();
+        (string email, _) = await api.SeedAdminAsync();
+        string? token = await api.DevLoginAsync(email, role: "Administrator");
+        Assert.False(string.IsNullOrWhiteSpace(token), "dev-login must issue an Administrator JWT");
+
         (_, string origin, string destination) = await api.SeedRouteAsync(
             email, OriginAddress, DestinationAddress);
 
@@ -50,27 +53,8 @@ public sealed class CheckNowScenarios : PlaywrightTestBase
             System.Console.WriteLine(log);
         };
 
-        // ── Act — log in ─────────────────────────────────────────────────────────
-        await Page.GotoAsync($"{BaseUrl}/login");
-
-        Microsoft.Playwright.ILocator emailInput = Page.Locator("input.rz-textbox").First;
-        try
-        {
-            await emailInput.WaitForAsync(new() { Timeout = 90_000 });
-        }
-        catch (Exception ex)
-        {
-            string diagnostics = string.Join("\n", consoleMessages.TakeLast(30));
-            throw new InvalidOperationException(
-                $"Login form did not render within 90 s.\nURL: {Page.Url}\n" +
-                $"Console (last 30):\n{diagnostics}", ex);
-        }
-
-        await emailInput.FillAsync(email);
-        await Page.Locator("input[type='password']").FillAsync(password);
-        await Page.GetByRole(Microsoft.Playwright.AriaRole.Button, new() { Name = "Sign In" })
-                  .ClickAsync();
-
+        // ── Act — authenticate ──────────────────────────────────────────────────
+        await AuthenticateWithAccessTokenAsync(token!);
         await Page.WaitForURLAsync($"{BaseUrl}/dashboard", new() { Timeout = 30_000 });
 
         // ── Navigation with debug output ─────────────────────────────────────────
@@ -172,7 +156,10 @@ public sealed class CheckNowScenarios : PlaywrightTestBase
         using HttpClient apiHttp = new() { BaseAddress = new Uri(BaseUrl) };
         TestingApiClient api = new(apiHttp);
 
-        (string email, string password) = await api.SeedAdminAsync();
+        (string email, _) = await api.SeedAdminAsync();
+        string? token = await api.DevLoginAsync(email, role: "Administrator");
+        Assert.False(string.IsNullOrWhiteSpace(token), "dev-login must issue an Administrator JWT");
+
         (_, string origin, _) = await api.SeedRouteAsync(email, OriginAddress, DestinationAddress);
 
         var consoleMessages = new List<string>();
@@ -189,12 +176,7 @@ public sealed class CheckNowScenarios : PlaywrightTestBase
             System.Console.WriteLine(log);
         };
 
-        await Page.GotoAsync($"{BaseUrl}/login");
-        Microsoft.Playwright.ILocator emailInput = Page.Locator("input.rz-textbox").First;
-        await emailInput.WaitForAsync(new() { Timeout = 90_000 });
-        await emailInput.FillAsync(email);
-        await Page.Locator("input[type='password']").FillAsync(password);
-        await Page.GetByRole(Microsoft.Playwright.AriaRole.Button, new() { Name = "Sign In" }).ClickAsync();
+        await AuthenticateWithAccessTokenAsync(token!);
         await Page.WaitForURLAsync($"{BaseUrl}/dashboard", new() { Timeout = 30_000 });
 
         await Page.GotoAsync($"{BaseUrl}/routes");

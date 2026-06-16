@@ -73,6 +73,18 @@ function Stop-PortProcesses {
 }
 
 function Install-PlaywrightChromium {
+    $localBrowserRoot = Join-Path $env:LOCALAPPDATA 'ms-playwright'
+    $homeBrowserRoot = Join-Path $env:USERPROFILE '.cache/ms-playwright'
+    $existingChrome = @($localBrowserRoot, $homeBrowserRoot) |
+        Where-Object { Test-Path $_ } |
+        ForEach-Object { Get-ChildItem $_ -Recurse -Filter chrome.exe -ErrorAction SilentlyContinue } |
+        Select-Object -First 1
+
+    if ($existingChrome) {
+        Write-Host "  Reusing cached Playwright Chromium: $($existingChrome.FullName)" -ForegroundColor Green
+        return
+    }
+
     $script = Join-Path $root 'tests/PoTraffic.E2ETests/bin/Debug/net10.0/playwright.ps1'
     if (!(Test-Path $script)) {
         throw "Playwright installer not found at $script. Build the E2E project first."
