@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Text.RegularExpressions;
 using PoTraffic.E2ETests.Helpers;
 
 namespace PoTraffic.E2ETests.Scenarios;
@@ -9,8 +10,8 @@ namespace PoTraffic.E2ETests.Scenarios;
 /// The [SkipUnlessE2EReady] attribute auto-skips when Playwright binaries or the app
 /// are not available, so CI passes without a live environment.
 ///
-/// The email/password login form was removed — Microsoft OAuth and (in Development) a
-/// GUEST button are the only sign-in paths. Tests that need an authenticated session
+/// The email/password login form was removed — Microsoft OAuth is the only normal
+/// sign-in path. Tests that need an authenticated session
 /// obtain a JWT from the testing-only /e2e/dev-login endpoint and inject it into localStorage.
 /// </summary>
 public sealed class AuthScenarios : PlaywrightTestBase
@@ -70,6 +71,35 @@ public sealed class AuthScenarios : PlaywrightTestBase
 
         bool isVisible = await statusBar.IsVisibleAsync();
         Assert.True(isVisible, "Dashboard status bar must be visible after admin login.");
+    }
+
+    [SkipUnlessE2EReady]
+    public async Task GuestLogin_BypassesOAuth_PersistsToken_AndDisplaysGuestId()
+    {
+        using HttpClient apiHttp = new() { BaseAddress = new Uri(BaseUrl) };
+        TestingApiClient api = new(apiHttp);
+
+        PoTraffic.Shared.DTOs.Auth.AuthResponse? auth = await api.GuestLoginAsync();
+        Assert.NotNull(auth);
+        Assert.False(string.IsNullOrWhiteSpace(auth!.AccessToken));
+
+        await Page.GotoAsync($"{BaseUrl}/login");
+        await Page.EvaluateAsync(
+            "([key, value]) => localStorage.setItem(key, value)",
+            new[] { LocalStorageTokenKey, auth.AccessToken });
+
+        string storedToken = await Page.EvaluateAsync<string>(
+            "key => localStorage.getItem(key)",
+            LocalStorageTokenKey);
+        Assert.Equal(auth.AccessToken, storedToken);
+
+        await Page.GotoAsync($"{BaseUrl}/dashboard");
+
+        Microsoft.Playwright.ILocator userChip = Page.Locator(".pt-user-chip");
+        await userChip.WaitForAsync(new() { Timeout = 30_000 });
+        string chipText = await userChip.InnerTextAsync();
+
+        Assert.Matches(new Regex(@"GUEST\d{8}\s+LOGGED IN", RegexOptions.IgnoreCase), chipText);
     }
 
     [SkipUnlessE2EReady]

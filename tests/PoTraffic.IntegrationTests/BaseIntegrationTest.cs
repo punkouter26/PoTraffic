@@ -1,11 +1,13 @@
 using System.Linq.Expressions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using PoTraffic.Api.Features.Auth;
 using PoTraffic.Api.Infrastructure.Providers;
 using PoTraffic.Api.Infrastructure.Scheduling;
 using PoTraffic.IntegrationTests.Helpers;
+using PoTraffic.IntegrationTests.Infrastructure;
 using PoTraffic.Shared.Enums;
 using PoTraffic.Api.Infrastructure.Storage;
 
@@ -14,7 +16,7 @@ namespace PoTraffic.IntegrationTests;
 /// <summary>
 /// Base class for all integration tests.
 /// Spins up a <see cref="WebApplicationFactory{Program}"/> with the Testing environment.
-/// The in-memory <see cref="TableStorageContext"/> provides persistence without external dependencies.
+/// Azurite is owned by Testcontainers so tests never depend on a manually started emulator.
 /// </summary>
 public abstract class BaseIntegrationTest : IAsyncLifetime
 {
@@ -22,16 +24,26 @@ public abstract class BaseIntegrationTest : IAsyncLifetime
 
     // ── IAsyncLifetime ────────────────────────────────────────────────────────
 
-    public Task InitializeAsync()
+    public async Task InitializeAsync()
     {
         // Suppress Azure Key Vault loading regardless of ASPNETCORE_ENVIRONMENT.
         Environment.SetEnvironmentVariable("AzureKeyVault__VaultUri", string.Empty);
         Environment.SetEnvironmentVariable("KeyVault__Uri", string.Empty);
 
+        string tableStorageConnectionString = await AzuriteTestContainer.GetConnectionStringAsync();
+
         _factory = new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder =>
             {
                 builder.UseEnvironment("Testing");
+                builder.ConfigureAppConfiguration((_, config) =>
+                {
+                    config.AddInMemoryCollection(new Dictionary<string, string?>
+                    {
+                        ["ConnectionStrings:TableStorage"] = tableStorageConnectionString,
+                        ["AzureTable:UseManagedIdentity"] = "false"
+                    });
+                });
 
                 builder.ConfigureServices(services =>
                 {
@@ -50,7 +62,6 @@ public abstract class BaseIntegrationTest : IAsyncLifetime
 
         // Warm up the host so the DI container is built before tests run
         _ = _factory.CreateClient();
-        return Task.CompletedTask;
     }
 
     public Task DisposeAsync()

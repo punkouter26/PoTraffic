@@ -40,10 +40,9 @@ public static class TableStorageExtensions
         string? connectionString = configuration["ConnectionStrings:TableStorage"];
 
         // Rule 5 — Dynamic Switching: Azurite locally, Azure Table Storage in cloud.
-        //   "UseDevelopmentStorage=true"  → Azurite (docker-compose runs it on :10001).
-        //   Empty / "AzureTable:UseManagedIdentity=true" → Managed Identity against the
-        //   storage account in `rg-potraffic`.
-        //   Any other string → interpreted as a custom Azure Table Storage connection string.
+        //   Empty / "UseDevelopmentStorage=true" → local Azurite default.
+        //   Explicit connection string → custom Azurite/Azure endpoint, used by Testcontainers.
+        //   Managed identity → Azure Table Storage account in `rg-potraffic`.
         bool useAzurite = string.IsNullOrEmpty(connectionString)
             || connectionString.Contains("UseDevelopmentStorage=true", StringComparison.OrdinalIgnoreCase)
             || (environment.IsDevelopment() && !configuration.GetValue<bool>("AzureCredential:UseProductionStorage"));
@@ -64,6 +63,19 @@ public static class TableStorageExtensions
 
             services.AddSingleton<TableServiceClient>(sp =>
                 new TableServiceClient(AzuriteConnectionString, tableOptions));
+        }
+        else if (!string.IsNullOrWhiteSpace(connectionString)
+            && !configuration.GetValue<bool>("AzureTable:UseManagedIdentity"))
+        {
+            services.AddSingleton<TableClient>(sp =>
+            {
+                string tableName = configuration["AzureTable:TableName"] ?? "TrafficPolls";
+                TableServiceClient client = new(connectionString, tableOptions);
+                return client.GetTableClient(tableName);
+            });
+
+            services.AddSingleton<TableServiceClient>(sp =>
+                new TableServiceClient(connectionString, tableOptions));
         }
         else
         {

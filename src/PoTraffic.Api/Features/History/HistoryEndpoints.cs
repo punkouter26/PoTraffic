@@ -14,7 +14,7 @@ public static class HistoryEndpoints
     {
         RouteGroupBuilder group = routes
             .MapGroup("/api/routes/{routeId:guid}")
-            .RequireAuthorization()
+            .RequireAuthorization("ProductionMicrosoftAuth")
             .WithTags("History");
 
         // GET /api/routes/{routeId}/poll-history?page=1&pageSize=20&sinceUtc=2026-04-04T00:00:00Z

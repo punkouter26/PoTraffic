@@ -25,6 +25,7 @@ Then complete OAuth client creation in Google Cloud Console (required for standa
 
 Create an app registration that supports personal + organizational accounts and add redirect URI:
 - `https://<your-host>/api/auth/external/microsoft/callback`
+- Local development: `https://localhost:5001/api/auth/external/microsoft/callback`
 
 Collect:
 - `MICROSOFT_CLIENT_ID`

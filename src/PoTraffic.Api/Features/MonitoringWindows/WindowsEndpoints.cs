@@ -14,7 +14,7 @@ public static class WindowsEndpoints
     public static IEndpointRouteBuilder MapWindowsEndpoints(this IEndpointRouteBuilder app)
     {
         RouteGroupBuilder group = app.MapGroup("/api/routes/{routeId:guid}/windows")
-            .RequireAuthorization()
+            .RequireAuthorization("ProductionMicrosoftAuth")
             .WithTags("Windows");
 
         group.MapGet("", GetWindows);

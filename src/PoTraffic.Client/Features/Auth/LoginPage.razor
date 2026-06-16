@@ -1,15 +1,9 @@
 @page "/login"
 @layout AuthLayout
 @using System.Net.Http.Json
-@using Microsoft.AspNetCore.Components.Authorization
-@using PoTraffic.Client.Infrastructure.Auth
 @using PoTraffic.Client.Layout
-@using PoTraffic.Shared.DTOs.Auth
-@using Microsoft.AspNetCore.Components.WebAssembly.Hosting
 @inject HttpClient Http
 @inject NavigationManager Nav
-@inject AuthenticationStateProvider AuthStateProvider
-@inject IWebAssemblyHostEnvironment HostEnvironment
 
 <RadzenCard class="rz-p-6">
     <RadzenText TextStyle="TextStyle.H5" class="rz-mb-2">Sign In</RadzenText>
@@ -29,18 +23,11 @@
         </RadzenAlert>
     }
 
-    <RadzenButton Text="🪟  Continue with Microsoft" ButtonStyle="ButtonStyle.Primary"
+    <RadzenButton Text="Continue with Microsoft" ButtonStyle="ButtonStyle.Primary"
                   class="rz-w-100 auth-social-btn"
                   Click='() => StartExternalLogin("microsoft")'
                   Disabled="@(_loading || (_providersLoaded && !_microsoftConfigured))" />
 
-    @if (HostEnvironment.IsDevelopment())
-    {
-        <RadzenButton Text="🔓  GUEST (Dev Only)" ButtonStyle="ButtonStyle.Warning" class="rz-w-100 rz-mt-2"
-                      Click="@GuestLoginAsync" IsBusy="_loading" />
-        <RadzenButton Text="🔑  Dev Admin (Dev Only)" ButtonStyle="ButtonStyle.Secondary" class="rz-w-100 rz-mt-2"
-                      Click="@DevAdminLoginAsync" IsBusy="_loading" />
-    }
 </RadzenCard>
 
 @code {
@@ -73,78 +60,6 @@
         _loading = true;
         string encodedReturnUrl = Uri.EscapeDataString("/dashboard");
         Nav.NavigateTo($"/api/auth/external/{provider}/start?returnUrl={encodedReturnUrl}", forceLoad: true);
-    }
-
-    private async Task GuestLoginAsync()
-    {
-        _error = "";
-        _loading = true;
-
-        try
-        {
-            HttpResponseMessage response = await Http.PostAsJsonAsync("/api/auth/guest-login", new { });
-
-            if (response.IsSuccessStatusCode)
-            {
-                AuthResponse? auth = await response.Content.ReadFromJsonAsync<AuthResponse>();
-                if (auth is not null)
-                {
-                    if (AuthStateProvider is JwtAuthenticationStateProvider jwtProvider)
-                    {
-                        await jwtProvider.LoginAsync(auth.AccessToken);
-                    }
-                    Nav.NavigateTo("/dashboard");
-                }
-            }
-            else
-            {
-                _error = "GUEST login failed. Check server logs.";
-            }
-        }
-        catch
-        {
-            _error = "Unable to connect. Please try again.";
-        }
-        finally
-        {
-            _loading = false;
-        }
-    }
-
-    private async Task DevAdminLoginAsync()
-    {
-        _error = "";
-        _loading = true;
-
-        try
-        {
-            HttpResponseMessage response = await Http.PostAsJsonAsync("/api/auth/dev-admin-login", new { });
-
-            if (response.IsSuccessStatusCode)
-            {
-                AuthResponse? auth = await response.Content.ReadFromJsonAsync<AuthResponse>();
-                if (auth is not null)
-                {
-                    if (AuthStateProvider is JwtAuthenticationStateProvider jwtProvider)
-                    {
-                        await jwtProvider.LoginAsync(auth.AccessToken);
-                    }
-                    Nav.NavigateTo("/dashboard");
-                }
-            }
-            else
-            {
-                _error = "Dev admin login failed. Check server logs.";
-            }
-        }
-        catch
-        {
-            _error = "Unable to connect. Please try again.";
-        }
-        finally
-        {
-            _loading = false;
-        }
     }
 
     private sealed record ProvidersResponse(List<string> Providers);

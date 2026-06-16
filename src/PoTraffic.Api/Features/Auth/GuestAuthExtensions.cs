@@ -11,14 +11,14 @@ using PoTraffic.Shared.DTOs.Auth;
 namespace PoTraffic.Api.Features.Auth;
 
 /// <summary>
-/// GUEST login for development/testing bypass of OAuth.
+/// GUEST login for integration/E2E test bypass of OAuth.
 /// Each call creates a unique GUEST user (e.g. guest46344343@potraffic.dev) so
 /// that parallel test runs or manual sessions do not collide in the database.
 /// All activity is stored under that session's own GUEST account.
 ///
-/// (Rule 6 — GUEST Mode: Persistence via LocalStorage; hidden in Prod;
+/// (Rule 6 — GUEST Mode: Persistence via LocalStorage; hidden outside Testing;
 ///  "GUEST12345678 LOGGED IN" shown in the nav bar.)
-/// (Rule 13 — Microsoft OAuth + Guest is allowed in dev/test env.)
+/// (Rule 13 — Microsoft OAuth is required outside Testing.)
 /// </summary>
 public static class GuestAuthExtensions
 {
@@ -38,14 +38,14 @@ public static class GuestAuthExtensions
 
     public static IEndpointRouteBuilder MapGuestEndpoints(this IEndpointRouteBuilder app)
     {
-        // Development-only GUEST login bypass (Rule 6: hidden + disabled in Prod).
+        // Testing-only GUEST login bypass for integration tests.
         app.MapPost("/api/auth/guest-login", async (
             ISender sender,
             IWebHostEnvironment env) =>
         {
-            // Only allow GUEST login in Development or Testing environments.
-            // In Production this endpoint is NOT registered (see Program.cs).
-            if (!env.IsDevelopment() && !env.IsEnvironment("Testing"))
+            // Only allow GUEST login in Testing. In Development and Production,
+            // this endpoint is not registered (see Program.cs).
+            if (!env.IsEnvironment("Testing"))
             {
                 return Results.NotFound();
             }
@@ -110,7 +110,7 @@ public sealed class GuestLoginCommandHandler : IRequestHandler<GuestLoginCommand
             Email = guestEmail,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(Guid.NewGuid().ToString()),
             Locale = "en-US",
-            Role = "Guest", // Special role for GUEST dev/test users
+            Role = "Guest", // Special role for GUEST test users
             AuthProvider = "guest",
             IsEmailVerified = true,
             EmailVerificationToken = null,

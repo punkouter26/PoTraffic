@@ -1,4 +1,5 @@
 using MediatR;
+using Microsoft.Extensions.Hosting;
 using PoTraffic.Api.Infrastructure.Storage;
 
 
@@ -21,11 +22,16 @@ public sealed class RefreshTokenCommandHandler : IRequestHandler<RefreshTokenCom
 {
     private readonly TableStorageContext _db;
     private readonly JwtTokenService _jwt;
+    private readonly IWebHostEnvironment _env;
 
-    public RefreshTokenCommandHandler(TableStorageContext db, JwtTokenService jwt)
+    public RefreshTokenCommandHandler(
+        TableStorageContext db,
+        JwtTokenService jwt,
+        IWebHostEnvironment env)
     {
         _db = db;
         _jwt = jwt;
+        _env = env;
     }
 
     public async Task<RefreshTokenResult> Handle(RefreshTokenCommand command, CancellationToken ct)
@@ -36,6 +42,12 @@ public sealed class RefreshTokenCommandHandler : IRequestHandler<RefreshTokenCom
 
         if (user is null)
             return new RefreshTokenResult(false, null, "INVALID_REFRESH_TOKEN");
+
+        if (!_env.IsEnvironment("Testing")
+            && !string.Equals(user.AuthProvider, "microsoft", StringComparison.OrdinalIgnoreCase))
+        {
+            return new RefreshTokenResult(false, null, "INVALID_REFRESH_TOKEN");
+        }
 
         (string accessToken, string newRefreshToken, DateTimeOffset expiresAt) = _jwt.GenerateTokens(user);
 

@@ -13,7 +13,7 @@ congestion or reroute anomalies in real time.
 | Back-end | ASP.NET Core Minimal API (.NET 10) + MediatR |
 | Persistence | Azure Table Storage, Azurite locally |
 | Background Jobs | Table Storage-backed scheduler |
-| Auth | Microsoft OAuth in production, GUEST only in dev/test |
+| Auth | Microsoft OAuth in dev/prod, Testing-only auth bypasses |
 | Logging | Serilog + WASM client log forwarding |
 | Observability | OpenTelemetry + Azure Monitor / Application Insights |
 | Testing | xUnit + NSubstitute, integration tests, Playwright .NET E2E |
@@ -82,9 +82,9 @@ traffic samples at configured intervals until the window closes. Samples are
 stored in Table Storage and used to build baseline travel-time bands per route
 and time slot.
 
-Production requires Microsoft OAuth. Development and Testing also allow GUEST
-login, which creates a `GUEST########` identity and stores the JWT in
-`localStorage` under `potraffic_access_token`.
+Development and Production require Microsoft OAuth. Testing exposes isolated
+auth bypass endpoints for integration and E2E tests; these are not available
+when running the app normally.
 
 ## Development Guidelines
 

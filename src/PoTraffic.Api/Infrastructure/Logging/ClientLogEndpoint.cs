@@ -24,7 +24,7 @@ public static class ClientLogEndpoints
     public static IEndpointRouteBuilder MapClientLogEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapPost("/api/client-logs", Handle)
-           .RequireAuthorization()
+           .RequireAuthorization("ProductionMicrosoftAuth")
            .WithName("PostClientLogs")
            .WithTags("Logging");
 

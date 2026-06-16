@@ -7,7 +7,7 @@
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 0;
+    gap: 0.75rem;
     position: sticky;
     top: 0;
     z-index: 100;
@@ -17,13 +17,29 @@
 .navbar-brand {
     font-weight: 800;
     font-size: 1.15rem;
-    letter-spacing: -0.03em;
+    letter-spacing: 0;
     background: linear-gradient(135deg, #fff 0%, #90caf9 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     text-decoration: none;
-    margin-right: 1.5rem;
+    margin-right: 0.75rem;
     padding: 0.5rem 0;
+}
+
+.pt-mock-data-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.5rem;
+    padding: 0.15rem 0.5rem;
+    border: 1px solid rgba(245, 158, 11, 0.7);
+    border-radius: 6px;
+    color: #fbbf24;
+    background: rgba(120, 53, 15, 0.38);
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: 0;
+    white-space: nowrap;
 }
 
 .navbar-toggler {
@@ -150,6 +166,8 @@
 /* ── Mobile ── */
 @media (max-width: 640px) {
     .navbar-toggler { display: flex; }
+
+    .pt-mock-data-badge { margin-right: auto; }
 
     .navbar-collapse {
         display: none;

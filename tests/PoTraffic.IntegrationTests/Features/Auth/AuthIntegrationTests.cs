@@ -8,8 +8,8 @@ using PoTraffic.Shared.DTOs.Auth;
 namespace PoTraffic.IntegrationTests.Features.Auth;
 
 /// <summary>
-/// Integration tests for the surviving Auth slice (guest-login, refresh-token, external Microsoft OAuth).
-/// Email/password register + login were removed — Microsoft OAuth and guest-login are the only sign-in paths.
+/// Integration tests for the surviving Auth slice (Testing guest-login, refresh-token, external Microsoft OAuth).
+/// Email/password register + login were removed — Microsoft OAuth is the only normal sign-in path.
 /// </summary>
 public sealed class AuthIntegrationTests : BaseIntegrationTest
 {

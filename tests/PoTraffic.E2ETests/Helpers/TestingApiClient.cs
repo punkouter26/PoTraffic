@@ -6,7 +6,7 @@ namespace PoTraffic.E2ETests.Helpers;
 /// <summary>
 /// Typed HTTP client wrapping the testing-only endpoints: /e2e/dev-login, /e2e/seed, /e2e/seed-admin.
 /// Used by all E2E scenarios to authenticate and seed test data.
-/// Available in Development and Testing environments (never Production).
+/// Available in the Testing environment only.
 /// </summary>
 public sealed class TestingApiClient
 {
@@ -27,6 +27,17 @@ public sealed class TestingApiClient
         if (!response.IsSuccessStatusCode) return null;
         var result = await response.Content.ReadFromJsonAsync<DevLoginResponse>(ct);
         return result?.Token;
+    }
+
+    /// <summary>
+    /// Calls POST /api/auth/guest-login to obtain a Testing-only GUEST JWT.
+    /// This bypasses Microsoft OAuth without enabling any guest path in Development or Production.
+    /// </summary>
+    public async Task<AuthResponse?> GuestLoginAsync(CancellationToken ct = default)
+    {
+        HttpResponseMessage response = await _http.PostAsync("/api/auth/guest-login", content: null, ct);
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<AuthResponse>(ct);
     }
 
     /// <summary>

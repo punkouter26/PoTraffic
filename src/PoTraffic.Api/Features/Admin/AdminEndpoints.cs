@@ -15,6 +15,7 @@ public static class AdminEndpoints
         // FR-022: All admin endpoints require Administrator role
         RouteGroupBuilder grp = app.MapGroup("/api/admin")
             .RequireAuthorization("AdminOnly")
+            .RequireAuthorization("ProductionMicrosoftAuth")
             .WithTags("Admin");
 
         grp.MapGet("/users", async (ISender sender, CancellationToken ct) =>

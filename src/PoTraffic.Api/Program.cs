@@ -226,17 +226,11 @@ try
     app.MapAccountEndpoints();
     app.MapAdminEndpoints();
     app.MapAuthEndpoints();
-    // Rule 6 / Rule 13: GUEST login is only registered in Dev + Testing.
-    // In Production the endpoint is omitted entirely (no `guest-login` route).
-    if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
+    // GUEST login is only registered in Testing for integration/E2E tests.
+    // Development and Production must authenticate through Microsoft OAuth.
+    if (app.Environment.IsEnvironment("Testing"))
     {
         app.MapGuestEndpoints();
-    }
-    // Dev-only admin login — lets the seeded dev Administrator (and its sample data)
-    // be exercised offline without Microsoft OAuth. Never registered outside Development.
-    if (app.Environment.IsDevelopment())
-    {
-        app.MapDevAuthEndpoints();
     }
     app.MapRoutesEndpoints();
     app.MapWindowsEndpoints();
@@ -314,16 +308,6 @@ try
     await using AsyncServiceScope scope = app.Services.CreateAsyncScope();
     TableStorageContext db = scope.ServiceProvider.GetRequiredService<TableStorageContext>();
     db.SeedDefaultConfigurationsIfMissing();
-
-    // Development-only: seed a deterministic admin + sample route with poll history so
-    // admin grids, route detail, history and charts are verifiable offline. Idempotent.
-    if (app.Environment.IsDevelopment())
-    {
-        Microsoft.Extensions.Logging.ILogger devSeedLogger = scope.ServiceProvider
-            .GetRequiredService<ILoggerFactory>()
-            .CreateLogger("DevDataSeeder");
-        await PoTraffic.Api.Features.Auth.DevAuthExtensions.SeedDevDataIfMissingAsync(db, devSeedLogger);
-    }
 
     // T086 — Register nightly pruning recurring job (02:00 UTC).
     // Skipped in Testing where IJobScheduler is not registered.

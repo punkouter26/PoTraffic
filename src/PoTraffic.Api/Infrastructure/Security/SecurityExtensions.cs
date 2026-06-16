@@ -53,9 +53,9 @@ internal static class SecurityExtensions
         {
             opts.AddPolicy("AdminOnly", p => p.RequireRole("Administrator"));
 
-            // Rule 13: in Production, Microsoft OAuth is REQUIRED.
+            // Rule 13: in Development/Production/Staging, Microsoft OAuth is REQUIRED.
             // GUEST and password-only sessions are rejected. The policy is a no-op
-            // in non-Production environments so dev/test E2E flows keep working.
+            // only in Testing so integration/E2E flows keep working.
             opts.AddPolicy("ProductionMicrosoftAuth", p =>
             {
                 p.RequireAuthenticatedUser();

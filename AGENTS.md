@@ -26,7 +26,7 @@ real time.
 | Back-end | ASP.NET Core 10 Minimal API + MediatR (CQRS) |
 | Persistence | Table Storage (Azurite locally, Azure in prod) |
 | Background Jobs | Table Storage-backed scheduler (recursive polling + nightly pruning) |
-| Auth | Microsoft OAuth (Prod **required**) + GUEST (Dev/Test only) |
+| Auth | Microsoft OAuth (Dev/Prod **required**) + Testing-only auth bypasses |
 | Logging | Serilog (Console, File, App Insights) + structured fields |
 | Observability | OpenTelemetry → Azure Monitor / App Insights in `rg-poshared` |
 | Testing | xUnit + NSubstitute (unit), Testcontainers (integration), Playwright (E2E) |
@@ -80,9 +80,10 @@ dotnet build
 
 ## 6. Auth (Rules 6 + 13)
 
-- **Prod:** Microsoft OAuth is **required**. GUEST login is rejected at the API.
-- **Dev / Testing:** Microsoft OAuth + GUEST both allowed. The `LoginPage.razor`
-  shows the GUEST button only when `IWebAssemblyHostEnvironment.IsDevelopment()`.
+- **Dev / Prod:** Microsoft OAuth is **required**. GUEST and dev-admin login are
+  rejected at the API and not shown in the client.
+- **Testing:** `/e2e/*` endpoints and GUEST login are allowed for integration and
+  E2E tests only.
 - **GUEST format:** `GUEST` + 8 random digits (e.g. `GUEST12345678`).
   Display in the nav bar as `GUEST12345678 LOGGED IN`.
 - **Persistence:** The JWT is stored in `localStorage` under key
@@ -146,8 +147,8 @@ dotnet watch --project src/PoTraffic.Api --launch-profile https
 - ❌ Do not reference `Microsoft.AspNetCore.OpenApi` directly — Scalar is wired
   in `Program.cs`.
 - ❌ Do not add a `Services/` project — the API project is the only host.
-- ❌ Do not skip the GUEST button hide in Prod — it is enforced at both the API
-  (`MapAnonEndpoints`) and the client (`IWebAssemblyHostEnvironment.IsDevelopment`).
+- ❌ Do not add GUEST or dev-admin login to Development or Production — Microsoft
+  OAuth is the only normal sign-in path.
 
 ## 11. Skills (Rule 12)
 

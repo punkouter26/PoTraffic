@@ -22,7 +22,7 @@ public static class RoutesEndpoints
     public static IEndpointRouteBuilder MapRoutesEndpoints(this IEndpointRouteBuilder app)
     {
         RouteGroupBuilder group = app.MapGroup("/api/routes")
-            .RequireAuthorization()
+            .RequireAuthorization("ProductionMicrosoftAuth")
             .WithTags("Routes");
 
         group.MapGet("", GetRoutes);

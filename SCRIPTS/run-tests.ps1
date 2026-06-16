@@ -1,5 +1,5 @@
-# run-tests.ps1 — Run Unit, Integration, and E2E tests in sequence.
-# Requires Docker Desktop (for Azurite Table Storage) and the app running on port 5000 for E2E.
+# run-tests.ps1 - Run Unit, Integration, and E2E tests in sequence.
+# Integration owns Azurite through Testcontainers. E2E starts the Testing host.
 # Run from repo root: ./SCRIPTS/run-tests.ps1
 
 [CmdletBinding()]
@@ -12,13 +12,14 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$root = Join-Path $PSScriptRoot '..'
-$e2eBaseUrl = $env:E2E_BASE_URL ?? 'http://localhost:5000'
+$root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$e2eBaseUrl = $env:E2E_BASE_URL ?? 'http://localhost:5150'
+$testResultsRoot = Join-Path $root 'TestResults'
 
 function Run-Suite {
     param([string]$Name, [string]$Project)
     Write-Host "`n--- $Name ---" -ForegroundColor Cyan
-    dotnet test (Join-Path $root $Project) --no-build --logger 'trx' --results-directory (Join-Path $root 'TestResults' $Name)
+    dotnet test (Join-Path $root $Project) --no-build --logger 'trx' --results-directory (Join-Path $testResultsRoot $Name)
     if ($LASTEXITCODE -ne 0) { throw "$Name tests failed." }
     Write-Host "$Name PASSED" -ForegroundColor Green
 }
@@ -42,19 +43,75 @@ function Warmup-App {
     return $false
 }
 
-function Test-AzuriteHealth {
-    # Check if Azurite Table service is responding on port 10002
+function Get-PortFromUrl {
+    param([string]$Url)
+    $uri = [Uri]$Url
+    if ($uri.IsDefaultPort) {
+        if ($uri.Scheme -eq 'https') { return 443 }
+        return 80
+    }
+    return $uri.Port
+}
+
+function Stop-PortProcesses {
+    param([int]$Port)
+    $pids = (netstat -ano 2>$null |
+        Select-String ":$Port\s" |
+        ForEach-Object { ($_ -split '\s+')[-1] } |
+        Where-Object { $_ -match '^\d+$' } |
+        Sort-Object -Unique)
+
+    foreach ($processId in $pids) {
+        try {
+            $proc = Get-Process -Id $processId -ErrorAction SilentlyContinue
+            if ($proc -and ($proc.ProcessName -in @('dotnet', 'PoTraffic.Api'))) {
+                Write-Host "  Stopping stale $($proc.ProcessName) PID $processId on port $Port" -ForegroundColor Yellow
+                Stop-Process -Id $processId -Force
+            }
+        } catch { }
+    }
+}
+
+function Install-PlaywrightChromium {
+    $script = Join-Path $root 'tests/PoTraffic.E2ETests/bin/Debug/net10.0/playwright.ps1'
+    if (!(Test-Path $script)) {
+        throw "Playwright installer not found at $script. Build the E2E project first."
+    }
+
+    Write-Host "  Ensuring Playwright Chromium is installed..." -ForegroundColor Yellow
+    & pwsh -NoProfile -ExecutionPolicy Bypass -File $script install chromium
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Playwright Chromium install failed.'
+    }
+}
+
+function Start-TestingHost {
+    param([string]$Url)
+
+    $port = Get-PortFromUrl $Url
+    Stop-PortProcesses -Port $port
+
+    $hostLogDir = Join-Path $testResultsRoot 'E2EHost'
+    New-Item -ItemType Directory -Force -Path $hostLogDir | Out-Null
+    $stdout = Join-Path $hostLogDir 'stdout.log'
+    $stderr = Join-Path $hostLogDir 'stderr.log'
+
+    Write-Host "  Starting Testing host at $Url ..." -ForegroundColor Yellow
+    $process = Start-Process -FilePath 'dotnet' `
+        -ArgumentList @('run', '--project', (Join-Path $root 'src/PoTraffic.Api/PoTraffic.Api.csproj'), '--launch-profile', 'Testing', '--no-build') `
+        -WorkingDirectory $root `
+        -RedirectStandardOutput $stdout `
+        -RedirectStandardError $stderr `
+        -WindowStyle Hidden `
+        -PassThru
+
+    return $process
+}
+
+function Test-DockerHealth {
     try {
-        $tcp = New-Object System.Net.Sockets.TcpClient
-        $result = $tcp.BeginConnect("127.0.0.1", 10002, $null, $null)
-        $wait = $result.AsyncWaitHandle.WaitOne(2000, $false)
-        if ($wait -and $tcp.Connected) {
-            $tcp.EndConnect($result)
-            $tcp.Close()
-            return $true
-        }
-        $tcp.Close()
-        return $false
+        docker info *> $null
+        return $LASTEXITCODE -eq 0
     } catch {
         return $false
     }
@@ -71,33 +128,26 @@ if (!$IntegrationOnly -and !$E2eOnly) { Run-Suite 'UnitTests'        'tests/PoTr
 if (!$UnitOnly        -and !$E2eOnly) { Run-Suite 'IntegrationTests' 'tests/PoTraffic.IntegrationTests' }
 if (!$UnitOnly -and !$IntegrationOnly) {
     Write-Host "`n--- E2E (Playwright) ---" -ForegroundColor Cyan
-    Write-Host "  NOTE: API must be running on $e2eBaseUrl (start-dev.ps1)." -ForegroundColor Yellow
+    if (!(Test-DockerHealth)) {
+        throw 'Docker daemon is not reachable. Integration/E2E storage is managed by Testcontainers and requires Docker.'
+    }
 
-    # Ensure Azurite is running (E2E tests need Table Storage)
-    if (!(Test-AzuriteHealth)) {
-        Write-Host "  Azurite not running — starting via docker compose..." -ForegroundColor Yellow
-        Push-Location $root
-        docker compose up -d
-        Pop-Location
-        Start-Sleep -Seconds 5
+    Install-PlaywrightChromium
+    $env:E2E_BASE_URL = $e2eBaseUrl
 
-        if (Test-AzuriteHealth) {
-            Write-Host "  Azurite started successfully on port 10002." -ForegroundColor Green
-        } else {
-            Write-Warning "Azurite still not reachable after docker compose up. E2E tests may fail."
+    $hostProcess = $null
+    try {
+        $hostProcess = Start-TestingHost -Url $e2eBaseUrl
+        $ready = Warmup-App -Url $e2eBaseUrl -MaxRetries 30 -DelaySeconds 2
+        if (!$ready) { throw "Testing host did not become ready at $e2eBaseUrl." }
+        Run-Suite 'E2ETests' 'tests/PoTraffic.E2ETests'
+    }
+    finally {
+        if ($hostProcess -and !$hostProcess.HasExited) {
+            Write-Host "  Stopping Testing host PID $($hostProcess.Id)." -ForegroundColor Yellow
+            Stop-Process -Id $hostProcess.Id -Force -ErrorAction SilentlyContinue
         }
-    } else {
-        Write-Host "  Azurite Table service is healthy on port 10002." -ForegroundColor Green
     }
-
-    # Warm-up ping to trigger JIT/AOT compilation before Playwright launches.
-    # Prevents first-test timeout failures from cold-start latency.
-    $ready = Warmup-App -Url $e2eBaseUrl
-    if (!$ready) {
-        Write-Warning "E2E tests may fail — app is not responding at $e2eBaseUrl."
-    }
-
-    Run-Suite 'E2ETests' 'tests/PoTraffic.E2ETests'
 }
 
 Write-Host "`nAll selected test suites passed." -ForegroundColor Green

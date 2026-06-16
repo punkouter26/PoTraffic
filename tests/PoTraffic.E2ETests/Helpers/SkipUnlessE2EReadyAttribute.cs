@@ -13,7 +13,7 @@ public sealed class SkipUnlessE2EReadyAttribute : FactAttribute
 {
     // Matches PlaywrightTestBase.BaseUrl — API hosts the WASM client via UseBlazorFrameworkFiles
     private static readonly string BaseUrl =
-        Environment.GetEnvironmentVariable("E2E_BASE_URL") ?? "http://localhost:5000";
+        Environment.GetEnvironmentVariable("E2E_BASE_URL") ?? "http://localhost:5150";
 
     public SkipUnlessE2EReadyAttribute()
     {

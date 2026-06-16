@@ -4,9 +4,8 @@ using Xunit;
 namespace PoTraffic.IntegrationTests.Helpers;
 
 /// <summary>
-/// Conditional Fact — runs the test when Docker is reachable (required for Azurite
-/// storage emulator). Skips gracefully otherwise. Use this attribute on integration
-/// tests that need a running Azurite instance for Table Storage persistence.
+/// Conditional Fact — runs the test when Docker is reachable. Azurite itself is
+/// created and cleaned up by Testcontainers inside the integration test host.
 /// </summary>
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
 public sealed class SkipUnlessAzuriteAvailableAttribute : FactAttribute
@@ -14,7 +13,7 @@ public sealed class SkipUnlessAzuriteAvailableAttribute : FactAttribute
     public SkipUnlessAzuriteAvailableAttribute()
     {
         if (!IsDockerRunning())
-            Skip = "Docker daemon not reachable — start Docker Desktop with Azurite and re-run.";
+            Skip = "Docker daemon not reachable — start Docker Desktop and re-run.";
     }
 
     private static bool IsDockerRunning()

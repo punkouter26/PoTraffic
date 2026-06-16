@@ -1,11 +1,18 @@
 ﻿@using Microsoft.AspNetCore.Components.Authorization
 @using PoTraffic.Client.Infrastructure.Auth
+@using System.Net.Http.Json
 @implements IDisposable
 @inject AuthenticationStateProvider AuthStateProvider
+@inject HttpClient Http
 @inject NavigationManager Nav
 
 <nav class="navbar navbar-dark app-navbar" role="navigation" aria-label="Main navigation">
     <a class="navbar-brand" href="dashboard">PoTraffic</a>
+
+    @if (_useMockProviders)
+    {
+        <span class="pt-mock-data-badge" role="status">USING MOCK DATA</span>
+    }
 
     <button class="navbar-toggler" @onclick="ToggleNavMenu" aria-expanded="@(!collapseNavMenu)" aria-label="Toggle navigation">
         <span class="navbar-toggler-icon"></span>
@@ -75,16 +82,31 @@
     private string _email = string.Empty;
     private string _displayLabel = string.Empty;
     private string _initials = "?";
+    private bool _useMockProviders;
 
     protected override async Task OnInitializedAsync()
     {
         AuthStateProvider.AuthenticationStateChanged += HandleAuthStateChanged;
+        await LoadFeatureFlagsAsync();
         await UpdateUserStateAsync(await AuthStateProvider.GetAuthenticationStateAsync());
     }
 
     private void ToggleNavMenu() => collapseNavMenu = !collapseNavMenu;
     private void ToggleUserMenu() => _menuOpen = !_menuOpen;
     private void CloseUserMenu() => _menuOpen = false;
+
+    private async Task LoadFeatureFlagsAsync()
+    {
+        try
+        {
+            FeatureFlags? flags = await Http.GetFromJsonAsync<FeatureFlags>("/api/system/features");
+            _useMockProviders = flags?.UseMockProviders == true;
+        }
+        catch
+        {
+            _useMockProviders = false;
+        }
+    }
 
     private async void HandleAuthStateChanged(Task<AuthenticationState> stateTask)
     {
@@ -148,4 +170,6 @@
     {
         AuthStateProvider.AuthenticationStateChanged -= HandleAuthStateChanged;
     }
+
+    private sealed record FeatureFlags(bool TripleTestEnabled, bool UseMockProviders);
 }

@@ -6,7 +6,7 @@
 #   2. Verify Docker Desktop is installed and running.
 #   3. Verify Azure CLI is installed.
 #   4. Check `az login` status and remind the user to log in to access Key Vault.
-#   5. Start Azurite via docker-compose.
+#   5. Verify Docker is ready for Testcontainers-backed integration tests.
 #   6. Restore + build the solution.
 
 [CmdletBinding()]
@@ -82,33 +82,16 @@ try {
     Warn 'az CLI not available — skipping auth check.'
 }
 
-Step '5/6' 'Starting Azurite (Table Storage emulator)...'
+Step '5/6' 'Verifying Docker for Testcontainers...'
 try {
-    & docker compose up -d
+    & docker info *> $null
     if ($LASTEXITCODE -eq 0) {
-        Ok 'Azurite container started (ports 10000/10001/10002).'
-        # Wait for Table service to be ready
-        Write-Host "  Waiting for Azurite Table service..." -ForegroundColor Yellow
-        for ($i = 1; $i -le 15; $i++) {
-            try {
-                $tcp = New-Object System.Net.Sockets.TcpClient
-                $result = $tcp.BeginConnect("127.0.0.1", 10002, $null, $null)
-                $wait = $result.AsyncWaitHandle.WaitOne(1000, $false)
-                if ($wait -and $tcp.Connected) {
-                    $tcp.EndConnect($result)
-                    $tcp.Close()
-                    Ok "Azurite Table service ready on port 10002."
-                    break
-                }
-                $tcp.Close()
-            } catch { }
-            if ($i -eq 15) { Warn "Azurite Table service not yet responsive — may need more time." }
-            Start-Sleep -Seconds 1
-        }
+        Ok 'Docker daemon is reachable. Integration tests will create Azurite through Testcontainers.'
+    } else {
+        Warn 'Docker daemon is not reachable. Start Docker Desktop before running integration or E2E tests.'
     }
-    else { Warn 'docker compose up failed — check Docker Desktop.' }
 } catch {
-    Warn 'Could not start Azurite container.'
+    Warn 'Docker daemon is not reachable. Start Docker Desktop before running integration or E2E tests.'
 }
 
 Step '6/6' 'Restoring + building solution...'

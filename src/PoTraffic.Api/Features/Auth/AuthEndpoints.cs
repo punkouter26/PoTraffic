@@ -18,10 +18,10 @@ public static class AuthEndpoints
     {
         RouteGroupBuilder group = app.MapGroup("/api/auth").WithTags("Auth");
 
-        // Sign-in is Microsoft OAuth only (plus the dev/test GUEST bypass).
+        // Sign-in is Microsoft OAuth only outside the Testing environment.
         // Local email/password registration and login were removed by design.
         group.MapGet("providers", GetAvailableProviders);
-        group.MapPost("logout", Logout).RequireAuthorization();
+        group.MapPost("logout", Logout).RequireAuthorization("ProductionMicrosoftAuth");
         group.MapPost("refresh-token", RefreshToken);
         group.MapGet("external/{provider}/start", StartExternalLogin);
         group.MapGet("external/{provider}/callback", CompleteExternalLogin);

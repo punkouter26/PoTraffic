@@ -12,7 +12,7 @@ public static class AccountEndpoints
     public static IEndpointRouteBuilder MapAccountEndpoints(this IEndpointRouteBuilder app)
     {
         RouteGroupBuilder grp = app.MapGroup("/api/account")
-            .RequireAuthorization()
+            .RequireAuthorization("ProductionMicrosoftAuth")
             .WithTags("Account");
 
         grp.MapGet("/profile", async (ClaimsPrincipal user, ISender sender, CancellationToken ct) =>
