@@ -14,7 +14,7 @@
 targetScope = 'resourceGroup'
 
 @description('App Service (web app) name.')
-param webAppName string = 'potraffic-api'
+param webAppName string = 'app-potraffic-api-prod-wus2-001'
 
 @description('Region — MUST match the App Service Plan region.')
 param location string = 'westus2'
@@ -29,7 +29,7 @@ param sharedIdentityId string
 param sharedIdentityClientId string
 
 @description('Key Vault URI (config key KeyVault:Uri, read at startup).')
-param keyVaultUri string = 'https://kv-poshared.vault.azure.net/'
+param keyVaultUri string = 'https://kv-platform-prod-eus2-00.vault.azure.net/'
 
 resource web 'Microsoft.Web/sites@2024-04-01' = {
   name: webAppName
