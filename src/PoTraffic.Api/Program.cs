@@ -13,9 +13,11 @@ using PoTraffic.Api.Features.Maintenance;
 using PoTraffic.Api.Features.MonitoringWindows;
 using PoTraffic.Api.Features.Routes;
 using PoTraffic.Api.Infrastructure;
+using PoTraffic.Api.Infrastructure.Caching;
 using PoTraffic.Api.Infrastructure.Logging;
 using PoTraffic.Api.Infrastructure.Observability;
 using PoTraffic.Api.Infrastructure.Providers;
+using PoTraffic.Api.Infrastructure.Resilience;
 using PoTraffic.Api.Infrastructure.Scheduling;
 using PoTraffic.Api.Infrastructure.Security;
 using PoTraffic.Api.Infrastructure.Storage;
@@ -111,8 +113,10 @@ try
     // ── FluentValidation ──────────────────────────────────────────────────────
     builder.Services.AddValidatorsFromAssembly(typeof(Program).Assembly);
 
-    // ── HTTP client resilience defaults ───────────────────────────────────────
-    builder.Services.ConfigureHttpClientDefaults(http => http.AddStandardResilienceHandler());
+    // ── HTTP resilience pipelines are registered per-client via ───────────────
+    //   Infrastructure/Resilience/ResiliencePipelineExtensions.AddResilienceHandler(name)
+    // ── Hybrid cache (L1 in-proc, optional distributed L2) ────────────────────
+    builder.Services.AddPoTrafficHybridCache();
 
     // ── Problem Details (RFC 7807) ────────────────────────────────────────────
     builder.Services.AddProblemDetails();

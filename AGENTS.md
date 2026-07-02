@@ -28,6 +28,8 @@ real time.
 | Background Jobs | Table Storage-backed scheduler (recursive polling + nightly pruning) |
 | Auth | BFF cookie sessions (HttpOnly, SameSite=Strict); Microsoft OAuth (Dev/Prod **required**) + Testing-only bypasses |
 | Logging | Serilog (Console, File, App Insights) + structured fields |
+| Caching | `HybridCache` (in-proc L1; optional distributed L2) — `Infrastructure/Caching` |
+| HTTP Resilience | `Microsoft.Extensions.Http.Resilience` (per-client named pipelines) — `Infrastructure/Resilience` |
 | Observability | OpenTelemetry → Azure Monitor / App Insights in `rg-poshared` |
 | Testing | xUnit + NSubstitute (unit), Testcontainers (integration), pure-HTTP (E2EAPI), Playwright (E2EUI) |
 
@@ -38,6 +40,9 @@ PoTraffic.Api             // Single host — Features/<Feature>/ slices (endpoin
                           // commands, handlers, entities) + Infrastructure/ cross-cutting
 PoTraffic.Client          // Blazor WASM — hosted by Api, no CORS
 PoTraffic.Shared          // DTOs/Enums/Constants shared between Api ↔ Client
+tests/
+  PoTraffic.Tests         // Unit + Integration (folder split via <Compile/>)
+  PoTraffic.Tests.E2E     // Playwright (Ui/) + HTTP (Api/) end-to-end scenarios
 ```
 
 **Rules:**
@@ -156,8 +161,9 @@ dotnet watch --project src/PoTraffic.Api --launch-profile https
   `appsettings.Development.json` (gitignored by convention).
 - ❌ Do not enable AOT / trimming — keep the build small and CI fast.
 - ❌ Do not create `setup.ps1` outside `/SCRIPTS` — all tools live there.
-- ❌ Do not reference `Microsoft.AspNetCore.OpenApi` directly — Scalar is wired
-  in `Program.cs`.
+- ❌ Do not bypass `app.MapOpenApi()` from `Microsoft.AspNetCore.OpenApi` —
+  Scalar is wired in `Program.cs` against the registered OpenAPI document.
+  The package reference is required (see `PoTraffic.Api.csproj`).
 - ❌ Do not add a `Services/` project — the API project is the only host.
 - ❌ Do not add GUEST or dev-admin login to Development or Production — Microsoft
   OAuth is the only normal sign-in path.
@@ -200,9 +206,35 @@ The [maddhruv/absolute](https://github.com/maddhruv/absolute) workflow pack
 - `azure.yaml` — azd project mapping.
 - `docker-compose.yml` — Azurite for local Table Storage.
 - `src/PoTraffic.Api/Program.cs` — composition root.
+- `src/PoTraffic.Api/Infrastructure/Resilience/ResiliencePipelineExtensions.cs` — named HTTP resilience pipelines (`traffic`, `external-auth`).
+- `src/PoTraffic.Api/Infrastructure/Caching/HybridCacheExtensions.cs` — HybridCache registration.
 - `docs/ProductSpec.md` — what we're building.
 - `docs/Architecture.mmd` — C4-style architecture diagram.
 - `docs/ApiContract.md` — HTTP surface area.
+
+## 13. Audit Trail
+
+Verified properties of the codebase as of 2026-07-02:
+
+| Concern | Status | Notes |
+|---|---|---|
+| `<Nullable>enable</Nullable>` | ✅ Enforced | `Directory.Build.props` |
+| `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>` | ✅ Enforced | `Directory.Build.props` |
+| `<EnableTrimAnalyzer>true</EnableTrimAnalyzer>` | ✅ Enforced in `PoTraffic.Shared`, `PoTraffic.Client` |
+| CPM (no inline `Version` in `.csproj`) | ✅ Verified | `Directory.Packages.props` |
+| Vertical Slice Architecture (no `Services/`, `Repositories/`, `DTOs/` at project root) | ✅ Verified |
+| Slug-pattern `Po{Name}` | ✅ All assemblies/root namespaces |
+| GUEST → `InvalidOperationException` in Production | ✅ Verified in `GuestAuthExtensions.MapGuestEndpoints` |
+| Microsoft OAuth required in Dev/Prod | ✅ Verified in `ProductionMicrosoftAuthPolicy` |
+| Cookie name `.PoTraffic.Auth`; `HttpOnly`, `SameSite=Strict` | ✅ Verified in `SecurityExtensions` |
+| Testcontainers Azurite (no stale manual mocks) | ✅ Verified in `Integration/Infrastructure/AzuriteTestContainer.cs` |
+| Named HTTP resilience pipelines | ✅ `ResiliencePipelineExtensions.TrafficPipeline`, `ExternalAuthPipeline` |
+| HybridCache registered | ✅ `HybridCacheExtensions.AddPoTrafficHybridCache` |
+| Key Vault pulled via Managed Identity | ✅ `DefaultAzureCredential` in `TableStorageExtensions` (Azure path) |
+| GH Actions workflow count | 1 (`deploy.yml` — build + Azure App Service deploy) |
+| Mobile-portrait nav layout | ✅ `app-shell` grid (Left=Brand / Center=Actions / Right=User) |
+| "USING MOCK DATA" banner | ✅ `pt-mock-banner` rendered below navbar when `Features.UseMockProviders` |
+| Scoped `.razor.css` (no inline `style=""`) | ✅ Top offenders migrated (Dashboard, CreateRoute, RouteCard, RouteAddressDisplay) |
 
 ---
 

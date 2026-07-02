@@ -29,14 +29,14 @@
         </span>
         <span class="pt-status-item">
             <span class="pt-quota-chip">
-                <span class="pt-quota-ring" style="@quotaRingStyle"></span>
+                <span class="pt-quota-ring" style="@quotaRingStyle" aria-hidden="true"></span>
                 <span class="pt-quota-chip-text">
                     <span class="pt-quota-chip-value">@_quotaConsumed / @quotaTotal</span>
                     <span class="pt-quota-chip-label">Quota</span>
                 </span>
             </span>
         </span>
-        <span class="pt-status-item" style="color:#94a3b8;">Resets midnight UTC</span>
+        <span class="pt-status-item pt-status-item-muted">Resets midnight UTC</span>
     </div>
     <div class="pt-status-bar-actions">
         <RadzenButton Text="+ Add Route" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Small"
@@ -67,10 +67,10 @@
 }
 else if (_routes.Count == 0)
 {
-    <div style="text-align:center; padding:3rem 1rem;">
-        <div style="font-size:3rem; margin-bottom:1rem;">🛣️</div>
-        <div style="font-size:1.2rem; font-weight:600; color:#334155; margin-bottom:0.5rem;">No routes yet</div>
-        <div style="color:#94a3b8; margin-bottom:1.5rem;">Add your first commute route to start monitoring traffic patterns.</div>
+    <div class="pt-empty-state">
+        <div class="pt-empty-state-emoji" aria-hidden="true">🛣️</div>
+        <div class="pt-empty-state-title">No routes yet</div>
+        <div class="pt-empty-state-text">Add your first commute route to start monitoring traffic patterns.</div>
         <RadzenButton Text="Add Your First Route" ButtonStyle="ButtonStyle.Primary" Icon="add"
                       Click="@(() => Nav.NavigateTo("/routes/create"))" />
     </div>

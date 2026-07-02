@@ -1,0 +1,5 @@
+/* ── RouteCard — scoped styles (replaces inline style="" attributes) ── */
+
+.pt-route-card-status {
+    flex-shrink: 0;
+}

@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>PoTraffic.Tests</RootNamespace>
+    <AssemblyName>PoTraffic.Tests</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <!--
+      Two-tier test layout: this project hosts BOTH unit and integration
+      tests. Source roots are split via <Compile Include="..." /> so feature
+      slices can mirror 1:1 against the API.
+    -->
+    <NoWarn>$(NoWarn);xUnit1031</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\PoTraffic.Shared\PoTraffic.Shared.csproj" />
+    <ProjectReference Include="..\..\src\PoTraffic.Api\PoTraffic.Api.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="NSubstitute" />
+    <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="Testcontainers" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+  </ItemGroup>
+
+  <!-- ── Source partitioning ─────────────────────────────────────────── -->
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Unit/xunit.runner.json" Link="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Integration/xunit.runner.json" Link="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

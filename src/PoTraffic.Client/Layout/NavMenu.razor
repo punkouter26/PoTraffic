@@ -6,67 +6,67 @@
 @inject HttpClient Http
 @inject NavigationManager Nav
 
-<nav class="navbar navbar-dark app-navbar" role="navigation" aria-label="Main navigation">
-    <a class="navbar-brand" href="dashboard">PoTraffic</a>
+<header class="app-shell">
+    @* ── Left: Branding ─────────────────────────────────────────────────── *@
+    <a class="app-shell-brand" href="dashboard">PoTraffic</a>
 
-    @if (_useMockProviders)
-    {
-        <span class="pt-mock-data-badge" role="status">USING MOCK DATA</span>
-    }
-
-    <button class="navbar-toggler" @onclick="ToggleNavMenu" aria-expanded="@(!collapseNavMenu)" aria-label="Toggle navigation">
-        <span class="navbar-toggler-icon"></span>
-    </button>
-
-    <div class="navbar-collapse @(collapseNavMenu ? "" : "show")">
-        <div class="navbar-nav me-auto">
-            @if (_isAuthenticated)
-            {
-                <NavLink class="nav-link" href="dashboard" Match="NavLinkMatch.All">Dashboard</NavLink>
-                @if (_isAdmin)
-                {
-                    <NavLink class="nav-link" href="admin">Admin</NavLink>
-                }
-            }
-            else
-            {
-                <NavLink class="nav-link" href="login" Match="NavLinkMatch.All">Sign In</NavLink>
-            }
-        </div>
-
+    @* ── Center: Actions (auth-gated) ──────────────────────────────────── *@
+    <nav class="app-shell-actions" aria-label="Primary">
         @if (_isAuthenticated)
         {
-            <div class="pt-user-chip" @onclick:stopPropagation="true">
-                <button class="pt-user-chip-btn" @onclick="ToggleUserMenu" type="button">
-                    <div class="pt-user-avatar">@_initials</div>
-                    <span>
-                        @if (_isGuest)
-                        {
-                            <text>@_displayLabel LOGGED IN</text>
-                        }
-                        else
-                        {
-                            <text>@_email</text>
-                        }
-                    </span>
-                    <span class="pt-user-caret">▾</span>
-                </button>
-                @if (_menuOpen)
-                {
-                    <div class="pt-user-dropdown" @onclick:stopPropagation="true">
-                        <div class="pt-user-dropdown-header">
-                            <div class="pt-user-dropdown-label">Signed in as</div>
-                            <div class="pt-user-dropdown-email">@_displayLabel</div>
-                        </div>
-                        <a class="pt-dropdown-item" href="/account/settings">Account Settings</a>
-                        <div class="pt-dropdown-divider"></div>
-                        <button class="pt-dropdown-item danger" @onclick="LogoutAsync" type="button">Sign Out</button>
+            <NavLink class="app-nav-link" href="dashboard" Match="NavLinkMatch.All">Dashboard</NavLink>
+            @if (_isAdmin)
+            {
+                <NavLink class="app-nav-link" href="admin">Admin</NavLink>
+            }
+        }
+        else
+        {
+            <NavLink class="app-nav-link" href="login" Match="NavLinkMatch.All">Sign In</NavLink>
+        }
+    </nav>
+
+    @* ── Right: User chip / logout ──────────────────────────────────────── *@
+    <div class="app-shell-user">
+        @if (_isAuthenticated)
+        {
+            <button class="pt-user-chip-btn" @onclick="ToggleUserMenu" type="button" aria-haspopup="menu" aria-expanded="@_menuOpen">
+                <span class="pt-user-avatar">@_initials</span>
+                <span class="pt-user-chip-label">
+                    @if (_isGuest)
+                    {
+                        <text>@_displayLabel LOGGED IN</text>
+                    }
+                    else
+                    {
+                        <text>@_displayLabel</text>
+                    }
+                </span>
+                <span class="pt-user-caret" aria-hidden="true">▾</span>
+            </button>
+            @if (_menuOpen)
+            {
+                <div class="pt-user-dropdown" @onclick:stopPropagation="true" role="menu">
+                    <div class="pt-user-dropdown-header">
+                        <div class="pt-user-dropdown-label">Signed in as</div>
+                        <div class="pt-user-dropdown-email">@_displayLabel</div>
                     </div>
-                }
-            </div>
+                    <a class="pt-dropdown-item" href="/account/settings" role="menuitem">Account Settings</a>
+                    <div class="pt-dropdown-divider" role="separator"></div>
+                    <button class="pt-dropdown-item danger" @onclick="LogoutAsync" type="button" role="menuitem">Sign Out</button>
+                </div>
+            }
         }
     </div>
-</nav>
+</header>
+
+@* ── Top notice banner: only when the API is running in mock mode ─────── *@
+@if (_useMockProviders)
+{
+    <div class="pt-mock-banner" role="status" aria-live="polite">
+        USING MOCK DATA — API responses are deterministic; do not use for production routing.
+    </div>
+}
 
 @if (_menuOpen)
 {
@@ -74,7 +74,6 @@
 }
 
 @code {
-    private bool collapseNavMenu = true;
     private bool _menuOpen;
     private bool _isAuthenticated;
     private bool _isAdmin;
@@ -91,7 +90,6 @@
         await UpdateUserStateAsync(await AuthStateProvider.GetAuthenticationStateAsync());
     }
 
-    private void ToggleNavMenu() => collapseNavMenu = !collapseNavMenu;
     private void ToggleUserMenu() => _menuOpen = !_menuOpen;
     private void CloseUserMenu() => _menuOpen = false;
 

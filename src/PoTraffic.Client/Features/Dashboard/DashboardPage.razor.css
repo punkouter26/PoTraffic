@@ -1,0 +1,50 @@
+/* ── DashboardPage — scoped styles (replaces inline style="" attributes) ── */
+
+.pt-quota-ring {
+    /* consumed by inline --pt-quota-pct / --pt-quota-color variables */
+    --pt-quota-pct: 0;
+    --pt-quota-color: #10b981;
+    --pt-quota-size: 2.25rem;
+    width: var(--pt-quota-size);
+    height: var(--pt-quota-size);
+    border-radius: 50%;
+    background:
+        conic-gradient(var(--pt-quota-color) calc(var(--pt-quota-pct) * 1%),
+                        rgba(148, 163, 184, 0.25) 0);
+    display: inline-block;
+    position: relative;
+}
+
+.pt-quota-ring::after {
+    content: "";
+    position: absolute;
+    inset: 0.22rem;
+    border-radius: 50%;
+    background: #fff;
+}
+
+.pt-status-item-muted {
+    color: #94a3b8;
+}
+
+.pt-empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+}
+
+.pt-empty-state-emoji {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+
+.pt-empty-state-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #334155;
+    margin-bottom: 0.5rem;
+}
+
+.pt-empty-state-text {
+    color: #94a3b8;
+    margin-bottom: 1.5rem;
+}

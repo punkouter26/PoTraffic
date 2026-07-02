@@ -13,7 +13,7 @@
   -->
 
   <ItemGroup>
-    <InternalsVisibleTo Include="PoTraffic.UnitTests" />
+    <InternalsVisibleTo Include="PoTraffic.Tests" />
   </ItemGroup>
 
   <ItemGroup>
@@ -45,6 +45,8 @@
     <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
     <PackageReference Include="Azure.Monitor.OpenTelemetry.Exporter" />
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
+    <PackageReference Include="Microsoft.Extensions.Resilience" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Hybrid" />
   </ItemGroup>
 
 </Project>

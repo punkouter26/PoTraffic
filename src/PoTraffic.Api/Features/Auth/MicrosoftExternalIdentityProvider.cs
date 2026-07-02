@@ -10,14 +10,14 @@ public sealed class MicrosoftExternalIdentityProvider : IExternalIdentityProvide
     private const string Authority = "https://login.microsoftonline.com/common/oauth2/v2.0";
     private const string UserInfoEndpoint = "https://graph.microsoft.com/oidc/userinfo";
 
-    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly HttpClient _http;
     private readonly IOptions<ExternalAuthConfiguration> _options;
 
     public MicrosoftExternalIdentityProvider(
-        IHttpClientFactory httpClientFactory,
+        HttpClient http,
         IOptions<ExternalAuthConfiguration> options)
     {
-        _httpClientFactory = httpClientFactory;
+        _http = http;
         _options = options;
     }
 
@@ -53,9 +53,8 @@ public sealed class MicrosoftExternalIdentityProvider : IExternalIdentityProvide
     public async Task<ExternalIdentity?> ExchangeCodeAsync(string code, string redirectUri, CancellationToken ct)
     {
         ExternalAuthConfiguration.ProviderOptions cfg = _options.Value.Microsoft;
-        HttpClient http = _httpClientFactory.CreateClient();
 
-        using HttpResponseMessage tokenResponse = await http.PostAsync(
+        using HttpResponseMessage tokenResponse = await _http.PostAsync(
             $"{Authority}/token",
             new FormUrlEncodedContent(new Dictionary<string, string>
             {
@@ -78,7 +77,7 @@ public sealed class MicrosoftExternalIdentityProvider : IExternalIdentityProvide
         using HttpRequestMessage request = new(HttpMethod.Get, UserInfoEndpoint);
         request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token.AccessToken);
 
-        using HttpResponseMessage userInfoResponse = await http.SendAsync(request, ct);
+        using HttpResponseMessage userInfoResponse = await _http.SendAsync(request, ct);
         if (!userInfoResponse.IsSuccessStatusCode)
             return null;
 

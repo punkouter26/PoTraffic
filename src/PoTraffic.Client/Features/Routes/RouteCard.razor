@@ -45,7 +45,7 @@
         </div>
 
         @* Status badge *@
-        <div style="flex-shrink:0;">
+        <div class="pt-route-card-status">
             <RadzenBadge BadgeStyle="@(Route.MonitoringStatus == MonitoringStatus.Active ? BadgeStyle.Success : BadgeStyle.Warning)"
                          Text="@Route.MonitoringStatus.ToString()" />
         </div>

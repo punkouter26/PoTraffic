@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>PoTraffic.Tests.E2E</RootNamespace>
+    <AssemblyName>PoTraffic.Tests.E2E</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <!--
+      End-to-end tests split into Api/ (HTTP-only scenarios) and Ui/
+      (Playwright-driven browser scenarios). Both share the same
+      configuration (BaseAddress, login factories) and run against a
+      live PoTraffic.Api instance under the Testing environment.
+    -->
+    <NoWarn>$(NoWarn);xUnit1031</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\PoTraffic.Shared\PoTraffic.Shared.csproj" />
+    <ProjectReference Include="..\..\src\PoTraffic.Api\PoTraffic.Api.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="FluentAssertions" />
+    <!-- Playwright .NET C# for Ui/ scenarios -->
+    <PackageReference Include="Microsoft.Playwright" />
+  </ItemGroup>
+
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>

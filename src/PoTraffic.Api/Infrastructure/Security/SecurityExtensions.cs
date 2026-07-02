@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using PoTraffic.Api.Features.Auth;
+using PoTraffic.Api.Infrastructure.Resilience;
 
 namespace PoTraffic.Api.Infrastructure.Security;
 
@@ -58,7 +59,9 @@ internal static class SecurityExtensions
             .SetApplicationName("PoTraffic")
             .PersistKeysToFileSystem(
                 new DirectoryInfo(Path.Combine(Directory.GetCurrentDirectory(), "keys")));
-        services.AddHttpClient();
+        // Typed Microsoft OAuth client — resilience wired via the "external-auth" pipeline.
+        services.AddHttpClient<MicrosoftExternalIdentityProvider>()
+            .AddResilienceHandler(ResiliencePipelineExtensions.ExternalAuthPipeline);
         // Microsoft OAuth is the only external sign-in provider. Local password
         // login/registration and Google sign-in were removed by design.
         services.AddScoped<IExternalIdentityProvider, MicrosoftExternalIdentityProvider>();

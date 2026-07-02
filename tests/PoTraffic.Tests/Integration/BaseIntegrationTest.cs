@@ -1,0 +1,152 @@
+using System.Linq.Expressions;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using PoTraffic.Api.Features.Auth;
+using PoTraffic.Api.Infrastructure.Providers;
+using PoTraffic.Api.Infrastructure.Scheduling;
+using PoTraffic.Tests.Helpers;
+using PoTraffic.Tests.Infrastructure;
+using PoTraffic.Shared.Enums;
+using PoTraffic.Api.Infrastructure.Storage;
+
+namespace PoTraffic.Tests;
+
+/// <summary>
+/// Base class for all integration tests.
+/// Spins up a <see cref="WebApplicationFactory{Program}"/> with the Testing environment.
+/// Azurite is owned by Testcontainers so tests never depend on a manually started emulator.
+/// </summary>
+public abstract class BaseIntegrationTest : IAsyncLifetime
+{
+    private WebApplicationFactory<Program>? _factory;
+
+    // ── IAsyncLifetime ────────────────────────────────────────────────────────
+
+    public async Task InitializeAsync()
+    {
+        // Suppress Azure Key Vault loading regardless of ASPNETCORE_ENVIRONMENT.
+        Environment.SetEnvironmentVariable("AzureKeyVault__VaultUri", string.Empty);
+        Environment.SetEnvironmentVariable("KeyVault__Uri", string.Empty);
+
+        string tableStorageConnectionString = await AzuriteTestContainer.GetConnectionStringAsync();
+
+        _factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder =>
+            {
+                builder.UseEnvironment("Testing");
+                builder.ConfigureAppConfiguration((_, config) =>
+                {
+                    config.AddInMemoryCollection(new Dictionary<string, string?>
+                    {
+                        ["ConnectionStrings:TableStorage"] = tableStorageConnectionString,
+                        ["AzureTable:UseManagedIdentity"] = "false"
+                    });
+                });
+
+                builder.ConfigureServices(services =>
+                {
+                    services.AddKeyedScoped<ITrafficProvider, FakeTrafficProvider>(RouteProvider.GoogleMaps);
+                    services.AddKeyedScoped<ITrafficProvider, FakeTrafficProvider>(RouteProvider.TomTom);
+                    services.AddScoped<IExternalIdentityProvider>(_ => new FakeExternalIdentityProvider("google"));
+                    services.AddScoped<IExternalIdentityProvider>(_ => new FakeExternalIdentityProvider("microsoft"));
+
+                    // Register a no-op IJobScheduler for handlers that depend on it
+                    // (BackgroundSchedulerService is skipped in Testing env)
+                    services.AddSingleton<IJobScheduler>(new NoOpJobScheduler());
+                });
+
+                ConfigureHost(builder);
+            });
+
+        // Warm up the host so the DI container is built before tests run
+        _ = _factory.CreateClient();
+    }
+
+    public Task DisposeAsync()
+    {
+        _factory?.Dispose();
+
+        Environment.SetEnvironmentVariable("AzureKeyVault__VaultUri", null);
+        Environment.SetEnvironmentVariable("KeyVault__Uri", null);
+
+        return Task.CompletedTask;
+    }
+
+    // ── Protected helpers ─────────────────────────────────────────────────────
+
+    protected virtual void ConfigureHost(IWebHostBuilder builder) { }
+
+    protected HttpClient CreateClient()
+    {
+        if (_factory is null)
+            throw new InvalidOperationException("Factory not yet initialised. Call InitializeAsync first.");
+
+        return _factory.CreateClient();
+    }
+
+    protected HttpClient CreateClientNoRedirect()
+    {
+        if (_factory is null)
+            throw new InvalidOperationException("Factory not yet initialised. Call InitializeAsync first.");
+
+        return _factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false
+        });
+    }
+
+    protected IServiceProvider GetServices()
+    {
+        if (_factory is null)
+            throw new InvalidOperationException("Factory not yet initialised. Call InitializeAsync first.");
+
+        return _factory.Services;
+    }
+
+    /// <summary>
+    /// Seeds default configuration rows in the in-memory <see cref="TableStorageContext"/>.
+    /// Call this from a test that requires cost/quota configuration to be present.
+    /// </summary>
+    protected void SeedDefaultConfigurations()
+    {
+        if (_factory is null)
+            throw new InvalidOperationException("Factory not yet initialised.");
+
+        using IServiceScope scope = _factory.Services.CreateScope();
+        TableStorageContext ctx = scope.ServiceProvider.GetRequiredService<TableStorageContext>();
+        ctx.SeedDefaultConfigurationsIfMissing();
+    }
+
+    /// <summary>
+    /// Returns the singleton <see cref="TableStorageContext"/> from the test host.
+    /// Use this to seed test data directly.
+    /// </summary>
+    protected TableStorageContext GetDbContext()
+    {
+        if (_factory is null)
+            throw new InvalidOperationException("Factory not yet initialised.");
+
+        return _factory.Services.GetRequiredService<TableStorageContext>();
+    }
+
+    /// <summary>
+    /// No-op — the in-memory <see cref="TableStorageContext"/> does not require schema migrations.
+    /// Kept so existing integration tests compile without change.
+    /// </summary>
+    protected Task ApplyMigrationsAsync() => Task.CompletedTask;
+}
+
+/// <summary>
+/// No-op IJobScheduler for integration tests. Handlers that inject IJobScheduler
+/// (e.g. StartTripleTestCommandHandler) can resolve without requiring a running Azurite instance.
+/// </summary>
+internal sealed class NoOpJobScheduler : IJobScheduler
+{
+    public string Enqueue(Expression<Func<Task>> job) => "noop-enqueue";
+    public string Schedule(Expression<Func<Task>> job, TimeSpan delay) => "noop-schedule";
+    public void Cancel(string jobId) { }
+    public void ScheduleRecurring(string jobId, Func<Task> job, string cronExpression) { }
+    public void CancelRecurring(string jobId) { }
+}
