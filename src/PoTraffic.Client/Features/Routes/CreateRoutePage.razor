@@ -57,14 +57,15 @@
 @code {
     private string _origin = string.Empty;
     private string _destination = string.Empty;
-    // Default to a sensible morning-commute window (07:30–09:00 local), still editable.
-    private DateTime? _startTime = TimeToday(7, 30);
-    private DateTime? _endTime  = TimeToday(9, 0);
+    // Defaults: start = now, end = one hour later (UTC — window times are
+    // interpreted server-side as UTC), so monitoring begins sampling immediately.
+    private DateTime? _startTime = UtcNowToMinute();
+    private DateTime? _endTime  = UtcNowToMinute().AddHours(1);
 
-    private static DateTime TimeToday(int hour, int minute)
+    internal static DateTime UtcNowToMinute()
     {
-        DateTime now = DateTime.Now;
-        return new DateTime(now.Year, now.Month, now.Day, hour, minute, 0);
+        DateTime now = DateTime.UtcNow;
+        return new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, 0, DateTimeKind.Utc);
     }
     private string _error = "";
     private bool _loading;

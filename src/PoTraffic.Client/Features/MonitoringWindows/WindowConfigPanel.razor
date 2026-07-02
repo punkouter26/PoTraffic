@@ -120,8 +120,11 @@
     private string _error = "";
     private string _loadError = "";
 
-    private DateTime? _startTime = DateTime.Today.AddHours(7);
-    private DateTime? _endTime = DateTime.Today.AddHours(9);
+    // Defaults for a new schedule: start = now, end = one hour later (UTC —
+    // window times are interpreted server-side as UTC). Editing an existing
+    // window overwrites these in LoadWindowAsync.
+    private DateTime? _startTime = Routes.CreateRoutePage.UtcNowToMinute();
+    private DateTime? _endTime = Routes.CreateRoutePage.UtcNowToMinute().AddHours(1);
 
     private readonly (string name, byte bit)[] _days =
     [
