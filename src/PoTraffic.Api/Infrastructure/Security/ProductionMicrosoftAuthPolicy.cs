@@ -13,7 +13,7 @@ namespace PoTraffic.Api.Infrastructure.Security;
 /// <para>Claim shape (set in <c>CookieSignIn</c>):</para>
 /// <list type="bullet">
 ///   <item><c>auth_provider = "microsoft"</c> → allowed in all environments.</item>
-///   <item><c>auth_provider = "guest"</c>      → allowed in Testing only.</item>
+///   <item><c>auth_provider = "guest"</c>      → allowed in Development and Testing.</item>
 ///   <item>Testing JWTs without <c>auth_provider</c> → allowed in Testing only.</item>
 /// </list>
 /// </summary>
@@ -27,8 +27,16 @@ internal static class ProductionMicrosoftAuthPolicy
             return ctx.User.Identity?.IsAuthenticated == true;
         }
 
-        // Development/Production/Staging: require Microsoft OAuth.
         string? provider = ctx.User.FindFirst("auth_provider")?.Value;
+
+        // Development: Microsoft OAuth or the guest bypass (Rule 4.4 split view).
+        if (string.Equals(environmentName, "Development", StringComparison.OrdinalIgnoreCase))
+        {
+            return string.Equals(provider, "microsoft", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(provider, "guest", StringComparison.OrdinalIgnoreCase);
+        }
+
+        // Production/Staging: require Microsoft OAuth.
         return string.Equals(provider, "microsoft", StringComparison.OrdinalIgnoreCase);
     }
 }

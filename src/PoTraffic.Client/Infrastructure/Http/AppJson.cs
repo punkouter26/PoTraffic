@@ -10,7 +10,7 @@ using PoTraffic.Shared.DTOs.Routes;
 namespace PoTraffic.Client.Infrastructure.Http;
 
 // ── Client-side contracts (previously anonymous objects or page-private records) ──
-public sealed record ProvidersResponse(List<string> Providers);
+public sealed record ProvidersResponse(List<string> Providers, bool GuestEnabled);
 public sealed record FeatureFlags(bool TripleTestEnabled, bool UseMockProviders);
 public sealed record CheckNowResponse(int DurationSeconds, int DistanceMetres);
 public sealed record SeedDataRequest(int RouteCount, int DaysOfHistory);

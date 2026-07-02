@@ -233,11 +233,12 @@ try
     app.MapAccountEndpoints();
     app.MapAdminEndpoints();
     app.MapAuthEndpoints();
-    // GUEST login is only registered in Testing for integration/E2E tests.
-    // Development and Production must authenticate through Microsoft OAuth.
-    if (app.Environment.IsEnvironment("Testing"))
+    // GUEST login bypass: Development (Rule 4.4 split view) + Testing (automated tests).
+    // Production registers Microsoft OAuth only; MapGuestEndpoints throws if it is
+    // ever wired into a Production host.
+    if (app.Environment.IsEnvironment("Testing") || app.Environment.IsDevelopment())
     {
-        app.MapGuestEndpoints();
+        app.MapGuestEndpoints(app.Environment);
     }
     app.MapRoutesEndpoints();
     app.MapWindowsEndpoints();

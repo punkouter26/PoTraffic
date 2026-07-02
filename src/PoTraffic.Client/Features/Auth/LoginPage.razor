@@ -2,13 +2,18 @@
 @layout AuthLayout
 @using System.Net.Http.Json
 @using PoTraffic.Client.Layout
+@using PoTraffic.Client.Infrastructure.Auth
+@using Microsoft.AspNetCore.Components.Authorization
 @inject HttpClient Http
 @inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthStateProvider
 
 <RadzenCard class="rz-p-6">
     <RadzenText TextStyle="TextStyle.H5" class="rz-mb-2">Sign In</RadzenText>
     <RadzenText TextStyle="TextStyle.Body2" class="rz-mb-4" style="color:var(--rz-text-tertiary-color)">
-        Sign in with your Microsoft account to continue.
+        @(_guestEnabled
+            ? "Sign in with your Microsoft account, or continue as a guest (local development)."
+            : "Sign in with your Microsoft account to continue.")
     </RadzenText>
 
     @if (!string.IsNullOrEmpty(_error))
@@ -16,24 +21,42 @@
         <RadzenAlert AlertStyle="AlertStyle.Danger" class="rz-mb-3">@_error</RadzenAlert>
     }
 
-    @if (_providersLoaded && !_microsoftConfigured)
+    @if (_providersLoaded && !_microsoftConfigured && !_guestEnabled)
     {
         <RadzenAlert AlertStyle="AlertStyle.Warning" AllowClose="false" class="rz-mb-3">
             Microsoft sign-in is not configured on this server.
         </RadzenAlert>
     }
 
-    <RadzenButton Text="Continue with Microsoft" ButtonStyle="ButtonStyle.Primary"
-                  class="rz-w-100 auth-social-btn"
-                  Click='() => StartExternalLogin("microsoft")'
-                  Disabled="@(_loading || (_providersLoaded && !_microsoftConfigured))" />
+    @if (!_providersLoaded || _microsoftConfigured || !_guestEnabled)
+    {
+        <RadzenButton Text="Continue with Microsoft" ButtonStyle="ButtonStyle.Primary"
+                      class="rz-w-100 auth-social-btn"
+                      Click='() => StartExternalLogin("microsoft")'
+                      Disabled="@(_loading || (_providersLoaded && !_microsoftConfigured))" />
+    }
+
+    @* Rule 4.4 — Dev split view / Testing bypass: guest login skips OAuth entirely. *@
+    @if (_guestEnabled)
+    {
+        <RadzenButton Text="Continue as Guest" ButtonStyle="ButtonStyle.Secondary"
+                      class="rz-w-100 rz-mt-3 auth-social-btn"
+                      Click="@GuestLoginAsync"
+                      IsBusy="@_guestLoading"
+                      Disabled="@_loading" />
+        <RadzenText TextStyle="TextStyle.Caption" class="rz-mt-2" style="color:var(--rz-text-tertiary-color)">
+            Guest sessions are for local development and testing only.
+        </RadzenText>
+    }
 
 </RadzenCard>
 
 @code {
     private string _error = "";
     private bool _loading;
+    private bool _guestLoading;
     private bool _providersLoaded;
+    private bool _guestEnabled;
     private List<string> _availableProviders = [];
     private bool _microsoftConfigured => _availableProviders.Contains("microsoft");
 
@@ -52,7 +75,10 @@
         {
             var result = await Http.GetFromJsonAsync("/api/auth/providers", AppJsonContext.Default.ProvidersResponse);
             if (result is not null)
+            {
                 _availableProviders = result.Providers;
+                _guestEnabled = result.GuestEnabled;
+            }
         }
         catch
         {
@@ -71,4 +97,31 @@
         Nav.NavigateTo($"/api/auth/external/{provider}/start?returnUrl={encodedReturnUrl}", forceLoad: true);
     }
 
+    private async Task GuestLoginAsync()
+    {
+        _guestLoading = true;
+        _error = "";
+        try
+        {
+            HttpResponseMessage resp = await Http.PostAsync("/api/auth/guest-login", content: null);
+            if (resp.IsSuccessStatusCode)
+            {
+                if (AuthStateProvider is CookieAuthenticationStateProvider cookieProvider)
+                    cookieProvider.Refresh();
+                Nav.NavigateTo("/dashboard");
+            }
+            else
+            {
+                _error = "Guest sign-in failed. Please try again.";
+            }
+        }
+        catch
+        {
+            _error = "Unable to connect. Please try again.";
+        }
+        finally
+        {
+            _guestLoading = false;
+        }
+    }
 }

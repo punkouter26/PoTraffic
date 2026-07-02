@@ -26,13 +26,17 @@ public static class AuthEndpoints
         return app;
     }
 
-    private static IResult GetAvailableProviders(IEnumerable<IExternalIdentityProvider> providers)
+    private static IResult GetAvailableProviders(
+        IEnumerable<IExternalIdentityProvider> providers,
+        IWebHostEnvironment env)
     {
         var available = providers
             .Where(p => p.IsConfigured())
             .Select(p => p.ProviderName)
             .ToList();
-        return Results.Ok(new { providers = available });
+        // Rule 4.4 — Dev shows Microsoft + Guest; Testing forces Guest; Prod is Microsoft-only.
+        bool guestEnabled = env.IsDevelopment() || env.IsEnvironment("Testing");
+        return Results.Ok(new { providers = available, guestEnabled });
     }
 
     private static IResult Me(ClaimsPrincipal user)

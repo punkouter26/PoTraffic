@@ -87,10 +87,12 @@ dotnet build
 
 ## 6. Auth (Rules 6 + 13)
 
-- **Dev / Prod:** Microsoft OAuth is **required**. GUEST and dev-admin login are
-  rejected at the API and not shown in the client.
-- **Testing:** `/e2e/*` endpoints and GUEST login are allowed for integration and
-  E2E tests only.
+- **Environment matrix (Rule 4.4):**
+  - **Testing** — GUEST bypass (automated tests skip interactive auth; `/e2e/*` available).
+  - **Development** — Microsoft OAuth **and** a "Continue as Guest" bypass button.
+  - **Production** — Microsoft OAuth **only**; `MapGuestEndpoints` throws if a
+    Production host ever registers it.
+- `/api/auth/providers` returns `guestEnabled` so the login page renders the right view.
 - **GUEST format:** `GUEST` + 8 random digits (e.g. `GUEST12345678`).
   Display in the nav bar as `GUEST12345678 LOGGED IN`.
 - **Persistence:** BFF pattern — the session is an HttpOnly `SameSite=Strict`

@@ -5,13 +5,14 @@ using PoTraffic.Shared.DTOs.Auth;
 namespace PoTraffic.Api.Features.Auth;
 
 /// <summary>
-/// GUEST login for integration/E2E test bypass of OAuth.
+/// GUEST login bypass of OAuth — shown as "Continue as Guest" in Development
+/// (Rule 4.4 split view) and used headlessly by integration/E2E tests in Testing.
 /// Each call creates a unique GUEST user (e.g. guest46344343@potraffic.dev) so
 /// that parallel test runs or manual sessions do not collide in the database.
 /// The session is issued as the standard BFF cookie.
 ///
-/// (Rule 6 — GUEST Mode: hidden outside Testing; "GUEST12345678 LOGGED IN" in the nav bar.)
-/// (Rule 13 — Microsoft OAuth is required outside Testing.)
+/// (Rule 6 — GUEST Mode: "GUEST12345678 LOGGED IN" in the nav bar.)
+/// (Rule 13 — Microsoft OAuth is the only sign-in path in Production.)
 /// </summary>
 public static class GuestAuthExtensions
 {
@@ -29,17 +30,20 @@ public static class GuestAuthExtensions
     /// </summary>
     public const int GuestSuffixLength = 8;
 
-    public static IEndpointRouteBuilder MapGuestEndpoints(this IEndpointRouteBuilder app)
+    public static IEndpointRouteBuilder MapGuestEndpoints(this IEndpointRouteBuilder app, IWebHostEnvironment environment)
     {
-        // Testing-only GUEST login bypass for integration tests.
+        // Rule 4.4 — the fake/guest auth path must never exist in Production.
+        if (environment.IsProduction())
+            throw new InvalidOperationException(
+                "GUEST login must not be registered in Production — Microsoft OAuth is the only sign-in path.");
+
+        // GUEST login bypass: Development (manual bypass button) + Testing (automated tests).
         app.MapPost("/api/auth/guest-login", async (
             HttpContext httpContext,
             ISender sender,
             IWebHostEnvironment env) =>
         {
-            // Only allow GUEST login in Testing. In Development and Production,
-            // this endpoint is not registered (see Program.cs).
-            if (!env.IsEnvironment("Testing"))
+            if (!env.IsEnvironment("Testing") && !env.IsDevelopment())
             {
                 return Results.NotFound();
             }
