@@ -759,3 +759,22 @@ article.content {
         content: none;
     }
 }
+/* UI-12: 24h travel-time sparkline on dashboard route cards */
+.pt-sparkline {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.4rem;
+}
+.pt-sparkline svg {
+    width: 120px;
+    height: 28px;
+    flex-shrink: 0;
+    background: rgba(148, 163, 184, 0.08);
+    border-radius: 4px;
+}
+.pt-sparkline-label {
+    font-size: 0.72rem;
+    color: #94a3b8;
+    white-space: nowrap;
+}

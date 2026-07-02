@@ -83,6 +83,7 @@ else
         {
             <RouteCard Route="route"
                        OptimalDeparture="@(_optimalDepartures.GetValueOrDefault(route.Id))"
+                       RecentPolls="@(_recentPolls.GetValueOrDefault(route.Id, []))"
                        OnDeleted="@LoadDataAsync"
                        OnRefresh="@LoadDataAsync" />
         }
@@ -92,6 +93,7 @@ else
 @code {
     private List<RouteDto> _routes = [];
     private Dictionary<Guid, OptimalDepartureDto> _optimalDepartures = [];
+    private Dictionary<Guid, List<PollRecordDto>> _recentPolls = [];
     private int _quotaConsumed;
     private bool _loading = true;
 
@@ -112,8 +114,11 @@ else
             if (quota is not null)
                 _quotaConsumed = quota.UsedToday;
 
-            // UI-2: Load optimal departure for each route (2-3 calls for typical user)
+            // UI-2/UI-12: Load optimal departure + 24h trend for each route
+            // (a handful of calls for a typical user; per-route failures are non-fatal)
             _optimalDepartures = [];
+            _recentPolls = [];
+            string sinceUtc = Uri.EscapeDataString(DateTime.UtcNow.AddHours(-24).ToString("o"));
             foreach (RouteDto route in _routes)
             {
                 try
@@ -122,6 +127,11 @@ else
                         $"/api/routes/{route.Id}/optimal-departure?dayOfWeek={dayOfWeek}", AppJsonContext.Default.OptimalDepartureDto);
                     if (optimal is not null)
                         _optimalDepartures[route.Id] = optimal;
+
+                    var history = await Http.GetFromJsonAsync(
+                        $"/api/routes/{route.Id}/poll-history?page=1&pageSize=60&sinceUtc={sinceUtc}", AppJsonContext.Default.PagedResultPollRecordDto);
+                    if (history is not null && history.Items.Count > 0)
+                        _recentPolls[route.Id] = [.. history.Items];
                 }
                 catch
                 {

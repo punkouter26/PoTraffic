@@ -36,6 +36,12 @@
                 <span class="pt-route-addr-arrow">→</span>
                 <span class="pt-route-addr-to">@_destStreet</span>
             </div>
+
+            @* UI-12: 24h travel-time trend at a glance *@
+            @if (RecentPolls.Count > 0)
+            {
+                <TrendSparkline Polls="RecentPolls" />
+            }
         </div>
 
         @* Status badge *@
@@ -74,6 +80,7 @@
 @code {
     [Parameter, EditorRequired] public RouteDto Route { get; set; } = default!;
     [Parameter] public OptimalDepartureDto? OptimalDeparture { get; set; }
+    [Parameter] public IReadOnlyList<PollRecordDto> RecentPolls { get; set; } = [];
     [Parameter] public EventCallback OnDeleted { get; set; }
     [Parameter] public EventCallback OnRefresh { get; set; }
 

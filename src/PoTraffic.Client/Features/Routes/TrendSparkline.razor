@@ -1,0 +1,56 @@
+@using PoTraffic.Shared.DTOs.History
+
+@* UI-12: 24h travel-time sparkline — trend at a glance without opening route detail *@
+@if (_points.Count >= 2)
+{
+    <div class="pt-sparkline" title="Travel time over the last 24 hours">
+        <svg viewBox="0 0 @Width @Height" preserveAspectRatio="none" role="img"
+             aria-label="Travel time trend, @_minMinutes to @_maxMinutes minutes over the last 24 hours">
+            <polyline points="@_polyline" fill="none" stroke="@_stroke" stroke-width="1.5"
+                      stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" />
+        </svg>
+        <span class="pt-sparkline-label">@_minMinutes–@_maxMinutes min · 24 h</span>
+    </div>
+}
+
+@code {
+    private const int Width = 120;
+    private const int Height = 28;
+
+    [Parameter, EditorRequired] public IReadOnlyList<PollRecordDto> Polls { get; set; } = [];
+
+    private List<(double X, double Y)> _points = [];
+    private string _polyline = string.Empty;
+    private string _stroke = "#94a3b8";
+    private int _minMinutes;
+    private int _maxMinutes;
+
+    protected override void OnParametersSet()
+    {
+        List<PollRecordDto> ordered = [.. Polls.OrderBy(p => p.PolledAt)];
+        _points = [];
+        if (ordered.Count < 2)
+            return;
+
+        int min = ordered.Min(p => p.TravelDurationSeconds);
+        int max = ordered.Max(p => p.TravelDurationSeconds);
+        _minMinutes = min / 60;
+        _maxMinutes = (max + 59) / 60;
+        double span = Math.Max(1, max - min);
+
+        for (int i = 0; i < ordered.Count; i++)
+        {
+            double x = (double)i / (ordered.Count - 1) * (Width - 4) + 2;
+            double y = Height - 3 - (ordered[i].TravelDurationSeconds - min) / span * (Height - 6);
+            _points.Add((x, y));
+        }
+
+        _polyline = string.Join(' ', _points.Select(p =>
+            string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{p.X:F1},{p.Y:F1}")));
+
+        // Direction color matches the app palette: rising travel time = rose, falling = emerald.
+        double mean = ordered.Average(p => (double)p.TravelDurationSeconds);
+        int last = ordered[^1].TravelDurationSeconds;
+        _stroke = last > mean * 1.1 ? "#f43f5e" : last < mean * 0.9 ? "#10b981" : "#94a3b8";
+    }
+}

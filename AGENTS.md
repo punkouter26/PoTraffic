@@ -23,29 +23,31 @@ real time.
 | Layer | Technology |
 |---|---|
 | Front-end | Blazor WebAssembly (.NET 10) + Radzen Blazor |
-| Back-end | ASP.NET Core 10 Minimal API + MediatR (CQRS) |
+| Back-end | ASP.NET Core 10 Minimal API + in-house validation-first Dispatcher (`Infrastructure/Dispatch`) |
 | Persistence | Table Storage (Azurite locally, Azure in prod) |
 | Background Jobs | Table Storage-backed scheduler (recursive polling + nightly pruning) |
-| Auth | Microsoft OAuth (Dev/Prod **required**) + Testing-only auth bypasses |
+| Auth | BFF cookie sessions (HttpOnly, SameSite=Strict); Microsoft OAuth (Dev/Prod **required**) + Testing-only bypasses |
 | Logging | Serilog (Console, File, App Insights) + structured fields |
 | Observability | OpenTelemetry → Azure Monitor / App Insights in `rg-poshared` |
-| Testing | xUnit + NSubstitute (unit), Testcontainers (integration), Playwright (E2E) |
+| Testing | xUnit + NSubstitute (unit), Testcontainers (integration), pure-HTTP (E2EAPI), Playwright (E2EUI) |
 
-## 3. Architecture (Onion)
+## 3. Architecture (Vertical Slice)
 
 ```
-PoTraffic.Domain          // Pure entities + value objects — no deps
-PoTraffic.Application     // Interfaces + DTOs + validators — depends on Domain
-PoTraffic.Infrastructure  // Table Storage, Azure, JWT, external providers
-PoTraffic.Api             // ASP.NET host — features/ + minimal API endpoints
+PoTraffic.Api             // Single host — Features/<Feature>/ slices (endpoints,
+                          // commands, handlers, entities) + Infrastructure/ cross-cutting
 PoTraffic.Client          // Blazor WASM — hosted by Api, no CORS
 PoTraffic.Shared          // DTOs/Enums/Constants shared between Api ↔ Client
 ```
 
 **Rules:**
-- Domain must not reference EF Core, ASP.NET, Azure, etc.
-- Application must not reference Infrastructure or Api.
-- Vertical slices under `Features/<FeatureName>/` — **no** `Services/`, `Repositories/`, `DTOs/` folders at the project root.
+- No Onion/Clean layer projects — slices live in `PoTraffic.Api/Features/<FeatureName>/`
+  (endpoints, commands/queries, handlers, validators, entities together).
+- Cross-cutting only under `PoTraffic.Api/Infrastructure/` (Dispatch, Storage,
+  Scheduling, Security, Observability, Testing).
+- Requests dispatch through `ISender` (`Infrastructure/Dispatch/Dispatcher.cs`):
+  FluentValidation runs before every handler; `ValidationException` → 422.
+- **No** `Services/`, `Repositories/`, `DTOs/` folders at the project root.
 
 ## 4. Build / Run
 
@@ -75,8 +77,13 @@ dotnet build
 - **Production secrets:** Azure Key Vault `kv-poshared` in `rg-poshared`. Prefix
   is `PoTraffic--` (mapped to `:` by `PrefixKeyVaultSecretManager`).
 - Connection strings flip automatically: `UseDevelopmentStorage=true` (Azurite)
-  vs the Azure connection string. The Azurite container is started by
-  `docker-compose.yml`.
+  vs managed identity against `AzureTable:AccountName`. The Azurite container is
+  started by `docker-compose.yml`.
+- **Durable persistence:** `TableStorageContext` hydrates the working set from
+  Table Storage at startup (`HydrateAsync`) and `SaveChangesAsync` writes the
+  delta (JSON snapshot diff + queued deletes) — one table per entity, poll
+  records partitioned by `RouteId`. Prod fails fast if storage is unreachable;
+  Dev degrades to memory-only (surfaced by the `storage` health check).
 
 ## 6. Auth (Rules 6 + 13)
 
@@ -86,8 +93,10 @@ dotnet build
   E2E tests only.
 - **GUEST format:** `GUEST` + 8 random digits (e.g. `GUEST12345678`).
   Display in the nav bar as `GUEST12345678 LOGGED IN`.
-- **Persistence:** The JWT is stored in `localStorage` under key
-  `potraffic_access_token` by `JwtAuthenticationStateProvider`.
+- **Persistence:** BFF pattern — the session is an HttpOnly `SameSite=Strict`
+  cookie (`.PoTraffic.Auth`) issued by `CookieSignIn`; the WASM client never
+  sees a token. Client auth state comes from `GET /api/auth/me`
+  (`CookieAuthenticationStateProvider`). There is no password or JWT stack.
 
 ## 7. Quality Bar
 
@@ -113,7 +122,8 @@ dotnet build
   Serilog log scope.
 - `/diag` (HTML) — connection status + masked keys. Available in dev and prod
   as a hidden page (see `DiagEndpoints.cs`).
-- `/health` — JSON health response. Used by uptime pings.
+- `/health` — JSON health response with `keyvault`, `trafficProvider`,
+  `storage` (durability), and `scheduler` (tick liveness) entries.
 
 ## 9. Conventional Commands
 

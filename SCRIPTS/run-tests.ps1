@@ -85,7 +85,7 @@ function Install-PlaywrightChromium {
         return
     }
 
-    $script = Join-Path $root 'tests/PoTraffic.E2ETests/bin/Debug/net10.0/playwright.ps1'
+    $script = Join-Path $root 'tests/PoTraffic.E2EUI/bin/Debug/net10.0/playwright.ps1'
     if (!(Test-Path $script)) {
         throw "Playwright installer not found at $script. Build the E2E project first."
     }
@@ -152,7 +152,8 @@ if (!$UnitOnly -and !$IntegrationOnly) {
         $hostProcess = Start-TestingHost -Url $e2eBaseUrl
         $ready = Warmup-App -Url $e2eBaseUrl -MaxRetries 30 -DelaySeconds 2
         if (!$ready) { throw "Testing host did not become ready at $e2eBaseUrl." }
-        Run-Suite 'E2ETests' 'tests/PoTraffic.E2ETests'
+        Run-Suite 'E2EAPI' 'tests/PoTraffic.E2EAPI'
+        Run-Suite 'E2EUI' 'tests/PoTraffic.E2EUI'
     }
     finally {
         if ($hostProcess -and !$hostProcess.HasExited) {
