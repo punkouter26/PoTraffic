@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 
 
 using PoTraffic.Shared.Constants;
+using PoTraffic.Shared.Enums;
 
 namespace PoTraffic.Api.Features.Routes;
 
@@ -49,6 +50,17 @@ public sealed class PollRouteJob
             }
         }
 
+        // Stop the chain when the route was deleted mid-poll — a soft-deleted route
+        // must never keep consuming provider quota.
+        using IServiceScope updateScope = _scopeFactory.CreateScope();
+        TableStorageContext db = updateScope.ServiceProvider.GetRequiredService<TableStorageContext>();
+        EntityRoute? route = db.Routes.FirstOrDefault(r => r.Id == routeId);
+        if (route is null || route.MonitoringStatus == (int)MonitoringStatus.Deleted)
+        {
+            _logger.LogInformation("PollRouteJob: route {RouteId} is gone or deleted — polling chain stopped", routeId);
+            return;
+        }
+
         // Schedule next execution — Chain of Responsibility enqueues its own successor
         string nextJobId = _scheduler.Schedule(
             () => Execute(routeId),
@@ -57,14 +69,7 @@ public sealed class PollRouteJob
         _logger.LogInformation(
             "PollRouteJob: Next poll for route {RouteId} scheduled as job {JobId}", routeId, nextJobId);
 
-        // Update route JobChainId with successor job ID
-        using IServiceScope updateScope = _scopeFactory.CreateScope();
-        TableStorageContext db = updateScope.ServiceProvider.GetRequiredService<TableStorageContext>();
-        EntityRoute? route = db.Routes.FirstOrDefault(r => r.Id == routeId);
-        if (route is not null)
-        {
-            route.JobChainId = nextJobId;
-            await db.SaveChangesAsync();
-        }
+        route.JobChainId = nextJobId;
+        await db.SaveChangesAsync();
     }
 }

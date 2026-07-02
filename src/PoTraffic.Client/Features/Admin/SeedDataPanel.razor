@@ -75,10 +75,10 @@
         try
         {
             var response = await Http.PostAsJsonAsync("/api/admin/seed-data",
-                new { RouteCount = _routeCount, DaysOfHistory = _daysOfHistory });
+                new SeedDataRequest(_routeCount, _daysOfHistory), AppJsonContext.Default.SeedDataRequest);
             if (response.IsSuccessStatusCode)
             {
-                _lastResult = await response.Content.ReadFromJsonAsync<SeedResult>();
+                _lastResult = await response.Content.ReadFromJsonAsync(AppJsonContext.Default.SeedResult);
                 NotificationService.Notify(new NotificationMessage
                 {
                     Severity = NotificationSeverity.Success,
@@ -118,7 +118,7 @@
             var response = await Http.PostAsync("/api/admin/clear-data", null);
             if (response.IsSuccessStatusCode)
             {
-                var result = await response.Content.ReadFromJsonAsync<ClearResult>();
+                var result = await response.Content.ReadFromJsonAsync(AppJsonContext.Default.ClearResult);
                 _lastResult = null;
                 if (result != null)
                 {
@@ -147,6 +147,4 @@
         }
     }
 
-    private sealed record SeedResult(int UsersCreated, int RoutesCreated, int PollsCreated);
-    private sealed record ClearResult(int UsersDeleted, int RoutesDeleted, int PollsDeleted);
 }

@@ -84,7 +84,7 @@
     {
         try
         {
-            _users = await Http.GetFromJsonAsync<List<UserDailyUsageDto>>("/api/admin/users") ?? [];
+            _users = await Http.GetFromJsonAsync("/api/admin/users", AppJsonContext.Default.ListUserDailyUsageDto) ?? [];
         }
         catch (Exception ex)
         {
@@ -100,8 +100,8 @@
     {
         try
         {
-            _points = await Http.GetFromJsonAsync<List<RecentVolatilityPointDto>>(
-                "/api/admin/global-volatility/recent?hours=24") ?? [];
+            _points = await Http.GetFromJsonAsync(
+                "/api/admin/global-volatility/recent?hours=24", AppJsonContext.Default.ListRecentVolatilityPointDto) ?? [];
         }
         catch (Exception ex)
         {

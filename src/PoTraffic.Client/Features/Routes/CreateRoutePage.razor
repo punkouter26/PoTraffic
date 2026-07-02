@@ -120,19 +120,17 @@
         _loading = true;
         try
         {
-            HttpResponseMessage createResp = await Http.PostAsJsonAsync("/api/routes", new
-            {
-                originAddress = _origin,
-                destinationAddress = _destination,
-                provider = _provider,
-                startTime = _startTime!.Value.ToString("HH:mm"),
-                endTime = _endTime!.Value.ToString("HH:mm"),
-                daysOfWeekMask = _mask
-            });
+            HttpResponseMessage createResp = await Http.PostAsJsonAsync("/api/routes", new CreateRouteRequest(
+                _origin,
+                _destination,
+                (RouteProvider)_provider,
+                _startTime!.Value.ToString("HH:mm"),
+                _endTime!.Value.ToString("HH:mm"),
+                _mask), AppJsonContext.Default.CreateRouteRequest);
 
             if (!createResp.IsSuccessStatusCode)
             {
-                var errBody = await createResp.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+                var errBody = await createResp.Content.ReadFromJsonAsync(AppJsonContext.Default.JsonElement);
                 string? errorCode = errBody.TryGetProperty("error", out var prop) ? prop.GetString() : null;
                 _error = errorCode switch
                 {
@@ -145,7 +143,7 @@
                 return;
             }
 
-            RouteDto? createdRoute = await createResp.Content.ReadFromJsonAsync<RouteDto>();
+            RouteDto? createdRoute = await createResp.Content.ReadFromJsonAsync(AppJsonContext.Default.RouteDto);
             MonitoringWindowDto? activeWindow = createdRoute?.Windows.FirstOrDefault(w => w.IsActive);
 
             if (createdRoute is null || activeWindow is null)

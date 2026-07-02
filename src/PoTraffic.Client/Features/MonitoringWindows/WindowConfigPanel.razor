@@ -147,15 +147,15 @@
         _loadError = "";
         try
         {
-            var windows = await Http.GetFromJsonAsync<List<MonitoringWindowDto>>(
-                $"/api/routes/{RouteId}/windows");
+            var windows = await Http.GetFromJsonAsync(
+                $"/api/routes/{RouteId}/windows", AppJsonContext.Default.ListMonitoringWindowDto);
             _activeWindow = windows?.FirstOrDefault(w => w.IsActive);
 
             _activeSession = null;
             if (_activeWindow is not null)
             {
-                var sessions = await Http.GetFromJsonAsync<List<SessionDto>>(
-                    $"/api/routes/{RouteId}/sessions");
+                var sessions = await Http.GetFromJsonAsync(
+                    $"/api/routes/{RouteId}/sessions", AppJsonContext.Default.ListSessionDto);
                 DateOnly today = DateOnly.FromDateTime(DateTime.UtcNow.Date);
                 _activeSession = sessions?.FirstOrDefault(
                     s => s.State == SessionState.Active && s.SessionDate == today);
@@ -230,7 +230,7 @@
         {
             HttpResponseMessage resp = await Http.PostAsJsonAsync(
                 $"/api/routes/{RouteId}/windows/{_activeWindow.Id}/stop",
-                new { sessionId = _activeSession.Id });
+                new StopSessionRequest(_activeSession.Id), AppJsonContext.Default.StopSessionRequest);
 
             if (resp.IsSuccessStatusCode)
             {
@@ -266,12 +266,10 @@
 
             HttpResponseMessage resp = await Http.PostAsJsonAsync(
                 $"/api/routes/{RouteId}/windows",
-                new
-                {
-                    startTime = _startTime!.Value.ToString("HH:mm:ss"),
-                    endTime = _endTime!.Value.ToString("HH:mm:ss"),
-                    daysOfWeekMask = mask
-                });
+                new SaveWindowRequest(
+                    _startTime!.Value.ToString("HH:mm:ss"),
+                    _endTime!.Value.ToString("HH:mm:ss"),
+                    mask), AppJsonContext.Default.SaveWindowRequest);
 
             if (resp.IsSuccessStatusCode)
             {

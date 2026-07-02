@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Security.Claims;
+using PoTraffic.Client.Infrastructure.Http;
 using Microsoft.AspNetCore.Components.Authorization;
 using PoTraffic.Shared.DTOs.Auth;
 
@@ -20,7 +21,7 @@ public sealed class CookieAuthenticationStateProvider(HttpClient http) : Authent
             if (!response.IsSuccessStatusCode)
                 return Anonymous();
 
-            AuthMeResponse? me = await response.Content.ReadFromJsonAsync<AuthMeResponse>();
+            AuthMeResponse? me = await response.Content.ReadFromJsonAsync(AppJsonContext.Default.AuthMeResponse);
             if (me is null)
                 return Anonymous();
 

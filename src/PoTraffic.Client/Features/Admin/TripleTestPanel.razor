@@ -74,7 +74,7 @@ else if (_session is not null)
                 (RouteProvider)_provider,
                 _startAt?.ToUniversalTime());
 
-            HttpResponseMessage resp = await Http.PostAsJsonAsync("/api/admin/triple-test", request);
+            HttpResponseMessage resp = await Http.PostAsJsonAsync("/api/admin/triple-test", request, AppJsonContext.Default.TripleTestRequest);
 
             if (!resp.IsSuccessStatusCode)
             {
@@ -82,7 +82,7 @@ else if (_session is not null)
                 return;
             }
 
-            var body = await resp.Content.ReadFromJsonAsync<JsonElement>();
+            var body = await resp.Content.ReadFromJsonAsync(AppJsonContext.Default.JsonElement);
             _sessionId = body.GetProperty("sessionId").GetGuid();
             _running = true;
             _pollCount = 0;
@@ -162,7 +162,7 @@ else if (_session is not null)
                 return;
             }
 
-            _session = await resp.Content.ReadFromJsonAsync<TripleTestSessionDto>();
+            _session = await resp.Content.ReadFromJsonAsync(AppJsonContext.Default.TripleTestSessionDto);
             _error = null;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

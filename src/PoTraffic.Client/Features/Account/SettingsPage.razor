@@ -101,8 +101,8 @@
     {
         try
         {
-            _profile = await Http.GetFromJsonAsync<ProfileDto>("/api/account/profile");
-            _quota = await Http.GetFromJsonAsync<QuotaDto>("/api/account/quota");
+            _profile = await Http.GetFromJsonAsync("/api/account/profile", AppJsonContext.Default.ProfileDto);
+            _quota = await Http.GetFromJsonAsync("/api/account/quota", AppJsonContext.Default.QuotaDto);
             _newLocale = _profile?.Locale ?? string.Empty;
         }
         catch { /* handled by null guards */ }
@@ -115,7 +115,7 @@
         _profileSaved = false;
         try
         {
-            HttpResponseMessage resp = await Http.PutAsJsonAsync("/api/account/profile", new UpdateProfileRequest(_newLocale));
+            HttpResponseMessage resp = await Http.PutAsJsonAsync("/api/account/profile", new UpdateProfileRequest(_newLocale), AppJsonContext.Default.UpdateProfileRequest);
             _profileSaved = resp.IsSuccessStatusCode;
         }
         finally { _saving = false; }

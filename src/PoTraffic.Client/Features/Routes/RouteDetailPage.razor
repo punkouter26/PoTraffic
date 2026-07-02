@@ -166,16 +166,16 @@ else
             string dayOfWeek = DateTime.Today.DayOfWeek.ToString();
 
             // Load today's active monitoring session — drives the Next Sample ETA card
-            var sessions = await Http.GetFromJsonAsync<List<SessionDto>>(
-                $"/api/routes/{RouteId}/sessions");
+            var sessions = await Http.GetFromJsonAsync(
+                $"/api/routes/{RouteId}/sessions", AppJsonContext.Default.ListSessionDto);
             DateOnly today = DateOnly.FromDateTime(DateTime.UtcNow.Date);
             _activeSession = sessions?.FirstOrDefault(
                 s => s.State == SessionState.Active && s.SessionDate == today);
 
             // Load past 24h poll records
             string sinceUtc = Uri.EscapeDataString(DateTime.UtcNow.AddHours(-24).ToString("o"));
-            var historyResult = await Http.GetFromJsonAsync<PagedResult<PollRecordDto>>(
-                $"/api/routes/{RouteId}/poll-history?page=1&pageSize=300&sinceUtc={sinceUtc}");
+            var historyResult = await Http.GetFromJsonAsync(
+                $"/api/routes/{RouteId}/poll-history?page=1&pageSize=300&sinceUtc={sinceUtc}", AppJsonContext.Default.PagedResultPollRecordDto);
             if (historyResult is not null)
             {
                 _todayPolls = [.. historyResult.Items];
@@ -189,8 +189,8 @@ else
             }
 
             // Load baseline
-            var baseline = await Http.GetFromJsonAsync<BaselineResponse>(
-                $"/api/routes/{RouteId}/baseline?dayOfWeek={dayOfWeek}");
+            var baseline = await Http.GetFromJsonAsync(
+                $"/api/routes/{RouteId}/baseline?dayOfWeek={dayOfWeek}", AppJsonContext.Default.BaselineResponse);
             if (baseline is not null)
             {
                 _baselineSlots = [.. baseline.Slots];
@@ -206,8 +206,8 @@ else
             }
 
             // Load optimal departure
-            var optimal = await Http.GetFromJsonAsync<OptimalDepartureDto>(
-                $"/api/routes/{RouteId}/optimal-departure?dayOfWeek={dayOfWeek}");
+            var optimal = await Http.GetFromJsonAsync(
+                $"/api/routes/{RouteId}/optimal-departure?dayOfWeek={dayOfWeek}", AppJsonContext.Default.OptimalDepartureDto);
             if (optimal is not null)
             {
                 _optimalDeparture = optimal;

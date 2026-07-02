@@ -104,11 +104,11 @@ else
         {
             string dayOfWeek = DateTime.Today.DayOfWeek.ToString();
 
-            var result = await Http.GetFromJsonAsync<PagedResult<RouteDto>>("/api/routes?page=1&pageSize=100");
+            var result = await Http.GetFromJsonAsync("/api/routes?page=1&pageSize=100", AppJsonContext.Default.PagedResultRouteDto);
             if (result is not null)
                 _routes = [.. result.Items];
 
-            var quota = await Http.GetFromJsonAsync<QuotaDto>("/api/account/quota");
+            var quota = await Http.GetFromJsonAsync("/api/account/quota", AppJsonContext.Default.QuotaDto);
             if (quota is not null)
                 _quotaConsumed = quota.UsedToday;
 
@@ -118,8 +118,8 @@ else
             {
                 try
                 {
-                    var optimal = await Http.GetFromJsonAsync<OptimalDepartureDto>(
-                        $"/api/routes/{route.Id}/optimal-departure?dayOfWeek={dayOfWeek}");
+                    var optimal = await Http.GetFromJsonAsync(
+                        $"/api/routes/{route.Id}/optimal-departure?dayOfWeek={dayOfWeek}", AppJsonContext.Default.OptimalDepartureDto);
                     if (optimal is not null)
                         _optimalDepartures[route.Id] = optimal;
                 }

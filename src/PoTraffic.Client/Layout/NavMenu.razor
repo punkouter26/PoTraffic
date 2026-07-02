@@ -1,4 +1,4 @@
-﻿@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
 @using PoTraffic.Client.Infrastructure.Auth
 @using System.Net.Http.Json
 @implements IDisposable
@@ -99,7 +99,7 @@
     {
         try
         {
-            FeatureFlags? flags = await Http.GetFromJsonAsync<FeatureFlags>("/api/system/features");
+            FeatureFlags? flags = await Http.GetFromJsonAsync("/api/system/features", AppJsonContext.Default.FeatureFlags);
             _useMockProviders = flags?.UseMockProviders == true;
         }
         catch
@@ -171,5 +171,4 @@
         AuthStateProvider.AuthenticationStateChanged -= HandleAuthStateChanged;
     }
 
-    private sealed record FeatureFlags(bool TripleTestEnabled, bool UseMockProviders);
 }

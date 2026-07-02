@@ -140,7 +140,9 @@ try
             return !string.IsNullOrWhiteSpace(healthCfg["GoogleMaps:ApiKey"])
                 ? HealthCheckResult.Healthy("Live GoogleMaps provider configured")
                 : HealthCheckResult.Degraded("GoogleMaps:ApiKey missing — live provider will fail");
-        });
+        })
+        .AddCheck<StorageHealthCheck>("storage")
+        .AddCheck<SchedulerHealthCheck>("scheduler");
 
     // ── OpenAPI (Scalar UI) ───────────────────────────────────────────────────
     builder.Services.AddOpenApi();
@@ -332,7 +334,7 @@ try
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"[startup] Recurring job registration failed — pruning will not run. {ex.Message}");
+        startupLog.LogError(ex, "Recurring job registration failed — nightly poll-record pruning will not run.");
     }
 
     app.Run();

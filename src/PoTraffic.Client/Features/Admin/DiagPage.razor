@@ -104,7 +104,7 @@
     {
         try
         {
-            _health = await Http.GetFromJsonAsync<List<ConnectionHealthDto>>("/api/admin/connection-health") ?? [];
+            _health = await Http.GetFromJsonAsync("/api/admin/connection-health", AppJsonContext.Default.ListConnectionHealthDto) ?? [];
         }
         catch (Exception ex)
         {
@@ -120,7 +120,7 @@
     {
         try
         {
-            _configs = await Http.GetFromJsonAsync<List<SystemConfigDto>>("/api/admin/configuration") ?? [];
+            _configs = await Http.GetFromJsonAsync("/api/admin/configuration", AppJsonContext.Default.ListSystemConfigDto) ?? [];
         }
         catch (Exception ex)
         {

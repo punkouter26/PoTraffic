@@ -6,6 +6,10 @@
     <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
     <RootNamespace>PoTraffic.Client</RootNamespace>
     <AssemblyName>PoTraffic.Client</AssemblyName>
+    <IsTrimmable>true</IsTrimmable>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <!-- IL2111: framework Router.NotFoundPage reflection (App.razor) — not addressable in user code -->
+    <NoWarn>$(NoWarn);IL2111</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

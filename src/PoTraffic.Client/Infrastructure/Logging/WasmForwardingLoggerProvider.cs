@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Threading.Channels;
+using PoTraffic.Client.Infrastructure.Http;
 using Microsoft.Extensions.Logging;
 
 namespace PoTraffic.Client.Infrastructure.Logging;
@@ -69,7 +70,7 @@ public sealed class WasmForwardingLoggerProvider : ILoggerProvider
     {
         try
         {
-            await _httpClient.PostAsJsonAsync("/api/client-logs", new { Entries = entries }, ct);
+            await _httpClient.PostAsJsonAsync("/api/client-logs", new ClientLogBatch(entries), AppJsonContext.Default.ClientLogBatch, ct);
         }
         catch { /* network failure — entries dropped gracefully */ }
     }

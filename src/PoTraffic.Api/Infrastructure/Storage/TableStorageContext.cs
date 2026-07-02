@@ -121,11 +121,6 @@ public sealed class TableStorageContext
     public IQueryable<MonitoringWindow> MonitoringWindows => Windows;
     public IQueryable<EntityRoute> EntityRoutes => Routes;
 
-    public IQueryable<T> Set<T>() where T : class
-    {
-        lock (_gate) return GetList<T>().AsQueryable();
-    }
-
     // ── Write operations (Add / Remove) ─────────────────────────────────────
 
     private static readonly Dictionary<Type, PropertyInfo?> s_idProperties = new();

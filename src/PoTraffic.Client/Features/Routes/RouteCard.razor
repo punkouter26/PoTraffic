@@ -129,7 +129,7 @@
             HttpResponseMessage resp = await Http.PostAsync($"/api/routes/{Route.Id}/check-now", null);
             if (resp.IsSuccessStatusCode)
             {
-                CheckNowResponse? data = await resp.Content.ReadFromJsonAsync<CheckNowResponse>();
+                CheckNowResponse? data = await resp.Content.ReadFromJsonAsync(AppJsonContext.Default.CheckNowResponse);
                 string detail = data is not null
                     ? $"{data.DurationSeconds / 60} min — {data.DistanceMetres / 1000.0:F1} km"
                     : "Live travel time retrieved";
@@ -173,5 +173,4 @@
         }
     }
 
-    private sealed record CheckNowResponse(int DurationSeconds, int DistanceMetres);
 }

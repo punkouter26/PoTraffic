@@ -1,4 +1,3 @@
-using Azure;
 using Azure.Data.Tables;
 using Azure.Identity;
 using Microsoft.Extensions.Configuration;
@@ -22,16 +21,6 @@ public static class TableStorageExtensions
     public const string AzuriteConnectionString =
         "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;";
 
-    /// <summary>
-    /// Name of the storage account in Azure.
-    /// </summary>
-    public const string StorageAccountName = "potraffic";
-
-    /// <summary>
-    /// Name of the resource group for the storage account.
-    /// </summary>
-    public const string StorageResourceGroup = "rg-potraffic";
-
     public static IServiceCollection AddTableStorageServices(
         this IServiceCollection services,
         IConfiguration configuration,
@@ -42,7 +31,7 @@ public static class TableStorageExtensions
         // Rule 5 — Dynamic Switching: Azurite locally, Azure Table Storage in cloud.
         //   Empty / "UseDevelopmentStorage=true" → local Azurite default.
         //   Explicit connection string → custom Azurite/Azure endpoint, used by Testcontainers.
-        //   Managed identity → Azure Table Storage account in `rg-potraffic`.
+        //   Managed identity → Azure Table Storage account from AzureTable:AccountName config.
         bool useAzurite = string.IsNullOrEmpty(connectionString)
             || connectionString.Contains("UseDevelopmentStorage=true", StringComparison.OrdinalIgnoreCase)
             || (environment.IsDevelopment() && !configuration.GetValue<bool>("AzureCredential:UseProductionStorage"));
@@ -54,85 +43,36 @@ public static class TableStorageExtensions
 
         if (useAzurite)
         {
-            // Local development: use Azurite
-            services.AddSingleton<TableClient>(sp =>
-            {
-                TableServiceClient client = new(AzuriteConnectionString, tableOptions);
-                return client.GetTableClient("TrafficPolls");
-            });
-
-            services.AddSingleton<TableServiceClient>(sp =>
+            services.AddSingleton<TableServiceClient>(_ =>
                 new TableServiceClient(AzuriteConnectionString, tableOptions));
         }
         else if (!string.IsNullOrWhiteSpace(connectionString)
             && !configuration.GetValue<bool>("AzureTable:UseManagedIdentity"))
         {
-            services.AddSingleton<TableClient>(sp =>
-            {
-                string tableName = configuration["AzureTable:TableName"] ?? "TrafficPolls";
-                TableServiceClient client = new(connectionString, tableOptions);
-                return client.GetTableClient(tableName);
-            });
-
-            services.AddSingleton<TableServiceClient>(sp =>
+            services.AddSingleton<TableServiceClient>(_ =>
                 new TableServiceClient(connectionString, tableOptions));
         }
         else
         {
-            // Production: use Managed Identity with Azure Table Storage
-            services.AddSingleton<TableClient>(sp =>
-            {
-                string tableName = configuration["AzureTable:TableName"] ?? "TrafficPolls";
-                TableServiceClient client = new(
-                    new Uri($"https://{StorageAccountName}.table.core.windows.net"),
-                    new DefaultAzureCredential(),
-                    tableOptions);
-                return client.GetTableClient(tableName);
-            });
-
-            services.AddSingleton<TableServiceClient>(sp =>
+            // Production: managed identity against the account named in configuration
+            // (AzureTable:AccountName — set in App Service application settings).
+            string accountName = configuration["AzureTable:AccountName"]
+                ?? throw new InvalidOperationException(
+                    "AzureTable:AccountName must be configured when using managed identity.");
+            services.AddSingleton<TableServiceClient>(_ =>
                 new TableServiceClient(
-                    new Uri($"https://{StorageAccountName}.table.core.windows.net"),
+                    new Uri($"https://{accountName}.table.core.windows.net"),
                     new DefaultAzureCredential(),
                     tableOptions));
         }
 
+        // Scheduler job-state table client (see TableStorageJobScheduler).
+        services.AddSingleton<TableClient>(sp =>
+        {
+            string tableName = configuration["AzureTable:TableName"] ?? "TrafficPolls";
+            return sp.GetRequiredService<TableServiceClient>().GetTableClient(tableName);
+        });
+
         return services;
     }
-
-    /// <summary>
-    /// Ensures the required tables exist in Azure Table Storage or Azurite.
-    /// Call this during application startup.
-    /// </summary>
-    public static async Task EnsureTablesExistAsync(TableServiceClient tableServiceClient, string tableName)
-    {
-        await tableServiceClient.CreateTableIfNotExistsAsync(tableName);
-    }
-}
-
-/// <summary>
-/// Entity for storing traffic poll results in Azure Table Storage.
-/// </summary>
-public class TrafficPollEntity : global::Azure.Data.Tables.ITableEntity
-{
-    public string PartitionKey { get; set; } = string.Empty;
-    public string RowKey { get; set; } = string.Empty;
-    public DateTimeOffset? Timestamp { get; set; }
-    public ETag ETag { get; set; }
-
-    // Route information
-    public Guid RouteId { get; set; }
-    public Guid UserId { get; set; }
-
-    // Poll results
-    public int DurationSeconds { get; set; }
-    public int DistanceMetres { get; set; }
-    public DateTimeOffset PollTimeUtc { get; set; }
-
-    // Provider information
-    public string Provider { get; set; } = string.Empty;
-
-    // Traffic conditions
-    public string TrafficLevel { get; set; } = string.Empty;
-    public double ConfidenceScore { get; set; }
 }
