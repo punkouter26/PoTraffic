@@ -173,6 +173,12 @@ general engineering skills such as `using-agent-skills`,
 If a skill is missing in the agent environment, prefer the patterns documented
 in `docs/` instead.
 
+The [maddhruv/absolute](https://github.com/maddhruv/absolute) workflow pack
+(11 skills: `absolute-init/-work/-spec/-ui/-simplify/-docs/-upgrade/-audit/
+-prune/-debt/-deflake`) is installed project-level under `.claude/skills/`
+(tracked, with `skills-lock.json`). Reinstall/update via
+`npx skills add maddhruv/absolute --skill '*' --agent claude-code -y`.
+
 ## 12. Key Files
 
 - `global.json` — pins .NET 10.
