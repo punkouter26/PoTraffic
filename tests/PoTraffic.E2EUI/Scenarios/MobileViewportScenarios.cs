@@ -1,7 +1,7 @@
 using Microsoft.Playwright;
-using PoTraffic.E2ETests.Helpers;
+using PoTraffic.E2EUI.Helpers;
 
-namespace PoTraffic.E2ETests.Scenarios;
+namespace PoTraffic.E2EUI.Scenarios;
 
 /// <summary>
 /// Mobile viewport E2E tests — verifies key user journeys render correctly

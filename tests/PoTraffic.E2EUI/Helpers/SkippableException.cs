@@ -1,6 +1,6 @@
 using Xunit.Sdk;
 
-namespace PoTraffic.E2ETests.Helpers;
+namespace PoTraffic.E2EUI.Helpers;
 
 /// <summary>
 /// Runtime skip helper for xUnit v2 (which lacks <c>Assert.Skip</c>).

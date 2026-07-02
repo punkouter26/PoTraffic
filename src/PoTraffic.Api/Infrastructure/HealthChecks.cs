@@ -17,13 +17,14 @@ public sealed class StorageHealthCheck(TableStorageContext db) : IHealthCheck
 /// Surfaces background-scheduler liveness: a tick is expected every second, so a
 /// stale or failed tick means polling and pruning have silently stopped.
 /// </summary>
-public sealed class SchedulerHealthCheck(IJobScheduler scheduler) : IHealthCheck
+public sealed class SchedulerHealthCheck(IServiceProvider services) : IHealthCheck
 {
     private static readonly TimeSpan StaleAfter = TimeSpan.FromSeconds(30);
 
     public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken ct = default)
     {
-        if (scheduler is NoOpJobScheduler)
+        // Not registered at all (Testing host) or explicitly no-op → nothing to monitor.
+        if (services.GetService<IJobScheduler>() is null or NoOpJobScheduler)
             return Task.FromResult(HealthCheckResult.Healthy("Scheduler disabled (Testing)"));
 
         SchedulerTickStatus tick = BackgroundSchedulerService.LastTick;

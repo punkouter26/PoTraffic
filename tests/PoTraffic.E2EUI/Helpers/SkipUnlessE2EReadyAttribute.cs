@@ -1,6 +1,6 @@
 using Xunit;
 
-namespace PoTraffic.E2ETests.Helpers;
+namespace PoTraffic.E2EUI.Helpers;
 
 /// <summary>
 /// Conditional Fact — runs the E2E test when both the Playwright Chromium binaries

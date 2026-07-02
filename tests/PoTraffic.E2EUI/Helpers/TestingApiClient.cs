@@ -1,7 +1,7 @@
 using System.Net.Http.Json;
 using PoTraffic.Shared.DTOs.Auth;
 
-namespace PoTraffic.E2ETests.Helpers;
+namespace PoTraffic.E2EUI.Helpers;
 
 /// <summary>
 /// Typed HTTP client wrapping the testing-only endpoints: /e2e/dev-login, /e2e/seed, /e2e/seed-admin.

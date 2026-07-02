@@ -1,8 +1,8 @@
 using FluentAssertions;
 using Microsoft.Playwright;
-using PoTraffic.E2ETests.Helpers;
+using PoTraffic.E2EUI.Helpers;
 
-namespace PoTraffic.E2ETests.Scenarios;
+namespace PoTraffic.E2EUI.Scenarios;
 
 /// <summary>
 /// E2E scenario: seeds an admin account via the API, obtains a JWT via the testing-only

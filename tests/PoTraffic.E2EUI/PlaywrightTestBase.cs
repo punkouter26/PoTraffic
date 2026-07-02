@@ -1,7 +1,7 @@
 using Microsoft.Playwright;
-using PoTraffic.E2ETests.Helpers;
+using PoTraffic.E2EUI.Helpers;
 
-namespace PoTraffic.E2ETests;
+namespace PoTraffic.E2EUI;
 
 /// <summary>
 /// Template Method pattern — base class for all E2E tests.

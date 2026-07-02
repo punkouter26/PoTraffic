@@ -1,6 +1,6 @@
-using PoTraffic.E2ETests.Helpers;
+using PoTraffic.E2EUI.Helpers;
 
-namespace PoTraffic.E2ETests.Scenarios;
+namespace PoTraffic.E2EUI.Scenarios;
 
 /// <summary>
 /// E2E scenarios for the "Check Now" route action (FR-016).
@@ -10,7 +10,7 @@ namespace PoTraffic.E2ETests.Scenarios;
 ///   - Playwright Chromium binaries installed
 ///   - ASPNETCORE_ENVIRONMENT=Development or Testing (enables /e2e/* endpoints)
 ///
-/// Run with: dotnet test tests/PoTraffic.E2ETests --filter "FullyQualifiedName~CheckNowScenarios"
+/// Run with: dotnet test tests/PoTraffic.E2EUI --filter "FullyQualifiedName~CheckNowScenarios"
 /// </summary>
 public sealed class CheckNowScenarios : PlaywrightTestBase
 {

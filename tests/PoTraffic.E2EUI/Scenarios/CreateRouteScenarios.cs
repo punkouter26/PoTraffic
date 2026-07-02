@@ -1,6 +1,6 @@
-using PoTraffic.E2ETests.Helpers;
+using PoTraffic.E2EUI.Helpers;
 
-namespace PoTraffic.E2ETests.Scenarios;
+namespace PoTraffic.E2EUI.Scenarios;
 
 /// <summary>
 /// E2E scenarios for the Add Route user story.
@@ -10,7 +10,7 @@ namespace PoTraffic.E2ETests.Scenarios;
 ///   - Playwright Chromium binaries installed
 ///   - ASPNETCORE_ENVIRONMENT=Development or Testing (enables /e2e/* endpoints)
 ///
-/// Run with: dotnet test tests/PoTraffic.E2ETests --filter "FullyQualifiedName~CreateRouteScenarios"
+/// Run with: dotnet test tests/PoTraffic.E2EUI --filter "FullyQualifiedName~CreateRouteScenarios"
 /// </summary>
 public sealed class CreateRouteScenarios : PlaywrightTestBase
 {

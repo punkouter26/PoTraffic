@@ -1,7 +1,7 @@
 using Microsoft.Playwright;
-using PoTraffic.E2ETests.Helpers;
+using PoTraffic.E2EUI.Helpers;
 
-namespace PoTraffic.E2ETests.Scenarios;
+namespace PoTraffic.E2EUI.Scenarios;
 
 /// <summary>
 /// E2E scenarios for the Monitoring Window configuration flow:
@@ -13,7 +13,7 @@ namespace PoTraffic.E2ETests.Scenarios;
 ///   - ASPNETCORE_ENVIRONMENT=Development or Testing (enables /e2e/* seeding endpoints)
 ///
 /// Run with:
-///   dotnet test tests/PoTraffic.E2ETests --filter "FullyQualifiedName~MonitoringWindowScenarios"
+///   dotnet test tests/PoTraffic.E2EUI --filter "FullyQualifiedName~MonitoringWindowScenarios"
 /// </summary>
 public sealed class MonitoringWindowScenarios : PlaywrightTestBase
 {

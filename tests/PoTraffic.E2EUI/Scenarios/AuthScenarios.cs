@@ -1,8 +1,8 @@
 using System.Net.Http.Json;
 using System.Text.RegularExpressions;
-using PoTraffic.E2ETests.Helpers;
+using PoTraffic.E2EUI.Helpers;
 
-namespace PoTraffic.E2ETests.Scenarios;
+namespace PoTraffic.E2EUI.Scenarios;
 
 /// <summary>
 /// E2E scenarios for authentication flows.
