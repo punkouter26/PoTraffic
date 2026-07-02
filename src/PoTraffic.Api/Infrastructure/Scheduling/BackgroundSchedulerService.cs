@@ -38,6 +38,22 @@ public sealed class BackgroundSchedulerService : BackgroundService
     {
         _logger.LogInformation("BackgroundSchedulerService starting");
 
+        // Crash recovery: jobs left in "Running" by a previous process are requeued
+        // so a restart never strands a poll chain.
+        if (_tableScheduler is not null)
+        {
+            try
+            {
+                int requeued = _tableScheduler.RequeueStaleRunningJobs();
+                if (requeued > 0)
+                    _logger.LogWarning("Requeued {Count} stale running job(s) from a previous run", requeued);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Stale-job recovery failed — continuing; jobs may need manual requeue");
+            }
+        }
+
         using PeriodicTimer timer = new(TimeSpan.FromSeconds(1));
 
         try

@@ -177,7 +177,7 @@ public sealed class TableStorageJobScheduler : IJobScheduler
     {
         entity.Status = "Running";
         entity.AttemptCount++;
-        _tableClient.UpdateEntity(entity, entity.ETag);
+        UpdateAndRefreshETag(entity);
     }
 
     /// <summary>
@@ -186,7 +186,7 @@ public sealed class TableStorageJobScheduler : IJobScheduler
     public void MarkCompleted(ScheduledJobEntity entity)
     {
         entity.Status = "Completed";
-        _tableClient.UpdateEntity(entity, entity.ETag);
+        UpdateAndRefreshETag(entity);
     }
 
     /// <summary>
@@ -198,7 +198,7 @@ public sealed class TableStorageJobScheduler : IJobScheduler
         entity.LastRunAt = DateTimeOffset.UtcNow;
         entity.FireAt = ComputeNextFire(entity.CronExpression!, DateTimeOffset.UtcNow);
         entity.AttemptCount = 0;
-        _tableClient.UpdateEntity(entity, entity.ETag);
+        UpdateAndRefreshETag(entity);
     }
 
     /// <summary>
@@ -212,7 +212,39 @@ public sealed class TableStorageJobScheduler : IJobScheduler
         {
             entity.FireAt = ComputeNextFire(entity.CronExpression!, DateTimeOffset.UtcNow);
         }
-        _tableClient.UpdateEntity(entity, entity.ETag);
+        UpdateAndRefreshETag(entity);
+    }
+
+    /// <summary>
+    /// Requeues one-shot jobs left in "Running" by a crash or a failed status
+    /// update. Called once at scheduler startup — nothing can legitimately be
+    /// running before the worker loop starts.
+    /// </summary>
+    public int RequeueStaleRunningJobs()
+    {
+        List<ScheduledJobEntity> stale = _tableClient
+            .Query<ScheduledJobEntity>(e => e.PartitionKey == OneShotPartition && e.Status == "Running")
+            .ToList();
+
+        foreach (ScheduledJobEntity job in stale)
+        {
+            job.Status = "Pending";
+            _tableClient.UpdateEntity(job, ETag.All);
+        }
+
+        return stale.Count;
+    }
+
+    /// <summary>
+    /// The SDK does not refresh <c>entity.ETag</c> after an update, so a second
+    /// status transition on the same instance (MarkRunning → MarkCompleted/Failed)
+    /// would 412. Capture the new ETag from the response.
+    /// </summary>
+    private void UpdateAndRefreshETag(ScheduledJobEntity entity)
+    {
+        Response response = _tableClient.UpdateEntity(entity, entity.ETag);
+        if (response.Headers.ETag is { } etag)
+            entity.ETag = etag;
     }
 
     internal static DateTimeOffset ComputeNextFire(string cronExpression, DateTimeOffset after)

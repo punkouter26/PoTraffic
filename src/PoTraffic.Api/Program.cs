@@ -97,6 +97,11 @@ try
     builder.Services.AddTableStoragePersistence();
     builder.Services.AddTableStorageServices(builder.Configuration, builder.Environment);
     builder.Services.AddBackgroundJobScheduler(builder.Environment);
+    // Background job types — BackgroundSchedulerService resolves these from DI
+    // by the type name stored with each scheduled job.
+    builder.Services.AddScoped<PollRouteJob>();
+    builder.Services.AddScoped<PruneOldPollRecordsJob>();
+    builder.Services.AddScoped<TripleTestShotJob>();
     builder.Services.AddSecurityServices(builder.Configuration, builder.Environment.EnvironmentName);
     builder.Services.AddTrafficProviders(builder.Configuration, builder.Environment);
 
