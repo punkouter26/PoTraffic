@@ -1,19 +1,16 @@
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using PoTraffic.Api.Features.MonitoringWindows.Entities;
 using PoTraffic.Api.Infrastructure.Scheduling;
 using PoTraffic.Api.Infrastructure.Storage;
-
-
-using Microsoft.Extensions.DependencyInjection;
-
-using Microsoft.Extensions.Logging;
-
-
-
 using PoTraffic.Shared.Constants;
 using PoTraffic.Shared.Enums;
 
 namespace PoTraffic.Api.Features.Routes;
 
-// Chain of Responsibility pattern — each job enqueues its own successor to maintain the polling chain
+// Chain of Responsibility pattern — each job enqueues its own successor to maintain the polling chain.
+// Polls are gated to the route's active MonitoringWindow (UTC): inside the window the chain
+// samples every PollIntervalMinutes; outside it the chain sleeps until the next window start.
 public sealed class PollRouteJob
 {
     private readonly IServiceScopeFactory _scopeFactory;
@@ -34,26 +31,11 @@ public sealed class PollRouteJob
     {
         _logger.LogInformation("PollRouteJob executing for route {RouteId}", routeId);
 
-        // Use a fresh DI scope for the handler (avoids DbContext state pollution across polls)
-        using (IServiceScope scope = _scopeFactory.CreateScope())
-        {
-            ISender sender = scope.ServiceProvider.GetRequiredService<ISender>();
-
-            try
-            {
-                await sender.Send(new ExecutePollCommand(routeId));
-            }
-            catch (Exception ex)
-            {
-                // Log but do not rethrow — scheduler must not retry on handler errors
-                _logger.LogError(ex, "PollRouteJob: Unhandled error for route {RouteId}", routeId);
-            }
-        }
+        using IServiceScope scope = _scopeFactory.CreateScope();
+        TableStorageContext db = scope.ServiceProvider.GetRequiredService<TableStorageContext>();
 
         // Stop the chain when the route was deleted mid-poll — a soft-deleted route
         // must never keep consuming provider quota.
-        using IServiceScope updateScope = _scopeFactory.CreateScope();
-        TableStorageContext db = updateScope.ServiceProvider.GetRequiredService<TableStorageContext>();
         EntityRoute? route = db.Routes.FirstOrDefault(r => r.Id == routeId);
         if (route is null || route.MonitoringStatus == (int)MonitoringStatus.Deleted)
         {
@@ -61,15 +43,142 @@ public sealed class PollRouteJob
             return;
         }
 
+        MonitoringWindow? window = db.Windows.FirstOrDefault(w => w.RouteId == routeId && w.IsActive);
+        if (window is null)
+        {
+            _logger.LogInformation("PollRouteJob: route {RouteId} has no active monitoring window — polling chain stopped", routeId);
+            route.JobChainId = null;
+            await db.SaveChangesAsync();
+            return;
+        }
+
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        TimeSpan nextDelay;
+
+        if (IsWithinWindow(window, now))
+        {
+            if (await EnsureActiveSessionAsync(db, route, now))
+            {
+                ISender sender = scope.ServiceProvider.GetRequiredService<ISender>();
+                try
+                {
+                    await sender.Send(new ExecutePollCommand(routeId));
+                }
+                catch (Exception ex)
+                {
+                    // Log but do not rethrow — scheduler must not retry on handler errors
+                    _logger.LogError(ex, "PollRouteJob: Unhandled error for route {RouteId}", routeId);
+                }
+                nextDelay = TimeSpan.FromMinutes(QuotaConstants.PollIntervalMinutes);
+            }
+            else if (!TrySleepUntilNextStart(window, now, routeId, "daily quota exhausted", out nextDelay))
+            {
+                route.JobChainId = null;
+                await db.SaveChangesAsync();
+                return;
+            }
+        }
+        else if (!TrySleepUntilNextStart(window, now, routeId, "outside monitoring window", out nextDelay))
+        {
+            route.JobChainId = null;
+            await db.SaveChangesAsync();
+            return;
+        }
+
         // Schedule next execution — Chain of Responsibility enqueues its own successor
         string nextJobId = _scheduler.Schedule(
             () => Execute(routeId),
-            TimeSpan.FromMinutes(QuotaConstants.PollIntervalMinutes));
+            nextDelay);
 
         _logger.LogInformation(
-            "PollRouteJob: Next poll for route {RouteId} scheduled as job {JobId}", routeId, nextJobId);
+            "PollRouteJob: Next poll for route {RouteId} scheduled as job {JobId} in {Delay}", routeId, nextJobId, nextDelay);
 
         route.JobChainId = nextJobId;
         await db.SaveChangesAsync();
     }
+
+    /// <summary>
+    /// Computes the delay to the next window start; false when the window has no
+    /// enabled days (chain should stop).
+    /// </summary>
+    private bool TrySleepUntilNextStart(MonitoringWindow window, DateTimeOffset now, Guid routeId, string reason, out TimeSpan delay)
+    {
+        DateTimeOffset? nextStart = NextWindowStart(window, now);
+        if (nextStart is null)
+        {
+            _logger.LogInformation("PollRouteJob: route {RouteId} window has no enabled days — polling chain stopped", routeId);
+            delay = default;
+            return false;
+        }
+
+        _logger.LogInformation(
+            "PollRouteJob: route {RouteId} {Reason} — sleeping until window start {NextStart:O}", routeId, reason, nextStart);
+        delay = nextStart.Value - now;
+        return true;
+    }
+
+    /// <summary>
+    /// A window's daily session is normally created when the user presses Start;
+    /// this creates the next day's session automatically at window start so a
+    /// Mon–Fri schedule keeps sampling without manual restarts. Honours the
+    /// per-user daily session quota.
+    /// </summary>
+    private async Task<bool> EnsureActiveSessionAsync(TableStorageContext db, EntityRoute route, DateTimeOffset nowUtc)
+    {
+        DateOnly today = DateOnly.FromDateTime(nowUtc.UtcDateTime.Date);
+        bool hasActive = db.Sessions.Any(s =>
+            s.RouteId == route.Id && s.SessionDate == today && s.State == (int)SessionState.Active);
+        if (hasActive)
+            return true;
+
+        HashSet<Guid> userRouteIds = db.GetUserRouteIds(route.UserId);
+        int todaySessionCount = db.Sessions.Count(s => userRouteIds.Contains(s.RouteId) && s.SessionDate == today);
+        if (todaySessionCount >= QuotaConstants.DefaultDailyQuota)
+        {
+            _logger.LogInformation(
+                "PollRouteJob: daily session quota exhausted for user {UserId} — route {RouteId} skips today",
+                route.UserId, route.Id);
+            return false;
+        }
+
+        db.Add(new MonitoringSession
+        {
+            Id = Guid.NewGuid(),
+            RouteId = route.Id,
+            SessionDate = today,
+            State = (int)SessionState.Active
+        });
+        await db.SaveChangesAsync();
+        _logger.LogInformation(
+            "PollRouteJob: auto-created today's monitoring session for route {RouteId} at window start", route.Id);
+        return true;
+    }
+
+    /// <summary>Window times are UTC; mask bit 0 = Monday … bit 6 = Sunday.</summary>
+    internal static bool IsWithinWindow(MonitoringWindow window, DateTimeOffset nowUtc)
+    {
+        TimeOnly time = TimeOnly.FromDateTime(nowUtc.UtcDateTime);
+        return IsDayEnabled(window.DaysOfWeekMask, nowUtc.UtcDateTime.DayOfWeek)
+            && time >= window.StartTime
+            && time < window.EndTime;
+    }
+
+    /// <summary>Next UTC instant the window opens after <paramref name="nowUtc"/>; null when no days are enabled.</summary>
+    internal static DateTimeOffset? NextWindowStart(MonitoringWindow window, DateTimeOffset nowUtc)
+    {
+        for (int i = 0; i <= 7; i++)
+        {
+            DateTime day = nowUtc.UtcDateTime.Date.AddDays(i);
+            if (!IsDayEnabled(window.DaysOfWeekMask, day.DayOfWeek))
+                continue;
+
+            DateTimeOffset start = new(day.Add(window.StartTime.ToTimeSpan()), TimeSpan.Zero);
+            if (start > nowUtc)
+                return start;
+        }
+        return null;
+    }
+
+    private static bool IsDayEnabled(byte mask, DayOfWeek day) =>
+        (mask & (1 << (((int)day + 6) % 7))) != 0;
 }

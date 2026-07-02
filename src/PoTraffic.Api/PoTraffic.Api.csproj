@@ -13,6 +13,10 @@
   -->
 
   <ItemGroup>
+    <InternalsVisibleTo Include="PoTraffic.UnitTests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Shared DTOs/Enums/Constants -->
     <ProjectReference Include="..\PoTraffic.Shared\PoTraffic.Shared.csproj" />
     <!-- Blazor WASM hosted client assets -->
