@@ -1,9 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-
-  <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <RootNamespace>PoTraffic.Domain</RootNamespace>
-    <AssemblyName>PoTraffic.Domain</AssemblyName>
-  </PropertyGroup>
-
-</Project>

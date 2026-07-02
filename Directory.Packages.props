@@ -9,6 +9,7 @@
 
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
 
   <ItemGroup Label="MediatR / FluentValidation">
@@ -72,6 +73,8 @@
   <ItemGroup Label="Security">
     <!-- Override transitive Newtonsoft.Json (CVE-2024-21907) to a patched 13.x. -->
     <PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
+    <!-- Override transitive Microsoft.OpenApi 2.0.0 (GHSA-v5pm-xwqc-g5wc). -->
+    <PackageVersion Include="Microsoft.OpenApi" Version="2.9.0" />
   </ItemGroup>
 
   <ItemGroup Label="Testing">
