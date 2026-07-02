@@ -99,6 +99,13 @@ logs.zip
 
 # Azurite (local Azure Storage emulator) data
 azurite/
+.azurite/
+
+# Playwright MCP page snapshots
+.playwright-mcp/
+
+# Ad-hoc QA screenshots at repo root
+/*.png
 
 # Container runtime data
 .docker/
