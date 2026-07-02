@@ -1,4 +1,3 @@
-using MediatR;
 using Microsoft.Extensions.Hosting;
 using PoTraffic.Api.Infrastructure.Storage;
 

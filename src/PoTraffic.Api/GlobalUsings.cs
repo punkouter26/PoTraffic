@@ -6,3 +6,5 @@ global using PoTraffic.Api.Features.Auth.Entities;
 global using PoTraffic.Api.Features.Routes.Entities;
 global using PoTraffic.Api.Features.MonitoringWindows.Entities;
 global using PoTraffic.Api.Features.Config.Entities;
+
+global using PoTraffic.Api.Infrastructure.Dispatch;

@@ -1,4 +1,3 @@
-using MediatR;
 using PoTraffic.Api.Infrastructure.Storage;
 
 using Microsoft.Extensions.DependencyInjection;

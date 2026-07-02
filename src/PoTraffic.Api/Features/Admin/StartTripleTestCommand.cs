@@ -3,7 +3,6 @@ using PoTraffic.Api.Infrastructure.Storage;
 
 using PoTraffic.Api.Infrastructure.Scheduling;
 
-using MediatR;
 
 using Microsoft.Extensions.Logging;
 

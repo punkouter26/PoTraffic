@@ -1,4 +1,4 @@
-using MediatR;
+using PoTraffic.Api.Infrastructure.Dispatch;
 using Microsoft.Extensions.DependencyInjection;
 using PoTraffic.Api.Features.Maintenance;
 using PoTraffic.Api.Infrastructure.Storage;

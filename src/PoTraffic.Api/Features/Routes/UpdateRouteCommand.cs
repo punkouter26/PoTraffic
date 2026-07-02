@@ -1,7 +1,6 @@
 using PoTraffic.Api.Infrastructure.Scheduling;
 using PoTraffic.Api.Infrastructure.Storage;
 
-using MediatR;
 
 using Microsoft.Extensions.DependencyInjection;
 

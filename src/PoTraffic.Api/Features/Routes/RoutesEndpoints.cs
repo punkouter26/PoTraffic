@@ -1,7 +1,6 @@
 
 using System.Security.Claims;
 using Microsoft.Extensions.Logging;
-using MediatR;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;

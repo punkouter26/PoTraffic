@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using PoTraffic.Api.Features.Account;
 using PoTraffic.Api.Infrastructure.Security;

@@ -1,7 +1,6 @@
 using FluentValidation;
 using PoTraffic.Api.Infrastructure.Storage;
 
-using MediatR;
 
 
 namespace PoTraffic.Api.Features.Account;

@@ -13,7 +13,6 @@
   </PropertyGroup>
 
   <ItemGroup Label="MediatR / FluentValidation">
-    <PackageVersion Include="MediatR" Version="12.5.0" />
     <PackageVersion Include="FluentValidation.AspNetCore" Version="11.3.0" />
   </ItemGroup>
 

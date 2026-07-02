@@ -1,5 +1,4 @@
 using FluentValidation;
-using MediatR;
 using PoTraffic.Api.Infrastructure.Providers;
 using PoTraffic.Shared.Constants;
 using PoTraffic.Shared.Enums;

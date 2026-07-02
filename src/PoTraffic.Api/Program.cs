@@ -114,14 +114,8 @@ try
     builder.Services.AddSecurityServices(builder.Configuration, builder.Environment.EnvironmentName);
     builder.Services.AddTrafficProviders(builder.Configuration, builder.Environment);
 
-    // ── MediatR CQRS ─────────────────────────────────────────────────────────
-    builder.Services.AddMediatR(cfg =>
-    {
-        cfg.RegisterServicesFromAssembly(typeof(Program).Assembly);
-        // Pipeline Behavior pattern — ValidationBehavior runs FluentValidation
-        // validators before every handler, decoupling validation from handlers.
-        cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
-    });
+    // ── Request dispatch (validation-first, see Infrastructure/Dispatch) ─────
+    builder.Services.AddDispatcher(typeof(Program).Assembly);
 
     // ── FluentValidation ──────────────────────────────────────────────────────
     builder.Services.AddValidatorsFromAssembly(typeof(Program).Assembly);

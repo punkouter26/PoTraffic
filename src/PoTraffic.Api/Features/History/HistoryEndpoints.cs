@@ -1,4 +1,3 @@
-using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using PoTraffic.Api.Infrastructure.Security;
 
