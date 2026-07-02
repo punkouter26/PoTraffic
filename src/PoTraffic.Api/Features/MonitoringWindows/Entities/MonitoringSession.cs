@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace PoTraffic.Api.Features.MonitoringWindows.Entities;
 
 public sealed class MonitoringSession
@@ -15,6 +17,8 @@ public sealed class MonitoringSession
     public int PollCount { get; set; }
     public bool IsHolidayExcluded { get; set; }
 
+    [JsonIgnore]
     public EntityRoute Route { get; set; } = null!;
+    [JsonIgnore]
     public ICollection<PollRecord> PollRecords { get; set; } = new List<PollRecord>();
 }

@@ -1,19 +1,18 @@
-using PoTraffic.Api.Infrastructure.Storage;
-
 namespace PoTraffic.Api.Infrastructure.Storage;
 
 /// <summary>
-/// Post-refactor: registers <see cref="TableStorageContext"/> in place of the
-/// old EF Core <c>PoTrafficDbContext</c>. Handlers that took
-/// <c>PoTrafficDbContext db</c> now take <c>TableStorageContext ctx</c>.
+/// Registers <see cref="TableStorageContext"/> (singleton working set) backed by
+/// <see cref="AzureTableStore"/> for durable writes. The store resolves the
+/// <c>TableServiceClient</c> configured in <see cref="TableStorageExtensions"/> —
+/// Azurite locally, managed identity in the cloud.
 /// </summary>
 public static class TableStorageServiceExtensions
 {
     public static IServiceCollection AddTableStoragePersistence(this IServiceCollection services)
     {
-        // Singleton so the in-memory store is shared across the request pipeline,
-        // matching the old AddDbContext() singleton-like lifecycle for the host.
-        services.AddSingleton<TableStorageContext>();
+        services.AddSingleton<ITableStore, AzureTableStore>();
+        services.AddSingleton<TableStorageContext>(sp =>
+            new TableStorageContext(sp.GetRequiredService<ITableStore>()));
         return services;
     }
 }

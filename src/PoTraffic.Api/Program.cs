@@ -291,28 +291,29 @@ try
         app.MapFallbackToFile("index.html");
     }
 
-    // ── Startup: ensure Table Storage tables exist + seed configuration ──────
-    // Idempotent — safe to run on every cold-start.
+    // ── Startup: hydrate the working set from Table Storage + seed configuration ──
+    // Idempotent — safe to run on every cold-start. Production treats a hydration
+    // failure as fatal (running without durability would silently lose user data);
+    // Development/Testing degrade to memory-only so a checkout without Azurite
+    // still boots (Rule 10 — First-Run Success).
+    ILogger<Program> startupLog = app.Services.GetRequiredService<ILogger<Program>>();
+    TableStorageContext db = app.Services.GetRequiredService<TableStorageContext>();
+    try
     {
-        TableServiceClient? tableService = app.Services.GetService<TableServiceClient>();
-        if (tableService is not null)
-        {
-            try
-            {
-                await TableStorageExtensions.EnsureTablesExistAsync(tableService, "TrafficPolls");
-                Console.WriteLine("[startup] Table Storage: TrafficPolls table ensured.");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[startup] Table Storage: failed to ensure TrafficPolls table — continuing. {ex.Message}");
-            }
-        }
+        await db.HydrateAsync();
+        startupLog.LogInformation("Table Storage hydrated: {Users} users, {Routes} routes, {Polls} polls.",
+            db.Users.Count(), db.Routes.Count(), db.Polls.Count());
+    }
+    catch (Exception ex) when (!app.Environment.IsProduction())
+    {
+        db.MarkVolatile();
+        startupLog.LogWarning(ex,
+            "Table Storage unreachable — running MEMORY-ONLY (data lost on restart). Start Azurite (docker compose up -d) to persist.");
     }
 
-    // Seed default SystemConfiguration rows (cost rates, daily quota) in the in-memory store.
-    await using AsyncServiceScope scope = app.Services.CreateAsyncScope();
-    TableStorageContext db = scope.ServiceProvider.GetRequiredService<TableStorageContext>();
+    // Seed default SystemConfiguration rows (cost rates, daily quota) and persist them.
     db.SeedDefaultConfigurationsIfMissing();
+    await db.SaveChangesAsync();
 
     // T086 — Register nightly pruning recurring job (02:00 UTC).
     // Skipped in Testing where IJobScheduler is not registered.

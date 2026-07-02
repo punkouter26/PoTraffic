@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace PoTraffic.Api.Features.Admin.Entities;
 
 public sealed class TripleTestSession
@@ -14,5 +16,6 @@ public sealed class TripleTestSession
     public DateTimeOffset ScheduledAt { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
 
+    [JsonIgnore]
     public ICollection<TripleTestShot> Shots { get; set; } = new List<TripleTestShot>();
 }

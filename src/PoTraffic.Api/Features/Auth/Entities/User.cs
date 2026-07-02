@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace PoTraffic.Api.Features.Auth.Entities;
 
 public sealed class User
@@ -21,5 +23,6 @@ public sealed class User
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? LastLoginAt { get; set; }
 
+    [JsonIgnore]
     public ICollection<EntityRoute> Routes { get; set; } = new List<EntityRoute>();
 }

@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace PoTraffic.Api.Features.Admin.Entities;
 
 public sealed class TripleTestShot
@@ -17,5 +19,6 @@ public sealed class TripleTestShot
     public int? DistanceMetres { get; set; }
     public string? ErrorCode { get; set; }
 
+    [JsonIgnore]
     public TripleTestSession Session { get; set; } = null!;
 }

@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace PoTraffic.Api.Features.MonitoringWindows.Entities;
 
 public sealed class MonitoringWindow
@@ -13,5 +15,6 @@ public sealed class MonitoringWindow
     public bool IsActive { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
 
+    [JsonIgnore]
     public EntityRoute Route { get; set; } = null!;
 }

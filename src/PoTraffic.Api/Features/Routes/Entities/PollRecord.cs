@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace PoTraffic.Api.Features.Routes.Entities;
 
 public sealed class PollRecord
@@ -12,6 +14,8 @@ public sealed class PollRecord
     public bool IsDeleted { get; set; }
     public string? RawProviderResponse { get; set; }
 
+    [JsonIgnore]
     public Route Route { get; set; } = null!;
+    [JsonIgnore]
     public MonitoringSession? Session { get; set; }
 }

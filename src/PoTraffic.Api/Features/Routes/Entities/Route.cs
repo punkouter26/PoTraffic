@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace PoTraffic.Api.Features.Routes.Entities;
 
 public sealed class Route
@@ -18,8 +20,12 @@ public sealed class Route
     public string? JobChainId { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
 
+    [JsonIgnore]
     public User User { get; set; } = null!;
+    [JsonIgnore]
     public ICollection<MonitoringWindow> Windows { get; set; } = new List<MonitoringWindow>();
+    [JsonIgnore]
     public ICollection<MonitoringSession> Sessions { get; set; } = new List<MonitoringSession>();
+    [JsonIgnore]
     public ICollection<PollRecord> PollRecords { get; set; } = new List<PollRecord>();
 }
