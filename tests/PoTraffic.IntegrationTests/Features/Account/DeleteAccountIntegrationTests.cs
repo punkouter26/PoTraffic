@@ -25,11 +25,9 @@ public sealed class DeleteAccountIntegrationTests : BaseIntegrationTest
         HttpResponseMessage registerResponse = await client.PostAsync("/api/auth/guest-login", content: null);
         registerResponse.StatusCode.Should().Be(HttpStatusCode.OK, "guest login must succeed");
 
-        AuthResponse? auth = await registerResponse.Content.ReadFromJsonAsync<AuthResponse>();
+        AuthMeResponse? auth = await registerResponse.Content.ReadFromJsonAsync<AuthMeResponse>();
         auth.Should().NotBeNull();
-        client.DefaultRequestHeaders.Authorization =
-            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", auth!.AccessToken);
-        Guid userId = auth.UserId;
+        Guid userId = auth!.UserId;
 
         // Act — delete the authenticated user's account
         HttpResponseMessage deleteResponse = await client.DeleteAsync("/api/account");
@@ -54,15 +52,13 @@ public sealed class DeleteAccountIntegrationTests : BaseIntegrationTest
         // Arrange — guest login + authenticate
         HttpResponseMessage registerResponse = await client.PostAsync("/api/auth/guest-login", content: null);
         registerResponse.StatusCode.Should().Be(HttpStatusCode.OK, "guest login must succeed");
-        AuthResponse? auth = await registerResponse.Content.ReadFromJsonAsync<AuthResponse>();
-        client.DefaultRequestHeaders.Authorization =
-            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", auth!.AccessToken);
+        (await registerResponse.Content.ReadFromJsonAsync<AuthMeResponse>()).Should().NotBeNull();
 
         // First deletion — must succeed
         HttpResponseMessage first = await client.DeleteAsync("/api/account");
         first.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
-        // Second deletion with same (now-gone) JWT — must return 404
+        // Second deletion with the same (now-orphaned) cookie session — must return 404
         HttpResponseMessage second = await client.DeleteAsync("/api/account");
         second.StatusCode.Should().Be(HttpStatusCode.NotFound,
             "deleting a non-existent user must return 404 (idempotent guard)");

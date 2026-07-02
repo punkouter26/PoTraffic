@@ -28,7 +28,7 @@ public sealed class GetGlobalVolatilityHandlerTests
         Guid userId = Guid.NewGuid();
         Guid routeId = Guid.NewGuid();
 
-        db.Add(new User { Id = userId, Email = "test@test.com", PasswordHash = "x", Locale = "en-IE", CreatedAt = DateTimeOffset.UtcNow });
+        db.Add(new User { Id = userId, Email = "test@test.com", Locale = "en-IE", CreatedAt = DateTimeOffset.UtcNow });
         db.Add(new EntityRoute
         {
             Id = routeId,

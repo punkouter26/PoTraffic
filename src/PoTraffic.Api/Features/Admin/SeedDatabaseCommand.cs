@@ -39,7 +39,6 @@ public sealed class SeedDatabaseHandler(
                 {
                     Id = Guid.NewGuid(),
                     Email = u.Email,
-                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("User123!"),
                     Locale = "en-US",
                     Role = "Commuter",
                     IsEmailVerified = true,

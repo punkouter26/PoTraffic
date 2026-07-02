@@ -18,26 +18,25 @@ public sealed class TestingApiClient
     }
 
     /// <summary>
-    /// Calls POST /e2e/dev-login to obtain a pre-issued JWT for the given role.
+    /// Calls POST /e2e/dev-login to establish a BFF cookie session for the given role.
     /// Returns null when the endpoint is not registered (Production environments).
     /// </summary>
-    public async Task<string?> DevLoginAsync(string email, string role = "Commuter", CancellationToken ct = default)
+    public async Task<AuthMeResponse?> DevLoginAsync(string email, string role = "Commuter", CancellationToken ct = default)
     {
         HttpResponseMessage response = await _http.PostAsJsonAsync("/e2e/dev-login", new { email, role }, ct);
         if (!response.IsSuccessStatusCode) return null;
-        var result = await response.Content.ReadFromJsonAsync<DevLoginResponse>(ct);
-        return result?.Token;
+        return await response.Content.ReadFromJsonAsync<AuthMeResponse>(ct);
     }
 
     /// <summary>
-    /// Calls POST /api/auth/guest-login to obtain a Testing-only GUEST JWT.
+    /// Calls POST /api/auth/guest-login to establish a Testing-only GUEST cookie session.
     /// This bypasses Microsoft OAuth without enabling any guest path in Development or Production.
     /// </summary>
-    public async Task<AuthResponse?> GuestLoginAsync(CancellationToken ct = default)
+    public async Task<AuthMeResponse?> GuestLoginAsync(CancellationToken ct = default)
     {
         HttpResponseMessage response = await _http.PostAsync("/api/auth/guest-login", content: null, ct);
         if (!response.IsSuccessStatusCode) return null;
-        return await response.Content.ReadFromJsonAsync<AuthResponse>(ct);
+        return await response.Content.ReadFromJsonAsync<AuthMeResponse>(ct);
     }
 
     /// <summary>
@@ -52,14 +51,13 @@ public sealed class TestingApiClient
     /// <summary>
     /// Calls POST /e2e/seed-admin to ensure a known Administrator user exists in the database.
     /// Idempotent — safe to call multiple times.
-    /// Returns the seeded credentials (email + password).
     /// </summary>
-    public async Task<(string Email, string Password)> SeedAdminAsync(CancellationToken ct = default)
+    public async Task<string> SeedAdminAsync(CancellationToken ct = default)
     {
         HttpResponseMessage response = await _http.PostAsync("/e2e/seed-admin", content: null, ct);
         response.EnsureSuccessStatusCode();
         SeedAdminResponse? result = await response.Content.ReadFromJsonAsync<SeedAdminResponse>(ct);
-        return (result!.Email, result.Password);
+        return result!.Email;
     }
 
     /// <summary>
@@ -82,7 +80,6 @@ public sealed class TestingApiClient
         return (result!.RouteId, result.OriginAddress, result.DestinationAddress);
     }
 
-    private sealed record DevLoginResponse(string Token);
-    private sealed record SeedAdminResponse(string Email, string Password);
+    private sealed record SeedAdminResponse(string Email);
     private sealed record SeedRouteResponse(Guid RouteId, string OriginAddress, string DestinationAddress);
 }

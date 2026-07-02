@@ -47,37 +47,6 @@
                 }
             </RadzenTabsItem>
 
-            <!-- Change Password Tab -->
-            <RadzenTabsItem Text="Change Password">
-                <RadzenStack Gap="1rem" class="rz-mt-4">
-                    <RadzenFormField Text="Current Password">
-                        <ChildContent>
-                            <RadzenPassword @bind-Value="_currentPassword" />
-                        </ChildContent>
-                    </RadzenFormField>
-                    <RadzenFormField Text="New Password">
-                        <ChildContent>
-                            <RadzenPassword @bind-Value="_newPassword" />
-                        </ChildContent>
-                    </RadzenFormField>
-                    <RadzenFormField Text="Confirm New Password">
-                        <ChildContent>
-                            <RadzenPassword @bind-Value="_confirmPassword" />
-                        </ChildContent>
-                    </RadzenFormField>
-                    <RadzenButton Text="Change Password" ButtonStyle="ButtonStyle.Primary"
-                                  Click="@ChangePasswordAsync" Disabled="@_saving" />
-                    @if (_passwordError is not null)
-                    {
-                        <RadzenAlert AlertStyle="AlertStyle.Danger" Text="@_passwordError" />
-                    }
-                    @if (_passwordSaved)
-                    {
-                        <RadzenAlert AlertStyle="AlertStyle.Success" Text="Password changed." />
-                    }
-                </RadzenStack>
-            </RadzenTabsItem>
-
             <!-- Quota Tab -->
             <RadzenTabsItem Text="Quota">
                 @if (_loading)
@@ -121,14 +90,9 @@
     private ProfileDto? _profile;
     private QuotaDto? _quota;
     private string _newLocale = string.Empty;
-    private string _currentPassword = string.Empty;
-    private string _newPassword = string.Empty;
-    private string _confirmPassword = string.Empty;
     private bool _loading = true;
     private bool _saving;
     private bool _profileSaved;
-    private bool _passwordSaved;
-    private string? _passwordError;
 
     // UX-10: Whitelist matches server-side validator — prevents freeform input that fails validation
     private static readonly List<string> _validLocales = ["en-IE", "en-GB", "en-US", "de-DE", "fr-FR"];
@@ -153,23 +117,6 @@
         {
             HttpResponseMessage resp = await Http.PutAsJsonAsync("/api/account/profile", new UpdateProfileRequest(_newLocale));
             _profileSaved = resp.IsSuccessStatusCode;
-        }
-        finally { _saving = false; }
-    }
-
-    private async Task ChangePasswordAsync()
-    {
-        _saving = true;
-        _passwordError = null;
-        _passwordSaved = false;
-        try
-        {
-            HttpResponseMessage resp = await Http.PostAsJsonAsync("/api/account/change-password",
-                new ChangePasswordRequest(_currentPassword, _newPassword, _confirmPassword));
-            if (resp.IsSuccessStatusCode)
-                _passwordSaved = true;
-            else
-                _passwordError = "Password change failed. Check your current password.";
         }
         finally { _saving = false; }
     }

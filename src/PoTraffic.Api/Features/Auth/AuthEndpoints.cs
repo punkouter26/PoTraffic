@@ -1,12 +1,9 @@
-
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
-
 using Microsoft.AspNetCore.Mvc;
-
 using Microsoft.AspNetCore.Routing;
-
-
-
+using PoTraffic.Api.Infrastructure.Security;
 using PoTraffic.Shared.DTOs.Auth;
 
 namespace PoTraffic.Api.Features.Auth;
@@ -18,10 +15,11 @@ public static class AuthEndpoints
         RouteGroupBuilder group = app.MapGroup("/api/auth").WithTags("Auth");
 
         // Sign-in is Microsoft OAuth only outside the Testing environment.
-        // Local email/password registration and login were removed by design.
+        // Sessions are server-managed HttpOnly cookies (BFF) — no tokens reach the client.
         group.MapGet("providers", GetAvailableProviders);
-        group.MapPost("logout", Logout).RequireAuthorization("ProductionMicrosoftAuth");
-        group.MapPost("refresh-token", RefreshToken);
+        group.MapGet("me", Me).RequireAuthorization();
+        // Cast: (HttpContext) => Task<IResult> would otherwise bind as a RequestDelegate
+        group.MapPost("logout", (Delegate)Logout);
         group.MapGet("external/{provider}/start", StartExternalLogin);
         group.MapGet("external/{provider}/callback", CompleteExternalLogin);
 
@@ -37,12 +35,22 @@ public static class AuthEndpoints
         return Results.Ok(new { providers = available });
     }
 
-    private static IResult Logout() => Results.NoContent();
-
-    private static async Task<IResult> RefreshToken(ISender sender, [FromBody] RefreshTokenRequest request)
+    private static IResult Me(ClaimsPrincipal user)
     {
-        RefreshTokenResult result = await sender.Send(new RefreshTokenCommand(request.RefreshToken));
-        return result.IsSuccess ? Results.Ok(result.Response) : Results.Unauthorized();
+        Guid? userId = user.GetUserIdOrNull();
+        if (userId is null) return Results.Unauthorized();
+
+        return Results.Ok(new AuthMeResponse(
+            userId.Value,
+            user.FindFirstValue(ClaimTypes.Email) ?? user.FindFirstValue("email") ?? string.Empty,
+            user.FindFirstValue(ClaimTypes.Role) ?? "Commuter",
+            user.FindFirstValue("auth_provider") ?? string.Empty));
+    }
+
+    private static async Task<IResult> Logout(HttpContext httpContext)
+    {
+        await httpContext.SignOutAsync();
+        return Results.NoContent();
     }
 
     private static IResult StartExternalLogin(
@@ -73,7 +81,7 @@ public static class AuthEndpoints
     {
         if (string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(state))
         {
-            return Results.Redirect("/auth/external-complete#error=INVALID_CALLBACK");
+            return Results.Redirect("/login?error=INVALID_CALLBACK");
         }
 
         string redirectUri = BuildExternalCallbackUri(httpContext, provider);
@@ -84,7 +92,15 @@ public static class AuthEndpoints
             redirectUri,
             ct);
 
-        return Results.Redirect(ExternalAuthService.BuildCompletionRedirectPath(result));
+        if (!result.IsSuccess || result.User is null)
+        {
+            return Results.Redirect($"/login?error={Uri.EscapeDataString(result.ErrorCode ?? "EXTERNAL_AUTH_FAILED")}");
+        }
+
+        // BFF: the session is established server-side; the browser lands directly
+        // on the requested page with an HttpOnly cookie — no tokens in the URL.
+        await CookieSignIn.SignInAsync(httpContext, result.User);
+        return Results.Redirect(result.ReturnPath);
     }
 
     private static string BuildExternalCallbackUri(HttpContext httpContext, string provider)
@@ -93,5 +109,3 @@ public static class AuthEndpoints
         return $"{request.Scheme}://{request.Host}{request.PathBase}/api/auth/external/{provider}/callback";
     }
 }
-
-public sealed record RefreshTokenRequest(string RefreshToken);

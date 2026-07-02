@@ -1,51 +1,39 @@
-using System.Text;
-using PoTraffic.Api.Infrastructure.Storage;
-
-using System.Security.Claims;
-
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
-
-using Microsoft.IdentityModel.Tokens;
-
 using PoTraffic.Api.Features.Auth;
-
 
 namespace PoTraffic.Api.Infrastructure.Security;
 
 internal static class SecurityExtensions
 {
     /// <summary>
-    /// Registers JWT Bearer authentication, authorization policies, DataProtection, and external OAuth providers.
-    /// Strategy pattern — external provider implementation is selected by provider key at runtime.
+    /// Registers BFF cookie authentication, authorization policies, DataProtection,
+    /// and the external OAuth provider. The Blazor WASM client never handles tokens —
+    /// the HttpOnly SameSite=Strict cookie is the only session credential.
     /// </summary>
     internal static IServiceCollection AddSecurityServices(this IServiceCollection services, IConfiguration configuration, string environmentName)
     {
-        JwtConfiguration jwtCfg = configuration.GetSection("Jwt").Get<JwtConfiguration>()
-            ?? throw new InvalidOperationException("Jwt configuration section is missing.");
-
-        services.Configure<JwtConfiguration>(configuration.GetSection("Jwt"));
         services.Configure<ExternalAuthConfiguration>(configuration.GetSection("ExternalAuth"));
 
-        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-            .AddJwtBearer(options =>
+        services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+            .AddCookie(options =>
             {
-                options.TokenValidationParameters = new TokenValidationParameters
+                options.Cookie.Name = ".PoTraffic.Auth";
+                options.Cookie.HttpOnly = true;
+                options.Cookie.SameSite = SameSiteMode.Strict;
+                options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+                options.SlidingExpiration = true;
+                options.ExpireTimeSpan = TimeSpan.FromDays(14);
+                // API host — return status codes instead of redirecting to a login page.
+                options.Events.OnRedirectToLogin = ctx =>
                 {
-                    ValidateIssuer = true,
-                    ValidateAudience = true,
-                    ValidateLifetime = true,
-                    ValidateIssuerSigningKey = true,
-                    ValidIssuer = jwtCfg.Issuer,
-                    ValidAudience = jwtCfg.Audience,
-                    IssuerSigningKey = new SymmetricSecurityKey(
-                        Encoding.UTF8.GetBytes(jwtCfg.Key))
-                    { KeyId = "potraffic-key" },
-                    ClockSkew = TimeSpan.Zero,
-                    // Ensure "sub" and "role" claims are mapped correctly to User.Identity properties
-                    NameClaimType = "sub",
-                    RoleClaimType = ClaimTypes.Role
+                    ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                    return Task.CompletedTask;
+                };
+                options.Events.OnRedirectToAccessDenied = ctx =>
+                {
+                    ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
+                    return Task.CompletedTask;
                 };
             });
 
@@ -54,8 +42,8 @@ internal static class SecurityExtensions
             opts.AddPolicy("AdminOnly", p => p.RequireRole("Administrator"));
 
             // Rule 13: in Development/Production/Staging, Microsoft OAuth is REQUIRED.
-            // GUEST and password-only sessions are rejected. The policy is a no-op
-            // only in Testing so integration/E2E flows keep working.
+            // GUEST sessions are rejected. The policy is a no-op only in Testing so
+            // integration/E2E flows keep working.
             opts.AddPolicy("ProductionMicrosoftAuth", p =>
             {
                 p.RequireAuthenticatedUser();
@@ -63,18 +51,13 @@ internal static class SecurityExtensions
             });
         });
 
-        services.AddSingleton<JwtTokenService>();
-        // Persist Data Protection keys to the local file system. Post-refactor: the
-        // in-process Table Storage backend isn't durable across restarts, so file-system
-        // persistence is the simplest option. For multi-instance deployments a Table
-        // Storage key ring would be the follow-up.
+        // Persist Data Protection keys (cookie + OAuth state encryption) to the local
+        // file system. For multi-instance deployments a Table Storage key ring would be
+        // the follow-up.
         services.AddDataProtection()
             .SetApplicationName("PoTraffic")
             .PersistKeysToFileSystem(
-                new System.IO.DirectoryInfo(
-                    System.IO.Path.Combine(
-                        System.IO.Directory.GetCurrentDirectory(),
-                        "keys")));
+                new DirectoryInfo(Path.Combine(Directory.GetCurrentDirectory(), "keys")));
         services.AddHttpClient();
         // Microsoft OAuth is the only external sign-in provider. Local password
         // login/registration and Google sign-in were removed by design.

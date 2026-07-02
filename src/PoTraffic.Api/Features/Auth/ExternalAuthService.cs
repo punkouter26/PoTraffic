@@ -1,50 +1,21 @@
 using System.Security.Cryptography;
-using PoTraffic.Api.Infrastructure.Storage;
-
-using System.Text;
-
-using System.Text.Encodings.Web;
-
 using System.Text.Json;
-
 using Microsoft.AspNetCore.DataProtection;
-
 using Microsoft.Extensions.Configuration;
-
 using Microsoft.Extensions.Logging;
-
-using PoTraffic.Shared.DTOs.Auth;
-
-
-
-using PoTraffic.Api.Infrastructure.Security;
+using PoTraffic.Api.Infrastructure.Storage;
 
 namespace PoTraffic.Api.Features.Auth;
 
-public sealed class ExternalAuthService
+public sealed class ExternalAuthService(
+    IEnumerable<IExternalIdentityProvider> providers,
+    IDataProtectionProvider dataProtectionProvider,
+    TableStorageContext db,
+    IConfiguration configuration,
+    ILogger<ExternalAuthService> logger)
 {
-    private readonly IEnumerable<IExternalIdentityProvider> _providers;
-    private readonly IDataProtector _stateProtector;
-    private readonly TableStorageContext _db;
-    private readonly JwtTokenService _jwt;
-    private readonly IConfiguration _configuration;
-    private readonly ILogger<ExternalAuthService> _logger;
-
-    public ExternalAuthService(
-        IEnumerable<IExternalIdentityProvider> providers,
-        IDataProtectionProvider dataProtectionProvider,
-        TableStorageContext db,
-        JwtTokenService jwt,
-        IConfiguration configuration,
-        ILogger<ExternalAuthService> logger)
-    {
-        _providers = providers;
-        _stateProtector = dataProtectionProvider.CreateProtector("PoTraffic.Auth.ExternalState.v1");
-        _db = db;
-        _jwt = jwt;
-        _configuration = configuration;
-        _logger = logger;
-    }
+    private readonly IDataProtector _stateProtector =
+        dataProtectionProvider.CreateProtector("PoTraffic.Auth.ExternalState.v1");
 
     public string BuildStartRedirectUrl(string provider, string redirectUri, string? returnUrl)
     {
@@ -92,10 +63,10 @@ public sealed class ExternalAuthService
             return new ExternalAuthCompletionResult(false, payload.ReturnPath, null, "EXTERNAL_IDENTITY_UNAVAILABLE");
 
         string normalizedEmail = identity.Email.Trim().ToLowerInvariant();
-        User? user = _db.Users.FirstOrDefault(u => u.Email == normalizedEmail);
+        User? user = db.Users.FirstOrDefault(u => u.Email == normalizedEmail);
 
         // Admin email promotion — configured in Auth:AdminEmail (non-sensitive, stored in appsettings)
-        string? adminEmail = _configuration["Auth:AdminEmail"];
+        string? adminEmail = configuration["Auth:AdminEmail"];
         bool isAdmin = !string.IsNullOrWhiteSpace(adminEmail)
             && string.Equals(normalizedEmail, adminEmail.Trim().ToLowerInvariant(), StringComparison.Ordinal);
 
@@ -105,7 +76,6 @@ public sealed class ExternalAuthService
             {
                 Id = Guid.NewGuid(),
                 Email = normalizedEmail,
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(Guid.NewGuid().ToString("N")),
                 Locale = "en-US",
                 Role = isAdmin ? "Administrator" : "Commuter",
                 AuthProvider = authProvider.ProviderName.ToLowerInvariant(),
@@ -113,7 +83,7 @@ public sealed class ExternalAuthService
                 CreatedAt = DateTimeOffset.UtcNow,
                 LastLoginAt = DateTimeOffset.UtcNow
             };
-            _db.Add(user);
+            db.Add(user);
         }
         else
         {
@@ -125,23 +95,15 @@ public sealed class ExternalAuthService
                 user.Role = "Administrator";
         }
 
-        (string accessToken, string refreshToken, DateTimeOffset expiresAt) = _jwt.GenerateTokens(user);
-        user.RefreshToken = refreshToken;
-        user.RefreshTokenExpiry = DateTimeOffset.UtcNow.AddDays(_jwt.RefreshTokenExpiryDays);
+        await db.SaveChangesAsync(ct);
+        logger.LogInformation("External login succeeded for {Email} via {Provider}", normalizedEmail, authProvider.ProviderName);
 
-        await _db.SaveChangesAsync(ct);
-        _logger.LogInformation("External login succeeded for {Email} via {Provider}", normalizedEmail, authProvider.ProviderName);
-
-        return new ExternalAuthCompletionResult(
-            true,
-            payload.ReturnPath,
-            new AuthResponse(accessToken, refreshToken, expiresAt, user.Id, user.Role),
-            null);
+        return new ExternalAuthCompletionResult(true, payload.ReturnPath, user, null);
     }
 
     private IExternalIdentityProvider ResolveProvider(string provider)
     {
-        IExternalIdentityProvider? match = _providers.LastOrDefault(
+        IExternalIdentityProvider? match = providers.LastOrDefault(
             p => string.Equals(p.ProviderName, provider, StringComparison.OrdinalIgnoreCase));
 
         return match ?? throw new InvalidOperationException($"Unsupported provider '{provider}'.");
@@ -156,7 +118,7 @@ public sealed class ExternalAuthService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to unprotect external auth state");
+            logger.LogWarning(ex, "Failed to unprotect external auth state");
             return null;
         }
     }
@@ -174,40 +136,6 @@ public sealed class ExternalAuthService
             normalized = "/" + normalized;
 
         return normalized;
-    }
-
-    public static string BuildCompletionRedirectPath(ExternalAuthCompletionResult result)
-    {
-        string targetPath = "/auth/external-complete";
-        if (!result.IsSuccess || result.Response is null)
-        {
-            string errorFragment = BuildFragment(new Dictionary<string, string?>
-            {
-                ["error"] = result.ErrorCode ?? "EXTERNAL_AUTH_FAILED",
-                ["returnUrl"] = result.ReturnPath
-            });
-
-            return $"{targetPath}#{errorFragment}";
-        }
-
-        string successFragment = BuildFragment(new Dictionary<string, string?>
-        {
-            ["accessToken"] = result.Response.AccessToken,
-            ["refreshToken"] = result.Response.RefreshToken,
-            ["expiresAt"] = result.Response.ExpiresAt.ToString("O"),
-            ["userId"] = result.Response.UserId.ToString(),
-            ["role"] = result.Response.Role,
-            ["returnUrl"] = result.ReturnPath
-        });
-
-        return $"{targetPath}#{successFragment}";
-    }
-
-    private static string BuildFragment(IReadOnlyDictionary<string, string?> values)
-    {
-        return string.Join('&', values
-            .Where(kvp => !string.IsNullOrWhiteSpace(kvp.Value))
-            .Select(kvp => $"{UrlEncoder.Default.Encode(kvp.Key)}={UrlEncoder.Default.Encode(kvp.Value!)}"));
     }
 
     private sealed record ExternalStatePayload(

@@ -89,13 +89,29 @@ public abstract class PlaywrightTestBase : IAsyncLifetime
     /// </summary>
     protected bool KeepVideoOnSuccess { get; set; }
 
-    protected async Task AuthenticateWithAccessTokenAsync(string accessToken, string destination = "/dashboard", IPage? page = null)
+    /// <summary>
+    /// Establishes a BFF cookie session inside the browser context by calling the
+    /// Testing-only /e2e/dev-login endpoint from the page itself (same-origin fetch
+    /// stores the HttpOnly cookie in the Playwright browser), then navigates.
+    /// </summary>
+    protected async Task AuthenticateViaDevLoginAsync(
+        string email,
+        string role = "Administrator",
+        string destination = "/dashboard",
+        IPage? page = null)
     {
         IPage targetPage = page ?? Page;
         await targetPage.GotoAsync($"{BaseUrl}/login");
         await targetPage.EvaluateAsync(
-            "([key, value]) => localStorage.setItem(key, value)",
-            new[] { "potraffic_access_token", accessToken });
+            @"async ([email, role]) => {
+                const resp = await fetch('/e2e/dev-login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, role })
+                });
+                if (!resp.ok) throw new Error('dev-login failed: ' + resp.status);
+            }",
+            new[] { email, role });
         await targetPage.GotoAsync($"{BaseUrl}{destination}");
     }
 

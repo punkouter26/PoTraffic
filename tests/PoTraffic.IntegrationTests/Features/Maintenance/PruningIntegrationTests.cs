@@ -31,7 +31,6 @@ public sealed class PruningIntegrationTests : BaseIntegrationTest
         {
             Id = Guid.NewGuid(),
             Email = "prune-test@test.invalid",
-            PasswordHash = "hash",
             Locale = "en-IE",
             CreatedAt = now.AddDays(-100)
         };

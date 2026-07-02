@@ -30,7 +30,7 @@ public sealed class GetPollCostSummaryHandlerTests
         DateTimeOffset todayStart = DateTimeOffset.UtcNow.Date;
 
         // Need a User and Route for the navigation to work
-        db.Add(new User { Id = userId, Email = "admin@test.com", PasswordHash = "x", Locale = "en-IE", CreatedAt = DateTimeOffset.UtcNow });
+        db.Add(new User { Id = userId, Email = "admin@test.com", Locale = "en-IE", CreatedAt = DateTimeOffset.UtcNow });
         db.Add(new EntityRoute
         {
             Id = routeId,

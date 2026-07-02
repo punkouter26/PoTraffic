@@ -1,29 +1,15 @@
-using System.IdentityModel.Tokens.Jwt;
-using PoTraffic.Api.Infrastructure.Storage;
-
-using System.Security.Claims;
-
-using System.Text;
-
 using Microsoft.AspNetCore.Mvc;
-
-using Microsoft.IdentityModel.Tokens;
-
-
-
-using PoTraffic.Api.Infrastructure.Security;
+using PoTraffic.Api.Features.Auth;
+using PoTraffic.Api.Infrastructure.Storage;
+using PoTraffic.Shared.DTOs.Auth;
 
 namespace PoTraffic.Api.Infrastructure.Testing;
-
-// Factory pattern — conditionally registers test infrastructure endpoints
-// These endpoints are NEVER available in Production.
 
 public static class TestingEndpoints
 {
     private sealed record DevLoginRequest(string Email, string Role);
-    private sealed record DevLoginResponse(string Token);
     private sealed record SeedRequest(string Scenario);
-    private sealed record SeedAdminResponse(string Email, string Password);
+    private sealed record SeedAdminResponse(string Email);
     private sealed record SeedRouteRequest(string UserEmail, string OriginAddress, string DestinationAddress, int Provider);
     private sealed record SeedRouteResponse(Guid RouteId, string OriginAddress, string DestinationAddress);
 
@@ -40,13 +26,13 @@ public static class TestingEndpoints
 
         RouteGroupBuilder group = app.MapGroup("/e2e").WithTags("E2E");
 
-        // POST /e2e/dev-login — issues a JWT for any email/role without a password check
+        // POST /e2e/dev-login — establishes a BFF cookie session for any email/role
         group.MapPost("/dev-login", DevLogin).AllowAnonymous();
 
         // POST /e2e/seed — runs a named seeding scenario
         group.MapPost("/seed", Seed).AllowAnonymous();
 
-        // POST /e2e/seed-admin — ensures a known admin user exists; returns credentials
+        // POST /e2e/seed-admin — ensures a known admin user exists
         group.MapPost("/seed-admin", SeedAdmin).AllowAnonymous();
 
         // POST /e2e/seed-route — creates a route directly in DB for a given user email
@@ -55,41 +41,31 @@ public static class TestingEndpoints
         return app;
     }
 
-    private static IResult DevLogin(
+    private static async Task<IResult> DevLogin(
         [FromBody] DevLoginRequest request,
+        HttpContext httpContext,
         TableStorageContext db,
-        IConfiguration configuration)
+        CancellationToken ct)
     {
-        JwtConfiguration? jwtConfig = configuration
-            .GetSection("Jwt")
-            .Get<JwtConfiguration>();
-
-        if (jwtConfig is null)
-            return Results.Problem("JWT configuration missing.");
-
-        SymmetricSecurityKey key = new(Encoding.UTF8.GetBytes(jwtConfig.Key));
-        SigningCredentials creds = new(key, SecurityAlgorithms.HmacSha256);
-
         User? user = db.Users.FirstOrDefault(u => u.Email == request.Email);
-        Guid userId = user?.Id ?? Guid.NewGuid();
+        if (user is null)
+        {
+            user = new User
+            {
+                Id = Guid.NewGuid(),
+                Email = request.Email,
+                Locale = "en-US",
+                Role = request.Role,
+                AuthProvider = "e2e",
+                IsEmailVerified = true,
+                CreatedAt = DateTimeOffset.UtcNow
+            };
+            db.Add(user);
+            await db.SaveChangesAsync(ct);
+        }
 
-        List<Claim> claims =
-        [
-            new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
-            new Claim(ClaimTypes.Email, request.Email),
-            new Claim("role", request.Role),
-            new Claim("e2e", "true")
-        ];
-
-        JwtSecurityToken token = new(
-            issuer: jwtConfig.Issuer,
-            audience: jwtConfig.Audience,
-            claims: claims,
-            expires: DateTime.UtcNow.AddMinutes(jwtConfig.ExpiryMinutes),
-            signingCredentials: creds);
-
-        string tokenString = new JwtSecurityTokenHandler().WriteToken(token);
-        return Results.Ok(new DevLoginResponse(tokenString));
+        await CookieSignIn.SignInAsync(httpContext, user);
+        return Results.Ok(new AuthMeResponse(user.Id, user.Email, user.Role, user.AuthProvider));
     }
 
     private static IResult Seed(
@@ -107,7 +83,6 @@ public static class TestingEndpoints
     /// <summary>
     /// Ensures a known Administrator user exists in the database.
     /// Idempotent — safe to call multiple times.
-    /// Returns the credentials so tests don't hard-code them.
     /// </summary>
     private static async Task<IResult> SeedAdmin(
         TableStorageContext db,
@@ -115,7 +90,6 @@ public static class TestingEndpoints
         CancellationToken ct)
     {
         const string adminEmail = "admin@potraffic.dev";
-        const string adminPassword = "Admin123!";
 
         bool exists = db.Users.Any(u => u.Email == adminEmail);
         if (!exists)
@@ -124,11 +98,10 @@ public static class TestingEndpoints
             {
                 Id = Guid.NewGuid(),
                 Email = adminEmail,
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(adminPassword),
                 Locale = "en-US",
                 Role = "Administrator",
+                AuthProvider = "e2e",
                 IsEmailVerified = true,
-                EmailVerificationToken = null,
                 CreatedAt = DateTimeOffset.UtcNow
             });
 
@@ -136,7 +109,7 @@ public static class TestingEndpoints
             logger.LogInformation("[E2E] Admin user {Email} created.", adminEmail);
         }
 
-        return Results.Ok(new SeedAdminResponse(adminEmail, adminPassword));
+        return Results.Ok(new SeedAdminResponse(adminEmail));
     }
 
     /// <summary>

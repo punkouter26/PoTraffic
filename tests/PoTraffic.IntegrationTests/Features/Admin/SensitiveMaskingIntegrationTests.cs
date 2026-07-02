@@ -43,10 +43,6 @@ public sealed class SensitiveMaskingIntegrationTests : BaseIntegrationTest
         HttpResponseMessage loginResponse = await client.PostAsJsonAsync("/e2e/dev-login", new { email = "admin@test.invalid", role = "Administrator" });
         loginResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        DevLoginResponse? loginDto = await loginResponse.Content.ReadFromJsonAsync<DevLoginResponse>();
-        client.DefaultRequestHeaders.Authorization =
-            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", loginDto!.Token);
-
         // Act
         HttpResponseMessage response = await client.GetAsync("/api/admin/configuration");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -70,5 +66,4 @@ public sealed class SensitiveMaskingIntegrationTests : BaseIntegrationTest
     }
 
     // Local DTO — mirrors the /e2e/dev-login JSON response shape
-    private sealed record DevLoginResponse(string Token);
 }

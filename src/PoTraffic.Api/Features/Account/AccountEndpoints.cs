@@ -38,24 +38,6 @@ public static class AccountEndpoints
         .Produces<ProfileDto>()
         .Produces(StatusCodes.Status404NotFound);
 
-        grp.MapPost("/change-password", async (
-            ClaimsPrincipal user,
-            [FromBody] ChangePasswordRequest body,
-            ISender sender,
-            CancellationToken ct) =>
-        {
-            Guid userId = user.GetUserId();
-            ChangePasswordResult result = await sender.Send(
-                new ChangePasswordCommand(userId, body.CurrentPassword, body.NewPassword, body.ConfirmNewPassword), ct);
-
-            return result.IsSuccess
-                ? Results.NoContent()
-                : Results.BadRequest(new { error = result.ErrorCode });
-        })
-        .WithName("ChangePassword")
-        .Produces(StatusCodes.Status204NoContent)
-        .Produces(StatusCodes.Status400BadRequest);
-
         grp.MapGet("/quota", async (ClaimsPrincipal user, ISender sender, CancellationToken ct) =>
         {
             Guid userId = user.GetUserId();

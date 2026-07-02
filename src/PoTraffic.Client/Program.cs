@@ -11,26 +11,22 @@ WebAssemblyHostBuilder builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
-// Base address for API calls — same origin as the hosting ASP.NET Core app
+// Base address for API calls — same origin as the hosting ASP.NET Core app.
+// The BFF session cookie flows automatically on same-origin requests; the
+// client never stores or attaches tokens.
 Uri apiBase = new(builder.HostEnvironment.BaseAddress);
 
-// AuthorizationMessageHandler attaches the JWT bearer token per-request and
-// redirects to /login on 401 (Strategy pattern — DelegatingHandler chain).
-builder.Services.AddScoped(sp =>
-{
-    var authProvider = sp.GetRequiredService<JwtAuthenticationStateProvider>();
-    var nav = sp.GetRequiredService<NavigationManager>();
-    var handler = new AuthorizationMessageHandler(authProvider, nav)
+builder.Services.AddScoped(sp => new HttpClient(
+    new UnauthorizedRedirectHandler(sp.GetRequiredService<NavigationManager>())
     {
         InnerHandler = new HttpClientHandler()
-    };
-    return new HttpClient(handler) { BaseAddress = apiBase };
-});
+    })
+{ BaseAddress = apiBase });
 
-// Authentication — JWT-based auth state provider backed by localStorage
-builder.Services.AddScoped<JwtAuthenticationStateProvider>();
+// Authentication — cookie-backed BFF auth state provider (GET /api/auth/me)
+builder.Services.AddScoped<CookieAuthenticationStateProvider>();
 builder.Services.AddScoped<AuthenticationStateProvider>(sp =>
-    sp.GetRequiredService<JwtAuthenticationStateProvider>());
+    sp.GetRequiredService<CookieAuthenticationStateProvider>());
 builder.Services.AddAuthorizationCore();
 
 // Radzen component services (dialogs, tooltips, notifications, context menus)

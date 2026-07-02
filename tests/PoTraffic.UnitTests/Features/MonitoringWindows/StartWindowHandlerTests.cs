@@ -34,7 +34,6 @@ public sealed class StartWindowHandlerTests
         {
             Id = userId,
             Email = $"user-{userId}@test.com",
-            PasswordHash = "hash",
             Locale = "Europe/London"
         };
         db.Add(user);
@@ -181,7 +180,6 @@ public sealed class StartWindowHandlerTests
         {
             Id = userId,
             Email = $"user-{userId}@test.com",
-            PasswordHash = "hash",
             Locale = "Europe/London"
         };
         db.Add(user);

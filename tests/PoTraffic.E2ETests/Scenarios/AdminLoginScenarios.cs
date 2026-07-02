@@ -7,7 +7,7 @@ namespace PoTraffic.E2ETests.Scenarios;
 /// <summary>
 /// E2E scenario: seeds an admin account via the API, obtains a JWT via the testing-only
 /// /e2e/dev-login endpoint (the email/password login form was removed in favour of
-/// Microsoft OAuth), injects it into localStorage, and verifies the dashboard loads.
+/// Microsoft OAuth), establishes a BFF cookie session, and verifies the dashboard loads.
 /// </summary>
 public sealed class AdminLoginScenarios : PlaywrightTestBase
 {
@@ -20,8 +20,6 @@ public sealed class AdminLoginScenarios : PlaywrightTestBase
         ?? Environment.GetEnvironmentVariable("E2E_BASE_URL")
         ?? "http://localhost:5150";
 
-    private const string LocalStorageTokenKey = "potraffic_access_token";
-
     [SkipUnlessE2EReady]
     public async Task Admin_Login_Redirects_To_Dashboard()
     {
@@ -29,18 +27,10 @@ public sealed class AdminLoginScenarios : PlaywrightTestBase
         using HttpClient apiHttp = new() { BaseAddress = new Uri(ApiBaseUrl) };
         TestingApiClient api = new(apiHttp);
 
-        (string email, _) = await api.SeedAdminAsync();
-        string? token = await api.DevLoginAsync(email, role: "Administrator");
-        token.Should().NotBeNullOrWhiteSpace("dev-login must issue an Administrator JWT");
+        string email = await api.SeedAdminAsync();
 
-        // Inject the JWT into localStorage so the WASM app treats us as authenticated.
-        await Page.GotoAsync("/login");
-        await Page.EvaluateAsync(
-            "([key, value]) => localStorage.setItem(key, value)",
-            new[] { LocalStorageTokenKey, token! });
-
-        // Act — navigate to the dashboard with the token already present.
-        await Page.GotoAsync("/dashboard");
+        // Act — establish the cookie session in the browser, then open the dashboard.
+        await AuthenticateViaDevLoginAsync(email);
 
         // Assert — should land on /dashboard and show the status bar.
         await Page.WaitForURLAsync("**/dashboard", new() { Timeout = 30_000 });

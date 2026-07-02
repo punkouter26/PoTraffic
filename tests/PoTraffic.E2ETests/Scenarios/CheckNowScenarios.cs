@@ -32,9 +32,8 @@ public sealed class CheckNowScenarios : PlaywrightTestBase
         using HttpClient apiHttp = new() { BaseAddress = new Uri(BaseUrl) };
         TestingApiClient api = new(apiHttp);
 
-        (string email, _) = await api.SeedAdminAsync();
-        string? token = await api.DevLoginAsync(email, role: "Administrator");
-        Assert.False(string.IsNullOrWhiteSpace(token), "dev-login must issue an Administrator JWT");
+        string email = await api.SeedAdminAsync();
+        Assert.NotNull(await api.DevLoginAsync(email, role: "Administrator"));
 
         (_, string origin, string destination) = await api.SeedRouteAsync(
             email, OriginAddress, DestinationAddress);
@@ -54,7 +53,7 @@ public sealed class CheckNowScenarios : PlaywrightTestBase
         };
 
         // ── Act — authenticate ──────────────────────────────────────────────────
-        await AuthenticateWithAccessTokenAsync(token!);
+        await AuthenticateViaDevLoginAsync(email);
         await Page.WaitForURLAsync($"{BaseUrl}/dashboard", new() { Timeout = 30_000 });
 
         // ── Navigation with debug output ─────────────────────────────────────────
@@ -156,9 +155,8 @@ public sealed class CheckNowScenarios : PlaywrightTestBase
         using HttpClient apiHttp = new() { BaseAddress = new Uri(BaseUrl) };
         TestingApiClient api = new(apiHttp);
 
-        (string email, _) = await api.SeedAdminAsync();
-        string? token = await api.DevLoginAsync(email, role: "Administrator");
-        Assert.False(string.IsNullOrWhiteSpace(token), "dev-login must issue an Administrator JWT");
+        string email = await api.SeedAdminAsync();
+        Assert.NotNull(await api.DevLoginAsync(email, role: "Administrator"));
 
         (_, string origin, _) = await api.SeedRouteAsync(email, OriginAddress, DestinationAddress);
 
@@ -176,7 +174,7 @@ public sealed class CheckNowScenarios : PlaywrightTestBase
             System.Console.WriteLine(log);
         };
 
-        await AuthenticateWithAccessTokenAsync(token!);
+        await AuthenticateViaDevLoginAsync(email);
         await Page.WaitForURLAsync($"{BaseUrl}/dashboard", new() { Timeout = 30_000 });
 
         await Page.GotoAsync($"{BaseUrl}/routes");

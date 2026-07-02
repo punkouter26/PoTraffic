@@ -32,7 +32,6 @@ public sealed class WindowLifecycleTests
         {
             Id = userId,
             Email = $"user-{userId}@test.com",
-            PasswordHash = "hash",
             Locale = "Europe/London"
         };
         db.Add(user);

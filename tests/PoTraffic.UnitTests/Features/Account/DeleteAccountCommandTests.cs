@@ -26,7 +26,7 @@ public sealed class DeleteAccountCommandTests
         Guid userId = Guid.NewGuid();
         Guid routeId = Guid.NewGuid();
 
-        db.Add(new User { Id = userId, Email = "del@test.com", PasswordHash = "h", Locale = "en-IE", CreatedAt = DateTimeOffset.UtcNow });
+        db.Add(new User { Id = userId, Email = "del@test.com", Locale = "en-IE", CreatedAt = DateTimeOffset.UtcNow });
         db.Add(new EntityRoute
         {
             Id = routeId,

@@ -52,7 +52,6 @@ public sealed class PruningBoundaryTests : BaseIntegrationTest
         {
             Id = Guid.NewGuid(),
             Email = "prune-boundary@test.invalid",
-            PasswordHash = "hash",
             Locale = "en-IE",
             CreatedAt = now.AddDays(-100)
         };

@@ -161,8 +161,8 @@
     private async Task LogoutAsync()
     {
         _menuOpen = false;
-        if (AuthStateProvider is JwtAuthenticationStateProvider jwtProvider)
-            await jwtProvider.LogoutAsync();
+        if (AuthStateProvider is CookieAuthenticationStateProvider cookieProvider)
+            await cookieProvider.LogoutAsync();
         Nav.NavigateTo("/login", forceLoad: true);
     }
 

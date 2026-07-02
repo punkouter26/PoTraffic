@@ -22,9 +22,7 @@ public sealed class RouteCrudIntegrationTests : BaseIntegrationTest
         // Arrange — guest login creates a real user row to satisfy FK constraints
         HttpResponseMessage guestResp = await client.PostAsync("/api/auth/guest-login", content: null);
         guestResp.StatusCode.Should().Be(HttpStatusCode.OK, "guest login must succeed");
-        AuthResponse? auth = await guestResp.Content.ReadFromJsonAsync<AuthResponse>();
-        client.DefaultRequestHeaders.Authorization =
-            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", auth!.AccessToken);
+        (await guestResp.Content.ReadFromJsonAsync<AuthMeResponse>()).Should().NotBeNull();
 
         // Act 1 — GET routes (empty initially)
         HttpResponseMessage getEmptyResp = await client.GetAsync("/api/routes?page=1&pageSize=10");

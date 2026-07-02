@@ -8,39 +8,45 @@ using PoTraffic.Shared.DTOs.Auth;
 namespace PoTraffic.IntegrationTests.Features.Auth;
 
 /// <summary>
-/// Integration tests for the surviving Auth slice (Testing guest-login, refresh-token, external Microsoft OAuth).
-/// Email/password register + login were removed — Microsoft OAuth is the only normal sign-in path.
+/// Integration tests for the BFF cookie auth slice (Testing guest-login, /me,
+/// logout, external Microsoft OAuth). Email/password register + login were
+/// removed — Microsoft OAuth is the only normal sign-in path.
 /// </summary>
 public sealed class AuthIntegrationTests : BaseIntegrationTest
 {
     [SkipUnlessAzuriteAvailable]
-    public async Task GuestLogin_ReturnsJwt_Refresh_ReturnsNewToken()
+    public async Task GuestLogin_EstablishesCookieSession_MeAndLogoutWork()
     {
         await ApplyMigrationsAsync();
         HttpClient client = CreateClient();
 
-        // Act 1 — Guest login creates a real User row and returns tokens.
+        // Act 1 — Guest login creates a real User row and sets the session cookie.
         HttpResponseMessage guestResponse = await client.PostAsync("/api/auth/guest-login", content: null);
         guestResponse.StatusCode.Should().Be(HttpStatusCode.OK, "guest login must succeed in the Testing environment");
 
-        AuthResponse? guestAuth = await guestResponse.Content.ReadFromJsonAsync<AuthResponse>();
+        AuthMeResponse? guestAuth = await guestResponse.Content.ReadFromJsonAsync<AuthMeResponse>();
         guestAuth.Should().NotBeNull();
-        guestAuth!.AccessToken.Should().NotBeNullOrWhiteSpace("guest login should return an access token");
-        guestAuth.RefreshToken.Should().NotBeNullOrWhiteSpace("guest login should return a refresh token");
+        guestAuth!.Email.Should().StartWith("guest").And.EndWith("@potraffic.dev");
+        guestResponse.Headers.TryGetValues("Set-Cookie", out IEnumerable<string>? cookies).Should().BeTrue();
+        cookies!.Should().Contain(c => c.StartsWith(".PoTraffic.Auth="), "BFF session must be an HttpOnly cookie");
 
-        // Act 2 — Refresh token rotation
-        HttpResponseMessage refreshResponse = await client.PostAsJsonAsync(
-            "/api/auth/refresh-token",
-            new { AccessToken = guestAuth.AccessToken, RefreshToken = guestAuth.RefreshToken });
-        refreshResponse.StatusCode.Should().Be(HttpStatusCode.OK, "refresh token rotation must succeed");
+        // Act 2 — /me reflects the cookie session (the factory client persists cookies).
+        AuthMeResponse? me = await client.GetFromJsonAsync<AuthMeResponse>("/api/auth/me");
+        me.Should().NotBeNull();
+        me!.UserId.Should().Be(guestAuth.UserId);
+        me.Role.Should().Be("Guest");
 
-        AuthResponse? refreshAuth = await refreshResponse.Content.ReadFromJsonAsync<AuthResponse>();
-        refreshAuth.Should().NotBeNull();
-        refreshAuth!.AccessToken.Should().NotBe(guestAuth.AccessToken, "new access token must differ from old");
+        // Act 3 — logout kills the session; /me returns 401.
+        HttpResponseMessage logoutResponse = await client.PostAsync("/api/auth/logout", content: null);
+        logoutResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        HttpResponseMessage meAfterLogout = await client.GetAsync("/api/auth/me");
+        meAfterLogout.StatusCode.Should().Be(HttpStatusCode.Unauthorized,
+            "the session cookie must be invalidated by logout");
     }
 
     [SkipUnlessAzuriteAvailable]
-    public async Task ExternalMicrosoftLogin_StartAndCallback_ReturnsCompletionRedirectWithAccessToken()
+    public async Task ExternalMicrosoftLogin_StartAndCallback_SignsInAndRedirectsToReturnUrl()
     {
         await ApplyMigrationsAsync();
         // Use a no-redirect client so we can inspect the 302 Location header directly.
@@ -61,10 +67,24 @@ public sealed class AuthIntegrationTests : BaseIntegrationTest
         HttpResponseMessage callbackResponse = await client.GetAsync(
             $"/api/auth/external/microsoft/callback?code=integration-test-code&state={Uri.EscapeDataString(state!)}");
 
+        // BFF: success sets the session cookie and lands directly on the return URL —
+        // no tokens in the redirect target.
         callbackResponse.StatusCode.Should().Be(HttpStatusCode.Redirect);
-        Uri? callbackLocation = callbackResponse.Headers.Location;
-        callbackLocation.Should().NotBeNull();
-        callbackLocation!.ToString().Should().StartWith("/auth/external-complete#");
-        callbackLocation.ToString().Should().Contain("accessToken=");
+        callbackResponse.Headers.Location!.ToString().Should().Be("/dashboard");
+        callbackResponse.Headers.TryGetValues("Set-Cookie", out IEnumerable<string>? cookies).Should().BeTrue();
+        cookies!.Should().Contain(c => c.StartsWith(".PoTraffic.Auth="), "callback must establish the cookie session");
+    }
+
+    [SkipUnlessAzuriteAvailable]
+    public async Task ExternalCallback_WithInvalidState_RedirectsToLoginWithError()
+    {
+        await ApplyMigrationsAsync();
+        HttpClient client = CreateClientNoRedirect();
+
+        HttpResponseMessage callbackResponse = await client.GetAsync(
+            "/api/auth/external/microsoft/callback?code=integration-test-code&state=tampered");
+
+        callbackResponse.StatusCode.Should().Be(HttpStatusCode.Redirect);
+        callbackResponse.Headers.Location!.ToString().Should().StartWith("/login?error=");
     }
 }

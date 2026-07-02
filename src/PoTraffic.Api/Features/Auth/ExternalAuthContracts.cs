@@ -1,5 +1,3 @@
-using PoTraffic.Shared.DTOs.Auth;
-
 namespace PoTraffic.Api.Features.Auth;
 
 public sealed record ExternalIdentity(
@@ -10,5 +8,5 @@ public sealed record ExternalIdentity(
 public sealed record ExternalAuthCompletionResult(
     bool IsSuccess,
     string ReturnPath,
-    AuthResponse? Response,
+    User? User,
     string? ErrorCode);

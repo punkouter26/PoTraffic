@@ -32,9 +32,8 @@ public sealed class MonitoringWindowScenarios : PlaywrightTestBase
         using HttpClient apiHttp = new() { BaseAddress = new Uri(BaseUrl) };
         TestingApiClient api = new(apiHttp);
 
-        (string email, _) = await api.SeedAdminAsync();
-        string? token = await api.DevLoginAsync(email, role: "Administrator");
-        Assert.False(string.IsNullOrWhiteSpace(token), "dev-login must issue an Administrator JWT");
+        string email = await api.SeedAdminAsync();
+        Assert.NotNull(await api.DevLoginAsync(email, role: "Administrator"));
 
         (Guid routeId, _, _) = await api.SeedRouteAsync(email, OriginAddress, DestinationAddress);
 
@@ -47,7 +46,7 @@ public sealed class MonitoringWindowScenarios : PlaywrightTestBase
         Page.PageError += (_, err) => consoleErrors.Add($"[PAGE ERROR] {err}");
 
         // ── Act — authenticate through the Testing-only token path ──────────────
-        await AuthenticateWithAccessTokenAsync(token!);
+        await AuthenticateViaDevLoginAsync(email);
         await Page.WaitForURLAsync($"{BaseUrl}/dashboard", new() { Timeout = 30_000 });
 
         // ── Navigate to Route Detail page ────────────────────────────────────────
@@ -143,9 +142,8 @@ public sealed class MonitoringWindowScenarios : PlaywrightTestBase
         using HttpClient apiHttp = new() { BaseAddress = new Uri(BaseUrl) };
         TestingApiClient api = new(apiHttp);
 
-        (string email, _) = await api.SeedAdminAsync();
-        string? token = await api.DevLoginAsync(email, role: "Administrator");
-        Assert.False(string.IsNullOrWhiteSpace(token), "dev-login must issue an Administrator JWT");
+        string email = await api.SeedAdminAsync();
+        Assert.NotNull(await api.DevLoginAsync(email, role: "Administrator"));
 
         (Guid routeId, _, _) = await api.SeedRouteAsync(email, OriginAddress, DestinationAddress);
 
@@ -158,7 +156,7 @@ public sealed class MonitoringWindowScenarios : PlaywrightTestBase
         Page.PageError += (_, err) => consoleErrors.Add($"[PAGE ERROR] {err}");
 
         // ── Act — authenticate ──────────────────────────────────────────────────
-        await AuthenticateWithAccessTokenAsync(token!);
+        await AuthenticateViaDevLoginAsync(email);
         await Page.WaitForURLAsync($"{BaseUrl}/dashboard", new() { Timeout = 30_000 });
 
         // Navigate to route detail

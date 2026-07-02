@@ -33,9 +33,8 @@ public sealed class CreateRouteScenarios : PlaywrightTestBase
         TestingApiClient api = new(apiHttp);
 
         // Seed admin user + a route for that user
-        (string email, _) = await api.SeedAdminAsync();
-        string? token = await api.DevLoginAsync(email, role: "Administrator");
-        Assert.False(string.IsNullOrWhiteSpace(token), "dev-login must issue an Administrator JWT");
+        string email = await api.SeedAdminAsync();
+        Assert.NotNull(await api.DevLoginAsync(email, role: "Administrator"));
 
         (_, string origin, string destination) = await api.SeedRouteAsync(
             email, OriginAddress, DestinationAddress);
@@ -45,7 +44,7 @@ public sealed class CreateRouteScenarios : PlaywrightTestBase
         Page.PageError += (_, err) => consoleMessages.Add($"[PAGE ERROR] {err}");
 
         // ── Act — authenticate through the Testing-only token path ──────────────
-        await AuthenticateWithAccessTokenAsync(token!);
+        await AuthenticateViaDevLoginAsync(email);
         await Page.WaitForURLAsync($"{BaseUrl}/dashboard", new() { Timeout = 30_000 });
 
         // Navigate to /routes — redirects to /dashboard where routes are shown as cards
@@ -90,16 +89,15 @@ public sealed class CreateRouteScenarios : PlaywrightTestBase
         // ── Arrange ─────────────────────────────────────────────────────────────
         using HttpClient apiHttp = new() { BaseAddress = new Uri(BaseUrl) };
         TestingApiClient api = new(apiHttp);
-        (string email, _) = await api.SeedAdminAsync();
-        string? token = await api.DevLoginAsync(email, role: "Administrator");
-        Assert.False(string.IsNullOrWhiteSpace(token), "dev-login must issue an Administrator JWT");
+        string email = await api.SeedAdminAsync();
+        Assert.NotNull(await api.DevLoginAsync(email, role: "Administrator"));
 
         var consoleMessages = new List<string>();
         Page.Console += (_, msg) => consoleMessages.Add($"[{msg.Type}] {msg.Text}");
         Page.PageError += (_, err) => consoleMessages.Add($"[PAGE ERROR] {err}");
 
         // ── Act — authenticate then navigate to create-route form ───────────────
-        await AuthenticateWithAccessTokenAsync(token!);
+        await AuthenticateViaDevLoginAsync(email);
         await Page.WaitForURLAsync($"{BaseUrl}/dashboard", new() { Timeout = 30_000 });
 
         await Page.GotoAsync($"{BaseUrl}/routes/create");

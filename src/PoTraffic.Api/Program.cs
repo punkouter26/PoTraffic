@@ -41,7 +41,7 @@ try
         builder.WebHost.UseStaticWebAssets();
 
     // ── Azure Key Vault (must be added BEFORE service registrations) ─────────
-    // Services read configuration eagerly at registration time (e.g. JWT signing key).
+    // Services read configuration eagerly at registration time (e.g. OAuth client secret).
     // Key Vault must be in the configuration pipeline first so that all services receive
     // the resolved secrets rather than the appsettings.json placeholder values.
     // PrefixKeyVaultSecretManager strips the "PoTraffic--" namespace prefix so that
@@ -92,20 +92,6 @@ try
         }
     }
 
-    // Guard: a placeholder JWT key in Production is a security incident waiting
-    // to happen. Fail-fast so it never reaches the wire.
-    string? jwtKey = builder.Configuration["Jwt:Key"];
-    bool isProdLike = builder.Environment.IsProduction() || builder.Environment.IsStaging();
-    bool jwtKeyLooksPlaceholder = string.IsNullOrWhiteSpace(jwtKey)
-        || jwtKey.StartsWith("REPLACE_WITH", StringComparison.OrdinalIgnoreCase)
-        || jwtKey.StartsWith("PoTraffic-LocalDev", StringComparison.OrdinalIgnoreCase);
-    if (isProdLike && (jwtKeyLooksPlaceholder || !keyVaultConfigured))
-    {
-        throw new InvalidOperationException(
-            "JWT signing key is missing or still a placeholder, and Key Vault is not configured. " +
-            "Production requires 'KeyVault:Uri' set and a non-placeholder 'Jwt:Key' resolved from Key Vault.");
-    }
-
     // ── Infrastructure extension methods (grouped by responsibility) ──────────
     builder.AddObservability();
     builder.Services.AddTableStoragePersistence();
@@ -129,21 +115,23 @@ try
     builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
     // ── Health checks — cheap, no external-quota cost ────────────────────────
-    // "keyvault" proves secrets resolved at runtime (Jwt:Key comes from the
-    // PoTraffic--Jwt--Key vault secret). "trafficProvider" confirms the live
-    // GoogleMaps key is present (i.e. real provider, not the mock path).
+    // "keyvault" proves secrets resolved at runtime (the Microsoft OAuth client
+    // secret comes from the PoTraffic--ExternalAuth--Microsoft--ClientSecret vault
+    // secret). "trafficProvider" confirms the live GoogleMaps key is present.
     IConfiguration healthCfg = builder.Configuration;
     bool usingMockProviders = builder.Environment.IsEnvironment("Testing")
         || string.Equals(healthCfg["Features:UseMockProviders"], "true", StringComparison.OrdinalIgnoreCase);
     builder.Services.AddHealthChecks()
         .AddCheck("keyvault", () =>
         {
-            string? k = healthCfg["Jwt:Key"];
+            if (usingMockProviders)
+                return HealthCheckResult.Healthy("Key Vault not required (test/dev mock mode)");
+            string? k = healthCfg["ExternalAuth:Microsoft:ClientSecret"];
             bool resolved = !string.IsNullOrWhiteSpace(k)
                 && !k.StartsWith("REPLACE_WITH", StringComparison.OrdinalIgnoreCase);
             return resolved
                 ? HealthCheckResult.Healthy("Key Vault secrets resolved")
-                : HealthCheckResult.Unhealthy("Key Vault secret 'Jwt:Key' not resolved");
+                : HealthCheckResult.Unhealthy("Key Vault secret 'ExternalAuth:Microsoft:ClientSecret' not resolved");
         })
         .AddCheck("trafficProvider", () =>
         {

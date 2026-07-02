@@ -131,24 +131,18 @@ public sealed class TripleTestIntegrationTests : BaseIntegrationTest
 
     // ── Private helpers ──────────────────────────────────────────────────────
 
-    private async Task AuthenticateAsAdminAsync(HttpClient client)
+    private static async Task AuthenticateAsAdminAsync(HttpClient client)
     {
         HttpResponseMessage resp = await client.PostAsJsonAsync(
             "/e2e/dev-login", new { Email = "admin@test.invalid", Role = "Administrator" });
-        var dto = await resp.Content.ReadFromJsonAsync<DevLoginResponse>();
-        client.DefaultRequestHeaders.Authorization =
-            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", dto!.Token);
+        resp.EnsureSuccessStatusCode();
     }
 
-    private async Task AuthenticateAsCommuterAsync(HttpClient client)
+    private static async Task AuthenticateAsCommuterAsync(HttpClient client)
     {
         HttpResponseMessage resp = await client.PostAsJsonAsync(
             "/e2e/dev-login", new { Email = "commuter@test.invalid", Role = "Commuter" });
-        var dto = await resp.Content.ReadFromJsonAsync<DevLoginResponse>();
-        client.DefaultRequestHeaders.Authorization =
-            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", dto!.Token);
+        resp.EnsureSuccessStatusCode();
     }
-
-    private sealed record DevLoginResponse(string Token);
     private sealed record StartResponse(Guid SessionId);
 }

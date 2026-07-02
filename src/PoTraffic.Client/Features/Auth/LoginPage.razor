@@ -39,6 +39,15 @@
 
     protected override async Task OnInitializedAsync()
     {
+        // The BFF OAuth callback redirects here with ?error=CODE on failure.
+        string query = new Uri(Nav.Uri).Query;
+        if (!string.IsNullOrEmpty(query))
+        {
+            var parsed = System.Web.HttpUtility.ParseQueryString(query);
+            if (!string.IsNullOrWhiteSpace(parsed["error"]))
+                _error = "Microsoft sign-in failed. Please try again.";
+        }
+
         try
         {
             var result = await Http.GetFromJsonAsync<ProvidersResponse>("/api/auth/providers");

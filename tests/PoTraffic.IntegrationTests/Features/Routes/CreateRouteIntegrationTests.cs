@@ -16,15 +16,12 @@ namespace PoTraffic.IntegrationTests.Features.Routes;
 /// </summary>
 public sealed class CreateRouteIntegrationTests : BaseIntegrationTest
 {
-    /// <summary>Helper — guest-logs-in (creates a real user row) and sets the returned JWT as the default auth header.</summary>
-    private async Task<AuthResponse> RegisterAndAuthenticateAsync(HttpClient client)
+    /// <summary>Helper — guest-logs-in (creates a real user row); the factory client keeps the session cookie.</summary>
+    private static async Task<AuthMeResponse> RegisterAndAuthenticateAsync(HttpClient client)
     {
         HttpResponseMessage resp = await client.PostAsync("/api/auth/guest-login", content: null);
         resp.StatusCode.Should().Be(HttpStatusCode.OK, "guest login must succeed");
-        AuthResponse auth = (await resp.Content.ReadFromJsonAsync<AuthResponse>())!;
-        client.DefaultRequestHeaders.Authorization =
-            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", auth.AccessToken);
-        return auth;
+        return (await resp.Content.ReadFromJsonAsync<AuthMeResponse>())!;
     }
 
     [SkipUnlessAzuriteAvailable]

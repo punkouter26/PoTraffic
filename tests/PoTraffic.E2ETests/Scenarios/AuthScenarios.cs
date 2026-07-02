@@ -11,12 +11,11 @@ namespace PoTraffic.E2ETests.Scenarios;
 /// are not available, so CI passes without a live environment.
 ///
 /// The email/password login form was removed — Microsoft OAuth is the only normal
-/// sign-in path. Tests that need an authenticated session
-/// obtain a JWT from the testing-only /e2e/dev-login endpoint and inject it into localStorage.
+/// sign-in path. Tests that need an authenticated session establish a BFF cookie
+/// session via the testing-only /e2e/dev-login endpoint from within the browser.
 /// </summary>
 public sealed class AuthScenarios : PlaywrightTestBase
 {
-    private const string LocalStorageTokenKey = "potraffic_access_token";
 
     /// <summary>
     /// Verifies that an Administrator user lands on the /dashboard with the status bar visible
@@ -34,22 +33,15 @@ public sealed class AuthScenarios : PlaywrightTestBase
         using HttpClient apiHttp = new() { BaseAddress = new Uri(BaseUrl) };
         TestingApiClient api = new(apiHttp);
 
-        (string email, _) = await api.SeedAdminAsync();
-        string? token = await api.DevLoginAsync(email, role: "Administrator");
-        Assert.False(string.IsNullOrWhiteSpace(token), "dev-login must issue an Administrator JWT");
+        string email = await api.SeedAdminAsync();
 
         // Capture browser console messages for diagnosing WASM/JS failures
         var consoleMessages = new System.Collections.Generic.List<string>();
         Page.Console += (_, msg) => consoleMessages.Add($"[{msg.Type}] {msg.Text}");
         Page.PageError += (_, err) => consoleMessages.Add($"[PAGE ERROR] {err}");
 
-        // ── Act — inject the JWT into localStorage, then navigate to the dashboard ──
-        await Page.GotoAsync($"{BaseUrl}/login");
-        await Page.EvaluateAsync(
-            "([key, value]) => localStorage.setItem(key, value)",
-            new[] { LocalStorageTokenKey, token! });
-
-        await Page.GotoAsync($"{BaseUrl}/dashboard");
+        // ── Act — establish the cookie session in the browser, then open the dashboard ──
+        await AuthenticateViaDevLoginAsync(email);
 
         // ── Assert — dashboard URL and status bar ──────────────────────────────
         try
@@ -78,24 +70,16 @@ public sealed class AuthScenarios : PlaywrightTestBase
     }
 
     [SkipUnlessE2EReady]
-    public async Task GuestLogin_BypassesOAuth_PersistsToken_AndDisplaysGuestId()
+    public async Task GuestLogin_BypassesOAuth_EstablishesCookieSession_AndDisplaysGuestId()
     {
-        using HttpClient apiHttp = new() { BaseAddress = new Uri(BaseUrl) };
-        TestingApiClient api = new(apiHttp);
-
-        PoTraffic.Shared.DTOs.Auth.AuthResponse? auth = await api.GuestLoginAsync();
-        Assert.NotNull(auth);
-        Assert.False(string.IsNullOrWhiteSpace(auth!.AccessToken));
-
+        // Guest login must happen inside the browser so the HttpOnly session
+        // cookie lands in the Playwright context.
         await Page.GotoAsync($"{BaseUrl}/login");
         await Page.EvaluateAsync(
-            "([key, value]) => localStorage.setItem(key, value)",
-            new[] { LocalStorageTokenKey, auth.AccessToken });
-
-        string storedToken = await Page.EvaluateAsync<string>(
-            "key => localStorage.getItem(key)",
-            LocalStorageTokenKey);
-        Assert.Equal(auth.AccessToken, storedToken);
+            @"async () => {
+                const resp = await fetch('/api/auth/guest-login', { method: 'POST' });
+                if (!resp.ok) throw new Error('guest-login failed: ' + resp.status);
+            }");
 
         await Page.GotoAsync($"{BaseUrl}/dashboard");
 

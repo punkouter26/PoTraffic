@@ -28,7 +28,6 @@
     <!-- Pin Newtonsoft.Json to a patched 13.x release (CVE-2024-21907) -->
     <PackageReference Include="Newtonsoft.Json" />
     <PackageReference Include="FluentValidation.AspNetCore" />
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
     <PackageReference Include="Azure.Data.Tables" />
     <PackageReference Include="Azure.Identity" />
     <PackageReference Include="Azure.Extensions.AspNetCore.Configuration.Secrets" />
@@ -42,7 +41,6 @@
     <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
     <PackageReference Include="Azure.Monitor.OpenTelemetry.Exporter" />
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
-    <PackageReference Include="BCrypt.Net-Next" />
     <PackageReference Include="AspNetCore.HealthChecks.Uris" />
   </ItemGroup>
 

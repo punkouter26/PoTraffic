@@ -10,7 +10,7 @@ namespace PoTraffic.Api.Infrastructure.Security;
 /// is the only accepted identity provider. In <c>Testing</c> the policy is a
 /// no-op, so E2E and integration tests can use deterministic JWTs.
 ///
-/// <para>Claim shape (set in <c>JwtTokenService</c>):</para>
+/// <para>Claim shape (set in <c>CookieSignIn</c>):</para>
 /// <list type="bullet">
 ///   <item><c>auth_provider = "microsoft"</c> → allowed in all environments.</item>
 ///   <item><c>auth_provider = "guest"</c>      → allowed in Testing only.</item>

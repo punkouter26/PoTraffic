@@ -1,10 +1,5 @@
-using PoTraffic.Api.Infrastructure.Storage;
-
 using Microsoft.Extensions.Logging;
-
-
-using PoTraffic.Api.Infrastructure.Security;
-
+using PoTraffic.Api.Infrastructure.Storage;
 using PoTraffic.Shared.DTOs.Auth;
 
 namespace PoTraffic.Api.Features.Auth;
@@ -13,10 +8,9 @@ namespace PoTraffic.Api.Features.Auth;
 /// GUEST login for integration/E2E test bypass of OAuth.
 /// Each call creates a unique GUEST user (e.g. guest46344343@potraffic.dev) so
 /// that parallel test runs or manual sessions do not collide in the database.
-/// All activity is stored under that session's own GUEST account.
+/// The session is issued as the standard BFF cookie.
 ///
-/// (Rule 6 — GUEST Mode: Persistence via LocalStorage; hidden outside Testing;
-///  "GUEST12345678 LOGGED IN" shown in the nav bar.)
+/// (Rule 6 — GUEST Mode: hidden outside Testing; "GUEST12345678 LOGGED IN" in the nav bar.)
 /// (Rule 13 — Microsoft OAuth is required outside Testing.)
 /// </summary>
 public static class GuestAuthExtensions
@@ -39,6 +33,7 @@ public static class GuestAuthExtensions
     {
         // Testing-only GUEST login bypass for integration tests.
         app.MapPost("/api/auth/guest-login", async (
+            HttpContext httpContext,
             ISender sender,
             IWebHostEnvironment env) =>
         {
@@ -50,9 +45,12 @@ public static class GuestAuthExtensions
             }
 
             GuestLoginResult result = await sender.Send(new GuestLoginCommand());
-            return result.IsSuccess
-                ? Results.Ok(result.Response)
-                : Results.BadRequest(new { error = result.ErrorCode });
+            if (!result.IsSuccess || result.User is null)
+                return Results.BadRequest(new { error = result.ErrorCode });
+
+            User user = result.User;
+            await CookieSignIn.SignInAsync(httpContext, user);
+            return Results.Ok(new AuthMeResponse(user.Id, user.Email, user.Role, user.AuthProvider));
         })
         .WithTags("Auth")
         .WithName("GuestLogin")
@@ -67,25 +65,13 @@ public sealed record GuestLoginCommand : IRequest<GuestLoginResult>;
 
 public sealed record GuestLoginResult(
     bool IsSuccess,
-    AuthResponse? Response,
+    User? User,
     string? ErrorCode);
 
-public sealed class GuestLoginCommandHandler : IRequestHandler<GuestLoginCommand, GuestLoginResult>
+public sealed class GuestLoginCommandHandler(
+    TableStorageContext db,
+    ILogger<GuestLoginCommandHandler> logger) : IRequestHandler<GuestLoginCommand, GuestLoginResult>
 {
-    private readonly TableStorageContext _db;
-    private readonly JwtTokenService _jwt;
-    private readonly ILogger<GuestLoginCommandHandler> _logger;
-
-    public GuestLoginCommandHandler(
-        TableStorageContext db,
-        JwtTokenService jwt,
-        ILogger<GuestLoginCommandHandler> logger)
-    {
-        _db = db;
-        _jwt = jwt;
-        _logger = logger;
-    }
-
     public async Task<GuestLoginResult> Handle(GuestLoginCommand command, CancellationToken ct)
     {
         // Each GUEST session gets a brand-new unique account so parallel runs never collide.
@@ -96,7 +82,7 @@ public sealed class GuestLoginCommandHandler : IRequestHandler<GuestLoginCommand
         string guestEmail = $"{GuestAuthExtensions.GuestEmailPrefix}{suffix}{GuestAuthExtensions.GuestEmailDomain}";
 
         // Ensure no accidental collision — retry once if needed
-        bool exists = _db.Users.Any(u => u.Email == guestEmail);
+        bool exists = db.Users.Any(u => u.Email == guestEmail);
         if (exists)
         {
             suffix = Random.Shared.Next(min, max);
@@ -107,30 +93,19 @@ public sealed class GuestLoginCommandHandler : IRequestHandler<GuestLoginCommand
         {
             Id = Guid.NewGuid(),
             Email = guestEmail,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(Guid.NewGuid().ToString()),
             Locale = "en-US",
             Role = "Guest", // Special role for GUEST test users
             AuthProvider = "guest",
             IsEmailVerified = true,
-            EmailVerificationToken = null,
-            CreatedAt = DateTimeOffset.UtcNow
+            CreatedAt = DateTimeOffset.UtcNow,
+            LastLoginAt = DateTimeOffset.UtcNow
         };
 
-        _db.Add(guestUser);
-        await _db.SaveChangesAsync(ct);
+        db.Add(guestUser);
+        await db.SaveChangesAsync(ct);
 
-        (string accessToken, string refreshToken, DateTimeOffset expiresAt) = _jwt.GenerateTokens(guestUser);
+        logger.LogInformation("GUEST session created: {Email}", guestEmail);
 
-        guestUser.RefreshToken = refreshToken;
-        guestUser.RefreshTokenExpiry = DateTimeOffset.UtcNow.AddDays(_jwt.RefreshTokenExpiryDays);
-        guestUser.LastLoginAt = DateTimeOffset.UtcNow;
-        await _db.SaveChangesAsync(ct);
-
-        _logger.LogInformation("GUEST session created: {Email}", guestEmail);
-
-        return new GuestLoginResult(
-            true,
-            new AuthResponse(accessToken, refreshToken, expiresAt, guestUser.Id, guestUser.Role),
-            null);
+        return new GuestLoginResult(true, guestUser, null);
     }
 }
