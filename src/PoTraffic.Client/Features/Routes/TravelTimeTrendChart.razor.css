@@ -1,0 +1,9 @@
+/* TravelTimeTrendChart — DEPRECATED. Replaced by the canvas-based TrendChart component. */
+.pt-tt-rerouted {
+    color: var(--pt-color-danger);
+    font-weight: var(--pt-weight-semibold);
+}
+.pt-tt-chart {
+    width: 100%;
+    height: 300px;
+}

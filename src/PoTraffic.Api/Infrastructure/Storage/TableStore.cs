@@ -14,6 +14,10 @@ public interface ITableStore
     Task EnsureTablesAsync(IEnumerable<string> tables, CancellationToken ct = default);
     Task<IReadOnlyList<(string PartitionKey, string RowKey, string Json)>> ReadAllAsync(string table, CancellationToken ct = default);
     Task ApplyAsync(IReadOnlyList<TableOp> ops, CancellationToken ct = default);
+
+    /// <summary>Cheap round-trip that proves the store is reachable right now (for health checks).
+    /// Throws if the backing store is unavailable.</summary>
+    Task PingAsync(CancellationToken ct = default);
 }
 
 /// <summary>
@@ -54,6 +58,19 @@ public sealed class AzureTableStore(TableServiceClient tableService) : ITableSto
                 rows.Add((entity.PartitionKey, entity.RowKey, json));
         }
         return rows;
+    }
+
+    public async Task PingAsync(CancellationToken ct = default)
+    {
+        // Read at most one row from the always-seeded config table. A connectivity/auth
+        // failure surfaces as RequestFailedException, which the health check reports.
+        TableClient client = Client("SystemConfigurations");
+        await foreach (Page<TableEntity> page in client
+            .QueryAsync<TableEntity>(maxPerPage: 1, cancellationToken: ct)
+            .AsPages())
+        {
+            break; // one page fetched → store reachable
+        }
     }
 
     public async Task ApplyAsync(IReadOnlyList<TableOp> ops, CancellationToken ct = default)

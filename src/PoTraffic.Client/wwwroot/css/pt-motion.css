@@ -1,0 +1,83 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   PoTraffic Motion Helpers
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Entrance */
+.pt-anim-fade   { animation: pt-fade-in   var(--pt-dur-base) var(--pt-ease) both; }
+.pt-anim-up     { animation: pt-slide-up  var(--pt-dur-base) var(--pt-ease) both; }
+.pt-anim-down   { animation: pt-slide-down var(--pt-dur-base) var(--pt-ease) both; }
+
+/* Interactive press feedback (replaces scale(0.98) which clips shadows) */
+.pt-press {
+    transition: background-color var(--pt-dur-fast) var(--pt-ease),
+                border-color var(--pt-dur-fast) var(--pt-ease),
+                box-shadow var(--pt-dur-fast) var(--pt-ease);
+    will-change: transform;
+}
+.pt-press:active { transform: translateY(1px); }
+
+.pt-press-glow { transition: box-shadow var(--pt-dur-fast) var(--pt-ease); }
+.pt-press-glow:active { box-shadow: 0 0 0 3px var(--pt-color-brand-200); }
+
+/* Live line indicator (replaces RadzenProgressBarIndeterminate) */
+.pt-progress-line {
+    position: relative;
+    overflow: hidden;
+    height: 2px;
+    width: 100%;
+    background: var(--pt-color-brand-100);
+    border-radius: var(--pt-radius-full);
+}
+.pt-progress-line::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg,
+        transparent 0%,
+        var(--pt-color-brand-600) 50%,
+        transparent 100%);
+    animation: pt-sweep 1.6s var(--pt-ease) infinite;
+    will-change: transform;
+}
+
+/* Skeleton (placeholder, not animation) */
+.pt-skeleton { height: 1rem; width: 100%; }
+.pt-skeleton.rounded { border-radius: var(--pt-radius-full); }
+.pt-skeleton.lg { height: 1.5rem; }
+.pt-skeleton.xl { height: 2rem; }
+
+/* Stagger entrance — children accept style="--i:N" */
+.pt-stagger > * {
+    animation: pt-slide-up var(--pt-dur-base) var(--pt-ease) both;
+    animation-delay: calc(var(--pt-i, 0) * 50ms);
+}
+
+/* Shimmer effect on top of any element */
+.pt-shimmer { position: relative; overflow: hidden; }
+.pt-shimmer::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+    animation: pt-sweep 1.4s linear infinite;
+}
+
+/* Live status dot */
+.pt-live-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--pt-color-success);
+    animation: pt-pulse 2s infinite var(--pt-ease);
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    .pt-progress-line::after,
+    .pt-shimmer::after,
+    .pt-live-dot {
+        animation: none;
+        opacity: 0.7;
+    }
+}

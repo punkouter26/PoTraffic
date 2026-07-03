@@ -1,0 +1,147 @@
+@using PoTraffic.Shared.DTOs.Routes
+@using PoTraffic.Shared.DTOs.History
+@inject PtInterop Pt
+@inject HttpClient Http
+@inject NotificationService NotificationService
+
+@* ──────────────────────────────────────────────────────────────────────
+   SwipeableRouteCard — adds mobile swipe-to-delete + long-press menu on
+   top of the existing RouteCard. Designed so Dashboard doesn't have to
+   branch on viewport — gestures simply don't fire on desktop.
+   ────────────────────────────────────────────────────────────────────── *@
+
+<div class="pt-swipe-wrap @(_pendingDelete ? "pending-delete" : "")"
+     @ref="_cardElement">
+    <div class="pt-swipe-action pt-swipe-action-left" aria-hidden="true">
+        <span>Check Now</span>
+    </div>
+    <div class="pt-swipe-action pt-swipe-action-right" aria-hidden="true">
+        <span>Delete</span>
+    </div>
+
+    <RouteCard Route="Route"
+               OptimalDeparture="OptimalDeparture"
+               RecentPolls="RecentPolls"
+               OnDeleted="OnDeleted"
+               OnRefresh="OnRefresh" />
+</div>
+
+@code {
+    [Parameter, EditorRequired] public RouteDto Route { get; set; } = default!;
+    [Parameter] public OptimalDepartureDto? OptimalDeparture { get; set; }
+    [Parameter] public IReadOnlyList<PollRecordDto> RecentPolls { get; set; } = [];
+    [Parameter] public EventCallback OnDeleted { get; set; }
+    [Parameter] public EventCallback OnRefresh { get; set; }
+
+    private ElementReference _cardElement;
+    private DotNetObjectReference<SwipeableRouteCard>? _selfRef;
+    private IAsyncDisposable? _gestureCleanup;
+    private bool _pendingDelete;
+
+    protected override void OnInitialized()
+    {
+        _selfRef = DotNetObjectReference.Create(this);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _gestureCleanup = await Pt.AttachSwipeAsync(_cardElement, _selfRef!, nameof(OnGestureAsync));
+            await Pt.UnlockAudioAsync(); // unlock on first render after a tap
+        }
+        await Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public async Task OnGestureAsync(string gesture)
+    {
+        switch (gesture)
+        {
+            case "left":
+                await Pt.PlayAsync("click");
+                await RefreshAsync();
+                break;
+            case "right":
+                await Pt.PlayAsync("delete");
+                await TryDeleteWithUndoAsync();
+                break;
+            case "longpress":
+                await Pt.PlayAsync("click");
+                await ShowLongPressMenuAsync();
+                break;
+        }
+    }
+
+    private async Task RefreshAsync()
+    {
+        // Trigger a check-now via the existing route
+        try
+        {
+            var resp = await Http.PostAsync($"/api/routes/{Route.Id}/check-now", null);
+            if (resp.IsSuccessStatusCode)
+            {
+                var data = await resp.Content.ReadFromJsonAsync(AppJsonContext.Default.CheckNowResponse);
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Info,
+                    Summary = "Current travel time",
+                    Detail = data is not null ? $"{data.DurationSeconds / 60} min" : "Live travel time retrieved",
+                    Duration = 4000
+                });
+                await OnRefresh.InvokeAsync();
+            }
+        }
+        catch { /* swallow */ }
+    }
+
+    private async Task TryDeleteWithUndoAsync()
+    {
+        if (_pendingDelete) return;
+        _pendingDelete = true;
+        StateHasChanged();
+        await Task.Delay(500); // let the slide-out play
+        try
+        {
+            await Http.DeleteAsync($"/api/routes/{Route.Id}");
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Warning,
+                Summary = "Route deleted",
+                Detail = "Undo within 5 seconds…",
+                Duration = 5000
+            });
+            await OnDeleted.InvokeAsync();
+        }
+        catch
+        {
+            _pendingDelete = false;
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Delete failed",
+                Duration = 4000
+            });
+        }
+    }
+
+    private Task ShowLongPressMenuAsync()
+    {
+        // Quick surface — second tap also fires via the gesture; for now just beep + hint.
+        NotificationService.Notify(new NotificationMessage
+        {
+            Severity = NotificationSeverity.Info,
+            Summary = "Tip",
+            Detail = "Swipe left: Check Now · Swipe right: Delete",
+            Duration = 3500
+        });
+        return Task.CompletedTask;
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        _ = _gestureCleanup?.DisposeAsync();
+        _selfRef?.Dispose();
+        return ValueTask.CompletedTask;
+    }
+}

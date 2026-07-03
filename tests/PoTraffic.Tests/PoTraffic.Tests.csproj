@@ -1,15 +1,23 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <!--
+    PoTraffic.Tests — Integration tier (50% of the test pyramid).
+
+    Spins up a real WebApplicationFactory<Program> in the Testing environment
+    and a Testcontainers-managed Azurite instance for Table Storage.
+
+    Tier ratio (100/50/25/25) enforced by the solution layout:
+      • PoTraffic.UnitTests        — Unit tier (no I/O, FluentValidation, DTO mapping).
+      • PoTraffic.Tests            — Integration tier (this file, WAF + Azurite).
+      • PoTraffic.Tests.E2E/Api    — E2E API tier (HTTP against a live API).
+      • PoTraffic.Tests.E2E/Ui     — E2E UI tier (Playwright in real browsers).
+  -->
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>PoTraffic.Tests</RootNamespace>
     <AssemblyName>PoTraffic.Tests</AssemblyName>
     <IsPackable>false</IsPackable>
-    <!--
-      Two-tier test layout: this project hosts BOTH unit and integration
-      tests. Source roots are split via <Compile Include="..." /> so feature
-      slices can mirror 1:1 against the API.
-    -->
     <NoWarn>$(NoWarn);xUnit1031</NoWarn>
   </PropertyGroup>
 
@@ -27,17 +35,15 @@
     <PackageReference Include="FluentAssertions" />
     <PackageReference Include="Testcontainers" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="FluentValidation" />
   </ItemGroup>
-
-  <!-- ── Source partitioning ─────────────────────────────────────────── -->
 
   <ItemGroup>
     <Using Include="Xunit" />
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="Unit/xunit.runner.json" Link="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="Integration/xunit.runner.json" Link="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Integration\xunit.runner.json" Link="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

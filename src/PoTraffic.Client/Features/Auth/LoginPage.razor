@@ -1,4 +1,5 @@
 @page "/login"
+@attribute [AllowAnonymous]
 @layout AuthLayout
 @using System.Net.Http.Json
 @using PoTraffic.Client.Layout
@@ -10,7 +11,7 @@
 
 <RadzenCard class="rz-p-6">
     <RadzenText TextStyle="TextStyle.H5" class="rz-mb-2">Sign In</RadzenText>
-    <RadzenText TextStyle="TextStyle.Body2" class="rz-mb-4" style="color:var(--rz-text-tertiary-color)">
+    <RadzenText TextStyle="TextStyle.Body2" class="rz-mb-4 pt-fg-tertiary">
         @(_guestEnabled
             ? "Sign in with your Microsoft account, or continue as a guest (local development)."
             : "Sign in with your Microsoft account to continue.")
@@ -44,7 +45,7 @@
                       Click="@GuestLoginAsync"
                       IsBusy="@_guestLoading"
                       Disabled="@_loading" />
-        <RadzenText TextStyle="TextStyle.Caption" class="rz-mt-2" style="color:var(--rz-text-tertiary-color)">
+        <RadzenText TextStyle="TextStyle.Caption" class="rz-mt-2 pt-fg-tertiary">
             Guest sessions are for local development and testing only.
         </RadzenText>
     }

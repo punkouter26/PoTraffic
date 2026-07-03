@@ -52,6 +52,14 @@ public sealed class TableStorageContext
     private readonly ITableStore? _store;
     private readonly Dictionary<object, string> _snapshots = new(ReferenceEqualityComparer.Instance);
     private readonly List<TableOp> _pendingDeletes = [];
+
+    // PollRecords are the unbounded, dominant table and carry a large RawProviderResponse
+    // blob. Re-serialising every one on every SaveChanges (to diff it) is the poll hot
+    // path's biggest cost. They are append-only after insert — the ONLY mutation of an
+    // existing PollRecord is the prune job — so we track changed ones explicitly and skip
+    // re-serialising the clean majority. Every other (small) table keeps the full diff.
+    private readonly HashSet<object> _dirtyPolls = new(ReferenceEqualityComparer.Instance);
+
     private bool _durable;
 
     /// <summary>Volatile in-memory context — unit tests only.</summary>
@@ -144,7 +152,12 @@ public sealed class TableStorageContext
                 idProp.SetValue(entity, Guid.NewGuid());
         }
 
-        lock (_gate) GetList<T>().Add(entity);
+        lock (_gate)
+        {
+            GetList<T>().Add(entity);
+            if (entity is PollRecord)
+                _dirtyPolls.Add(entity);
+        }
 
         // Cascade: add navigation collection children (replaces EF Core change tracking)
         AddNavigationChildren(entity, type);
@@ -216,6 +229,17 @@ public sealed class TableStorageContext
         foreach (T entity in entities) Add(entity);
     }
 
+    /// <summary>
+    /// Announces a mutation to an <em>existing</em> <see cref="PollRecord"/> so the next
+    /// <see cref="SaveChangesAsync"/> persists it. Required because PollRecords use explicit
+    /// change tracking rather than the full-scan diff (see <c>_dirtyPolls</c>). Newly added
+    /// records are tracked automatically by <see cref="Add{T}"/>.
+    /// </summary>
+    public void MarkChanged(PollRecord record)
+    {
+        lock (_gate) _dirtyPolls.Add(record);
+    }
+
     public void Remove<T>(T entity) where T : class
     {
         lock (_gate) RemoveCore(entity);
@@ -235,6 +259,7 @@ public sealed class TableStorageContext
             return;
 
         _snapshots.Remove(entity);
+        _dirtyPolls.Remove(entity);
         if (Maps.TryGetValue(typeof(T), out EntityMap? map))
             _pendingDeletes.Add(new TableOp(TableOpKind.Delete, map.Table, map.Pk(entity), map.Rk(entity), null));
     }
@@ -268,7 +293,13 @@ public sealed class TableStorageContext
 
             foreach ((Type type, EntityMap map) in Maps)
             {
-                foreach (object entity in GetListUntyped(type))
+                // PollRecord uses explicit change tracking — only serialise the ones that were
+                // added or announced via MarkChanged, not the entire (unbounded) table.
+                IEnumerable<object> candidates = type == typeof(PollRecord)
+                    ? _dirtyPolls
+                    : GetListUntyped(type).Cast<object>();
+
+                foreach (object entity in candidates)
                 {
                     string json = JsonSerializer.Serialize(entity, type, JsonOpts);
                     if (_snapshots.TryGetValue(entity, out string? prev) && prev == json)
@@ -297,9 +328,27 @@ public sealed class TableStorageContext
         lock (_gate)
         {
             foreach ((object entity, string json) in written)
+            {
                 _snapshots[entity] = json;
+                // Successfully persisted — clear its dirty flag so it isn't re-serialised
+                // next save. On failure we skip this block, so the flag survives and retries.
+                if (entity is PollRecord)
+                    _dirtyPolls.Remove(entity);
+            }
         }
         return ops.Count;
+    }
+
+    /// <summary>
+    /// Live reachability probe for the health check: a cheap round-trip to the backing
+    /// store. Throws if the store is unreachable. Returns without doing anything in
+    /// memory-only mode (the health check reports that separately via <see cref="IsDurable"/>).
+    /// </summary>
+    public async Task ProbeStoreAsync(CancellationToken ct = default)
+    {
+        if (_store is null || !_durable)
+            return;
+        await _store.PingAsync(ct);
     }
 
     /// <summary>

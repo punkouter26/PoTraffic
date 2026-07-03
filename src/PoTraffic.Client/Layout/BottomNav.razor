@@ -1,0 +1,28 @@
+@using Microsoft.AspNetCore.Components.Authorization
+@using PoTraffic.Client.Infrastructure.Auth
+@inject AuthenticationStateProvider AuthStateProvider
+
+@* Bottom navigation — only visible on mobile portrait (≤640px). Provides
+   thumb-reach to the three most common destinations so the user doesn't
+   have to scroll back to the top nav. The desktop top nav still owns
+   branding + user chip per the L/C/R spatial contract. *@
+<nav class="pt-bottom-nav" aria-label="Quick actions">
+    <a class="pt-bottom-nav-link" href="dashboard" aria-label="Dashboard">
+        <span class="pt-bottom-nav-icon" aria-hidden="true">⌂</span>
+        <span class="pt-bottom-nav-label">Dashboard</span>
+    </a>
+    <a class="pt-bottom-nav-link pt-bottom-nav-fab" href="routes/create" aria-label="Add route">
+        <span class="pt-bottom-nav-fab-inner" aria-hidden="true">+</span>
+    </a>
+    <a class="pt-bottom-nav-link" href="account/settings" aria-label="Account">
+        <span class="pt-bottom-nav-icon" aria-hidden="true">◉</span>
+        <span class="pt-bottom-nav-label">Account</span>
+    </a>
+</nav>
+
+@code {
+    protected override void OnInitialized()
+    {
+        // No-op — BottomNav is presentation-only; state lives in the top nav.
+    }
+}

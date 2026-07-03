@@ -1,7 +1,9 @@
 html, body {
     font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-    font-size: 15px;
+    font-size: var(--pt-text-base, 16px);
     -webkit-font-smoothing: antialiased;
+    background: var(--pt-bg-page);
+    color: var(--pt-fg-primary);
 }
 
 h1:focus {
@@ -23,19 +25,25 @@ a, .btn-link {
 }
 
 .content {
-    padding-top: 1.1rem;
+    padding: var(--pt-space-5) var(--pt-space-4) calc(var(--pt-space-12) + 56px); /* bottom space for fixed bottom nav */
+}
+
+@media (min-width: 1024px) {
+    .content {
+        padding-bottom: var(--pt-space-8);
+    }
 }
 
 .valid.modified:not([type=checkbox]) {
-    outline: 1px solid #26b050;
+    outline: 1px solid var(--pt-color-success);
 }
 
 .invalid {
-    outline: 1px solid red;
+    outline: 1px solid var(--pt-color-danger);
 }
 
 .validation-message {
-    color: red;
+    color: var(--pt-color-danger);
 }
 
 #blazor-error-ui {
@@ -112,21 +120,48 @@ code {
     text-align: end;
 }
 
-.form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
-    text-align: start;
+/* Legacy token aliases — kept for any third-party component that still references them.
+   New code should consume `--pt-*` directly from pt-tokens.css. */
+:root {
+    --pt-brand-primary: var(--pt-color-brand-600);
+    --pt-brand-surface: var(--pt-bg-page);
+    --pt-brand-sidebar: var(--pt-color-neutral-900);
+    --pt-accent-indigo: var(--pt-color-info);
+    --pt-accent-emerald: var(--pt-color-success);
+    --pt-accent-amber: var(--pt-color-warning);
+    --pt-accent-rose: var(--pt-color-danger);
+    --pt-card-radius: var(--pt-radius-lg);
 }
 
-/* ═══════════════════════════════════════════════
-   Po3UiUx UI-2: Design System Tokens
-═══════════════════════════════════════════════ */
-:root {
-    --pt-brand-primary: #3b82f6;
-    --pt-brand-surface: #f8fafc;
-    --pt-brand-sidebar: #0f172a;
-    --pt-accent-indigo: #6366f1;
-    --pt-accent-emerald: #10b981;
-    --pt-accent-amber: #f59e0b;
-    --pt-accent-rose: #f43f5e;
+/* ═══════════════════════════════════════════════════════════════
+   Micro-animations — see pt-tokens.css for canonical keyframes
+═══════════════════════════════════════════════════════════════ */
+.pt-stat-meta {
+    font-size: var(--pt-text-xs);
+    color: var(--pt-fg-tertiary);
+    margin-top: var(--pt-space-1);
+    font-variant-numeric: tabular-nums;
+}
+.pt-poll-live {
+    animation: pt-pulse 2s var(--pt-ease) infinite;
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: var(--pt-radius-sm);
+}
+.pt-skeleton {
+    background: linear-gradient(90deg,
+        var(--pt-color-neutral-200) 25%,
+        var(--pt-color-neutral-100) 50%,
+        var(--pt-color-neutral-200) 75%);
+    background-size: 200% 100%;
+    animation: pt-shimmer 1.4s linear infinite;
+    border-radius: var(--pt-radius-sm);
+    height: 1rem;
+    width: 100%;
+}
+.pt-collapsible-icon { display: inline-block; transition: transform var(--pt-dur-base) var(--pt-ease); }
+.pt-collapsible-icon.open { transform: rotate(90deg); }
+════════════════    --pt-accent-rose: #f43f5e;
     --pt-card-radius: 12px;
 }
 
@@ -149,87 +184,7 @@ code {
     100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
 }
 
-article.content {
-    animation: pt-slide-up 0.2s ease;
-}
-
-.pt-skeleton {
-    background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
-    background-size: 200% 100%;
-    animation: pt-shimmer 1.4s infinite;
-    border-radius: 6px;
-    height: 1rem;
-    width: 100%;
-}
-
-.pt-poll-live {
-    display: inline-block;
-    animation: pt-pulse 2s infinite;
-    border-radius: 4px;
-    padding: 2px 6px;
-}
-
-/* ═══════════════════════════════════════════════
-   Po3UiUx UI-1: KPI Stat Strip (Dashboard)
-═══════════════════════════════════════════════ */
-.pt-kpi-strip {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-}
-
-@media (max-width: 900px) {
-    .pt-kpi-strip { grid-template-columns: repeat(2, 1fr); }
-}
-
-@media (max-width: 480px) {
-    .pt-kpi-strip { grid-template-columns: 1fr; }
-}
-
-.pt-kpi-card {
-    background: #fff;
-    border-radius: var(--pt-card-radius, 12px);
-    border-top: 4px solid var(--pt-kpi-color, #3b82f6);
-    padding: 1.25rem 1.5rem;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
-    transition: box-shadow 0.15s ease;
-}
-
-.pt-kpi-card:hover {
-    box-shadow: 0 4px 12px rgba(0,0,0,0.10);
-}
-
-.pt-kpi-card .pt-kpi-value {
-    font-size: 2rem;
-    font-weight: 700;
-    line-height: 1.1;
-    color: #1e293b;
-    font-variant-numeric: tabular-nums;
-}
-
-.pt-kpi-card .pt-kpi-label {
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
-    color: #94a3b8;
-}
-
-.pt-kpi-card .pt-kpi-sub {
-    font-size: 0.82rem;
-    color: #64748b;
-    margin-top: 0.15rem;
-}
-
-.pt-kpi-blue   { --pt-kpi-color: #3b82f6; }
-.pt-kpi-green  { --pt-kpi-color: #10b981; }
-.pt-kpi-amber  { --pt-kpi-color: #f59e0b; }
-.pt-kpi-indigo { --pt-kpi-color: #6366f1; }
-.pt-kpi-rose   { --pt-kpi-color: #f43f5e; }
+/* KPI Strip — DEPRECATED, removed. The Dashboard now uses .pt-status-bar. */
 
 /* ═══════════════════════════════════════════════
    Po3UiUx UI-3: Route Detail Stat Blocks

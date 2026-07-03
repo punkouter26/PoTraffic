@@ -1,0 +1,54 @@
+/* Swipe wrapper — translates horizontally via --pt-swipe-x (set by JS gesture).
+   Reveals red "Delete" on right swipe, blue "Check Now" on left swipe. */
+.pt-swipe-wrap {
+    position: relative;
+    overflow: hidden;
+    border-radius: var(--pt-radius-lg);
+    transform: translate3d(var(--pt-swipe-x, 0), 0, 0);
+    transition: transform var(--pt-dur-fast) var(--pt-ease);
+    will-change: transform;
+    touch-action: pan-y; /* allow vertical scroll but capture horizontal */
+}
+
+.pt-swipe-wrap.is-swiping {
+    transition: none;
+}
+
+.pt-swipe-wrap.pending-delete {
+    transform: translate3d(-120%, 0, 0);
+    opacity: 0;
+    pointer-events: none;
+    transition: transform var(--pt-dur-base) var(--pt-ease),
+                opacity var(--pt-dur-base) var(--pt-ease);
+}
+
+.pt-swipe-action {
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 96px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--pt-fg-on-brand);
+    font-weight: var(--pt-weight-semibold);
+    font-size: var(--pt-text-sm);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    user-select: none;
+}
+
+.pt-swipe-action-left {
+    left: 0;
+    background: var(--pt-color-info);
+}
+
+.pt-swipe-action-right {
+    right: 0;
+    background: var(--pt-color-danger);
+}
+
+/* On desktop (≥768px) the swipe hint is disabled — gestures don't fire
+   because there are no touchstart events. Visual artifact is harmless. */
+@media (min-width: 1024px) {
+    .pt-swipe-action { display: none; }
+}

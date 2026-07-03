@@ -4,13 +4,33 @@ using PoTraffic.Api.Infrastructure.Storage;
 
 namespace PoTraffic.Api.Infrastructure;
 
-/// <summary>Degraded when the context fell back to memory-only mode (data lost on restart).</summary>
+/// <summary>
+/// Degraded when the context fell back to memory-only mode; Unhealthy when the durable
+/// store is configured but not actually reachable right now. The old check only read the
+/// startup <c>IsDurable</c> flag, so a post-startup Table Storage outage (every write
+/// failing) still reported Healthy — masking the outage from App Service probes.
+/// </summary>
 public sealed class StorageHealthCheck(TableStorageContext db) : IHealthCheck
 {
-    public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken ct = default)
-        => Task.FromResult(db.IsDurable
-            ? HealthCheckResult.Healthy("Table Storage persistence active")
-            : HealthCheckResult.Degraded("MEMORY-ONLY mode — start Azurite (docker compose up -d) to persist data"));
+    private static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(3);
+
+    public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken ct = default)
+    {
+        if (!db.IsDurable)
+            return HealthCheckResult.Degraded("MEMORY-ONLY mode — start Azurite (docker compose up -d) to persist data");
+
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts.CancelAfter(ProbeTimeout);
+            await db.ProbeStoreAsync(cts.Token);
+            return HealthCheckResult.Healthy("Table Storage reachable");
+        }
+        catch (Exception ex)
+        {
+            return HealthCheckResult.Unhealthy($"Table Storage probe failed: {ex.Message.Split('\n')[0]}");
+        }
+    }
 }
 
 /// <summary>

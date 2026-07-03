@@ -1,0 +1,28 @@
+.pt-sparkline-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: var(--pt-space-1);
+    margin-top: var(--pt-space-2);
+    width: 100%;
+}
+
+.pt-sparkline-svg {
+    display: block;
+    width: 100%;
+    height: 56px;
+    overflow: visible;
+}
+
+.pt-sparkline-area {
+    transition: opacity 200ms ease-out;
+}
+
+.pt-sparkline-line {
+    transition: stroke 200ms ease-out;
+}
+
+.pt-sparkline-label {
+    font-size: var(--pt-text-xs);
+    color: var(--pt-fg-tertiary);
+    font-variant-numeric: tabular-nums;
+}

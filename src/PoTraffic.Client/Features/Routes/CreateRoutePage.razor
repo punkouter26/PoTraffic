@@ -57,15 +57,29 @@
 @code {
     private string _origin = string.Empty;
     private string _destination = string.Empty;
-    // Defaults: start = now, end = one hour later (UTC — window times are
-    // interpreted server-side as UTC), so monitoring begins sampling immediately.
-    private DateTime? _startTime = UtcNowToMinute();
-    private DateTime? _endTime  = UtcNowToMinute().AddHours(1);
+    // Defaults: start = local time now, end = one hour later. The HH:mm string is
+    // sent to the server unchanged; the server interprets window times as UTC
+    // (see PollRouteJob.IsWithinWindow). We default to local time so the form
+    // matches the user's wall clock — they can adjust before submitting.
+    private DateTime? _startTime = LocalNowToMinute();
+    private DateTime? _endTime  = LocalNowToMinute().AddHours(1);
 
-    internal static DateTime UtcNowToMinute()
+    internal static DateTime LocalNowToMinute()
     {
-        DateTime now = DateTime.UtcNow;
-        return new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, 0, DateTimeKind.Utc);
+        DateTime now = DateTime.Now;
+        return new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, 0, DateTimeKind.Unspecified);
+    }
+
+    // The form shows wall-clock local time (HH:mm on screen matches the user's clock).
+    // The server's PollRouteJob interprets the wire HH:mm as UTC, so we convert
+    // local → UTC on submit. Without this, a 15:01 local window is stored as
+    // 15:01 UTC = 11:01 EDT-4 and never matches the user's wall-clock window.
+    internal static string ToUtcHHmm(DateTime local)
+    {
+        DateTime utc = local.Kind == DateTimeKind.Utc
+            ? local
+            : TimeZoneInfo.ConvertTimeToUtc(local, TimeZoneInfo.Local);
+        return utc.ToString("HH:mm");
     }
     private string _error = "";
     private bool _loading;
@@ -125,8 +139,8 @@
                 _origin,
                 _destination,
                 (RouteProvider)_provider,
-                _startTime!.Value.ToString("HH:mm"),
-                _endTime!.Value.ToString("HH:mm"),
+                ToUtcHHmm(_startTime!.Value),
+                ToUtcHHmm(_endTime!.Value),
                 _mask), AppJsonContext.Default.CreateRouteRequest);
 
             if (!createResp.IsSuccessStatusCode)

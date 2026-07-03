@@ -1,0 +1,3 @@
+/* SeedDataPanel — scoped styles. */
+.pt-seed-danger-card { border: 1px solid var(--pt-color-danger); }
+.pt-seed-danger-title { color: var(--pt-color-danger); }

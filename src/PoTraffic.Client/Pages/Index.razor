@@ -1,8 +1,12 @@
 @page "/"
+@attribute [AllowAnonymous]
 @using Microsoft.AspNetCore.Components.Authorization
 @inject NavigationManager Nav
 
 <AuthorizeView>
+    <Authorizing>
+        <div class="pt-splash" role="status" aria-live="polite">Loading…</div>
+    </Authorizing>
     <Authorized>
         @{ Nav.NavigateTo("/dashboard", forceLoad: false); }
     </Authorized>

@@ -17,6 +17,11 @@ public sealed class WasmForwardingLoggerProvider : ILoggerProvider
     private readonly CancellationTokenSource _cts = new();
     private readonly Task _flushTask;
 
+    // Stable id for this app load (browser tab). Stamped on every forwarded entry so a
+    // tab's client-side logs correlate with each other on the server, instead of every
+    // entry arriving with SessionId=null (previously un-joinable to anything).
+    private readonly string _sessionId = Guid.NewGuid().ToString("N");
+
     private const int BatchSize = 20;
     private const int FlushIntervalMs = 5000;
 
@@ -31,7 +36,7 @@ public sealed class WasmForwardingLoggerProvider : ILoggerProvider
     }
 
     public ILogger CreateLogger(string categoryName) =>
-        new WasmForwardingLogger(categoryName, _channel.Writer);
+        new WasmForwardingLogger(categoryName, _channel.Writer, _sessionId);
 
     public void Dispose()
     {
@@ -81,11 +86,13 @@ internal sealed class WasmForwardingLogger : ILogger
 {
     private readonly string _categoryName;
     private readonly ChannelWriter<ClientLogEntry> _writer;
+    private readonly string _sessionId;
 
-    public WasmForwardingLogger(string categoryName, ChannelWriter<ClientLogEntry> writer)
+    public WasmForwardingLogger(string categoryName, ChannelWriter<ClientLogEntry> writer, string sessionId)
     {
         _categoryName = categoryName;
         _writer = writer;
+        _sessionId = sessionId;
     }
 
     public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
@@ -105,7 +112,7 @@ internal sealed class WasmForwardingLogger : ILogger
             Message: message,
             SourceContext: _categoryName,
             CorrelationId: null,
-            SessionId: null,
+            SessionId: _sessionId,
             Timestamp: DateTimeOffset.UtcNow);
 
         _writer.TryWrite(entry);

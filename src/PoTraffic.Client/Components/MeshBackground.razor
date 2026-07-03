@@ -1,0 +1,49 @@
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+@* GPU-accelerated mesh gradient background. WebGL2 preferred, WebGL1
+   fallback, hidden if neither available. Sits at z-index -1 in the
+   local stacking context, so all children sit on top without an
+   extra opaque layer. *@
+
+<div class="pt-mesh-host" aria-hidden="true">
+    <canvas @ref="_canvas" class="pt-mesh-canvas"></canvas>
+</div>
+
+@code {
+    private ElementReference _canvas;
+    private Task<IJSObjectReference>? _module;
+    private bool _started;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_started)
+        {
+            _started = true;
+            _module = JS.InvokeAsync<IJSObjectReference>("import", "./js/pt-mesh.js").AsTask();
+            try
+            {
+                var m = await _module;
+                await m.InvokeVoidAsync("start", _canvas);
+            }
+            catch
+            {
+                // No WebGL — canvas stays empty, page remains usable.
+            }
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_module is { IsCompletedSuccessfully: true } m)
+        {
+            try
+            {
+                var module = await m;
+                await module.InvokeVoidAsync("stop");
+                await module.DisposeAsync();
+            }
+            catch { /* ignore */ }
+        }
+    }
+}

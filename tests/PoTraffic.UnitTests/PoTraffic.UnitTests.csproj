@@ -1,10 +1,26 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
+  <!--
+    PoTraffic.UnitTests — STRICT Unit tier.
+
+    Rules:
+      • No I/O of any kind (no HTTP, no disk, no real clock, no network).
+      • No Azurite. No Testcontainers. No WebApplicationFactory.
+      • Only NSubstitute mocks, FluentAssertions, FluentValidation,
+        FluentValidation.TestHelper, xUnit.
+      • FluentValidation tests live here.
+      • DTO mapping tests live here.
+      • Handler tests that need I/O go to PoTraffic.Tests (Integration).
+
+    Enforced by UnitTierGuard module initializer in GlobalUsings.cs.
+  -->
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>PoTraffic.UnitTests</RootNamespace>
     <AssemblyName>PoTraffic.UnitTests</AssemblyName>
     <IsPackable>false</IsPackable>
+    <NoWarn>$(NoWarn);xUnit1031</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -19,6 +35,7 @@
     <PackageReference Include="xunit.runner.visualstudio" />
     <PackageReference Include="NSubstitute" />
     <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="FluentValidation" />
   </ItemGroup>
 
   <ItemGroup>

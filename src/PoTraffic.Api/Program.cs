@@ -8,6 +8,7 @@ using PoTraffic.Api.Features.Account;
 using PoTraffic.Api.Features.Admin;
 using PoTraffic.Api.Features.Auth;
 using PoTraffic.Api.Features.Config;
+using PoTraffic.Api.Features.Diagnostics;
 using PoTraffic.Api.Features.History;
 using PoTraffic.Api.Features.Maintenance;
 using PoTraffic.Api.Features.MonitoringWindows;
@@ -59,23 +60,30 @@ try
     bool isDev = builder.Environment.IsDevelopment();
     if (keyVaultConfigured)
     {
+        // Refresh rotated secrets without a restart (the old wiring read secrets once at boot).
+        var kvOptions = new AzureKeyVaultConfigurationOptions
+        {
+            Manager = new PrefixKeyVaultSecretManager(),
+            ReloadInterval = TimeSpan.FromMinutes(30)
+        };
+
         if (isDev)
         {
-            // Chain of Responsibility — try the credential, swallow CredentialUnavailableException
+            // Chain of Responsibility — try the credential, swallow auth/credential failures
             // so first-time contributors without `az login` can still `dotnet run` locally.
             try
             {
                 builder.Configuration.AddAzureKeyVault(
                     new Uri(vaultUri!),
                     new DefaultAzureCredential(),
-                    new PrefixKeyVaultSecretManager());
+                    kvOptions);
             }
             catch (Exception ex) when (
-                ex is Azure.Identity.CredentialUnavailableException
+                ex is Azure.Identity.AuthenticationFailedException      // covers CredentialUnavailableException
                 || ex is Azure.RequestFailedException
                 || ex is AggregateException)
             {
-                // DEV-ONLY: any Key Vault failure (no `az login`, 403/disabled vault,
+                // DEV-ONLY: any Key Vault failure (no/expired `az login`, 403/disabled vault,
                 // network unreachable, etc.) must NOT prevent a local boot. Rule 10
                 // (First-Run Success) — fall back to appsettings.Development.json.
                 Console.WriteLine(
@@ -90,7 +98,7 @@ try
             builder.Configuration.AddAzureKeyVault(
                 new Uri(vaultUri!),
                 new DefaultAzureCredential(),
-                new PrefixKeyVaultSecretManager());
+                kvOptions);
         }
     }
 
@@ -242,6 +250,7 @@ try
     app.MapAccountEndpoints();
     app.MapAdminEndpoints();
     app.MapAuthEndpoints();
+    app.MapDiagnosticsEndpoints();
     // GUEST login bypass: Development (Rule 4.4 split view) + Testing (automated tests).
     // Production registers Microsoft OAuth only; MapGuestEndpoints throws if it is
     // ever wired into a Production host.

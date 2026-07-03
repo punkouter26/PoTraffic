@@ -1,56 +1,92 @@
 @using PoTraffic.Shared.DTOs.History
+@* UI-12: 24h travel-time sparkline — lightweight inline SVG so it scales to
+   whatever container width the card provides. RadzenSparkline was producing
+   an empty 200×300 SVG with no path; we draw the line ourselves. *@
 
-@* UI-12: 24h travel-time sparkline — trend at a glance without opening route detail *@
-@if (_points.Count >= 2)
+@if (_values.Count >= 2)
 {
-    <div class="pt-sparkline" title="Travel time over the last 24 hours">
-        <svg viewBox="0 0 @Width @Height" preserveAspectRatio="none" role="img"
-             aria-label="Travel time trend, @_minMinutes to @_maxMinutes minutes over the last 24 hours">
-            <polyline points="@_polyline" fill="none" stroke="@_stroke" stroke-width="1.5"
-                      stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" />
+    <div class="pt-sparkline-wrap" title="Travel time over the last 24 hours">
+        <svg class="pt-sparkline-svg"
+             viewBox="0 0 @(_values.Count - 1) 1"
+             preserveAspectRatio="none"
+             aria-hidden="true">
+            <path class="pt-sparkline-area" d="@_areaPath" fill="@_fill" />
+            <path class="pt-sparkline-line" d="@_linePath"
+                  fill="none" stroke="@_stroke"
+                  stroke-width="0.04" vector-effect="non-scaling-stroke"
+                  stroke-linecap="round" stroke-linejoin="round" />
         </svg>
         <span class="pt-sparkline-label">@_minMinutes–@_maxMinutes min · 24 h</span>
     </div>
 }
 
 @code {
-    private const int Width = 120;
-    private const int Height = 28;
-
     [Parameter, EditorRequired] public IReadOnlyList<PollRecordDto> Polls { get; set; } = [];
 
-    private List<(double X, double Y)> _points = [];
-    private string _polyline = string.Empty;
-    private string _stroke = "#94a3b8";
+    private IReadOnlyList<double> _values = [];
+    private string _linePath = string.Empty;
+    private string _areaPath = string.Empty;
+    private string _stroke = "var(--pt-color-info)";
+    private string _fill = "rgba(99, 102, 241, 0.12)";
     private int _minMinutes;
     private int _maxMinutes;
 
     protected override void OnParametersSet()
     {
-        List<PollRecordDto> ordered = [.. Polls.OrderBy(p => p.PolledAt)];
-        _points = [];
+        var ordered = Polls.OrderBy(p => p.PolledAt).ToList();
         if (ordered.Count < 2)
-            return;
-
-        int min = ordered.Min(p => p.TravelDurationSeconds);
-        int max = ordered.Max(p => p.TravelDurationSeconds);
-        _minMinutes = min / 60;
-        _maxMinutes = (max + 59) / 60;
-        double span = Math.Max(1, max - min);
-
-        for (int i = 0; i < ordered.Count; i++)
         {
-            double x = (double)i / (ordered.Count - 1) * (Width - 4) + 2;
-            double y = Height - 3 - (ordered[i].TravelDurationSeconds - min) / span * (Height - 6);
-            _points.Add((x, y));
+            _values = [];
+            _linePath = string.Empty;
+            _areaPath = string.Empty;
+            return;
         }
 
-        _polyline = string.Join(' ', _points.Select(p =>
-            string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{p.X:F1},{p.Y:F1}")));
+        _values = ordered.Select(p => (double)p.TravelDurationSeconds / 60.0).ToList();
+        int minSec = ordered.Min(p => p.TravelDurationSeconds);
+        int maxSec = ordered.Max(p => p.TravelDurationSeconds);
+        _minMinutes = minSec / 60;
+        _maxMinutes = (maxSec + 59) / 60;
 
-        // Direction color matches the app palette: rising travel time = rose, falling = emerald.
-        double mean = ordered.Average(p => (double)p.TravelDurationSeconds);
-        int last = ordered[^1].TravelDurationSeconds;
-        _stroke = last > mean * 1.1 ? "#f43f5e" : last < mean * 0.9 ? "#10b981" : "#94a3b8";
+        // Normalize y to [0..1] over the actual min/max range with a small pad.
+        double min = _values.Min();
+        double max = _values.Max();
+        double range = Math.Max(max - min, 0.5);  // prevent flat-line collapse
+        double yMin = min - range * 0.1;
+        double yMax = max + range * 0.1;
+
+        // Build SVG path. x = index, y = 1 - normalized_value
+        int n = _values.Count;
+        var sb = new System.Text.StringBuilder();
+        for (int i = 0; i < n; i++)
+        {
+            double x = i;
+            double y = 1.0 - (_values[i] - yMin) / (yMax - yMin);
+            if (i == 0) sb.Append($"M {x:R} {y:R}");
+            else sb.Append($" L {x:R} {y:R}");
+        }
+        _linePath = sb.ToString();
+
+        // Closed area path: line + baseline (y = 1)
+        _areaPath = $"{_linePath} L {(n - 1):R} 1 L 0 1 Z";
+
+        // Color by latest sample vs mean — gives at-a-glance congestion cue.
+        double mean = _values.Average();
+        double last = _values[^1];
+        if (last > mean * 1.1)
+        {
+            _stroke = "var(--pt-color-danger, #f43f5e)";
+            _fill = "rgba(244, 63, 94, 0.14)";
+        }
+        else if (last < mean * 0.9)
+        {
+            _stroke = "var(--pt-color-success, #10b981)";
+            _fill = "rgba(16, 185, 129, 0.14)";
+        }
+        else
+        {
+            _stroke = "var(--pt-fg-tertiary, #64748b)";
+            _fill = "rgba(100, 116, 139, 0.10)";
+        }
     }
 }

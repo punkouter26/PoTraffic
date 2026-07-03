@@ -1,4 +1,5 @@
 using FluentValidation;
+using PoTraffic.Api.Infrastructure.Logging;
 using PoTraffic.Api.Infrastructure.Storage;
 
 
@@ -44,10 +45,15 @@ public sealed class CreateRouteValidator : AbstractValidator<CreateRouteCommand>
         RuleFor(x => x.DestinationAddress).NotEmpty().MaximumLength(ValidationConstants.AddressMaxLength);
         RuleFor(x => x.Provider).IsInEnum();
 
-        RuleFor(x => x.StartTime).NotEmpty().Matches(TimePattern)
-            .WithMessage("Start time must be in HH:mm format.");
-        RuleFor(x => x.EndTime).NotEmpty().Matches(TimePattern)
-            .WithMessage("End time must be in HH:mm format.");
+        // Two gates: the regex enforces the canonical HH:mm shape, and TryParse rejects
+        // shapes that pass the regex but aren't real times (e.g. "99:99") — which the
+        // handler's TimeOnly.Parse would otherwise throw a FormatException on (→ 500).
+        RuleFor(x => x.StartTime).NotEmpty()
+            .Matches(TimePattern).WithMessage("Start time must be in HH:mm format.")
+            .Must(t => TimeOnly.TryParse(t, out _)).WithMessage("Start time must be a valid time of day.");
+        RuleFor(x => x.EndTime).NotEmpty()
+            .Matches(TimePattern).WithMessage("End time must be in HH:mm format.")
+            .Must(t => TimeOnly.TryParse(t, out _)).WithMessage("End time must be a valid time of day.");
         RuleFor(x => x.EndTime)
             .Must((cmd, endTime) =>
             {
@@ -56,8 +62,10 @@ public sealed class CreateRouteValidator : AbstractValidator<CreateRouteCommand>
                 return e > s;
             })
             .WithMessage("End time must be after start time.");
+        // Only the low 7 bits map to days (Mon–Sun); a high-bit-only mask like 0x80
+        // would pass `m > 0` yet decode to zero real days and silently stall polling.
         RuleFor(x => x.DaysOfWeekMask)
-            .Must(m => m > 0)
+            .Must(m => (m & 0x7F) != 0)
             .WithMessage("At least one day of week must be selected.");
     }
 }
@@ -79,14 +87,14 @@ public sealed class CreateRouteCommandHandler(
             originCoords = await provider.GeocodeAsync(cmd.OriginAddress, ct);
             if (originCoords is null)
             {
-                logger.LogWarning("Geocode failed for origin address {Address}", cmd.OriginAddress);
+                logger.LogWarning("Geocode failed for origin address {AddressRef}", PiiRedactor.Redact(cmd.OriginAddress));
                 return new CreateRouteResult(false, RouteErrorCodes.AddressNotFound, null);
             }
 
             destCoords = await provider.GeocodeAsync(cmd.DestinationAddress, ct);
             if (destCoords is null)
             {
-                logger.LogWarning("Geocode failed for destination address {Address}", cmd.DestinationAddress);
+                logger.LogWarning("Geocode failed for destination address {AddressRef}", PiiRedactor.Redact(cmd.DestinationAddress));
                 return new CreateRouteResult(false, RouteErrorCodes.AddressNotFound, null);
             }
         }

@@ -8,14 +8,14 @@
 @if (StartAt.HasValue)
 {
     var first = StartAt.Value;
-    <RadzenCard class="rz-p-3 rz-mb-3" style="background:var(--rz-base-200,#f8f9fa);border:1px solid var(--rz-base-300,#dee2e6)">
-        <RadzenText TextStyle="TextStyle.Caption" style="font-weight:600">SCHEDULED SHOTS</RadzenText>
-        <div style="font-size:0.85rem;margin-top:4px;line-height:1.8">
+    <RadzenCard class="rz-p-3 rz-mb-3 pt-tt-card">
+        <RadzenText TextStyle="TextStyle.Caption" class="pt-tt-caption">SCHEDULED SHOTS</RadzenText>
+        <div class="pt-tt-shots">
             <div>Shot 1 (+0 s) — fires at <strong>@first.ToString("HH:mm:ss")</strong> @CountdownLabel(first)</div>
             <div>Shot 2 (+20 s) — fires at <strong>@first.AddSeconds(20).ToString("HH:mm:ss")</strong> @CountdownLabel(first.AddSeconds(20))</div>
             <div>Shot 3 (+40 s) — fires at <strong>@first.AddSeconds(40).ToString("HH:mm:ss")</strong> @CountdownLabel(first.AddSeconds(40))</div>
         </div>
-        <div style="font-size:0.78rem;color:var(--rz-text-secondary-color);margin-top:6px">
+        <div class="pt-tt-session">
             Session ID: <code>@SessionId</code>
         </div>
     </RadzenCard>

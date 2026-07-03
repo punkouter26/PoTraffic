@@ -1,0 +1,193 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   PoTraffic Design Tokens — single source of truth for color / type / spacing
+   / elevation / motion. Wired to Radzen's CSS variables so third-party
+   components inherit the brand automatically.
+
+   Touch this file alone to reskin the entire app.
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root {
+    /* ── Palette (1 primary + 1 neutral + 4 accents) ─────────────────── */
+    --pt-color-brand-50:  #eff6ff;
+    --pt-color-brand-100: #dbeafe;
+    --pt-color-brand-200: #bfdbfe;
+    --pt-color-brand-300: #93c5fd;
+    --pt-color-brand-400: #60a5fa;
+    --pt-color-brand-500: #3b82f6;   /* primary */
+    --pt-color-brand-600: #2563eb;
+    --pt-color-brand-700: #1d4ed8;
+    --pt-color-brand-800: #1e40af;
+    --pt-color-brand-900: #1e3a8a;
+
+    --pt-color-neutral-0:   #ffffff;
+    --pt-color-neutral-50:  #f8fafc;
+    --pt-color-neutral-100: #f1f5f9;
+    --pt-color-neutral-200: #e2e8f0;
+    --pt-color-neutral-300: #cbd5e1;
+    --pt-color-neutral-400: #94a3b8;
+    --pt-color-neutral-500: #64748b;
+    --pt-color-neutral-600: #475569;
+    --pt-color-neutral-700: #334155;
+    --pt-color-neutral-800: #1e293b;
+    --pt-color-neutral-900: #0f172a;
+
+    /* Accents — semantic */
+    --pt-color-success: #10b981;
+    --pt-color-warning: #f59e0b;
+    --pt-color-danger:  #f43f5e;
+    --pt-color-info:    #6366f1;
+
+    /* Semantic surface tokens */
+    --pt-bg-page:    var(--pt-color-neutral-50);
+    --pt-bg-surface: var(--pt-color-neutral-0);
+    --pt-bg-elev-1:  var(--pt-color-neutral-0);
+    --pt-bg-elev-2:  var(--pt-color-neutral-50);
+
+    --pt-fg-primary:   var(--pt-color-neutral-900);
+    --pt-fg-secondary: var(--pt-color-neutral-600);
+    --pt-fg-tertiary:  var(--pt-color-neutral-400);
+    --pt-fg-on-brand:  var(--pt-color-neutral-0);
+
+    --pt-border-subtle: var(--pt-color-neutral-200);
+    --pt-border-strong: var(--pt-color-neutral-300);
+
+    /* ── Surface radius (8px scale, used everywhere) ──────────────────── */
+    --pt-radius-xs:  4px;
+    --pt-radius-sm:  6px;
+    --pt-radius-md:  10px;
+    --pt-radius-lg:  14px;
+    --pt-radius-xl:  20px;
+    --pt-radius-full: 9999px;
+
+    /* ── Spacing (8px grid) ───────────────────────────────────────────── */
+    --pt-space-0: 0;
+    --pt-space-1: 0.25rem;  /*  4 */
+    --pt-space-2: 0.5rem;   /*  8 */
+    --pt-space-3: 0.75rem;  /* 12 */
+    --pt-space-4: 1rem;     /* 16 */
+    --pt-space-5: 1.25rem;  /* 20 */
+    --pt-space-6: 1.5rem;   /* 24 */
+    --pt-space-8: 2rem;     /* 32 */
+    --pt-space-10: 2.5rem;  /* 40 */
+    --pt-space-12: 3rem;    /* 48 */
+
+    /* ── Type scale (modular 1.250) ───────────────────────────────────── */
+    --pt-text-xs:   0.75rem;     /* 12 */
+    --pt-text-sm:   0.875rem;    /* 14 */
+    --pt-text-base: 1rem;        /* 16 */
+    --pt-text-lg:   1.125rem;    /* 18 */
+    --pt-text-xl:   1.25rem;     /* 20 */
+    --pt-text-2xl:  1.5rem;      /* 24 */
+    --pt-text-3xl:  1.875rem;    /* 30 */
+
+    --pt-leading-tight: 1.25;
+    --pt-leading-normal: 1.5;
+    --pt-leading-loose: 1.75;
+
+    --pt-weight-regular: 400;
+    --pt-weight-medium:  500;
+    --pt-weight-semibold: 600;
+    --pt-weight-bold:    700;
+
+    /* ── Elevation ────────────────────────────────────────────────────── */
+    --pt-elev-0: none;
+    --pt-elev-1: 0 1px 2px rgba(15, 23, 42, 0.06);
+    --pt-elev-2: 0 2px 8px rgba(15, 23, 42, 0.08);
+    --pt-elev-3: 0 8px 24px rgba(15, 23, 42, 0.12);
+    --pt-elev-4: 0 20px 48px rgba(15, 23, 42, 0.18);
+
+    /* ── Motion ───────────────────────────────────────────────────────── */
+    --pt-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --pt-ease-out: cubic-bezier(0, 0, 0.2, 1);
+    --pt-dur-instant: 80ms;
+    --pt-dur-fast:    150ms;
+    --pt-dur-base:    220ms;
+    --pt-dur-slow:    320ms;
+
+    /* ── Z-index scale ─────────────────────────────────────────────────── */
+    --pt-z-nav:   100;
+    --pt-z-pop:   200;
+    --pt-z-modal: 300;
+    --pt-z-toast: 400;
+    --pt-z-debug: 9999;
+
+    /* ── Glass surface tokens (used by glassmorphism) ─────────────────── */
+    --pt-glass-bg: rgba(255, 255, 255, 0.72);
+    --pt-glass-bg-strong: rgba(255, 255, 255, 0.86);
+    --pt-glass-border: rgba(255, 255, 255, 0.45);
+    --pt-glass-blur: 16px;
+    --pt-glass-saturate: 180%;
+
+    /* ── Radzen theme mapping (so Radzen components inherit brand) ────── */
+    --rz-primary:            var(--pt-color-brand-600);
+    --rz-primary-light:      var(--pt-color-brand-300);
+    --rz-primary-lighter:    var(--pt-color-brand-100);
+    --rz-primary-dark:       var(--pt-color-brand-700);
+    --rz-primary-darker:     var(--pt-color-brand-900);
+    --rz-base-100:           var(--pt-color-neutral-0);
+    --rz-base-200:           var(--pt-color-neutral-50);
+    --rz-base-300:           var(--pt-color-neutral-100);
+    --rz-base-400:           var(--pt-color-neutral-200);
+    --rz-base-500:           var(--pt-color-neutral-300);
+    --rz-text-color:         var(--pt-fg-primary);
+    --rz-text-secondary-color: var(--pt-fg-secondary);
+    --rz-text-disabled-color: var(--pt-fg-tertiary);
+    --rz-border-color:       var(--pt-border-subtle);
+    --rz-disabled-opacity:   0.5;
+    --rz-corner-radius:      var(--pt-radius-md);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Motion keyframes — single source for animations
+   ═══════════════════════════════════════════════════════════════════════════ */
+@keyframes pt-fade-in       { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pt-slide-up      { from { opacity: 0; transform: translate3d(0, 8px, 0); }
+                              to   { opacity: 1; transform: translate3d(0, 0, 0); } }
+@keyframes pt-slide-down    { from { opacity: 0; transform: translate3d(0, -8px, 0); }
+                              to   { opacity: 1; transform: translate3d(0, 0, 0); } }
+@keyframes pt-scale-press   { from { transform: scale(1); }
+                              to   { transform: scale(0.97); } }
+@keyframes pt-shimmer       { 0%   { background-position: -200% 0; }
+                              100% { background-position:  200% 0; } }
+@keyframes pt-pulse         { 0%   { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
+                              70%  { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+                              100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
+@keyframes pt-sweep         { 0%   { transform: translate3d(-100%, 0, 0); }
+                              100% { transform: translate3d(0%, 0, 0); } }
+
+/* Utility for stagger entrance — apply to children via [style="--i:N"] */
+.pt-stagger > * { animation: pt-slide-up var(--pt-dur-base) var(--pt-ease) both;
+                  animation-delay: calc(var(--pt-i, 0) * 40ms); }
+
+/* Honor reduced motion preference globally */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/* Default page entrance */
+article.content { animation: pt-slide-up var(--pt-dur-base) var(--pt-ease); }
+
+/* Skeleton primitive — used appwide */
+.pt-skeleton {
+    background: linear-gradient(90deg,
+        var(--pt-color-neutral-200) 25%,
+        var(--pt-color-neutral-100) 50%,
+        var(--pt-color-neutral-200) 75%);
+    background-size: 200% 100%;
+    animation: pt-shimmer 1.4s linear infinite;
+    border-radius: var(--pt-radius-sm);
+}
+
+/* Touch target guarantee — minimum 44×44 on interactive elements */
+button, a, [role="button"] {
+    min-height: var(--pt-space-2);
+}
+@media (max-width: 640px) {
+    button, a, [role="button"] {
+        min-height: var(--pt-space-6);
+    }
+}

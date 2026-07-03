@@ -4,6 +4,9 @@ using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using PoTraffic.Api.Features.Routes;
+using PoTraffic.Api.Infrastructure.Storage;
+using PoTraffic.Shared.Enums;
 
 namespace PoTraffic.Api.Infrastructure.Scheduling;
 
@@ -52,6 +55,18 @@ public sealed class BackgroundSchedulerService : BackgroundService
             {
                 _logger.LogWarning(ex, "Stale-job recovery failed — continuing; jobs may need manual requeue");
             }
+
+            // Reconciliation: re-arm any monitored route whose poll chain died (e.g. a
+            // transient-storage exception left it with no successor) so polling is
+            // self-healing across restarts, not only across in-process failures.
+            try
+            {
+                ReconcilePollChains();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Poll-chain reconciliation failed — continuing");
+            }
         }
 
         using PeriodicTimer timer = new(TimeSpan.FromSeconds(1));
@@ -75,6 +90,48 @@ public sealed class BackgroundSchedulerService : BackgroundService
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
             _logger.LogInformation("BackgroundSchedulerService stopped");
+        }
+    }
+
+    /// <summary>
+    /// Re-arms poll chains for monitored routes that have no live poll job. A route is
+    /// considered "monitored" only if it already has a <c>JobChainId</c> (the user pressed
+    /// Start), so never-started routes are left alone. A sleeping chain has a Pending
+    /// successor and is therefore skipped; only genuinely dead chains are re-armed.
+    /// </summary>
+    private void ReconcilePollChains()
+    {
+        if (_tableScheduler is null)
+            return;
+
+        using IServiceScope scope = _serviceProvider.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TableStorageContext>();
+
+        HashSet<Guid> live = _tableScheduler.GetRouteIdsWithLivePollJobs();
+
+        List<EntityRoute> monitored = db.Routes
+            .Where(r => r.JobChainId != null
+                && r.MonitoringStatus != (int)MonitoringStatus.Deleted)
+            .ToList();
+
+        int rearmed = 0;
+        foreach (EntityRoute route in monitored)
+        {
+            if (live.Contains(route.Id))
+                continue;
+            if (!db.Windows.Any(w => w.RouteId == route.Id && w.IsActive))
+                continue;
+
+            var job = new PollRouteJob(null!, null!, null!);
+            string jobId = _tableScheduler.Enqueue(() => job.Execute(route.Id));
+            route.JobChainId = jobId;
+            rearmed++;
+        }
+
+        if (rearmed > 0)
+        {
+            db.SaveChangesAsync().GetAwaiter().GetResult();
+            _logger.LogWarning("Reconciled {Count} dead poll chain(s) at startup", rearmed);
         }
     }
 

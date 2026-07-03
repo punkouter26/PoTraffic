@@ -13,7 +13,7 @@
     }
     else
     {
-        <RadzenChart Style="width:100%;height:300px;">
+        <RadzenChart class="pt-tt-chart">
             <RadzenLineSeries Data="@ChartActual" CategoryProperty="PolledAtDateTime"
                               Title="Past 24h Actual" ValueProperty="DurationMinutes"
                               Smooth="false">
@@ -23,7 +23,7 @@
                 <TooltipTemplate Context="p">
                     @if (p.IsRerouted)
                     {
-                        <div style="color:red;font-weight:bold;">⚠ Rerouted: @p.DurationMinutes.ToString("F1") min</div>
+                        <div class="pt-tt-rerouted">⚠ Rerouted: @p.DurationMinutes.ToString("F1") min</div>
                     }
                     else
                     {

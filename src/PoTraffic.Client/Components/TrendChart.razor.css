@@ -1,0 +1,33 @@
+.pt-trend-canvas {
+    display: block;
+    width: 100%;
+    height: 240px;
+    border-radius: var(--pt-radius-md);
+    background: var(--pt-bg-elev-1);
+}
+
+.pt-trend-empty {
+    text-align: center;
+    padding: var(--pt-space-8);
+    background: var(--pt-bg-elev-1);
+    border-radius: var(--pt-radius-md);
+    border: 1px dashed var(--pt-border-subtle);
+}
+
+.pt-trend-empty-icon {
+    font-size: var(--pt-text-3xl);
+    margin-bottom: var(--pt-space-2);
+    opacity: 0.5;
+}
+
+.pt-trend-empty-title {
+    font-size: var(--pt-text-lg);
+    font-weight: var(--pt-weight-semibold);
+    color: var(--pt-fg-primary);
+    margin-bottom: var(--pt-space-1);
+}
+
+.pt-trend-empty-text {
+    font-size: var(--pt-text-sm);
+    color: var(--pt-fg-secondary);
+}

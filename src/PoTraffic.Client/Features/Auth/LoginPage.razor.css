@@ -1,0 +1,4 @@
+/* LoginPage — scoped styles. Replaces inline color="var(--rz-text-tertiary-color)" usages. */
+.pt-fg-tertiary {
+    color: var(--pt-fg-tertiary);
+}

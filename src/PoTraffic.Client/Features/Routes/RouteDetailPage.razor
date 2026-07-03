@@ -18,7 +18,7 @@
 
 @if (_loading)
 {
-    <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+    <PtProgressLine AriaLabel="Loading route" />
 }
 else
 {
@@ -52,7 +52,7 @@ else
                 </div>
                 @if (LatestPoll is not null)
                 {
-                    <div style="font-size:0.8rem;color:#64748b;margin-top:0.15rem;">at @LatestPoll.PolledAtDateTime.ToLocalTime().ToString("HH:mm:ss")</div>
+                    <div class="pt-stat-meta">at @LatestPoll.PolledAtDateTime.ToLocalTime().ToString("HH:mm:ss")</div>
                 }
             </div>
             <div class="pt-stat-block pt-stat-green">
@@ -60,7 +60,7 @@ else
                 <div class="pt-stat-value">@_todayPolls.Count</div>
                 @if (_todayPolls.Count > 0)
                 {
-                    <div style="font-size:0.8rem;color:#64748b;margin-top:0.15rem;">@_todayPolls.Count(p => p.IsRerouted) rerouted</div>
+                    <div class="pt-stat-meta">@_todayPolls.Count(p => p.IsRerouted) rerouted</div>
                 }
             </div>
             @{
@@ -71,7 +71,7 @@ else
                 <div class="pt-stat-value @(next.Live ? "pt-poll-live" : "")">@next.Value</div>
                 @if (!string.IsNullOrEmpty(next.Detail))
                 {
-                    <div style="font-size:0.8rem;color:#64748b;margin-top:0.15rem;">@next.Detail</div>
+                    <div class="pt-stat-meta">@next.Detail</div>
                 }
             </div>
         </div>
@@ -80,9 +80,15 @@ else
     @* Monitoring window configuration *@
     <WindowConfigPanel RouteId="RouteId" OnSaved="OnWindowSaved" />
 
-    @* P1/UX-9: Chart always visible — no toggle required *@
-    <TravelTimeTrendChart ChartActual="_chartActual" ChartRerouted="_chartRerouted"
-                          ChartBaseline="_chartBaseline" ChartUpperBand="_chartUpperBand" />
+    @* P1/UX-9: Chart always visible — no toggle required.
+       Uses the canvas-based TrendChart (GPU-friendly) instead of RadzenChart. *@
+    <RadzenCard class="rz-mb-4">
+        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">Travel Time Trend (Past 24h)</RadzenText>
+        <TrendChart Points="@_trendPoints"
+                    Baseline="@_trendBaseline"
+                    UpperBand="@_trendUpperBand"
+                    ReroutedFlags="@_trendRerouted" />
+    </RadzenCard>
 
     @* UX-9: Raw poll table — collapsed by default for stat-lovers *@
     <PollHistoryTable Polls="_todayPolls" />
@@ -98,16 +104,36 @@ else
     private List<TravelTimeTrendChart.ActualChartPoint> _chartRerouted = [];
     private List<TravelTimeTrendChart.BaselineChartPoint> _chartBaseline = [];
     private List<TravelTimeTrendChart.UpperBandPoint> _chartUpperBand = [];
+    private double[] _trendPoints = [];
+    private double[] _trendBaseline = [];
+    private double[] _trendUpperBand = [];
+    private bool[] _trendRerouted = [];
     private OptimalDepartureDto? _optimalDeparture;
     private string _optimalDepartureLabel = string.Empty;
     private SessionDto? _activeSession;
+    private MonitoringWindowDto? _activeWindow;
     private PollRecordDto? LatestPoll => _todayPolls.OrderByDescending(p => p.PolledAtDateTime).FirstOrDefault();
+
+    /// <summary>
+    /// True if the active monitoring window currently contains "now" (UTC).
+    /// Used by <see cref="NextSample"/> to distinguish "between polls, inside window"
+    /// from "window has closed for today, scheduler is silent".
+    /// </summary>
+    private bool WindowIsOpenNow()
+    {
+        if (_activeWindow is null) return false;
+        if (!TimeOnly.TryParse(_activeWindow.StartTime, out var start)) return false;
+        if (!TimeOnly.TryParse(_activeWindow.EndTime, out var end)) return false;
+        TimeOnly nowUtc = TimeOnly.FromDateTime(DateTime.UtcNow);
+        return nowUtc >= start && nowUtc < end;
+    }
 
     private readonly record struct NextSampleInfo(string Value, string Detail, bool Live);
 
     // Headline + detail describing when the next traffic sample is expected to complete.
     // Polls run on a self-perpetuating chain every QuotaConstants.PollIntervalMinutes while
-    // a session is active; the first poll is enqueued the moment monitoring starts.
+    // a session is active and inside the monitoring window; the first poll is enqueued
+    // the moment monitoring starts.
     private NextSampleInfo NextSample
     {
         get
@@ -118,6 +144,17 @@ else
             if (!monitoringActive)
             {
                 return new NextSampleInfo("—", "Start monitoring to begin sampling", Live: false);
+            }
+
+            // Distinguish "session active but window closed for today" from "session active
+            // and we're waiting for the next poll tick". Without this, a window that ended
+            // an hour ago still shows "Due now" because the next +5min slot has passed.
+            if (!WindowIsOpenNow())
+            {
+                string startLabel = _activeWindow is not null
+                    ? $"Window closed — next opens {_activeWindow.StartTime[..5]}"
+                    : "Window closed for today";
+                return new NextSampleInfo("Idle", startLabel, Live: false);
             }
 
             // The session's server-recorded last poll is the authoritative cadence anchor;
@@ -165,6 +202,13 @@ else
         {
             string dayOfWeek = DateTime.Today.DayOfWeek.ToString();
 
+            // Load the active monitoring window — drives NextSample's window-open detection
+            // so the card switches to "Idle / Window closed" instead of "Due now" after the
+            // daily window ends.
+            var windows = await Http.GetFromJsonAsync(
+                $"/api/routes/{RouteId}/windows", AppJsonContext.Default.ListMonitoringWindowDto);
+            _activeWindow = windows?.FirstOrDefault(w => w.IsActive);
+
             // Load today's active monitoring session — drives the Next Sample ETA card
             var sessions = await Http.GetFromJsonAsync(
                 $"/api/routes/{RouteId}/sessions", AppJsonContext.Default.ListSessionDto);
@@ -186,6 +230,8 @@ else
                         p.IsRerouted))
                     .ToList();
                 _chartRerouted = _chartActual.Where(p => p.IsRerouted).ToList();
+                _trendPoints = _todayPolls.Select(p => p.TravelDurationSeconds / 60.0).ToArray();
+                _trendRerouted = _todayPolls.Select(p => p.IsRerouted).ToArray();
             }
 
             // Load baseline
@@ -203,6 +249,12 @@ else
                         s.TimeSlotBucket,
                         (s.MeanDurationSeconds + s.StdDevDurationSeconds!.Value) / 60.0))
                     .ToList();
+                _trendBaseline = _baselineSlots.Select(s => s.MeanDurationSeconds / 60.0).ToArray();
+                _trendUpperBand = _baselineSlots
+                    .Select(s => s.StdDevDurationSeconds.HasValue
+                        ? (s.MeanDurationSeconds + s.StdDevDurationSeconds.Value) / 60.0
+                        : s.MeanDurationSeconds / 60.0)
+                    .ToArray();
             }
 
             // Load optimal departure

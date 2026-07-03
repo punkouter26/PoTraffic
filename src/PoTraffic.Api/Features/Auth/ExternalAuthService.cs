@@ -125,15 +125,25 @@ public sealed class ExternalAuthService(
 
     private static string NormalizeReturnPath(string? returnUrl)
     {
+        const string fallback = "/dashboard";
+
         if (string.IsNullOrWhiteSpace(returnUrl))
-            return "/dashboard";
+            return fallback;
 
         if (!Uri.TryCreate(returnUrl, UriKind.Relative, out Uri? relativeUri))
-            return "/dashboard";
+            return fallback;
 
         string normalized = relativeUri.OriginalString;
-        if (!normalized.StartsWith('/'))
-            normalized = "/" + normalized;
+
+        // Must be a same-site absolute path. Reject protocol-relative ("//evil.com")
+        // and backslash-tricked ("/\evil.com") forms the browser would treat as a
+        // host — otherwise the post-login Redirect becomes an open redirect.
+        if (!normalized.StartsWith('/')
+            || normalized.StartsWith("//", StringComparison.Ordinal)
+            || normalized.StartsWith("/\\", StringComparison.Ordinal))
+        {
+            return fallback;
+        }
 
         return normalized;
     }

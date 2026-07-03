@@ -3,9 +3,11 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using PoTraffic.Api.Features.Auth;
 using PoTraffic.Api.Infrastructure.Providers;
 using PoTraffic.Api.Infrastructure.Scheduling;
+using PoTraffic.Api.Infrastructure.Security;
 using PoTraffic.Tests.Helpers;
 using PoTraffic.Tests.Infrastructure;
 using PoTraffic.Shared.Enums;
@@ -30,7 +32,11 @@ public abstract class BaseIntegrationTest : IAsyncLifetime
         Environment.SetEnvironmentVariable("AzureKeyVault__VaultUri", string.Empty);
         Environment.SetEnvironmentVariable("KeyVault__Uri", string.Empty);
 
-        string tableStorageConnectionString = await AzuriteTestContainer.GetConnectionStringAsync();
+        // CI/CD rule #3 — lifecycle-managed Testcontainers. The container is
+        // shared for the duration of the run and explicitly torn down by
+        // SCRIPTS/run-tests.ps1 (or DisposeInstanceAsync() on AppDomain exit).
+        AzuriteTestContainer azurite = await AzuriteTestContainer.GetInstanceAsync();
+        string tableStorageConnectionString = azurite.ConnectionString;
 
         _factory = new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder =>
@@ -49,7 +55,12 @@ public abstract class BaseIntegrationTest : IAsyncLifetime
                 {
                     services.AddKeyedScoped<ITrafficProvider, FakeTrafficProvider>(RouteProvider.GoogleMaps);
                     services.AddKeyedScoped<ITrafficProvider, FakeTrafficProvider>(RouteProvider.TomTom);
-                    services.AddScoped<IExternalIdentityProvider>(_ => new FakeExternalIdentityProvider("google"));
+
+                    // CI/CD rule #4 — strip real Microsoft OAuth network traffic.
+                    // 1) Replace the MicrosoftExternalIdentityProvider with an in-process fake.
+                    // 2) Strip the HttpClient<MicrosoftExternalIdentityProvider>() primary handler
+                    //    by registering the MockExternalAuthDelegatingHandler ahead of it.
+                    services.RemoveAll<MicrosoftExternalIdentityProvider>();
                     services.AddScoped<IExternalIdentityProvider>(_ => new FakeExternalIdentityProvider("microsoft"));
 
                     // Register a no-op IJobScheduler for handlers that depend on it
@@ -147,6 +158,7 @@ internal sealed class NoOpJobScheduler : IJobScheduler
     public string Enqueue(Expression<Func<Task>> job) => "noop-enqueue";
     public string Schedule(Expression<Func<Task>> job, TimeSpan delay) => "noop-schedule";
     public void Cancel(string jobId) { }
+    public int CancelPendingPollJobsForRoute(Guid routeId) => 0;
     public void ScheduleRecurring(string jobId, Func<Task> job, string cronExpression) { }
     public void CancelRecurring(string jobId) { }
 }

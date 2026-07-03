@@ -12,9 +12,9 @@
                   Click="@OnRefresh" class="rz-mb-3" />
 }
 
-<details style="font-size:0.8rem;color:var(--rz-text-secondary-color);margin-bottom:12px">
-    <summary style="cursor:pointer">Session debug info</summary>
-    <div style="padding:8px 0;line-height:1.9">
+<details class="pt-tt-debug">
+    <summary>Session debug info</summary>
+    <div class="pt-tt-debug-body">
         <div><strong>Session ID:</strong> <code>@Session.SessionId</code></div>
         <div><strong>Origin:</strong> @Session.OriginAddress</div>
         <div><strong>Destination:</strong> @Session.DestinationAddress</div>
@@ -59,11 +59,11 @@ else if (AllDone)
             <Template Context="row">
                 @if (row.FiredAt.HasValue)
                 {
-                    <span style="color:var(--rz-success)">@row.FiredAt.Value.ToLocalTime().ToString("HH:mm:ss")</span>
+                    <span class="pt-tt-fired">@row.FiredAt.Value.ToLocalTime().ToString("HH:mm:ss")</span>
                 }
                 else if (!row.IsAverage)
                 {
-                    <span style="color:var(--rz-text-secondary-color)">pending…</span>
+                    <span class="pt-tt-pending">pending…</span>
                 }
                 else { <span>—</span> }
             </Template>

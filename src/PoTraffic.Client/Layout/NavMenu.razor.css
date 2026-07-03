@@ -200,12 +200,12 @@
     }
 
     .app-shell-brand {
-        font-size: 1.05rem;
+        font-size: var(--pt-text-lg);
     }
 
     .app-nav-link {
-        padding: 0.4rem 0.55rem;
-        font-size: 0.85rem;
+        padding: var(--pt-space-2) var(--pt-space-3);
+        font-size: var(--pt-text-sm);
     }
 
     .pt-user-chip-label {

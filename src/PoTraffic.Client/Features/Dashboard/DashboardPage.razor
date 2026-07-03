@@ -12,6 +12,8 @@
 
 <PageTitle>Dashboard — PoTraffic</PageTitle>
 
+<MeshBackground />
+
 @* C2: Compact status bar replaces 4 KPI cards *@
 <div class="pt-status-bar">
     @{
@@ -77,16 +79,19 @@ else if (_routes.Count == 0)
 }
 else
 {
-    @* C1/UI-1: Route cards replace the grid — one card per route *@
-    <div class="pt-route-cards">
-        @foreach (RouteDto route in _routes)
-        {
-            <RouteCard Route="route"
-                       OptimalDeparture="@(_optimalDepartures.GetValueOrDefault(route.Id))"
-                       RecentPolls="@(_recentPolls.GetValueOrDefault(route.Id, []))"
-                       OnDeleted="@LoadDataAsync"
-                       OnRefresh="@LoadDataAsync" />
-        }
+    @* C1/UI-1: Route cards replace the grid — one card per route.
+       Virtualize keeps only the visible cards in the DOM. With 10+ routes
+       the user can scroll without paying the cost of 100+ RadzenCards. *@
+    <div class="pt-route-cards pt-stagger" role="list">
+        <Virtualize Items="_routes" Context="route" ItemSize="180" OverscanCount="2">
+            <div role="listitem" style="--i:@(_indexOffset)">
+                <SwipeableRouteCard Route="route"
+                           OptimalDeparture="@(_optimalDepartures.GetValueOrDefault(route.Id))"
+                           RecentPolls="@(_recentPolls.GetValueOrDefault(route.Id, []))"
+                           OnDeleted="@LoadDataAsync"
+                           OnRefresh="@LoadDataAsync" />
+            </div>
+        </Virtualize>
     </div>
 }
 
@@ -96,6 +101,7 @@ else
     private Dictionary<Guid, List<PollRecordDto>> _recentPolls = [];
     private int _quotaConsumed;
     private bool _loading = true;
+    private int _indexOffset; // used to stagger the first batch; resets on reload
 
     protected override TimeSpan PollingInterval => TimeSpan.FromSeconds(60);
 
@@ -108,7 +114,10 @@ else
 
             var result = await Http.GetFromJsonAsync("/api/routes?page=1&pageSize=100", AppJsonContext.Default.PagedResultRouteDto);
             if (result is not null)
+            {
                 _routes = [.. result.Items];
+                _indexOffset = 0; // refresh re-staggers from the top
+            }
 
             var quota = await Http.GetFromJsonAsync("/api/account/quota", AppJsonContext.Default.QuotaDto);
             if (quota is not null)

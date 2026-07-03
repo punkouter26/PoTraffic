@@ -94,12 +94,47 @@ public sealed class TableStorageJobScheduler : IJobScheduler
                 OneShotPartition, jobId);
             ScheduledJobEntity entity = response.Value;
             entity.Status = "Cancelled";
-            _tableClient.UpdateEntity(entity, entity.ETag);
+            // Unconditional (ETag.All): a concurrent MarkRunning bumps the ETag, which would
+            // 412 an IfMatch update and bubble a 500 out of Delete/Stop/Update route commands.
+            // Cancellation is a best-effort "make it Cancelled", so last-writer-wins is correct.
+            _tableClient.UpdateEntity(entity, ETag.All);
         }
         catch (RequestFailedException ex) when (ex.Status == 404)
         {
             // Job already completed or doesn't exist — no-op
         }
+    }
+
+    public int CancelPendingPollJobsForRoute(Guid routeId)
+    {
+        // PollRouteJob.Execute(routeId) serializes its arg to the ArgsJson array, so the
+        // route id appears verbatim in the JSON. Match pending one-shot Execute jobs for
+        // this route and cancel them; the currently-executing job is "Running", not
+        // "Pending", so it is never caught here.
+        string needle = routeId.ToString();
+        List<ScheduledJobEntity> duplicates = _tableClient
+            .Query<ScheduledJobEntity>(e =>
+                e.PartitionKey == OneShotPartition && e.Status == "Pending")
+            .Where(e => e.MethodName == "Execute"
+                && e.ArgsJson != null
+                && e.ArgsJson.Contains(needle, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        int cancelled = 0;
+        foreach (ScheduledJobEntity job in duplicates)
+        {
+            job.Status = "Cancelled";
+            try
+            {
+                _tableClient.UpdateEntity(job, job.ETag);
+                cancelled++;
+            }
+            catch (RequestFailedException)
+            {
+                // Lost the race (job started or was already changed) — safe to ignore.
+            }
+        }
+        return cancelled;
     }
 
     public void ScheduleRecurring(string jobId, Func<Task> job, string cronExpression)
@@ -132,7 +167,7 @@ public sealed class TableStorageJobScheduler : IJobScheduler
                 RecurringPartition, jobId);
             ScheduledJobEntity entity = response.Value;
             entity.Status = "Cancelled";
-            _tableClient.UpdateEntity(entity, entity.ETag);
+            _tableClient.UpdateEntity(entity, ETag.All);
         }
         catch (RequestFailedException ex) when (ex.Status == 404)
         {
@@ -216,19 +251,56 @@ public sealed class TableStorageJobScheduler : IJobScheduler
     }
 
     /// <summary>
+    /// Route ids that currently have a live (Pending or Running) one-shot poll job.
+    /// Used by startup reconciliation to tell a sleeping/active chain (has a live job)
+    /// from a dead one (crashed without scheduling a successor).
+    /// </summary>
+    public HashSet<Guid> GetRouteIdsWithLivePollJobs()
+    {
+        var live = new HashSet<Guid>();
+        foreach (ScheduledJobEntity e in _tableClient.Query<ScheduledJobEntity>(e =>
+            e.PartitionKey == OneShotPartition && (e.Status == "Pending" || e.Status == "Running")))
+        {
+            if (e.MethodName != "Execute" || string.IsNullOrEmpty(e.ArgsJson))
+                continue;
+            try
+            {
+                using JsonDocument doc = JsonDocument.Parse(e.ArgsJson);
+                if (doc.RootElement.ValueKind == JsonValueKind.Array
+                    && doc.RootElement.GetArrayLength() > 0
+                    && doc.RootElement[0].ValueKind == JsonValueKind.String
+                    && Guid.TryParse(doc.RootElement[0].GetString(), out Guid routeId))
+                {
+                    live.Add(routeId);
+                }
+            }
+            catch (JsonException)
+            {
+                // Unparseable args — ignore for reconciliation purposes.
+            }
+        }
+        return live;
+    }
+
+    /// <summary>
     /// Requeues one-shot jobs left in "Running" by a crash or a failed status
     /// update. Called once at scheduler startup — nothing can legitimately be
     /// running before the worker loop starts.
     /// </summary>
     public int RequeueStaleRunningJobs()
     {
+        // Covers BOTH partitions: a recurring job (e.g. nightly pruning) stuck in "Running"
+        // by a crash is skipped by the due-query (which only returns "Pending"), so without
+        // this it would never run again. Recompute its FireAt so it fires promptly.
         List<ScheduledJobEntity> stale = _tableClient
-            .Query<ScheduledJobEntity>(e => e.PartitionKey == OneShotPartition && e.Status == "Running")
+            .Query<ScheduledJobEntity>(e => e.Status == "Running")
             .ToList();
 
         foreach (ScheduledJobEntity job in stale)
         {
             job.Status = "Pending";
+            if (job.PartitionKey == RecurringPartition && !string.IsNullOrEmpty(job.CronExpression))
+                job.FireAt = ComputeNextFire(job.CronExpression, DateTimeOffset.UtcNow);
             _tableClient.UpdateEntity(job, ETag.All);
         }
 

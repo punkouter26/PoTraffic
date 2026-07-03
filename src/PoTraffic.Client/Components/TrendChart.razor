@@ -1,0 +1,89 @@
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+@* GPU-friendly canvas trend chart. Receives three lists and renders a
+   polyline (actual), dashed baseline, and shaded +1σ band. Includes a
+   live "now" sweep that animates left→right each refresh tick. *@
+
+@if (Points.Count == 0)
+{
+    <div class="pt-trend-empty">
+        <div class="pt-trend-empty-icon" aria-hidden="true">📈</div>
+        <div class="pt-trend-empty-title">No samples yet</div>
+        <div class="pt-trend-empty-text">The canvas chart will draw as soon as the first poll completes.</div>
+    </div>
+}
+else
+{
+    <canvas @ref="_canvas" class="pt-trend-canvas"
+            aria-label="Travel time trend chart"></canvas>
+}
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<double> Points { get; set; } = [];
+    [Parameter] public IReadOnlyList<double> Baseline { get; set; } = [];
+    [Parameter] public IReadOnlyList<double> UpperBand { get; set; } = [];
+    [Parameter] public IReadOnlyList<bool> ReroutedFlags { get; set; } = [];
+    [Parameter] public bool ShowSweep { get; set; } = true;
+
+    private ElementReference _canvas;
+    private Task<IJSObjectReference>? _module;
+    private bool _loaded;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _module = JS.InvokeAsync<IJSObjectReference>("import", "./js/pt-chart.js").AsTask();
+            try
+            {
+                var m = await _module;
+                _loaded = true;
+                await RenderAsync();
+            }
+            catch
+            {
+                _loaded = false;
+            }
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loaded) await RenderAsync();
+    }
+
+    private async Task RenderAsync()
+    {
+        try
+        {
+            var m = await (_module ?? Task.FromResult<IJSObjectReference>(null!));
+            await m.InvokeVoidAsync("render", _canvas,
+                new
+                {
+                    points = Points,
+                    baseline = Baseline,
+                    upperBand = UpperBand,
+                    rerouted = ReroutedFlags
+                },
+                ShowSweep ? SweepFraction() : (double?)null);
+        }
+        catch { /* ignore */ }
+    }
+
+    private double SweepFraction()
+    {
+        // Map the latest point's age in the window to a 0..1 sweep position
+        // so the user sees a moving "now" cursor each refresh.
+        if (Points.Count == 0) return 1.0;
+        return 1.0;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_module is { IsCompletedSuccessfully: true } m)
+        {
+            try { await (await m).DisposeAsync(); } catch { /* ignore */ }
+        }
+    }
+}

@@ -18,6 +18,12 @@
 @using Radzen
 @using Radzen.Blazor
 @using PoTraffic.Client.Infrastructure
+@using PoTraffic.Client.Components
 @using PoTraffic.Shared.Constants
 @using PoTraffic.Client.Infrastructure.Http
 @using PoTraffic.Shared.DTOs.History
+
+@* App-wide default: every routable page requires an authenticated user unless it opts
+   out with [AllowAnonymous]. Prevents a page from silently rendering to anonymous users
+   (protected chrome flashing before the 401-bounce) when someone forgets [Authorize]. *@
+@attribute [Authorize]

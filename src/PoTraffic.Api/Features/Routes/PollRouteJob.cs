@@ -29,72 +29,115 @@ public sealed class PollRouteJob
 
     public async Task Execute(Guid routeId)
     {
-        _logger.LogInformation("PollRouteJob executing for route {RouteId}", routeId);
+        _logger.LogDebug("PollRouteJob executing for route {RouteId}", routeId);
+
+        // Collapse a forked chain: if a crash re-ran a job that had already scheduled its
+        // successor, cancel any stray pending poll job(s) for this route so exactly one
+        // chain proceeds. No-op in normal operation.
+        try
+        {
+            int collapsed = _scheduler.CancelPendingPollJobsForRoute(routeId);
+            if (collapsed > 0)
+                _logger.LogWarning(
+                    "PollRouteJob: collapsed {Count} duplicate poll job(s) for route {RouteId}", collapsed, routeId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "PollRouteJob: duplicate-collapse check failed for route {RouteId}", routeId);
+        }
 
         using IServiceScope scope = _scopeFactory.CreateScope();
         TableStorageContext db = scope.ServiceProvider.GetRequiredService<TableStorageContext>();
 
-        // Stop the chain when the route was deleted mid-poll — a soft-deleted route
-        // must never keep consuming provider quota.
-        EntityRoute? route = db.Routes.FirstOrDefault(r => r.Id == routeId);
-        if (route is null || route.MonitoringStatus == (int)MonitoringStatus.Deleted)
+        try
         {
-            _logger.LogInformation("PollRouteJob: route {RouteId} is gone or deleted — polling chain stopped", routeId);
-            return;
-        }
-
-        MonitoringWindow? window = db.Windows.FirstOrDefault(w => w.RouteId == routeId && w.IsActive);
-        if (window is null)
-        {
-            _logger.LogInformation("PollRouteJob: route {RouteId} has no active monitoring window — polling chain stopped", routeId);
-            route.JobChainId = null;
-            await db.SaveChangesAsync();
-            return;
-        }
-
-        DateTimeOffset now = DateTimeOffset.UtcNow;
-        TimeSpan nextDelay;
-
-        if (IsWithinWindow(window, now))
-        {
-            if (await EnsureActiveSessionAsync(db, route, now))
+            // Stop the chain when the route was deleted mid-poll — a soft-deleted route
+            // must never keep consuming provider quota.
+            EntityRoute? route = db.Routes.FirstOrDefault(r => r.Id == routeId);
+            if (route is null || route.MonitoringStatus == (int)MonitoringStatus.Deleted)
             {
-                ISender sender = scope.ServiceProvider.GetRequiredService<ISender>();
-                try
-                {
-                    await sender.Send(new ExecutePollCommand(routeId));
-                }
-                catch (Exception ex)
-                {
-                    // Log but do not rethrow — scheduler must not retry on handler errors
-                    _logger.LogError(ex, "PollRouteJob: Unhandled error for route {RouteId}", routeId);
-                }
-                nextDelay = TimeSpan.FromMinutes(QuotaConstants.PollIntervalMinutes);
+                _logger.LogInformation("PollRouteJob: route {RouteId} is gone or deleted — polling chain stopped", routeId);
+                return;
             }
-            else if (!TrySleepUntilNextStart(window, now, routeId, "daily quota exhausted", out nextDelay))
+
+            MonitoringWindow? window = db.Windows.FirstOrDefault(w => w.RouteId == routeId && w.IsActive);
+            if (window is null)
+            {
+                _logger.LogInformation("PollRouteJob: route {RouteId} has no active monitoring window — polling chain stopped", routeId);
+                route.JobChainId = null;
+                await db.SaveChangesAsync();
+                return;
+            }
+
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            TimeSpan nextDelay;
+
+            if (IsWithinWindow(window, now))
+            {
+                if (await EnsureActiveSessionAsync(db, route, now))
+                {
+                    ISender sender = scope.ServiceProvider.GetRequiredService<ISender>();
+                    try
+                    {
+                        await sender.Send(new ExecutePollCommand(routeId));
+                    }
+                    catch (Exception ex)
+                    {
+                        // Log but do not rethrow — scheduler must not retry on handler errors
+                        _logger.LogError(ex, "PollRouteJob: Unhandled error for route {RouteId}", routeId);
+                    }
+                    nextDelay = TimeSpan.FromMinutes(QuotaConstants.PollIntervalMinutes);
+                }
+                else if (!TrySleepUntilNextStart(window, now, routeId, "daily quota exhausted", out nextDelay))
+                {
+                    route.JobChainId = null;
+                    await db.SaveChangesAsync();
+                    return;
+                }
+            }
+            else if (!TrySleepUntilNextStart(window, now, routeId, "outside monitoring window", out nextDelay))
             {
                 route.JobChainId = null;
                 await db.SaveChangesAsync();
                 return;
             }
-        }
-        else if (!TrySleepUntilNextStart(window, now, routeId, "outside monitoring window", out nextDelay))
-        {
-            route.JobChainId = null;
+
+            // Schedule next execution — Chain of Responsibility enqueues its own successor
+            string nextJobId = _scheduler.Schedule(
+                () => Execute(routeId),
+                nextDelay);
+
+            _logger.LogDebug(
+                "PollRouteJob: Next poll for route {RouteId} scheduled as job {JobId} in {Delay}", routeId, nextJobId, nextDelay);
+
+            route.JobChainId = nextJobId;
             await db.SaveChangesAsync();
-            return;
         }
+        catch (Exception ex)
+        {
+            // A transient dependency failure (e.g. Table Storage blip) must not permanently
+            // kill the chain. Re-arm a successor so polling resumes once storage recovers;
+            // if even that fails, startup reconciliation is the backstop.
+            _logger.LogError(ex, "PollRouteJob: unexpected failure for route {RouteId} — re-arming chain", routeId);
+            try
+            {
+                string retryJobId = _scheduler.Schedule(
+                    () => Execute(routeId),
+                    TimeSpan.FromMinutes(QuotaConstants.PollIntervalMinutes));
 
-        // Schedule next execution — Chain of Responsibility enqueues its own successor
-        string nextJobId = _scheduler.Schedule(
-            () => Execute(routeId),
-            nextDelay);
-
-        _logger.LogInformation(
-            "PollRouteJob: Next poll for route {RouteId} scheduled as job {JobId} in {Delay}", routeId, nextJobId, nextDelay);
-
-        route.JobChainId = nextJobId;
-        await db.SaveChangesAsync();
+                EntityRoute? route = db.Routes.FirstOrDefault(r => r.Id == routeId);
+                if (route is not null)
+                {
+                    route.JobChainId = retryJobId;
+                    await db.SaveChangesAsync();
+                }
+            }
+            catch (Exception reArmEx)
+            {
+                _logger.LogError(reArmEx,
+                    "PollRouteJob: failed to re-arm chain for route {RouteId} — startup reconciliation will recover it", routeId);
+            }
+        }
     }
 
     /// <summary>

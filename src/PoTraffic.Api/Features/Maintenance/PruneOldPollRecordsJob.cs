@@ -39,6 +39,9 @@ public sealed class PruneOldPollRecordsCommandHandler
         {
             record.IsDeleted = true;
             record.RawProviderResponse = null;  // free storage; no longer needed post-pruning
+            // PollRecords use explicit change tracking, so a mutation to an existing one
+            // must be announced or the save would skip it.
+            _db.MarkChanged(record);
         }
 
         await _db.SaveChangesAsync(ct);

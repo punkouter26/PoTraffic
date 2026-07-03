@@ -29,6 +29,16 @@ public interface IJobScheduler
     void Cancel(string jobId);
 
     /// <summary>
+    /// Cancels every *pending* one-shot poll job targeting <paramref name="routeId"/>.
+    /// Called at the start of a poll execution to collapse a forked chain: if a crash
+    /// re-ran a job that had already scheduled its successor, two pending successors
+    /// exist — this cancels the stragglers so exactly one chain survives. A no-op in
+    /// normal operation (the only live poll job for the route is the one running now).
+    /// </summary>
+    /// <returns>The number of duplicate pending jobs cancelled.</returns>
+    int CancelPendingPollJobsForRoute(Guid routeId);
+
+    /// <summary>
     /// Register a recurring job with a CRON expression.
     /// </summary>
     /// <param name="jobId">Stable identifier for the recurring job (replaces previous registration).</param>

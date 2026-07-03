@@ -1,0 +1,3 @@
+/* SettingsPage — scoped styles replacing inline `Style="..."` on Radzen components. */
+.pt-settings-full { width: 100%; }
+.pt-settings-meta { font-size: var(--pt-text-sm); color: var(--pt-fg-tertiary); }

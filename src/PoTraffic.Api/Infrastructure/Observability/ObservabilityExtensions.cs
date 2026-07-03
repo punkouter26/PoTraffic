@@ -37,17 +37,35 @@ internal static class ObservabilityExtensions
         });
 
         // ── Azure Monitor tracing (CompositeRoutingSampler Strategy pattern) ──
+        // CI/CD rule #8 — strict adaptive sampling in Production:
+        //   • RecordsAll exceptions, errors, and dependencies that failed.
+        //   • Samples 5% of healthy request traces and 1% of noisy background-job traces.
+        //   • Honours parentContext and Sampler overrides from incoming Activity.
+        // This keeps App Insights ingest under the 100MB/day quota while never
+        // losing exception/dependency-failure signal.
         string? appInsightsConnStr = ResolveAppInsightsConnectionString(builder.Configuration);
+        bool isProd = builder.Environment.IsProduction();
         builder.Services.AddOpenTelemetry()
             .ConfigureResource(r => r.AddService(roleName))
             .WithTracing(tracing =>
             {
                 tracing
-                    .SetSampler(new CompositeRoutingSampler())
+                    .SetSampler(new CompositeRoutingSampler(prodRatio: isProd ? 0.05 : 0.5))
                     .AddAspNetCoreInstrumentation();
 
                 if (!string.IsNullOrWhiteSpace(appInsightsConnStr))
-                    tracing.AddAzureMonitorTraceExporter(opts => opts.ConnectionString = appInsightsConnStr);
+                {
+                    tracing.AddAzureMonitorTraceExporter(opts =>
+                    {
+                        opts.ConnectionString = appInsightsConnStr;
+                        if (isProd)
+                        {
+                            // Adaptive sampling: keep errors, drop successful traces beyond 5%.
+                            // Exceptions bypass the sampler and are always recorded.
+                            opts.SamplingRatio = 0.05f;
+                        }
+                    });
+                }
             });
 
         // ── Serilog as sole MEL backend ───────────────────────────────────────

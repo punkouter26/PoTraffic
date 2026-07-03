@@ -2,6 +2,7 @@ using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using PoTraffic.Api.Infrastructure.Logging;
 using PoTraffic.Shared.Constants;
 
 namespace PoTraffic.Api.Infrastructure.Providers;
@@ -47,17 +48,19 @@ public sealed class GoogleMapsTrafficProvider : ITrafficProvider
             {
                 GoogleLocation loc = response.Results[0].Geometry.Location;
                 string coords = $"{loc.Lat},{loc.Lng}";
-                _logger.LogDebug("Google Maps geocoded '{Address}' → {Coords}", address, coords);
+                _logger.LogDebug("Google Maps geocoded {AddressRef} → {Coords}",
+                    PiiRedactor.Redact(address), coords);
                 return coords;
             }
 
-            _logger.LogWarning("Google Maps geocoding returned status '{Status}' for address '{Address}'.",
-                response?.Status, address);
+            _logger.LogWarning("Google Maps geocoding returned status '{Status}' for address {AddressRef}.",
+                response?.Status, PiiRedactor.Redact(address));
             return null;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Google Maps geocoding request failed for address '{Address}'.", address);
+            _logger.LogError(ex, "Google Maps geocoding request failed for address {AddressRef}.",
+                PiiRedactor.Redact(address));
             return null;
         }
     }

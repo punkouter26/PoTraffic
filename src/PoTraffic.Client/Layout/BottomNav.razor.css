@@ -1,0 +1,81 @@
+/* Bottom navigation — mobile portrait only (≤640px).
+   Glass surface with central FAB for the primary "Add Route" action. */
+
+.pt-bottom-nav {
+    display: none;
+}
+
+@media (max-width: 640px) {
+    .pt-bottom-nav {
+        display: flex;
+        align-items: center;
+        justify-content: space-around;
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        min-height: 64px;
+        padding: var(--pt-space-2) var(--pt-space-3) calc(var(--pt-space-2) + env(safe-area-inset-bottom, 0));
+        background: var(--pt-glass-bg-strong);
+        backdrop-filter: blur(20px) saturate(180%);
+        -webkit-backdrop-filter: blur(20px) saturate(180%);
+        border-top: 1px solid var(--pt-border-subtle);
+        box-shadow: 0 -1px 12px rgba(15, 23, 42, 0.06);
+        z-index: var(--pt-z-nav);
+        animation: pt-slide-up var(--pt-dur-base) var(--pt-ease);
+    }
+}
+
+.pt-bottom-nav-link {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    color: var(--pt-fg-secondary);
+    text-decoration: none;
+    font-size: 0.7rem;
+    font-weight: var(--pt-weight-medium);
+    min-width: 64px;
+    min-height: 48px;
+    transition: color var(--pt-dur-fast) var(--pt-ease);
+    -webkit-tap-highlight-color: transparent;
+}
+
+.pt-bottom-nav-link:active { color: var(--pt-color-brand-600); }
+
+.pt-bottom-nav-icon {
+    font-size: 1.25rem;
+    line-height: 1;
+}
+
+/* FAB-style center button */
+.pt-bottom-nav-fab {
+    position: relative;
+    margin-top: -28px;
+}
+
+.pt-bottom-nav-fab-inner {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--pt-color-brand-500), var(--pt-color-brand-700));
+    color: var(--pt-fg-on-brand);
+    font-size: 1.6rem;
+    line-height: 52px;
+    text-align: center;
+    font-weight: var(--pt-weight-bold);
+    box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
+    transition: transform var(--pt-dur-fast) var(--pt-ease),
+                box-shadow var(--pt-dur-fast) var(--pt-ease);
+}
+
+.pt-bottom-nav-fab:active .pt-bottom-nav-fab-inner {
+    transform: scale(0.95);
+    box-shadow: 0 3px 10px rgba(37, 99, 235, 0.5);
+}
+
+.pt-bottom-nav-link:active .pt-bottom-nav-fab-inner {
+    /* override color on FAB — it always uses brand */
+    color: var(--pt-fg-on-brand);
+}

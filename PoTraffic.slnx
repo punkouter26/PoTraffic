@@ -5,6 +5,7 @@
     <Project Path="src/PoTraffic.Shared/PoTraffic.Shared.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/PoTraffic.UnitTests/PoTraffic.UnitTests.csproj" />
     <Project Path="tests/PoTraffic.Tests/PoTraffic.Tests.csproj" />
     <Project Path="tests/PoTraffic.Tests.E2E/PoTraffic.Tests.E2E.csproj" />
   </Folder>

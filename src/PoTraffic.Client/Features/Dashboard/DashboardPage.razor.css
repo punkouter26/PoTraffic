@@ -3,7 +3,7 @@
 .pt-quota-ring {
     /* consumed by inline --pt-quota-pct / --pt-quota-color variables */
     --pt-quota-pct: 0;
-    --pt-quota-color: #10b981;
+    --pt-quota-color: var(--pt-color-success);
     --pt-quota-size: 2.25rem;
     width: var(--pt-quota-size);
     height: var(--pt-quota-size);
@@ -20,31 +20,70 @@
     position: absolute;
     inset: 0.22rem;
     border-radius: 50%;
-    background: #fff;
+    background: var(--pt-bg-surface);
 }
 
-.pt-status-item-muted {
-    color: #94a3b8;
-}
+.pt-status-item-muted { color: var(--pt-fg-tertiary); }
 
 .pt-empty-state {
     text-align: center;
-    padding: 3rem 1rem;
+    padding: var(--pt-space-12) var(--pt-space-4);
+    background: var(--pt-glass-bg);
+    backdrop-filter: blur(var(--pt-glass-blur)) saturate(var(--pt-glass-saturate));
+    -webkit-backdrop-filter: blur(var(--pt-glass-blur)) saturate(var(--pt-glass-saturate));
+    border: 1px solid var(--pt-glass-border);
+    border-radius: var(--pt-radius-lg);
 }
 
 .pt-empty-state-emoji {
-    font-size: 3rem;
-    margin-bottom: 1rem;
+    font-size: var(--pt-text-3xl);
+    margin-bottom: var(--pt-space-4);
 }
 
 .pt-empty-state-title {
-    font-size: 1.2rem;
-    font-weight: 600;
-    color: #334155;
-    margin-bottom: 0.5rem;
+    font-size: var(--pt-text-xl);
+    font-weight: var(--pt-weight-semibold);
+    color: var(--pt-fg-primary);
+    margin-bottom: var(--pt-space-2);
 }
 
 .pt-empty-state-text {
-    color: #94a3b8;
-    margin-bottom: 1.5rem;
+    color: var(--pt-fg-secondary);
+    margin-bottom: var(--pt-space-6);
+}
+
+/* Glass surface for the status bar — sits over the mesh background */
+.pt-status-bar {
+    background: var(--pt-glass-bg-strong);
+    backdrop-filter: blur(var(--pt-glass-blur)) saturate(var(--pt-glass-saturate));
+    -webkit-backdrop-filter: blur(var(--pt-glass-blur)) saturate(var(--pt-glass-saturate));
+    border: 1px solid var(--pt-glass-border);
+    box-shadow: var(--pt-elev-1);
+    border-radius: var(--pt-radius-lg);
+    padding: var(--pt-space-3) var(--pt-space-5);
+}
+
+/* Route card — translucent surface so the mesh shows through subtly */
+.pt-route-cards {
+    display: flex;
+    flex-direction: column;
+    gap: var(--pt-space-4);
+}
+
+.pt-route-card {
+    background: var(--pt-glass-bg-strong);
+    backdrop-filter: blur(var(--pt-glass-blur)) saturate(var(--pt-glass-saturate));
+    -webkit-backdrop-filter: blur(var(--pt-glass-blur)) saturate(var(--pt-glass-saturate));
+    border: 1px solid var(--pt-glass-border);
+    border-left: 5px solid var(--pt-ambient-color, var(--pt-color-brand-500));
+    box-shadow: var(--pt-elev-2);
+    border-radius: var(--pt-radius-lg);
+    transition: box-shadow var(--pt-dur-fast) var(--pt-ease),
+                transform var(--pt-dur-fast) var(--pt-ease);
+    overflow: hidden;
+}
+
+.pt-route-card:hover {
+    box-shadow: var(--pt-elev-3);
+    transform: translateY(-1px);
 }

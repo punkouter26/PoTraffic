@@ -34,7 +34,7 @@
                         <RadzenFormField Text="Locale">
                             <ChildContent>
                                 @* UX-10: Dropdown mirrors RegisterPage locale list — prevents freeform text that fails server validation *@
-                                <RadzenDropDown @bind-Value="_newLocale" Data="@_validLocales" Style="width:100%;" />
+                                <RadzenDropDown @bind-Value="_newLocale" Data="@_validLocales" class="pt-settings-full" />
                             </ChildContent>
                         </RadzenFormField>
                         <RadzenButton Text="Save" ButtonStyle="ButtonStyle.Primary"
@@ -66,7 +66,7 @@
                         </RadzenText>
                         <RadzenProgressBar Value="@((double)_quota.UsedToday / _quota.DailyLimit * 100)"
                                            ShowValue="true" />
-                        <RadzenText Style="font-size:0.85rem;color:var(--rz-text-tertiary-color)">
+                        <RadzenText class="pt-settings-meta">
                             Resets at @_quota.ResetsAtUtc.ToString("HH:mm") UTC
                         </RadzenText>
                     </RadzenStack>

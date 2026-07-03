@@ -12,7 +12,11 @@ public sealed class LogContextEnrichmentMiddleware(RequestDelegate next, IWebHos
 {
     public async Task InvokeAsync(HttpContext ctx)
     {
-        string userId = ctx.User.FindFirstValue("sub") ?? "anonymous";
+        // Cookie/BFF sessions carry identity on ClaimTypes.NameIdentifier (what the rest of
+        // the app resolves). Reading only "sub" tagged every such request UserId=anonymous.
+        string userId = ctx.User.FindFirstValue(ClaimTypes.NameIdentifier)
+                     ?? ctx.User.FindFirstValue("sub")
+                     ?? "anonymous";
         string correlationId = ctx.Request.Headers.TryGetValue("X-Correlation-Id", out var correlationHeader)
             ? correlationHeader.ToString()
             : ctx.TraceIdentifier;

@@ -20,7 +20,7 @@
                 <NavLink class="app-nav-link" href="admin">Admin</NavLink>
             }
         }
-        else
+        else if (_authResolved)
         {
             <NavLink class="app-nav-link" href="login" Match="NavLinkMatch.All">Sign In</NavLink>
         }
@@ -75,6 +75,7 @@
 
 @code {
     private bool _menuOpen;
+    private bool _authResolved;   // false until the first auth state comes back — avoids a "Sign In" flash for logged-in users
     private bool _isAuthenticated;
     private bool _isAdmin;
     private bool _isGuest;
@@ -115,6 +116,7 @@
     private Task UpdateUserStateAsync(AuthenticationState authState)
     {
         var user = authState.User;
+        _authResolved = true;
         _isAuthenticated = user.Identity?.IsAuthenticated == true;
         _isAdmin = _isAuthenticated &&
             (user.IsInRole("Administrator") ||

@@ -3,6 +3,7 @@
 @using PoTraffic.Shared.DTOs.History
 @using PoTraffic.Shared.Enums
 @inject HttpClient Http
+@implements IDisposable
 
 <RadzenFieldset Text="Monitoring Schedule" class="rz-mb-3">
     @if (_loadingWindows)
@@ -77,7 +78,7 @@
                 <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.3rem">
                     <RadzenCheckBox TValue="bool" Value="_selectedDays[name]"
                                     Change="@(v => _selectedDays[name] = v)" />
-                    <RadzenText TextStyle="TextStyle.Body2" Style="margin:0;cursor:pointer;">@name</RadzenText>
+                    <RadzenText TextStyle="TextStyle.Body2" class="pt-wcp-day-label">@name</RadzenText>
                 </RadzenStack>
             }
         </div>
@@ -115,16 +116,65 @@
     private bool _loadingWindows = true;
     private bool _saving;
     private bool _editing;
+    private Guid _loadedRouteId;   // guards against reloading on every parent re-render (the 15s dashboard poll)
     private MonitoringWindowDto? _activeWindow;
     private SessionDto? _activeSession;
     private string _error = "";
     private string _loadError = "";
+    private System.Timers.Timer? _sessionRefreshTimer;
 
-    // Defaults for a new schedule: start = now, end = one hour later (UTC —
-    // window times are interpreted server-side as UTC). Editing an existing
-    // window overwrites these in LoadWindowAsync.
-    private DateTime? _startTime = Routes.CreateRoutePage.UtcNowToMinute();
-    private DateTime? _endTime = Routes.CreateRoutePage.UtcNowToMinute().AddHours(1);
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Refresh PollCount + LastPollAt every 15s so the "X poll(s) recorded today"
+            // banner stays current while the scheduler is actively polling. Cheap call,
+            // never blocks UI.
+            _sessionRefreshTimer = new System.Timers.Timer(TimeSpan.FromSeconds(15).TotalMilliseconds);
+            _sessionRefreshTimer.Elapsed += async (_, _) =>
+            {
+                if (_activeWindow is not null && !_editing)
+                {
+                    try { await RefreshSessionAsync(); }
+                    catch { /* swallow — periodic refresh only */ }
+                }
+            };
+            _sessionRefreshTimer.AutoReset = true;
+            _sessionRefreshTimer.Start();
+        }
+    }
+
+    private async Task RefreshSessionAsync()
+    {
+        if (_activeWindow is null) return;
+        var sessions = await Http.GetFromJsonAsync(
+            $"/api/routes/{RouteId}/sessions", AppJsonContext.Default.ListSessionDto);
+        DateOnly today = DateOnly.FromDateTime(DateTime.UtcNow.Date);
+        _activeSession = sessions?.FirstOrDefault(
+            s => s.State == SessionState.Active && s.SessionDate == today);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        if (_sessionRefreshTimer is not null)
+        {
+            _sessionRefreshTimer.Stop();
+            _sessionRefreshTimer.Dispose();
+            _sessionRefreshTimer = null;
+        }
+    }
+
+    // Defaults for a new schedule: start = local time now, end = one hour later.
+    // Window times are stored/interpreted server-side as UTC (see PollRouteJob),
+    // but we display defaults in local time so they match the user's wall clock.
+    // Editing an existing window overwrites these in LoadWindowAsync.
+    private DateTime? _startTime = Routes.CreateRoutePage.LocalNowToMinute();
+    private DateTime? _endTime = Routes.CreateRoutePage.LocalNowToMinute().AddHours(1);
+
+    /// <summary>Convert local wall-clock <paramref name="local"/> to UTC and return "HH:mm".
+    /// Delegates to <see cref="Routes.CreateRoutePage.ToUtcHHmm"/> so behavior is consistent.</summary>
+    private static string ToUtcHHmm(DateTime local) => Routes.CreateRoutePage.ToUtcHHmm(local);
 
     private readonly (string name, byte bit)[] _days =
     [
@@ -140,6 +190,13 @@
 
     protected override async Task OnParametersSetAsync()
     {
+        // Only (re)load when the route actually changes. The parent (RouteDetailPage) polls
+        // every 15s and re-renders, which re-invokes this on an unchanged RouteId — reloading
+        // there would flash the spinner and wipe any in-progress schedule edit.
+        if (RouteId == _loadedRouteId)
+            return;
+
+        _loadedRouteId = RouteId;
         await LoadWindowAsync();
     }
 
@@ -270,8 +327,8 @@
             HttpResponseMessage resp = await Http.PostAsJsonAsync(
                 $"/api/routes/{RouteId}/windows",
                 new SaveWindowRequest(
-                    _startTime!.Value.ToString("HH:mm:ss"),
-                    _endTime!.Value.ToString("HH:mm:ss"),
+                    ToUtcHHmm(_startTime!.Value),
+                    ToUtcHHmm(_endTime!.Value),
                     mask), AppJsonContext.Default.SaveWindowRequest);
 
             if (resp.IsSuccessStatusCode)

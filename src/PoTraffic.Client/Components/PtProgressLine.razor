@@ -1,0 +1,14 @@
+@* ──────────────────────────────────────────────────────────────────────
+   PtProgressLine — GPU-composited sweep, replaces RadzenProgressBar
+   indeterminate. 2px tall, brand-color sweep, respects reduced motion.
+   ────────────────────────────────────────────────────────────────────── *@
+@if (Visible)
+{
+    <div class="pt-progress-line" role="progressbar" aria-busy="true"
+         aria-label="@AriaLabel" aria-valuetext="@AriaLabel"></div>
+}
+
+@code {
+    [Parameter] public bool Visible { get; set; } = true;
+    [Parameter] public string AriaLabel { get; set; } = "Loading";
+}

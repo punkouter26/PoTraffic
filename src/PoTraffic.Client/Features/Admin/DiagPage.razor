@@ -11,8 +11,7 @@
     <RadzenTabs>
         <Tabs>
             <RadzenTabsItem Text="Connection Health" Icon="health_and_safety">
-                <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-mt-3 rz-mb-2"
-                            style="color:var(--rz-text-tertiary-color)">
+                <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-mt-3 rz-mb-2 pt-diag-subtitle">
                     Live ping results for all external dependencies.
                 </RadzenText>
                 <LoadingErrorCard IsLoading="_healthLoading" Error="@_healthError">
@@ -33,8 +32,7 @@
             </RadzenTabsItem>
 
             <RadzenTabsItem Text="System Config" Icon="settings">
-                <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-mt-3 rz-mb-4"
-                            style="color:var(--rz-text-tertiary-color)">
+                <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-mt-3 rz-mb-4 pt-diag-subtitle">
                     Sensitive values are masked. Values can be updated by administrators.
                 </RadzenText>
                 <LoadingErrorCard IsLoading="_loading" Error="@_error">
@@ -45,7 +43,7 @@
                                 <Template Context="c">
                                     @if (c.IsSensitive)
                                     {
-                                        <span style="font-style:italic;color:var(--rz-text-tertiary-color)">@c.Value</span>
+                                        <span class="pt-diag-sensitive">@c.Value</span>
                                     }
                                     else
                                     {
@@ -78,7 +76,7 @@
             </RadzenTabsItem>
 
             <RadzenTabsItem Text="Triple Test" Icon="science">
-                <div class="rz-mt-3" style="max-width:800px;">
+                <div class="rz-mt-3 pt-diag-triple-test">
                     <TripleTestPanel />
                 </div>
             </RadzenTabsItem>

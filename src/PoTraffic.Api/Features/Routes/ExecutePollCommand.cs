@@ -21,6 +21,11 @@ public sealed class ExecutePollCommandHandler(
     ITrafficProviderFactory providerFactory,
     ILogger<ExecutePollCommandHandler> logger) : IRequestHandler<ExecutePollCommand, bool>
 {
+    /// <summary>Two polls closer together than this are treated as the same logical poll
+    /// (a re-executed job after a crash/requeue); the second is suppressed. Well below the
+    /// minutes-apart real poll interval, so it never suppresses a legitimate poll.</summary>
+    private static readonly TimeSpan DedupWindow = TimeSpan.FromSeconds(30);
+
     public async Task<bool> Handle(ExecutePollCommand cmd, CancellationToken ct)
     {
         // 1. Load Route + active MonitoringSession for today
@@ -46,6 +51,19 @@ public sealed class ExecutePollCommandHandler(
         {
             logger.LogInformation("ExecutePollCommand: No active session for route {RouteId} on {Date}",
                 cmd.RouteId, today);
+            return false;
+        }
+
+        // 2b. Idempotency guard against a re-executed job (crash between the poll and its
+        // MarkCompleted requeues the job → it would poll again). Polls are spaced minutes
+        // apart, so a poll landing within DedupWindow of the last one is a duplicate: skip
+        // it so we neither charge the provider twice nor write a duplicate PollRecord.
+        if (session.LastPollAt is { } last
+            && DateTimeOffset.UtcNow - last < DedupWindow)
+        {
+            logger.LogInformation(
+                "ExecutePollCommand: duplicate poll for route {RouteId} suppressed — last poll {Seconds:F0}s ago",
+                cmd.RouteId, (DateTimeOffset.UtcNow - last).TotalSeconds);
             return false;
         }
 

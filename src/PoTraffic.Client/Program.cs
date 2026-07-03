@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using PoTraffic.Client;
+using PoTraffic.Client.Infrastructure;
 using PoTraffic.Client.Infrastructure.Auth;
 using PoTraffic.Client.Infrastructure.Http;
 using Radzen;
@@ -31,5 +32,8 @@ builder.Services.AddAuthorizationCore();
 
 // Radzen component services (dialogs, tooltips, notifications, context menus)
 builder.Services.AddRadzenComponents();
+
+// PoTraffic native-browser interop (audio feedback, touch gestures)
+builder.Services.AddScoped<PtInterop>();
 
 await builder.Build().RunAsync();

@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
+using PoTraffic.Api.Infrastructure.Logging;
 
 namespace PoTraffic.Api.Infrastructure.Providers;
 
@@ -39,16 +40,16 @@ public sealed class TomTomTrafficProvider : ITrafficProvider
             if (results is { Length: > 0 })
             {
                 string coords = $"{results[0].Lat},{results[0].Lon}";
-                _logger.LogDebug("Nominatim geocoded '{Address}' → {Coords}", address, coords);
+                _logger.LogDebug("Nominatim geocoded {AddressRef} → {Coords}", PiiRedactor.Redact(address), coords);
                 return coords;
             }
 
-            _logger.LogWarning("Nominatim returned no results for address '{Address}'.", address);
+            _logger.LogWarning("Nominatim returned no results for address {AddressRef}.", PiiRedactor.Redact(address));
             return null;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Nominatim geocoding request failed for address '{Address}'.", address);
+            _logger.LogError(ex, "Nominatim geocoding request failed for address {AddressRef}.", PiiRedactor.Redact(address));
             return null;
         }
     }
