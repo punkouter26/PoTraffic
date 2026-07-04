@@ -97,8 +97,10 @@ function Warmup-App {
 
 function Install-PlaywrightChromium {
     $local = Join-Path $env:LOCALAPPDATA 'ms-playwright'
-    $home = Join-Path $env:USERPROFILE '.cache/ms-playwright'
-    $existing = @($local, $home) | Where-Object { Test-Path $_ } | ForEach-Object {
+    # NB: do NOT use $home — it is a read-only PowerShell automatic variable; assigning
+    # to it throws and aborts the Playwright install, silently skipping the E2E UI tier.
+    $homeCache = Join-Path $env:USERPROFILE '.cache/ms-playwright'
+    $existing = @($local, $homeCache) | Where-Object { Test-Path $_ } | ForEach-Object {
         Get-ChildItem $_ -Recurse -Filter chrome.exe -ErrorAction SilentlyContinue
     } | Select-Object -First 1
     if ($existing) {
@@ -177,14 +179,14 @@ function Invoke-Tier {
             $ns.AddNamespace('t', 'http://microsoft.com/schemas/VisualStudio/TeamTest/2010')
             $counters = $xml.SelectSingleNode('/t:TestRun/t:ResultSummary/t:Counters', $ns)
             if ($counters) {
-                $counts.total = [int]$counters.SelectSingleNode('t:Total', $ns).'#text'
-                $counts.passed = [int]$counters.SelectSingleNode('t:Passed', $ns).'#text'
-                $counts.failed = [int]$counters.SelectSingleNode('t:Failed', $ns).'#text'
-                $inconclusive = $counters.SelectSingleNode('t:Inconclusive', $ns)
-                $notRunnable = $counters.SelectSingleNode('t:NotRunnable', $ns)
-                $counts.skipped = ([int]$inconclusive.'#text') + ([int]$notRunnable.'#text')
-                $completed = $counters.SelectSingleNode('t:Completed', $ns)
-                $counts.duration = [double]$completed.'#text'
+                # TRX exposes these as ATTRIBUTES on <Counters .../> (total="102" passed="102" ...),
+                # not child elements — SelectSingleNode('t:Total') always returned null → 0.
+                $counts.total = [int]$counters.GetAttribute('total')
+                $counts.passed = [int]$counters.GetAttribute('passed')
+                $counts.failed = [int]$counters.GetAttribute('failed')
+                # Everything neither passed nor failed (inconclusive/not-executed/skipped) counts as skipped.
+                $counts.skipped = [math]::Max(0, $counts.total - $counts.passed - $counts.failed)
+                $counts.duration = 0.0
             }
         } catch { }
     }

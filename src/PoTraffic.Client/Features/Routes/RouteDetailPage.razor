@@ -115,17 +115,42 @@ else
     private PollRecordDto? LatestPoll => _todayPolls.OrderByDescending(p => p.PolledAtDateTime).FirstOrDefault();
 
     /// <summary>
-    /// True if the active monitoring window currently contains "now" (UTC).
-    /// Used by <see cref="NextSample"/> to distinguish "between polls, inside window"
-    /// from "window has closed for today, scheduler is silent".
+    /// True if the active monitoring window currently contains "now" (UTC) — both the
+    /// day-of-week AND the time-of-day must match. Mirrors the server's
+    /// <c>PollRouteJob.IsWithinWindow</c> so the card never claims a poll is imminent on
+    /// a day the scheduler has gated off (e.g. a Mon–Fri schedule viewed on Saturday).
     /// </summary>
     private bool WindowIsOpenNow()
     {
         if (_activeWindow is null) return false;
+        if (!_activeWindow.DaysOfWeek.Contains(DateTime.UtcNow.DayOfWeek.ToString())) return false;
         if (!TimeOnly.TryParse(_activeWindow.StartTime, out var start)) return false;
         if (!TimeOnly.TryParse(_activeWindow.EndTime, out var end)) return false;
         TimeOnly nowUtc = TimeOnly.FromDateTime(DateTime.UtcNow);
         return nowUtc >= start && nowUtc < end;
+    }
+
+    /// <summary>
+    /// Next UTC instant the active window opens after now, or null when no days are
+    /// enabled / the time is unparseable. Mirrors <c>PollRouteJob.NextWindowStart</c> so
+    /// the ETA card names the same instant the scheduler is actually sleeping until.
+    /// </summary>
+    private DateTimeOffset? NextWindowOpenUtc()
+    {
+        if (_activeWindow is null) return null;
+        if (!TimeOnly.TryParse(_activeWindow.StartTime, out var start)) return null;
+
+        DateTimeOffset nowUtc = DateTimeOffset.UtcNow;
+        for (int i = 0; i <= 7; i++)
+        {
+            DateTime day = nowUtc.UtcDateTime.Date.AddDays(i);
+            if (!_activeWindow.DaysOfWeek.Contains(day.DayOfWeek.ToString()))
+                continue;
+            var open = new DateTimeOffset(day.Add(start.ToTimeSpan()), TimeSpan.Zero);
+            if (open > nowUtc)
+                return open;
+        }
+        return null;
     }
 
     private readonly record struct NextSampleInfo(string Value, string Detail, bool Live);
@@ -146,15 +171,22 @@ else
                 return new NextSampleInfo("—", "Start monitoring to begin sampling", Live: false);
             }
 
-            // Distinguish "session active but window closed for today" from "session active
-            // and we're waiting for the next poll tick". Without this, a window that ended
-            // an hour ago still shows "Due now" because the next +5min slot has passed.
+            // Distinguish "session active but window not open now" from "session active
+            // and we're waiting for the next poll tick". "Not open now" covers both a
+            // closed time-of-day AND a day the schedule excludes — on a Mon–Fri schedule
+            // viewed Saturday the next poll is days away, not "within 5 min".
             if (!WindowIsOpenNow())
             {
-                string startLabel = _activeWindow is not null
-                    ? $"Window closed — next opens {_activeWindow.StartTime[..5]}"
-                    : "Window closed for today";
-                return new NextSampleInfo("Idle", startLabel, Live: false);
+                DateTimeOffset? nextOpen = NextWindowOpenUtc();
+                if (nextOpen is null)
+                {
+                    return new NextSampleInfo("Idle", "No polling days scheduled", Live: false);
+                }
+
+                // Reuse the window's own time string so this matches the Schedule panel exactly.
+                DateTime openUtc = nextOpen.Value.UtcDateTime;
+                string when = openUtc.Date == DateTime.UtcNow.Date ? "today" : openUtc.ToString("ddd");
+                return new NextSampleInfo("Idle", $"Next poll {when} {_activeWindow!.StartTime[..5]}", Live: false);
             }
 
             // The session's server-recorded last poll is the authoritative cadence anchor;

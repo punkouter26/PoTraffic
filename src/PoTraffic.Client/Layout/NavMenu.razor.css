@@ -213,11 +213,17 @@
     }
 }
 
-/* ── Overlay behind the user menu ── */
+/* ── Overlay behind the user menu ──
+   MUST stay below .app-shell (position:sticky; z-index:100). The header is its own
+   stacking context, so the dropdown's z-index:200 only ranks *within* the header —
+   at the root the whole header ranks at 100. A root-level overlay above 100 would
+   paint over the dropdown and swallow its clicks (Sign Out looks dead, just closes
+   the menu). At 90 the overlay still covers all page content below the header to
+   catch outside clicks, while the dropdown inside the header stays clickable. */
 
 .pt-overlay {
     position: fixed;
     inset: 0;
-    z-index: 150;
+    z-index: 90;
     background: transparent;
 }

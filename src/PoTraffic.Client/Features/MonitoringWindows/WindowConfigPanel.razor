@@ -34,6 +34,10 @@
                 {
                     <span> Last poll: @_activeSession.LastPollAt.Value.ToLocalTime().ToString("HH:mm:ss")</span>
                 }
+                @if (!TodayIsScheduled)
+                {
+                    <div class="rz-mt-1">Today (@DateTime.UtcNow.DayOfWeek) is outside this schedule — polling resumes on the next scheduled day.</div>
+                }
             </RadzenAlert>
         }
         else
@@ -119,6 +123,13 @@
     private Guid _loadedRouteId;   // guards against reloading on every parent re-render (the 15s dashboard poll)
     private MonitoringWindowDto? _activeWindow;
     private SessionDto? _activeSession;
+
+    /// <summary>True when today's UTC day-of-week is one the active window polls on.
+    /// A Mon–Fri schedule viewed on Saturday is "active" (session running) but not scheduled,
+    /// which is why the poll count can sit at 0 all day.</summary>
+    private bool TodayIsScheduled =>
+        _activeWindow is not null && _activeWindow.DaysOfWeek.Contains(DateTime.UtcNow.DayOfWeek.ToString());
+
     private string _error = "";
     private string _loadError = "";
     private System.Timers.Timer? _sessionRefreshTimer;
