@@ -11,7 +11,7 @@ permissions:
 
 env:
   DOTNET_VERSION: '10.0.x'
-  AZURE_WEBAPP_NAME: potraffic-api
+  AZURE_WEBAPP_NAME: potraffic-api-win
   AZURE_RESOURCE_GROUP: PoTraffic
   API_PROJECT_PATH: src/PoTraffic.Api/PoTraffic.Api.csproj
   DOTNET_NOLOGO: 'true'
@@ -57,7 +57,7 @@ jobs:
     timeout-minutes: 15
     environment:
       name: production
-      url: https://potraffic-api.azurewebsites.net
+      url: https://potraffic-api-win.azurewebsites.net
     steps:
       - uses: actions/download-artifact@v4
         with:
