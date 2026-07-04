@@ -14,7 +14,7 @@ namespace PoTraffic.Api.Infrastructure.Scheduling;
 public sealed class TableStorageJobScheduler : IJobScheduler
 {
     private readonly TableClient _tableClient;
-    private const string TableName = "ScheduledJobs";
+    internal const string TableName = "ScheduledJobs";
     private const string OneShotPartition = "OneShot";
     private const string RecurringPartition = "Recurring";
 

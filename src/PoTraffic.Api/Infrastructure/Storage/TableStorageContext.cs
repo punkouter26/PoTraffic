@@ -390,7 +390,9 @@ public sealed class TableStorageContext
 
             HydrationLog.EnsuringTables(logger, _store.GetType().Name, Maps.Count);
 
-            await _store.EnsureTablesAsync(Maps.Values.Select(m => m.Table), ct);
+            await _store.EnsureTablesAsync(
+                Maps.Values.Select(m => m.Table).Append(Scheduling.TableStorageJobScheduler.TableName),
+                ct);
 
             int totalEntities = 0;
             foreach ((Type type, EntityMap map) in Maps)
