@@ -28,13 +28,22 @@ public static class TableStorageExtensions
     {
         string? connectionString = configuration["ConnectionStrings:TableStorage"];
 
-        // Rule 5 — Dynamic Switching: Azurite locally, Azure Table Storage in cloud.
-        //   Empty / "UseDevelopmentStorage=true" → local Azurite default.
-        //   Explicit connection string → custom Azurite/Azure endpoint, used by Testcontainers.
-        //   Managed identity → Azure Table Storage account from AzureTable:AccountName config.
-        bool useAzurite = string.IsNullOrEmpty(connectionString)
-            || connectionString.Contains("UseDevelopmentStorage=true", StringComparison.OrdinalIgnoreCase)
-            || (environment.IsDevelopment() && !configuration.GetValue<bool>("AzureCredential:UseProductionStorage"));
+        // Rule 5 — Dynamic Switching, corrected for cloud (Rule 6 — Managed Identity, no
+        // connection strings in prod):
+        //   • Explicit "UseDevelopmentStorage=true"        → local Azurite.
+        //   • Local Development with no connection string  → local Azurite.
+        //   • Explicit non-dev connection string           → use it (Testcontainers / custom endpoint).
+        //   • Any DEPLOYED environment with no connection string → Managed Identity against
+        //     AzureTable:AccountName.
+        // An EMPTY connection string must NEVER silently fall back to the 127.0.0.1 emulator
+        // outside Development — that is exactly what crashed prod (500.30, socket 127.0.0.1:10002).
+        bool explicitDevStorage = !string.IsNullOrEmpty(connectionString)
+            && connectionString.Contains("UseDevelopmentStorage=true", StringComparison.OrdinalIgnoreCase);
+
+        bool useAzurite = explicitDevStorage
+            || (environment.IsDevelopment()
+                && string.IsNullOrEmpty(connectionString)
+                && !configuration.GetValue<bool>("AzureCredential:UseProductionStorage"));
 
         TableClientOptions tableOptions = new()
         {
