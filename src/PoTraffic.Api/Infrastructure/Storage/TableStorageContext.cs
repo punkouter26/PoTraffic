@@ -417,7 +417,7 @@ public sealed class TableStorageContext
 
             lock (_gate) RelinkNavigations();
             HydrationLog.HydrationComplete(logger, totalEntities);
-            _hydrated = true;
+            _hydrated = true;  // success path only — readiness probes report true ONLY when hydration actually finished
         }
         catch (RequestFailedException rfe) when (rfe.Status is 401 or 403)
         {
@@ -426,13 +426,13 @@ public sealed class TableStorageContext
                 rfe.Status,
                 rfe.ErrorCode ?? "AuthorizationPermissionMismatch",
                 _store?.GetType().Name ?? "<none>");
-            _hydrated = true;
+            // _hydrated stays false → /health/ready returns 503 until RBAC is granted
             throw;
         }
         catch (Exception ex)
         {
             HydrationLog.HydrationFailed(logger, ex.GetType().Name, ex.Message);
-            _hydrated = true;
+            // _hydrated stays false → /health/ready returns 503 until hydration succeeds
             throw;
         }
     }
