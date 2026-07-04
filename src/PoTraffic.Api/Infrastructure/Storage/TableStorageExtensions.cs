@@ -1,3 +1,4 @@
+using Azure.Core;
 using Azure.Data.Tables;
 using Azure.Identity;
 using Microsoft.Extensions.Configuration;
@@ -65,14 +66,22 @@ public static class TableStorageExtensions
         {
             // Production: managed identity against the account named in configuration
             // (AzureTable:AccountName — set in App Service application settings).
+            //
+            // Use ManagedIdentityCredential explicitly. DefaultAzureCredential walks env
+            // vars → workload identity → chained MIs in an order that is hard to debug;
+            // a deterministic credential means "the missing role is on this identity,
+            // not another." If AZURE_CLIENT_ID is set (user-assigned MI), honor it;
+            // otherwise fall back to the system-assigned MI created on the App Service.
             string accountName = configuration["AzureTable:AccountName"]
                 ?? throw new InvalidOperationException(
                     "AzureTable:AccountName must be configured when using managed identity.");
-            services.AddSingleton<TableServiceClient>(_ =>
-                new TableServiceClient(
-                    new Uri($"https://{accountName}.table.core.windows.net"),
-                    new DefaultAzureCredential(),
-                    tableOptions));
+
+            TokenCredential credential = ResolveManagedIdentityCredential(configuration);
+
+            services.AddSingleton<TableServiceClient>(_ => new TableServiceClient(
+                new Uri($"https://{accountName}.table.core.windows.net"),
+                credential,
+                tableOptions));
         }
 
         // Scheduler job-state table client (see TableStorageJobScheduler).
@@ -83,5 +92,19 @@ public static class TableStorageExtensions
         });
 
         return services;
+    }
+
+    /// <summary>
+    /// Returns a <see cref="ManagedIdentityCredential"/> targeting either the
+    /// user-assigned MI named by <c>AZURE_CLIENT_ID</c> or, when that env var
+    /// is unset, the system-assigned MI. Centralized so any future caller
+    /// (cache, scheduler, custom HttpClient) uses the same path.
+    /// </summary>
+    internal static TokenCredential ResolveManagedIdentityCredential(IConfiguration configuration)
+    {
+        string? clientId = configuration["AZURE_CLIENT_ID"];
+        return string.IsNullOrWhiteSpace(clientId)
+            ? new ManagedIdentityCredential(ManagedIdentityId.SystemAssigned)
+            : new ManagedIdentityCredential(ManagedIdentityId.FromUserAssignedClientId(clientId));
     }
 }

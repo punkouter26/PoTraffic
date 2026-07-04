@@ -27,10 +27,18 @@ using Scalar.AspNetCore;
 using Serilog;
 
 // ── Serilog bootstrap (MEL-only; all app code uses ILogger<T>) ───────────────
+//
+// Serilog.Debugging.SelfLog flushes any internal pipeline failures to stderr.
+// In a 500.30 environment the MEL sink can stall before stdout flushes, so
+// SelfLog is the last-resort signal that "Serilog itself is broken, not the
+// host". Surface it as soon as the bootstrap logger is created.
 Log.Logger = new LoggerConfiguration()
     .Enrich.FromLogContext()
     .WriteTo.Console()
     .CreateBootstrapLogger();
+
+Serilog.Debugging.SelfLog.Enable(msg =>
+    Console.Error.WriteLine($"[serilog-selflog] {DateTime.UtcNow:O} {msg}"));
 
 try
 {
@@ -71,6 +79,8 @@ try
         {
             // Chain of Responsibility — try the credential, swallow auth/credential failures
             // so first-time contributors without `az login` can still `dotnet run` locally.
+            // In Dev we still try DefaultAzureCredential first because `az login` is the
+            // typical path; if it fails we fall back to appsettings.Development.json.
             try
             {
                 builder.Configuration.AddAzureKeyVault(
@@ -94,10 +104,23 @@ try
         }
         else
         {
-            // Production / Staging — let exceptions propagate. Rule 6 + 13.
+            // Production / Staging — pin the credential to a single managed identity so
+            // a future "I forgot which MI the role is on" mistake becomes a deterministic
+            // error. DefaultAzureCredential walks env → workload → chained MIs; that
+            // ordering is fine for dev but hides the real identity in prod.
+            //
+            // AZURE_CLIENT_ID is set in App Service app settings (from Bicep) and points
+            // at the shared user-assigned MI in PoShared. If unset (e.g. local prod
+            // build), fall back to system-assigned — never chain.
+            Azure.Core.TokenCredential kvCredential = !string.IsNullOrWhiteSpace(
+                builder.Configuration["AZURE_CLIENT_ID"])
+                ? new Azure.Identity.ManagedIdentityCredential(
+                    Azure.Identity.ManagedIdentityId.FromUserAssignedClientId(builder.Configuration["AZURE_CLIENT_ID"]!))
+                : new Azure.Identity.ManagedIdentityCredential(Azure.Identity.ManagedIdentityId.SystemAssigned);
+
             builder.Configuration.AddAzureKeyVault(
                 new Uri(vaultUri!),
-                new DefaultAzureCredential(),
+                kvCredential,
                 kvOptions);
         }
     }
@@ -268,7 +291,18 @@ try
     // Error endpoint
     app.MapGet("/error", () => Results.Problem()).ExcludeFromDescription();
 
-    // Health check endpoint — pings DB and external APIs, returns JSON status per dependency
+    // ── Readiness probe — distinct from /health so App Service readiness probes
+    // don't depend on hydration completing. Returns 503 while HydrateAsync is in
+    // flight; 200 once IsHydrated is true. The host binds first either way.
+    app.MapGet("/health/ready", () =>
+    {
+        TableStorageContext ctx = app.Services.GetRequiredService<TableStorageContext>();
+        return ctx.IsHydrated
+            ? Results.Ok(new { status = "ready", durable = ctx.IsDurable })
+            : Results.Json(new { status = "hydrating", durable = ctx.IsDurable }, statusCode: 503);
+    }).AllowAnonymous();
+
+    // ── Health check endpoint — pings DB and external APIs, returns JSON status per dependency ──
     app.MapHealthChecks("/health", new HealthCheckOptions
     {
         ResponseWriter = async (httpCtx, report) =>
@@ -313,28 +347,85 @@ try
     }
 
     // ── Startup: hydrate the working set from Table Storage + seed configuration ──
-    // Idempotent — safe to run on every cold-start. Production treats a hydration
-    // failure as fatal (running without durability would silently lose user data);
-    // Development/Testing degrade to memory-only so a checkout without Azurite
-    // still boots (Rule 10 — First-Run Success).
+    // Idempotent — safe to run on every cold-start.
+    //
+    // Hydration runs OFF the host startup path so a transient Storage blip
+    // (RBAC propagation gap, network glitch, 403 during cold start) never causes
+    // a 500.30. The host binds immediately, /health returns 200, /health/ready
+    // returns 503 until the working set is populated. A background retry loop
+    // handles transient failures. In Production, a permanent failure still
+    // crashes the host via `app.Lifetime.ApplicationStopping` so ops gets a
+    // loud signal — but only AFTER traffic can already be served.
     ILogger<Program> startupLog = app.Services.GetRequiredService<ILogger<Program>>();
     TableStorageContext db = app.Services.GetRequiredService<TableStorageContext>();
-    try
-    {
-        await db.HydrateAsync();
-        startupLog.LogInformation("Table Storage hydrated: {Users} users, {Routes} routes, {Polls} polls.",
-            db.Users.Count(), db.Routes.Count(), db.Polls.Count());
-    }
-    catch (Exception ex) when (!app.Environment.IsProduction())
-    {
-        db.MarkVolatile();
-        startupLog.LogWarning(ex,
-            "Table Storage unreachable — running MEMORY-ONLY (data lost on restart). Start Azurite (docker compose up -d) to persist.");
-    }
 
-    // Seed default SystemConfiguration rows (cost rates, daily quota) and persist them.
-    db.SeedDefaultConfigurationsIfMissing();
-    await db.SaveChangesAsync();
+    _ = Task.Run(async () =>
+    {
+        // Push Storage.AccountName + Storage.Auth onto every log event inside
+        // the hydration scope so App Insights queries can filter by either
+        // (e.g. "Storage.Account == 'potrafficstorage'" AND "Storage.Auth == 'user-assigned'").
+        string accountName = builder.Configuration["AzureTable:AccountName"] ?? "<none>";
+        string credentialSource = !string.IsNullOrWhiteSpace(builder.Configuration["AZURE_CLIENT_ID"])
+            ? "user-assigned"
+            : "system-assigned";
+
+        using (Serilog.Context.LogContext.PushProperty("Storage.Account", accountName))
+        using (Serilog.Context.LogContext.PushProperty("Storage.Auth", credentialSource))
+        using (Serilog.Context.LogContext.PushProperty("Operation", "HydrateAsync"))
+        {
+            const int MaxAttempts = 5;
+            TimeSpan backoff = TimeSpan.FromSeconds(5);
+            for (int attempt = 1; attempt <= MaxAttempts; attempt++)
+            {
+                try
+                {
+                    await db.HydrateAsync();
+                    startupLog.LogInformation(
+                        "Table Storage hydrated: {Users} users, {Routes} routes, {Polls} polls (attempt {Attempt}).",
+                        db.Users.Count(), db.Routes.Count(), db.Polls.Count(), attempt);
+
+                    // Seed default SystemConfiguration rows (cost rates, daily quota) and persist them.
+                    db.SeedDefaultConfigurationsIfMissing();
+                    await db.SaveChangesAsync();
+                    return;
+                }
+                catch (Exception ex) when (!app.Environment.IsProduction())
+                {
+                    // Dev/Test fallback: degrade to memory-only.
+                    db.MarkVolatile();
+                    startupLog.LogWarning(ex,
+                        "Table Storage unreachable (attempt {Attempt}/{Max}) — running MEMORY-ONLY. " +
+                        "Start Azurite (docker compose up -d) to persist.", attempt, MaxAttempts);
+                    return;
+                }
+                catch (Exception ex) when (app.Environment.IsProduction() && attempt < MaxAttempts)
+                {
+                    startupLog.LogError(ex,
+                        "Table Storage hydration failed (attempt {Attempt}/{Max}); retrying in {BackoffSec}s.",
+                        attempt, MaxAttempts, backoff.TotalSeconds);
+                    try
+                    {
+                        await Task.Delay(backoff, app.Lifetime.ApplicationStopping);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        return;
+                    }
+                    backoff = TimeSpan.FromSeconds(Math.Min(backoff.TotalSeconds * 2, 60));
+                }
+                catch (Exception ex)
+                {
+                    // Final failure in Production: stop the host with a loud signal.
+                    startupLog.LogCritical(ex,
+                        "Table Storage hydration failed after {Max} attempts — terminating host. " +
+                        "Verify the App Service managed identity has 'Storage Table Data Contributor' " +
+                        "on the storage account; RBAC propagation can take 3–5 minutes.", MaxAttempts);
+                    app.Lifetime.StopApplication();
+                    return;
+                }
+            }
+        }
+    });
 
     // T086 — Register nightly pruning recurring job (02:00 UTC).
     // Skipped in Testing where IJobScheduler is not registered.

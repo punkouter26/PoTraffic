@@ -70,6 +70,16 @@ resource web 'Microsoft.Web/sites@2024-04-01' = {
         { name: 'AZURE_CLIENT_ID', value: sharedIdentityClientId }
         // Deploy a pre-built artifact from CI — skip Oryx build-on-deploy.
         { name: 'SCM_DO_BUILD_DURING_DEPLOYMENT', value: 'false' }
+        // Surface the real startup exception instead of a generic 500.30.
+        // Stripped back to false once ops confirms healthy boots.
+        { name: 'ASPNETCORE_DETAILEDERRORS', value: 'true' }
+        // MEL/Sink verbosity — captures hydration, scheduler, and storage failures.
+        { name: 'Logging__LogLevel__Default', value: 'Information' }
+        { name: 'Logging__LogLevel__Microsoft__Hosting__Lifetime', value: 'Information' }
+        { name: 'Logging__LogLevel__PoTraffic', value: 'Debug' }
+        // Force the managed-identity path explicitly (TableStorageExtensions
+        // honors this and avoids DefaultAzureCredential ambiguity).
+        { name: 'AzureTable__UseManagedIdentity', value: 'true' }
       ]
     }
   }
@@ -110,6 +120,44 @@ resource storage 'Microsoft.Storage/storageAccounts@2023-01-01' = if (!empty(sto
     networkAcls: {
       defaultAction: 'Allow'
     }
+  }
+}
+
+// ── Storage role assignments (CI/CD rule #6 — Managed Identity only) ───────
+//
+// Grant 'Storage Table Data Contributor' to BOTH the user-assigned MI
+// (sharedIdentityId — read via AZURE_CLIENT_ID at runtime) and the system-
+// assigned MI on the App Service (web.identity.principalId — the one the
+// Portal IAM selector targets). Without either, HydrateAsync throws a 403
+// and the host crashes with HTTP 500.30.
+//
+// The user-assigned MI reference uses an explicit existing-resource lookup so
+// Bicep correctly resolves principalId at deploy time.
+resource sharedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' existing = {
+  name: last(split(sharedIdentityId, '/'))
+}
+
+var storageTableDataContributorRoleId = subscriptionResourceId(
+  'Microsoft.Authorization/roleDefinitions',
+  '0a9a7e1f-b9d0-4cc4-a60d-9918e0c33e7d')  // Storage Table Data Contributor
+
+resource saUserAssignedTableContrib 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(storageAccountName)) {
+  name: guid(storage.id, sharedIdentityId, 'sttdc')
+  scope: storage
+  properties: {
+    roleDefinitionId: storageTableDataContributorRoleId
+    principalId:      sharedIdentity.properties.principalId
+    principalType:    'ServicePrincipal'
+  }
+}
+
+resource saSystemAssignedTableContrib 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(storageAccountName)) {
+  name: guid(storage.id, web.id, 'sttdc')
+  scope: storage
+  properties: {
+    roleDefinitionId: storageTableDataContributorRoleId
+    principalId:      web.identity.principalId
+    principalType:    'ServicePrincipal'
   }
 }
 

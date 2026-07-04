@@ -1,6 +1,9 @@
 using System.Collections;
 using System.Reflection;
 using System.Text.Json;
+using Azure;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using PoTraffic.Api.Features.Admin.Entities;
 using PoTraffic.Api.Features.Auth.Entities;
 using PoTraffic.Api.Features.Config.Entities;
@@ -39,6 +42,15 @@ public sealed class TableStorageContext
 
     private static readonly JsonSerializerOptions JsonOpts = new(); // nav properties carry [JsonIgnore]
 
+    /// <summary>
+    /// Optional logger factory — wired in DI registration. Source-generated logs
+    /// mean zero allocations per hydration event.
+    /// </summary>
+    internal ILoggerFactory? LoggerFactory { get; set; }
+
+    private ILogger CreateHydrationLogger()
+        => (LoggerFactory ?? NullLoggerFactory.Instance).CreateLogger("PoTraffic.Storage.Hydration");
+
     internal readonly List<User> _users = new();
     internal readonly List<EntityRoute> _routes = new();
     internal readonly List<MonitoringWindow> _windows = new();
@@ -61,6 +73,7 @@ public sealed class TableStorageContext
     private readonly HashSet<object> _dirtyPolls = new(ReferenceEqualityComparer.Instance);
 
     private bool _durable;
+    private volatile bool _hydrated;
 
     /// <summary>Volatile in-memory context — unit tests only.</summary>
     public TableStorageContext() { }
@@ -73,6 +86,9 @@ public sealed class TableStorageContext
 
     /// <summary>True when writes are being persisted to Table Storage.</summary>
     public bool IsDurable => _durable;
+
+    /// <summary>True once <see cref="HydrateAsync"/> has finished (success or fatal).</summary>
+    public bool IsHydrated => _hydrated;
 
     /// <summary>
     /// Degrades to memory-only mode (Dev fallback when Azurite is not running).
@@ -354,36 +370,71 @@ public sealed class TableStorageContext
     /// <summary>
     /// Loads the full working set from Table Storage (creating tables on first
     /// run) and relinks the navigation collections handlers read from.
-    /// Call once at startup, before the app serves traffic.
+    /// Idempotent — safe to run on every cold-start AND from a background
+    /// retry loop after a failed hydration. <see cref="IsHydrated"/> flips to
+    /// true on completion (success or fatal) so the readiness probe can report
+    /// "hydrating" until then.
     /// </summary>
     public async Task HydrateAsync(CancellationToken ct = default)
     {
-        if (_store is null)
-            return;
+        ILogger logger = CreateHydrationLogger();
 
-        await _store.EnsureTablesAsync(Maps.Values.Select(m => m.Table), ct);
-
-        foreach ((Type type, EntityMap map) in Maps)
+        try
         {
-            IReadOnlyList<(string, string, string Json)> rows = await _store.ReadAllAsync(map.Table, ct);
-            lock (_gate)
+            if (_store is null)
             {
-                IList list = GetListUntyped(type);
-                list.Clear();
-                foreach ((_, _, string json) in rows)
-                {
-                    object? entity = JsonSerializer.Deserialize(json, type, JsonOpts);
-                    if (entity is null)
-                        continue;
-                    list.Add(entity);
-                    // Snapshot the canonical re-serialised form so the first save
-                    // after startup only writes genuine changes.
-                    _snapshots[entity] = JsonSerializer.Serialize(entity, type, JsonOpts);
-                }
+                HydrationLog.NoStore(logger);
+                _hydrated = true;
+                return;
             }
-        }
 
-        lock (_gate) RelinkNavigations();
+            HydrationLog.EnsuringTables(logger, _store.GetType().Name, Maps.Count);
+
+            await _store.EnsureTablesAsync(Maps.Values.Select(m => m.Table), ct);
+
+            int totalEntities = 0;
+            foreach ((Type type, EntityMap map) in Maps)
+            {
+                IReadOnlyList<(string, string, string Json)> rows = await _store.ReadAllAsync(map.Table, ct);
+                lock (_gate)
+                {
+                    IList list = GetListUntyped(type);
+                    list.Clear();
+                    foreach ((_, _, string json) in rows)
+                    {
+                        object? entity = JsonSerializer.Deserialize(json, type, JsonOpts);
+                        if (entity is null)
+                            continue;
+                        list.Add(entity);
+                        // Snapshot the canonical re-serialised form so the first save
+                        // after startup only writes genuine changes.
+                        _snapshots[entity] = JsonSerializer.Serialize(entity, type, JsonOpts);
+                    }
+                }
+                HydrationLog.TableLoaded(logger, map.Table, rows.Count);
+                totalEntities += rows.Count;
+            }
+
+            lock (_gate) RelinkNavigations();
+            HydrationLog.HydrationComplete(logger, totalEntities);
+            _hydrated = true;
+        }
+        catch (RequestFailedException rfe) when (rfe.Status is 401 or 403)
+        {
+            HydrationLog.StorageAuthzDenied(
+                logger,
+                rfe.Status,
+                rfe.ErrorCode ?? "AuthorizationPermissionMismatch",
+                _store?.GetType().Name ?? "<none>");
+            _hydrated = true;
+            throw;
+        }
+        catch (Exception ex)
+        {
+            HydrationLog.HydrationFailed(logger, ex.GetType().Name, ex.Message);
+            _hydrated = true;
+            throw;
+        }
     }
 
     private void RelinkNavigations()

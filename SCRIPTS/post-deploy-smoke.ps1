@@ -75,6 +75,38 @@ catch {
     Run-Check 'health' 'Fail' $_.Exception.Message
 }
 
+# ── Check 1b: /health/ready (waits up to 60s for hydration to finish) ────────
+# Hydration now runs off the startup path so the host binds immediately. The
+# readiness probe lets App Service route traffic only once the working set
+# is loaded. Poll for at most 60s — if still 503, fail loudly.
+try {
+    $ready = $null
+    for ($i = 0; $i -lt 12; $i++) {
+        try {
+            $r = Invoke-WebRequest -Uri "$BaseUrl/health/ready" -UseBasicParsing -SkipCertificateCheck -TimeoutSec 10
+            if ($r.StatusCode -eq 200) {
+                $ready = $r
+                break
+            }
+        }
+        catch {
+            # 503 → still hydrating; loop. Network errors fall through.
+            if ($_.Exception.Response.StatusCode.value__ -ne 503) { throw }
+        }
+        Start-Sleep -Seconds 5
+    }
+    if ($ready) {
+        $body = ($ready.Content | ConvertFrom-Json -ErrorAction SilentlyContinue)
+        Run-Check 'health/ready' 'Pass' "HTTP 200 status=$($body.status) durable=$($body.durable) after $(($i+1)*5)s"
+    }
+    else {
+        Run-Check 'health/ready' 'Fail' "Still 503 after 60s — hydration likely failing. Run ./SCRIPTS/triage-50030.ps1"
+    }
+}
+catch {
+    Run-Check 'health/ready' 'Fail' $_.Exception.Message
+}
+
 # ── Check 2: render-tree (index.html → dotnet.{hash}.js) ─────────────────────
 try {
     $resp = Invoke-WebRequest -Uri "$BaseUrl/" -UseBasicParsing -SkipCertificateCheck -TimeoutSec 30

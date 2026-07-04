@@ -1,3 +1,5 @@
+using Azure;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using PoTraffic.Api.Infrastructure.Scheduling;
 using PoTraffic.Api.Infrastructure.Storage;
@@ -9,8 +11,15 @@ namespace PoTraffic.Api.Infrastructure;
 /// store is configured but not actually reachable right now. The old check only read the
 /// startup <c>IsDurable</c> flag, so a post-startup Table Storage outage (every write
 /// failing) still reported Healthy — masking the outage from App Service probes.
+///
+/// 401/403 are surfaced with copy operators can act on (RBAC role + identity hint) so
+/// App Service uptime probes and dashboards show the real root cause, not a generic
+/// "probe failed".
 /// </summary>
-public sealed class StorageHealthCheck(TableStorageContext db) : IHealthCheck
+public sealed class StorageHealthCheck(
+    TableStorageContext db,
+    IConfiguration configuration,
+    ILogger<StorageHealthCheck> log) : IHealthCheck
 {
     private static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(3);
 
@@ -26,9 +35,26 @@ public sealed class StorageHealthCheck(TableStorageContext db) : IHealthCheck
             await db.ProbeStoreAsync(cts.Token);
             return HealthCheckResult.Healthy("Table Storage reachable");
         }
+        catch (RequestFailedException rfe) when (rfe.Status is 401 or 403)
+        {
+            string accountName = configuration["AzureTable:AccountName"] ?? "<unknown>";
+            string credentialSource = !string.IsNullOrWhiteSpace(configuration["AZURE_CLIENT_ID"])
+                ? "user-assigned (AZURE_CLIENT_ID)"
+                : "system-assigned (App Service MI)";
+
+            string description =
+                $"Storage authz denied ({rfe.ErrorCode ?? "AuthorizationPermissionMismatch"}) " +
+                $"for account '{accountName}' via {credentialSource}. " +
+                $"Grant 'Storage Table Data Contributor' on /subscriptions/.../storageAccounts/{accountName} " +
+                $"to the {credentialSource} managed identity. RBAC propagation can take 3–5 minutes.";
+
+            log.LogWarning("StorageHealthCheck: {Description}", description);
+            return HealthCheckResult.Unhealthy(description);
+        }
         catch (Exception ex)
         {
-            return HealthCheckResult.Unhealthy($"Table Storage probe failed: {ex.Message.Split('\n')[0]}");
+            return HealthCheckResult.Unhealthy(
+                $"Table Storage probe failed: {ex.GetType().Name}: {ex.Message.Split('\n')[0]}");
         }
     }
 }
