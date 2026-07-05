@@ -8,9 +8,16 @@
     <AssemblyName>PoTraffic.Client</AssemblyName>
     <IsTrimmable>true</IsTrimmable>
     <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
-    <!-- IL2111: framework Router.NotFoundPage reflection (App.razor) — not addressable in user code -->
+    <!-- IL2111: framework Router.NotFoundPage reflection (App.razor) — not addressable in user code.
+         The referenced NotFound page is preserved from trimming via ILLink.Descriptors.xml below,
+         which fixes the runtime CtorNotLocated the trimmer otherwise causes. -->
     <NoWarn>$(NoWarn);IL2111</NoWarn>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Preserve reflectively-referenced components (Router.NotFoundPage) from the IL trimmer. -->
+    <TrimmerRootDescriptor Include="ILLink.Descriptors.xml" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\PoTraffic.Shared\PoTraffic.Shared.csproj" />

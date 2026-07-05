@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Trimmer roots for PoTraffic.Client.
+
+  The IL trimmer (IsTrimmable=true) removes members it cannot see being used.
+  Pages referenced only reflectively via typeof(...) — rather than through the
+  routable-component assembly scan — lose their constructor, which surfaces at
+  runtime as "CtorNotLocated" when the framework calls ActivatorUtilities.
+
+  App.razor wires the .NET 10 Router.NotFoundPage as
+  NotFoundPage="typeof(Pages.NotFound)", so NotFound is only reached this way.
+  Preserve it so the not-found page renders in the trimmed (published) app.
+-->
+<linker>
+  <assembly fullname="PoTraffic.Client">
+    <type fullname="PoTraffic.Client.Pages.NotFound" preserve="all" />
+  </assembly>
+</linker>
