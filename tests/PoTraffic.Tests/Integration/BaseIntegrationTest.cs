@@ -38,6 +38,19 @@ public abstract class BaseIntegrationTest : IAsyncLifetime
         AzuriteTestContainer azurite = await AzuriteTestContainer.GetInstanceAsync();
         string tableStorageConnectionString = azurite.ConnectionString;
 
+        // Point storage at the Azurite testcontainer via ENVIRONMENT VARIABLES.
+        // These are read by WebApplication.CreateBuilder() before Program.cs runs
+        // AddTableStorageServices, so the Azurite connection string is visible when
+        // the TableServiceClient is selected. ConfigureAppConfiguration (below) is
+        // merged into the final IConfiguration only AFTER service registration in
+        // minimal hosting — too late for client selection, which would otherwise
+        // fall through to the production Managed Identity path (169.254.169.254 IMDS
+        // → socket-unreachable 500 on every storage write). Same value for every
+        // test (one shared container), so concurrent sets are idempotent; left set
+        // for the process lifetime to avoid a teardown race with parallel classes.
+        Environment.SetEnvironmentVariable("ConnectionStrings__TableStorage", tableStorageConnectionString);
+        Environment.SetEnvironmentVariable("AzureTable__UseManagedIdentity", "false");
+
         _factory = new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder =>
             {

@@ -36,13 +36,18 @@ public sealed class AuthIntegrationTests : BaseIntegrationTest
         me!.UserId.Should().Be(guestAuth.UserId);
         me.Role.Should().Be("Guest");
 
-        // Act 3 — logout kills the session; /me returns 401.
+        // Act 3 — logout kills the session; /me now returns 200 with the empty-UserId
+        // anonymous sentinel (the probe deliberately avoids a 401 so the WASM client
+        // doesn't log a console error on first paint — see AuthEndpoints.Me).
         HttpResponseMessage logoutResponse = await client.PostAsync("/api/auth/logout", content: null);
         logoutResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         HttpResponseMessage meAfterLogout = await client.GetAsync("/api/auth/me");
-        meAfterLogout.StatusCode.Should().Be(HttpStatusCode.Unauthorized,
-            "the session cookie must be invalidated by logout");
+        meAfterLogout.StatusCode.Should().Be(HttpStatusCode.OK);
+        AuthMeResponse? meAnon = await meAfterLogout.Content.ReadFromJsonAsync<AuthMeResponse>();
+        meAnon.Should().NotBeNull();
+        meAnon!.UserId.Should().Be(Guid.Empty,
+            "the session cookie must be invalidated by logout (anonymous sentinel)");
     }
 
     [SkipUnlessAzuriteAvailable]
