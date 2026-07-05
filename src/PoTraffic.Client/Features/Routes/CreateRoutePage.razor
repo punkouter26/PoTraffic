@@ -16,13 +16,15 @@
         <RadzenAlert AlertStyle="AlertStyle.Danger" class="rz-mb-3">@_error</RadzenAlert>
     }
 
-    <RadzenFormField Text="Origin Address" class="rz-w-100 rz-mb-2">
+    <RadzenFormField Text="Origin Address" class="rz-w-100 rz-mb-1">
         <RadzenTextBox @bind-Value="_origin" />
     </RadzenFormField>
+    <small class="pt-field-hint">Enter a full street address or place name (e.g. "1600 Amphitheatre Pkwy, Mountain View").</small>
 
-    <RadzenFormField Text="Destination Address" class="rz-w-100 rz-mb-2">
+    <RadzenFormField Text="Destination Address" class="rz-w-100 rz-mb-1">
         <RadzenTextBox @bind-Value="_destination" />
     </RadzenFormField>
+    <small class="pt-field-hint">We verify both addresses when you save; unrecognized addresses are rejected.</small>
     <div class="rz-mb-3"></div>
 
     <RadzenFieldset Text="Monitoring Schedule" class="rz-mb-4">
@@ -36,13 +38,13 @@
         </div>
 
         <RadzenText TextStyle="TextStyle.Caption" class="rz-mb-2">Probe on these days:</RadzenText>
-        <div class="rz-display-flex rz-gap-3 rz-flex-wrap">
+        <div class="pt-day-toggles" role="group" aria-label="Probe on these days">
             @foreach ((string label, byte bit) in _days)
             {
-                <label class="pt-day-checkbox">
+                <label class="pt-day-toggle @(IsDaySelected(bit) ? "is-selected" : null)">
                     <input type="checkbox" checked="@IsDaySelected(bit)"
                            @onchange="@(() => ToggleDay(bit))" />
-                    @label
+                    <span>@label</span>
                 </label>
             }
         </div>
@@ -57,13 +59,21 @@
 @code {
     private string _origin = string.Empty;
     private string _destination = string.Empty;
-    // Defaults: start = local time now, end = one hour later. The HH:mm string is
-    // sent to the server unchanged; the server interprets window times as UTC
-    // (see PollRouteJob.IsWithinWindow). We default to local time so the form
-    // matches the user's wall clock — they can adjust before submitting.
-    private DateTime? _startTime = LocalNowToMinute();
-    private DateTime? _endTime  = LocalNowToMinute().AddHours(1);
+    // Defaults: a typical morning commute window (07:00–09:00 local). Most users
+    // monitor a rush-hour window, so this is a better starting point than "now →
+    // now+1h"; they can adjust before submitting. Times are shown as wall-clock
+    // local and converted to UTC on submit (see ToUtcHHmm / PollRouteJob).
+    private DateTime? _startTime = LocalTimeToday(7, 0);
+    private DateTime? _endTime  = LocalTimeToday(9, 0);
 
+    internal static DateTime LocalTimeToday(int hour, int minute)
+    {
+        DateTime now = DateTime.Now;
+        return new DateTime(now.Year, now.Month, now.Day, hour, minute, 0, DateTimeKind.Unspecified);
+    }
+
+    // Current local wall-clock truncated to the minute. Used by WindowConfigPanel
+    // when adding a window to an existing route (defaults to now → now+1h there).
     internal static DateTime LocalNowToMinute()
     {
         DateTime now = DateTime.Now;

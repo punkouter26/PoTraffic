@@ -5,9 +5,62 @@
     margin: 48px auto 0;
 }
 
-.pt-day-checkbox {
+/* Day-of-week selector — spaced, touch-friendly toggle pills.
+   Replaces bare native checkboxes that butted together with no gap and were
+   below the 44px minimum tap target on mobile. */
+.pt-day-toggles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.pt-day-toggle {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    justify-content: center;
+    min-width: 48px;
+    min-height: 44px;
+    padding: 0 14px;
+    border: 1px solid var(--pt-border-subtle, #d1d5db);
+    border-radius: 999px;
+    background: var(--pt-bg-surface, #fff);
+    color: var(--pt-fg-secondary, #4b5563);
+    font-size: 0.875rem;
+    font-weight: 600;
     cursor: pointer;
+    user-select: none;
+    transition: background-color .15s ease, border-color .15s ease, color .15s ease;
+}
+
+.pt-day-toggle:hover {
+    border-color: var(--pt-color-brand-500, #2563eb);
+}
+
+.pt-day-toggle.is-selected {
+    background: var(--pt-color-brand-500, #2563eb);
+    border-color: var(--pt-color-brand-500, #2563eb);
+    color: var(--pt-fg-on-brand, #fff);
+}
+
+/* Keep the checkbox accessible to screen readers / keyboard, but drive the
+   visual state from the pill itself. */
+.pt-day-toggle input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.pt-day-toggle:focus-within {
+    outline: 2px solid var(--pt-color-brand-500, #2563eb);
+    outline-offset: 2px;
+}
+
+/* Muted helper hint shown under the address fields. */
+.pt-field-hint {
+    display: block;
+    margin: -2px 0 10px;
+    color: var(--pt-fg-tertiary, #6b7280);
+    font-size: 0.8rem;
 }

@@ -40,10 +40,16 @@
         </span>
         <span class="pt-status-item pt-status-item-muted">Resets midnight UTC</span>
     </div>
-    <div class="pt-status-bar-actions">
-        <RadzenButton Text="+ Add Route" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Small"
-                      Click="@(() => Nav.NavigateTo("/routes/create"))" />
-    </div>
+    @* Show the status-bar add button only when routes exist. On the empty
+       dashboard the empty-state CTA (and the mobile FAB) already provide it —
+       avoids three competing "Add Route" buttons on first load. *@
+    @if (_loading || _routes.Count > 0)
+    {
+        <div class="pt-status-bar-actions">
+            <RadzenButton Text="+ Add Route" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Small"
+                          Click="@(() => Nav.NavigateTo("/routes/create"))" />
+        </div>
+    }
 </div>
 
 @if (_quotaConsumed >= QuotaConstants.DefaultDailyQuota - 2)

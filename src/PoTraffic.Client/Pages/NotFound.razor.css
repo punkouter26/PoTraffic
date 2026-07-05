@@ -1,0 +1,29 @@
+/* Not-found page — centered, with a clear way back (no dead ends). */
+.pt-notfound {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    min-height: 60vh;
+    padding: var(--pt-space-8, 2rem) var(--pt-space-4, 1rem);
+    gap: 0.5rem;
+}
+
+.pt-notfound-emoji {
+    font-size: 3rem;
+    margin-bottom: 0.5rem;
+}
+
+.pt-notfound-title {
+    font-size: var(--pt-text-2xl, 1.5rem);
+    font-weight: 700;
+    color: var(--pt-fg-primary, #0f172a);
+    margin: 0;
+}
+
+.pt-notfound-text {
+    color: var(--pt-fg-secondary, #4b5563);
+    max-width: 32rem;
+    margin: 0 0 1rem;
+}

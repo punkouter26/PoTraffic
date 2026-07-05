@@ -3,6 +3,7 @@ using Azure.Data.Tables;
 using Azure.Identity;
 using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using PoTraffic.Api.Features.Account;
 using PoTraffic.Api.Features.Admin;
@@ -187,7 +188,24 @@ try
     // ── OpenAPI (Scalar UI) ───────────────────────────────────────────────────
     builder.Services.AddOpenApi();
 
+    // ── Reverse-proxy awareness (Azure App Service) ───────────────────────────
+    // In production TLS terminates at the App Service front end; the app receives
+    // plain HTTP with the original scheme in X-Forwarded-Proto. Honoring it lets
+    // UseHttpsRedirection see the real scheme (no redirect loop) and stops the
+    // "Failed to determine the https port for redirect" warning. The proxy IP is
+    // not fixed, so clear the known-proxy allowlist (App Service isolates the net).
+    builder.Services.Configure<ForwardedHeadersOptions>(options =>
+    {
+        options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+        options.KnownIPNetworks.Clear();
+        options.KnownProxies.Clear();
+    });
+
     WebApplication app = builder.Build();
+
+    // Must run before HTTPS redirection / auth so downstream middleware sees the
+    // forwarded scheme, host, and client IP rather than the proxy's.
+    app.UseForwardedHeaders();
 
     // ── Blazor WASM WebRootFileProvider fix ───────────────────────────────────
     // In .NET 10, MapStaticAssets() creates endpoint-based routes for each fingerprinted

@@ -17,7 +17,10 @@ public static class AuthEndpoints
         // Sign-in is Microsoft OAuth only outside the Testing environment.
         // Sessions are server-managed HttpOnly cookies (BFF) — no tokens reach the client.
         group.MapGet("providers", GetAvailableProviders);
-        group.MapGet("me", Me).RequireAuthorization();
+        // Anonymous-allowed on purpose: this is the client's "am I signed in?" probe.
+        // Returning 200 with an empty-UserId body (instead of 401) keeps the browser
+        // console clean on first paint while still reflecting only the caller's claims.
+        group.MapGet("me", Me);
         // Cast: (HttpContext) => Task<IResult> would otherwise bind as a RequestDelegate
         group.MapPost("logout", (Delegate)Logout);
         group.MapGet("external/{provider}/start", StartExternalLogin);
@@ -42,7 +45,10 @@ public static class AuthEndpoints
     private static IResult Me(ClaimsPrincipal user)
     {
         Guid? userId = user.GetUserIdOrNull();
-        if (userId is null) return Results.Unauthorized();
+        // Anonymous → 200 with an empty UserId sentinel (not 401) so the WASM
+        // auth-state probe doesn't surface a console error before sign-in.
+        if (userId is null)
+            return Results.Ok(new AuthMeResponse(Guid.Empty, string.Empty, string.Empty, string.Empty));
 
         return Results.Ok(new AuthMeResponse(
             userId.Value,
