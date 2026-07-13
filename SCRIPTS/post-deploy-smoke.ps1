@@ -141,63 +141,36 @@ catch {
     Run-Check 'render-tree' 'Fail' $_.Exception.Message
 }
 
-# ── Check 2b: blazor.boot.json (Fix #5) ─────────────────────────────────────
-# Confirms the WASM runtime manifest is reachable. In the deploy that
-# produced NotFoundPage for every route, the manifest returned 401 and the
-# client assembly never loaded. Probing this catches the regression class
-# before users do.
-try {
-    $bootResp = Invoke-WebRequest -Uri "$BaseUrl/_framework/blazor.boot.json" -UseBasicParsing -SkipCertificateCheck -TimeoutSec 15
-    if ($bootResp.StatusCode -ne 200) {
-        Run-Check 'blazor-boot' 'Fail' "HTTP $($bootResp.StatusCode) — WASM client cannot boot (manifest unreachable)"
-    }
-    else {
-        $boot = $bootResp.Content | ConvertFrom-Json -ErrorAction SilentlyContinue
-        $entry = $boot.entryAssembly
-        $assetCount = $boot.totalAssets
-        if ($entry -ne 'PoTraffic.Client.dll') {
-            Run-Check 'blazor-boot' 'Fail' "entryAssembly=$entry expected=PoTraffic.Client.dll"
-        }
-        elseif (-not $assetCount -or $assetCount -lt 5) {
-            Run-Check 'blazor-boot' 'Fail' "totalAssets=$assetCount (too few — manifest looks incomplete)"
+# ── Check 2b: WASM boot assets are actually served ───────────────────────────
+# The deploy that produced a permanent "Loading" spinner served an index.html
+# whose asset references (blazor.webassembly.js, the scoped-CSS bundle) did not
+# match the fingerprinted files on disk, so every asset 404'd/401'd and the WASM
+# client never booted. Asset fingerprinting is now disabled so the physical names
+# match index.html verbatim; probe the two assets that used to fail. Note the
+# .NET 10 WASM runtime embeds the boot manifest in dotnet.js — there is no
+# standalone /_framework/blazor.boot.json to probe.
+$bootAssets = @(
+    @{ Path = '/_framework/blazor.webassembly.js'; Type = 'application/javascript' },
+    @{ Path = '/PoTraffic.Client.bundle.scp.css';  Type = 'text/css' }
+)
+foreach ($asset in $bootAssets) {
+    try {
+        $r = Invoke-WebRequest -Uri "$BaseUrl$($asset.Path)" -UseBasicParsing -SkipCertificateCheck -TimeoutSec 15
+        if ($r.StatusCode -eq 200 -and $r.RawContentLength -gt 0) {
+            Run-Check 'boot-asset' 'Pass' "$($asset.Path) HTTP 200 ($($r.RawContentLength) bytes)"
         }
         else {
-            Run-Check 'blazor-boot' 'Pass' "entry=$entry totalAssets=$assetCount manifestLen=$($bootResp.Content.Length)"
+            Run-Check 'boot-asset' 'Fail' "$($asset.Path) HTTP $($r.StatusCode) len=$($r.RawContentLength) — WASM client cannot boot"
         }
     }
-}
-catch {
-    Run-Check 'blazor-boot' 'Fail' $_.Exception.Message
+    catch {
+        $code = $_.Exception.Response.StatusCode.value__
+        Run-Check 'boot-asset' 'Fail' "$($asset.Path) HTTP $code — WASM client cannot boot ($($_.Exception.Message))"
+    }
 }
 
-# ── Check 2b: blazor.boot.json (Fix #5) ─────────────────────────────────────
-# Confirms the WASM runtime manifest is reachable. In the deploy that
-# produced NotFoundPage for every route, the manifest returned 401 and the
-# client assembly never loaded. Probing this catches the regression class
-# before users do.
-try {
-    $bootResp = Invoke-WebRequest -Uri "$BaseUrl/_framework/blazor.boot.json" -UseBasicParsing -SkipCertificateCheck -TimeoutSec 15
-    if ($bootResp.StatusCode -ne 200) {
-        Run-Check 'blazor-boot' 'Fail' "HTTP $($bootResp.StatusCode) — WASM client cannot boot (manifest unreachable)"
-    }
-    else {
-        $boot = $bootResp.Content | ConvertFrom-Json -ErrorAction SilentlyContinue
-        $entry = $boot.entryAssembly
-        $assetCount = $boot.totalAssets
-        if ($entry -ne 'PoTraffic.Client.dll') {
-            Run-Check 'blazor-boot' 'Fail' "entryAssembly=$entry expected=PoTraffic.Client.dll"
-        }
-        elseif (-not $assetCount -or $assetCount -lt 5) {
-            Run-Check 'blazor-boot' 'Fail' "totalAssets=$assetCount (too few — manifest looks incomplete)"
-        }
-        else {
-            Run-Check 'blazor-boot' 'Pass' "entry=$entry totalAssets=$assetCount manifestLen=$($bootResp.Content.Length)"
-        }
-    }
-}
-catch {
-    Run-Check 'blazor-boot' 'Fail' $_.Exception.Message
-}
+# ── Check 3: /diag/keyvault (masked secret retrieval, admin cookie required) ──
+$diagHeaders = @{}
 if ($AdminCookieValue) {
     $diagHeaders['Cookie'] = ".PoTraffic.Auth=$AdminCookieValue"
 }

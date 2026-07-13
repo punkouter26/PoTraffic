@@ -213,73 +213,21 @@ try
     // forwarded scheme, host, and client IP rather than the proxy's.
     app.UseForwardedHeaders();
 
-    // ── Static web assets (must run BEFORE auth — Fix #1+#7+#8) ──────────────
-    // The deny-by-default FallbackPolicy (§4.5) blocks anonymous access to
-    // endpoints that don't explicitly opt out. In .NET 10, MapStaticAssets()
-    // registers per-file endpoints for fingerprinted assets (e.g.
-    // blazor.webassembly.[hash].js) and a SINGLE catch-all endpoint for the
-    // runtime manifest (blazor.boot.json). That catch-all does NOT carry the
-    // AllowAnonymous() metadata reliably, so the runtime manifest 401s and
-    // the WASM client never receives the assembly list → empty route table →
-    // every page renders NotFound.
+    // ── Static assets for the hosted Blazor WASM client (must run BEFORE auth) ──
+    // Classic hosted-WASM pipeline: UseBlazorFrameworkFiles serves /_framework/*
+    // (the WASM runtime + assemblies) and UseStaticFiles serves /css, /lib,
+    // /_content, and the scoped-CSS bundle from wwwroot. Both are middleware, so
+    // they run ahead of the authorization pipeline and are exempt from the
+    // deny-by-default FallbackPolicy (§4.5) that guards the API endpoints — the
+    // WASM client must load before the user can sign in.
     //
-    // UseBlazorFrameworkFiles() runs at the middleware layer (before auth
-    // runs) and is exempt from the FallbackPolicy by framework design.
-    // UseStaticFiles() then serves /css, /lib, /_content from wwwroot.
+    // Asset fingerprinting is disabled in PoTraffic.Client.csproj so the physical
+    // file names (blazor.webassembly.js, PoTraffic.Client.bundle.scp.css) match the
+    // references in index.html verbatim. That is what makes the classic middleware
+    // pipeline sufficient — no MapStaticAssets() endpoint routing (and its
+    // deny-by-default 401s) is needed.
     app.UseBlazorFrameworkFiles();
     app.UseStaticFiles();
-
-    // ── Blazor WASM WebRootFileProvider fix ───────────────────────────────────
-    // In .NET 10, MapStaticAssets() creates endpoint-based routes for each fingerprinted
-    // static asset, but MapFallbackToFile("index.html") uses WebRootFileProvider (the older
-    // middleware approach). UseStaticWebAssets() may not update WebRootFileProvider correctly
-    // outside of the Development environment. We manually populate it from the runtime manifest
-    // so that SPA routing (MapFallbackToFile) can serve index.html for all non-API routes.
-    if (!app.Environment.IsProduction())
-    {
-        IWebHostEnvironment webEnv = app.Services.GetRequiredService<IWebHostEnvironment>();
-        ILogger<Program> startupLogger = app.Services.GetRequiredService<ILogger<Program>>();
-
-        if (!webEnv.WebRootFileProvider.GetFileInfo("index.html").Exists)
-        {
-            startupLogger.LogWarning(
-                "WebRootFileProvider does not contain index.html — configuring from static web assets manifest.");
-
-            string manifestPath = Path.Combine(
-                AppContext.BaseDirectory,
-                $"{webEnv.ApplicationName}.staticwebassets.runtime.json");
-
-            if (File.Exists(manifestPath))
-            {
-                using System.Text.Json.JsonDocument manifestDoc =
-                    System.Text.Json.JsonDocument.Parse(File.ReadAllText(manifestPath));
-                if (manifestDoc.RootElement.TryGetProperty("ContentRoots",
-                    out System.Text.Json.JsonElement roots))
-                {
-                    Microsoft.Extensions.FileProviders.IFileProvider[] providers = roots.EnumerateArray()
-                        .Select(r => r.GetString() ?? string.Empty)
-                        .Where(p => !string.IsNullOrEmpty(p) && Directory.Exists(p))
-                        .Select(p =>
-                            (Microsoft.Extensions.FileProviders.IFileProvider)
-                            new Microsoft.Extensions.FileProviders.PhysicalFileProvider(p))
-                        .ToArray();
-
-                    if (providers.Length > 0)
-                    {
-                        webEnv.WebRootFileProvider =
-                            new Microsoft.Extensions.FileProviders.CompositeFileProvider(providers);
-                        startupLogger.LogInformation(
-                            "Configured WebRootFileProvider with {Count} content root(s) from static web assets manifest.",
-                            providers.Length);
-                    }
-                }
-            }
-            else
-            {
-                startupLogger.LogWarning("Static web assets manifest not found at {Path}.", manifestPath);
-            }
-        }
-    }
 
     // ── Exception handling ────────────────────────────────────────────────────
     // GlobalExceptionHandler runs first (handles ValidationException → 422);
@@ -373,46 +321,9 @@ try
     // specific than this catch-all, so they always win; anonymous so the 404 isn't challenged.
     app.Map("/api/{**rest}", () => Results.NotFound()).AllowAnonymous().ExcludeFromDescription();
 
-    // ── Serve Blazor WASM fallback (non-API requests) ─────────────────────────
-    // Static assets + the SPA shell are anonymous: the WASM client must load BEFORE
-    // the user can sign in, and client-side <AuthorizeRouteView> gates the UI. The
-    // deny-by-default fallback (§4.5) only guards the API endpoints.
-    //
-    // NOTE: We intentionally do NOT call MapStaticAssets() here. In .NET 10 it
-    // registers ENDPOINT routes for every fingerprinted /_framework/* asset; but
-    // UseBlazorFrameworkFiles() (wired above at the middleware layer) ALSO claims
-    // /_framework/*. For a WASM asset request, routing selects the MapStaticAssets
-    // endpoint while the UseBlazorFrameworkFiles StaticFileMiddleware runs first and
-    // ends the pipeline — so EndpointMiddleware never executes the selected endpoint,
-    // throwing InvalidOperationException "The request reached the end of the pipeline
-    // without executing the endpoint" → HTTP 500 for EVERY /_framework/* asset under
-    // in-process IIS hosting (the Blazor client then cannot boot; every route renders
-    // NotFound). UseBlazorFrameworkFiles + UseStaticFiles + MapFallbackToFile is the
-    // complete, supported hosting pipeline for a hosted Blazor WASM app; MapStaticAssets
-    // is for the HOST's own static web assets, of which there are none here.
-
-    // Fix #9 — /.well-known/blazor-boot — minimal re-probe endpoint for ops.
-    // Always anonymous. Always synthesises a real blazor.boot.json from the
-    // published wwwroot/_framework directory so it works regardless of whether
-    // the project's staticwebassets.endpoints.json was populated. Cached for
-    // 60s — invalidation requires an app restart (acceptable for a framework
-    // manifest that only changes on deploy).
-    app.MapGet("/.well-known/blazor-boot", (IWebHostEnvironment webEnv) =>
-        Results.Json(BlazorBootManifestBuilder.Build(webEnv), contentType: "application/json"))
-        .AllowAnonymous().ExcludeFromDescription()
-        .CacheOutput(p => p.Expire(TimeSpan.FromSeconds(60)));
-
-    // NOTE: We do NOT map an endpoint for /_framework/blazor.boot.json. The .NET 8+
-    // WASM runtime embeds the boot manifest in the fingerprinted dotnet.{hash}.js and
-    // does not fetch a standalone blazor.boot.json, so that legacy path is unused.
-    // Worse, mapping it as an endpoint reintroduces the UseBlazorFrameworkFiles/endpoint
-    // pipeline collision that 500s every /_framework/* request. The ops re-probe at
-    // /.well-known/blazor-boot above (a non-/_framework path) still exposes the
-    // synthesised manifest without colliding with the framework-files middleware.
-
-    // Fix #10 — client-side unhandled error sink (paired with blazor-error-ui
-    // observer in wwwroot/js/blazor-error-reporter.js). Anonymous so the
-    // bootstrap page can report load-time failures before sign-in.
+    // ── Client-side unhandled error sink ─────────────────────────────────────
+    // Paired with the blazor-error-ui observer in wwwroot/js/blazor-error-reporter.js.
+    // Anonymous so the bootstrap page can report load-time failures before sign-in.
     app.MapPost("/api/diag/client-error", (
         [FromBody] ClientErrorReport report,
         [FromServices] ILoggerFactory loggerFactory) =>
@@ -426,51 +337,13 @@ try
         return Results.NoContent();
     }).AllowAnonymous().ExcludeFromDescription();
 
-    if (app.Environment.IsEnvironment("Testing"))
-    {
-        string testingIndexPath = Path.GetFullPath(
-            Path.Combine(app.Environment.ContentRootPath, "..", "PoTraffic.Client", "wwwroot", "index.html"));
-
-        if (File.Exists(testingIndexPath))
-        {
-            app.MapGet("/index.html", () => Results.File(testingIndexPath, "text/html")).AllowAnonymous();
-            app.MapFallback(() => Results.File(testingIndexPath, "text/html")).AllowAnonymous();
-        }
-        else
-        {
-            app.MapFallbackToFile("index.html").AllowAnonymous();
-        }
-    }
-    else
-    {
-        // Fix #11b — explicit / route reads index.html from any static-asset
-        // content root (handles composite-provider layouts).
-        app.MapGet("/", (IWebHostEnvironment webEnv) =>
-        {
-            string indexPath = PoTraffic.Api.Infrastructure.BlazorBootManifestBuilder.ResolveIndexHtml(webEnv);
-            return File.Exists(indexPath)
-                ? Results.File(indexPath, "text/html")
-                : Results.NotFound(new { error = "index.html not present", path = indexPath, webRoot = webEnv.WebRootPath });
-        }).AllowAnonymous().ExcludeFromDescription();
-
-        // Fix #11c — SPA fallback for any non-API, non-framework GET. Returns
-        // index.html so the Blazor Router can take over client-side. Skips /api,
-        // /_framework, /.well-known, /health — those have their own handlers.
-        app.MapFallback((HttpContext ctx, IWebHostEnvironment webEnv) =>
-        {
-            if (ctx.Request.Path.StartsWithSegments("/api")
-                || ctx.Request.Path.StartsWithSegments("/_framework")
-                || ctx.Request.Path.StartsWithSegments("/.well-known")
-                || ctx.Request.Path.StartsWithSegments("/health"))
-            {
-                return Results.NotFound();
-            }
-            string indexPath = PoTraffic.Api.Infrastructure.BlazorBootManifestBuilder.ResolveIndexHtml(webEnv);
-            return File.Exists(indexPath)
-                ? Results.File(indexPath, "text/html")
-                : Results.NotFound();
-        }).AllowAnonymous().ExcludeFromDescription();
-    }
+    // ── SPA fallback (non-API GET requests) ──────────────────────────────────
+    // Static assets are served above by UseBlazorFrameworkFiles/UseStaticFiles.
+    // Anything else falls back to index.html so the client-side Blazor Router can
+    // take over. Anonymous: the shell must load before sign-in, and client-side
+    // <AuthorizeRouteView> gates the UI. The unknown-/api catch-all above already
+    // 404s stray API routes, so this only ever serves real client-side routes.
+    app.MapFallbackToFile("index.html").AllowAnonymous();
 
     // ── Startup: hydrate the working set from Table Storage + seed configuration ──
     // Idempotent — safe to run on every cold-start.
@@ -584,160 +457,13 @@ finally
     Log.CloseAndFlush();
 }
 
-/// <summary>
-/// Fix #11 — Synthesises a minimal but correct <c>blazor.boot.json</c> from the
-/// published <c>wwwroot/_framework</c> directory. The .NET 10 framework
-/// normally generates this manifest at runtime and serves it via
-/// <c>MapStaticAssets()</c>, but with <c>OverrideHtmlAssetPlaceholders=true</c>
-/// on a non-server host, the host's <c>staticwebassets.endpoints.json</c>
-/// ends up empty and the runtime manifest becomes unreachable. Emitting our
-/// own (file-system-driven) version keeps the WASM client bootable.
-///
-/// The shape mirrors the one expected by <c>blazor.webassembly.js</c>:
-///   * <c>entryAssembly</c> = first PoTraffic.* .dll matching the version hash,
-///   * <c>resources.assembly</c> = every .wasm/.dll/.pdb in _framework,
-///   * <c>resources.runtime</c> = dotnet.* and dotnet.native.* .js/.wasm,
-///   * <c>resources.icudt</c> = icudt_* .dat files,
-///   * <c>resources.css</c> = .css files outside _framework.
-/// Zero-allocation: directory enumeration is lazy via EnumerateFiles.
-/// </summary>
-internal static partial class BlazorBootManifestBuilder
-{
-    internal static object Build(IWebHostEnvironment webEnv)
-{
-    string frameworkDir = Path.Combine(webEnv.WebRootPath, "_framework");
-    if (!Directory.Exists(frameworkDir))
-    {
-        // Fallback: walk ContentRoots from the static web assets manifest (covers
-        // bin/Debug/|bin/Release/ layout when wwwroot isn't physically present).
-        string manifestPath = Path.Combine(
-            AppContext.BaseDirectory,
-            $"{webEnv.ApplicationName}.staticwebassets.runtime.json");
-        if (File.Exists(manifestPath))
-        {
-            using System.Text.Json.JsonDocument doc =
-                System.Text.Json.JsonDocument.Parse(File.ReadAllText(manifestPath));
-            if (doc.RootElement.TryGetProperty("ContentRoots", out var roots))
-            {
-                foreach (var r in roots.EnumerateArray())
-                {
-                    string? root = r.GetString();
-                    if (string.IsNullOrEmpty(root)) continue;
-                    string candidate = Path.Combine(root, "_framework");
-                    if (Directory.Exists(candidate)) { frameworkDir = candidate; break; }
-                }
-            }
-        }
-    }
-
-    var assemblies = new List<object>();
-    var runtimes = new List<object>();
-    var icudts = new List<object>();
-
-    string? entryAssembly = null;
-    long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-
-    if (Directory.Exists(frameworkDir))
-    {
-        foreach (string path in Directory.EnumerateFiles(frameworkDir))
-        {
-            string name = Path.GetFileName(path);
-            string rel = "_framework/" + name;
-            long size = new FileInfo(path).Length;
-            // entryAssembly: first non-managed PoTraffic.Client DLL (the app's own assembly).
-            if (entryAssembly is null
-                && name.StartsWith("PoTraffic.Client.", StringComparison.OrdinalIgnoreCase)
-                && !name.Contains(".wasm", StringComparison.OrdinalIgnoreCase)
-                && (name.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)))
-            {
-                entryAssembly = name;
-            }
-            // runtime: dotnet.* and dotnet.native.* — anything starting with "dotnet."
-            if (name.StartsWith("dotnet.", StringComparison.OrdinalIgnoreCase))
-            {
-                runtimes.Add(new { name = rel, integrity = (string?)null, loader = (string?)null });
-            }
-            // icudt
-            else if (name.StartsWith("icudt_", StringComparison.OrdinalIgnoreCase))
-            {
-                icudts.Add(new { name = rel });
-            }
-            // assemblies: everything else that's a binary artifact (.dll/.wasm/.pdb)
-            else if (name.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)
-                  || name.EndsWith(".wasm", StringComparison.OrdinalIgnoreCase)
-                  || name.EndsWith(".pdb", StringComparison.OrdinalIgnoreCase))
-            {
-                assemblies.Add(new { name = rel, codeBase = "", culture = "", symbols = (string?)null });
-            }
-            else if (name.EndsWith(".json", StringComparison.OrdinalIgnoreCase)
-                  && !name.StartsWith("blazor.boot", StringComparison.OrdinalIgnoreCase))
-            {
-                // Some packages use additional JSON manifests (e.g. satellites); include them.
-            }
-        }
-    }
-
-    if (entryAssembly is null)
-    {
-        // Sensible fallback: the trimmer strips a published assembly; in that case
-        // entryAssembly should at least match the manifest's expected name. The
-        // client falls back to its own copy via blazor.webassembly.{hash}.js.
-        entryAssembly = assemblies.Count > 0 ? "PoTraffic.Client.dll" : "PoTraffic.Client.wasm";
-    }
-
-    return new
-    {
-        name = "PoTraffic",
-        entryAssembly,
-        manifests = Array.Empty<object>(),
-        resources = new
-        {
-            cache = Array.Empty<object>(),
-            runtime = runtimes,
-            assembly = assemblies,
-            pdb = Array.Empty<object>(),
-            satelliteResources = Array.Empty<object>(),
-            icudt = icudts,
-            css = Array.Empty<object>(),
-            jsModule = Array.Empty<object>(),
-            jsFiles = Array.Empty<object>(),
-            wasmNative = Array.Empty<object>(),
-            fingerprint = new Dictionary<string, string>(),
-        },
-        config = Array.Empty<object>(),
-        globalizationMode = "auto",
-        debugLevel = 0,
-        cacheBootResources = true,
-        omitGetMappingHeaders = false,
-        totalAssets = assemblies.Count + runtimes.Count + icudts.Count,
-        linkerEnabled = true,
-        sources = Array.Empty<object>(),
-        generated = now,
-    };
-}
-
-
-// Marker for WebApplicationFactory<Program> in integration tests
+// Marker so WebApplicationFactory<Program> can reference the host in integration tests.
 public partial class Program { }
 
 /// <summary>
-/// Payload shape for Fix #10 — client-side unhandled error reports. Keep
-/// fields primitive so System.Text.Json source-gen-friendly payloads succeed
-/// without reflection at AOT.
-/// </summary>
-public sealed record ClientErrorReport(
-    [property: System.Text.Json.Serialization.JsonPropertyName("url")] string Url,
-    [property: System.Text.Json.Serialization.JsonPropertyName("userAgent")] string? UserAgent,
-    [property: System.Text.Json.Serialization.JsonPropertyName("appVersion")] string? AppVersion,
-    [property: System.Text.Json.Serialization.JsonPropertyName("message")] string? Message,
-    [property: System.Text.Json.Serialization.JsonPropertyName("stack")] string? Stack);
-}
-// end BlazorBootManifestBuilder
-
-/// <summary>
-/// Payload shape for Fix #10 — client-side unhandled error reports. Keep
-/// fields primitive so System.Text.Json source-gen-friendly payloads succeed
-/// without reflection at AOT.
+/// Payload shape for the client-side unhandled error reports posted to
+/// <c>/api/diag/client-error</c>. Keep fields primitive so the System.Text.Json
+/// source-generated payloads succeed without reflection under AOT.
 /// </summary>
 public sealed record ClientErrorReport(
     [property: System.Text.Json.Serialization.JsonPropertyName("url")] string Url,
