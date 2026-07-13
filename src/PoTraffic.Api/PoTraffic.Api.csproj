@@ -41,7 +41,6 @@
     <PackageReference Include="Serilog.AspNetCore" />
     <PackageReference Include="Serilog.Sinks.Console" />
     <PackageReference Include="Serilog.Sinks.File" />
-    <PackageReference Include="Serilog.Sinks.ApplicationInsights" />
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
     <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
     <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
@@ -50,6 +49,8 @@
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
     <PackageReference Include="Microsoft.Extensions.Resilience" />
     <PackageReference Include="Microsoft.Extensions.Caching.Hybrid" />
+    <!-- #1 — Web Push delivery (VAPID + payload encryption) -->
+    <PackageReference Include="WebPush" />
   </ItemGroup>
 
 </Project>

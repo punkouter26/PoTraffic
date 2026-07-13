@@ -12,7 +12,8 @@ public sealed record RouteDto(
     MonitoringStatus MonitoringStatus,
     string? JobChainId,
     DateTimeOffset CreatedAt,
-    IReadOnlyList<MonitoringWindowDto> Windows);
+    IReadOnlyList<MonitoringWindowDto> Windows,
+    Guid? ReturnRouteId = null);
 
 public sealed record MonitoringWindowDto(
     Guid Id,

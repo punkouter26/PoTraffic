@@ -45,10 +45,19 @@ public sealed class CookieAuthenticationStateProvider(HttpClient http) : Authent
         }
     }
 
-    /// <summary>Signs out server-side and reverts to an anonymous identity.</summary>
+    /// <summary>Signs out server-side and reverts to an anonymous identity. Best-effort:
+    /// a failed/aborted server call (offline, connection reset, mid-navigation) must still
+    /// sign the user out locally rather than surfacing an error page.</summary>
     public async Task LogoutAsync()
     {
-        await http.PostAsync("/api/auth/logout", content: null);
+        try
+        {
+            using var response = await http.PostAsync("/api/auth/logout", content: null);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or OperationCanceledException)
+        {
+            // Cookie will expire server-side regardless; proceed to local sign-out.
+        }
         NotifyAuthenticationStateChanged(Task.FromResult(Anonymous()));
     }
 

@@ -30,6 +30,7 @@
     <div class="app-shell-user">
         @if (_isAuthenticated)
         {
+            <PoTraffic.Client.Features.Alerts.NotificationBell />
             <button class="pt-user-chip-btn" @onclick="ToggleUserMenu" type="button" aria-haspopup="menu" aria-expanded="@_menuOpen" title="@_displayLabel">
                 <span class="pt-user-avatar">@_initials</span>
                 <span class="pt-user-chip-label">

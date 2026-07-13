@@ -85,6 +85,9 @@ Azurite (`azurite-up` → `docker compose up -d`), then launches the API on 5000
 - `appsettings.Testing.json` — E2E / integration test overrides.
 - **Production secrets:** Azure Key Vault `kv-poshared` in `rg-poshared`. Prefix
   is `PoTraffic--` (mapped to `:` by `PrefixKeyVaultSecretManager`).
+- **Web Push (#1):** set `Push:VapidPublicKey` / `Push:VapidPrivateKey` / `Push:Subject`
+  (Key Vault). If unset, `VapidKeyProvider` generates an ephemeral pair per process (dev only;
+  browser subscriptions reset on restart). Reuses `GoogleMaps:ApiKey` for Places autocomplete (#9).
 - Connection strings flip automatically: `UseDevelopmentStorage=true` (Azurite)
   vs managed identity against `AzureTable:AccountName`. The Azurite container is
   started by `docker-compose.yml`.

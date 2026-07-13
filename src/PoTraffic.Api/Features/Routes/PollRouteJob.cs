@@ -86,7 +86,8 @@ public sealed class PollRouteJob
                         // Log but do not rethrow — scheduler must not retry on handler errors
                         _logger.LogError(ex, "PollRouteJob: Unhandled error for route {RouteId}", routeId);
                     }
-                    nextDelay = TimeSpan.FromMinutes(QuotaConstants.PollIntervalMinutes);
+                    // Adaptive cadence (#8): back off when the route has been stable to save cost.
+                    nextDelay = ComputeAdaptiveInterval(db, routeId, now);
                 }
                 else if (!TrySleepUntilNextStart(window, now, routeId, "daily quota exhausted", out nextDelay))
                 {
@@ -195,6 +196,36 @@ public sealed class PollRouteJob
         _logger.LogInformation(
             "PollRouteJob: auto-created today's monitoring session for route {RouteId} at window start", route.Id);
         return true;
+    }
+
+    /// <summary>
+    /// Adaptive poll cadence (#8): inspects the last hour of samples for the route. When
+    /// travel time has been stable (coefficient of variation ≤ threshold) it backs off to
+    /// <see cref="QuotaConstants.StablePollIntervalMinutes"/> to cut provider cost; when
+    /// volatile — or samples are too few to judge — it stays at the fast base interval so
+    /// congestion spikes are never missed.
+    /// </summary>
+    internal static TimeSpan ComputeAdaptiveInterval(TableStorageContext db, Guid routeId, DateTimeOffset now)
+    {
+        DateTimeOffset since = now.AddHours(-1);
+        List<int> recent = db.Polls
+            .Where(p => p.RouteId == routeId && !p.IsDeleted && p.PolledAt >= since)
+            .OrderByDescending(p => p.PolledAt)
+            .Take(QuotaConstants.AdaptiveSampleWindow)
+            .Select(p => p.TravelDurationSeconds)
+            .ToList();
+
+        if (recent.Count < QuotaConstants.AdaptiveMinSamples)
+            return TimeSpan.FromMinutes(QuotaConstants.PollIntervalMinutes);
+
+        double mean = recent.Average();
+        if (mean <= 0)
+            return TimeSpan.FromMinutes(QuotaConstants.PollIntervalMinutes);
+
+        double stddev = Math.Sqrt(recent.Sum(v => Math.Pow(v - mean, 2)) / recent.Count);
+        return stddev / mean <= QuotaConstants.StableVolatilityThreshold
+            ? TimeSpan.FromMinutes(QuotaConstants.StablePollIntervalMinutes)
+            : TimeSpan.FromMinutes(QuotaConstants.PollIntervalMinutes);
     }
 
     /// <summary>Window times are UTC; mask bit 0 = Monday … bit 6 = Sunday.</summary>

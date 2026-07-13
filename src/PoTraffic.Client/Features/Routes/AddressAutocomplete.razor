@@ -1,0 +1,90 @@
+@using PoTraffic.Shared.DTOs.Routes
+@implements IDisposable
+@inject HttpClient Http
+
+@* #9 — debounced Google Places autocomplete (BFF-proxied). Degrades to a plain text box
+   when the API returns nothing, so free-text entry always works. *@
+<div class="pt-ac">
+    <input class="pt-ac-input" type="text" value="@Value" placeholder="@Placeholder"
+           @oninput="OnInput" @onblur="OnBlur" autocomplete="off" />
+    @if (_open && _suggestions.Count > 0)
+    {
+        <ul class="pt-ac-list">
+            @foreach (PlaceSuggestionDto s in _suggestions)
+            {
+                <li class="pt-ac-item" @onmousedown="() => Pick(s)">@s.Description</li>
+            }
+        </ul>
+    }
+</div>
+
+@code {
+    [Parameter] public string Value { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public string Placeholder { get; set; } = string.Empty;
+
+    private List<PlaceSuggestionDto> _suggestions = [];
+    private bool _open;
+    private System.Timers.Timer? _debounce;
+    private string _pending = string.Empty;
+
+    private async Task OnInput(ChangeEventArgs e)
+    {
+        string text = e.Value?.ToString() ?? string.Empty;
+        Value = text;
+        await ValueChanged.InvokeAsync(text);
+
+        _pending = text;
+        _debounce?.Stop();
+        _debounce ??= CreateTimer();
+        _debounce.Start();
+    }
+
+    private System.Timers.Timer CreateTimer()
+    {
+        var t = new System.Timers.Timer(250) { AutoReset = false };
+        t.Elapsed += async (_, _) => await InvokeAsync(QueryAsync);
+        return t;
+    }
+
+    private async Task QueryAsync()
+    {
+        string q = _pending;
+        if (q.Trim().Length < 3)
+        {
+            _open = false;
+            _suggestions = [];
+            StateHasChanged();
+            return;
+        }
+        try
+        {
+            List<PlaceSuggestionDto>? results = await Http.GetFromJsonAsync(
+                $"/api/places/autocomplete?q={Uri.EscapeDataString(q)}", AppJsonContext.Default.ListPlaceSuggestionDto);
+            _suggestions = results ?? [];
+            _open = _suggestions.Count > 0;
+        }
+        catch
+        {
+            _suggestions = [];
+            _open = false;
+        }
+        StateHasChanged();
+    }
+
+    private async Task Pick(PlaceSuggestionDto s)
+    {
+        Value = s.Description;
+        _open = false;
+        await ValueChanged.InvokeAsync(s.Description);
+    }
+
+    // Delay close so a mousedown on a suggestion still registers.
+    private void OnBlur() => _open = false;
+
+    public void Dispose()
+    {
+        _debounce?.Stop();
+        _debounce?.Dispose();
+    }
+}

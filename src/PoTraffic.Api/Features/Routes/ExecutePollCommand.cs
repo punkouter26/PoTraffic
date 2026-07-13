@@ -19,6 +19,7 @@ public sealed record ExecutePollCommand(Guid RouteId) : IRequest<bool>;
 public sealed class ExecutePollCommandHandler(
     TableStorageContext db,
     ITrafficProviderFactory providerFactory,
+    Alerts.AlertEvaluator alertEvaluator,
     ILogger<ExecutePollCommandHandler> logger) : IRequestHandler<ExecutePollCommand, bool>
 {
     /// <summary>Two polls closer together than this are treated as the same logical poll
@@ -138,6 +139,16 @@ public sealed class ExecutePollCommandHandler(
 
         // 8. Save
         await db.SaveChangesAsync(ct);
+
+        // 9. Proactive alert evaluation (#1) — never let it break the poll chain.
+        try
+        {
+            await alertEvaluator.EvaluateAsync(route, record, session, ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "ExecutePollCommand: alert evaluation failed for route {RouteId}", cmd.RouteId);
+        }
 
         return true;
     }

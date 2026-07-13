@@ -38,6 +38,13 @@
                 </span>
             </span>
         </span>
+        @if (_pollsToday > 0)
+        {
+            <span class="pt-status-item pt-status-item-muted"
+                  title="@_pollsToday poll(s) today · projected ~$@(_projectedMonthlyCost.ToString("F2"))/mo">
+                💲@(_estimatedCostToday.ToString("F3")) today
+            </span>
+        }
         <span class="pt-status-item pt-status-item-muted">Resets midnight UTC</span>
     </div>
     @* Show the status-bar add button only when routes exist. On the empty
@@ -106,6 +113,9 @@ else
     private Dictionary<Guid, OptimalDepartureDto> _optimalDepartures = [];
     private Dictionary<Guid, List<PollRecordDto>> _recentPolls = [];
     private int _quotaConsumed;
+    private int _pollsToday;
+    private decimal _estimatedCostToday;
+    private decimal _projectedMonthlyCost;
     private bool _loading = true;
     private int _indexOffset; // used to stagger the first batch; resets on reload
 
@@ -127,7 +137,12 @@ else
 
             var quota = await Http.GetFromJsonAsync("/api/account/quota", AppJsonContext.Default.QuotaDto);
             if (quota is not null)
+            {
                 _quotaConsumed = quota.UsedToday;
+                _pollsToday = quota.PollsToday;
+                _estimatedCostToday = quota.EstimatedCostTodayUsd;
+                _projectedMonthlyCost = quota.ProjectedMonthlyCostUsd;
+            }
 
             // UI-2/UI-12: Load optimal departure + 24h trend for each route
             // (a handful of calls for a typical user; per-route failures are non-fatal)

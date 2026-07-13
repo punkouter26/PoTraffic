@@ -27,10 +27,32 @@ else
     {
         <div class="pt-departure-banner rz-mb-4">
             <span class="pt-departure-banner-icon">⏰</span>
-            <div>
+            <div class="pt-departure-banner-body">
                 <div class="pt-departure-banner-label">Best departure today</div>
                 <div class="pt-departure-banner-time">@_optimalDepartureLabel</div>
             </div>
+            @* #2: one-click calendar reminder (cookie-authenticated same-origin download) *@
+            <a class="pt-departure-ics" href="@_icsHref" download="departure.ics"
+               title="Add a weekly 'leave by' reminder to your calendar">📅 Add to calendar</a>
+        </div>
+    }
+
+    @* #3: return-trip pairing *@
+    @if (_route is not null)
+    {
+        <div class="pt-returntrip-bar rz-mb-4">
+            @if (_route.ReturnRouteId is Guid rid)
+            {
+                <span class="pt-returntrip-label">🔁 Return trip linked</span>
+                <RadzenButton Text="View return trip" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small"
+                              Click="@(() => Nav.NavigateTo($"/routes/{rid}"))" />
+            }
+            else
+            {
+                <span class="pt-returntrip-label">🔁 Also track the trip home?</span>
+                <RadzenButton Text="Track return trip" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small"
+                              Click="CreateReturnTripAsync" IsBusy="_creatingReturn" />
+            }
         </div>
     }
 
@@ -140,6 +162,9 @@ else
     private string _optimalDepartureLabel = string.Empty;
     private WeekdayComparisonDto? _weekdayComparison;
     private string? _weekdaySummary;
+    private RouteDto? _route;
+    private bool _creatingReturn;
+    private string _icsHref = string.Empty;
 
     private double WeekdayMaxMean =>
         _weekdayComparison?.Days.Where(d => d.SampleCount > 0)
@@ -269,6 +294,24 @@ else
         StateHasChanged();
     }
 
+    /// <summary>Creates (or re-uses) the reverse-direction route and navigates to it (#3).</summary>
+    private async Task CreateReturnTripAsync()
+    {
+        _creatingReturn = true;
+        try
+        {
+            HttpResponseMessage resp = await Http.PostAsync($"/api/routes/{RouteId}/return-trip", null);
+            if (resp.IsSuccessStatusCode)
+            {
+                RouteDto? created = await resp.Content.ReadFromJsonAsync(AppJsonContext.Default.RouteDto);
+                if (created is not null)
+                    Nav.NavigateTo($"/routes/{created.Id}", forceLoad: false);
+            }
+        }
+        catch { /* transient — user can retry */ }
+        finally { _creatingReturn = false; }
+    }
+
     /// <summary>"Fridays run 22% slower than Mondays" — null until both a best and a
     /// materially-slower worst day exist.</summary>
     private static string? BuildWeekdaySummary(WeekdayComparisonDto? c)
@@ -291,6 +334,10 @@ else
         try
         {
             string dayOfWeek = DateTime.Today.DayOfWeek.ToString();
+            _icsHref = $"/api/routes/{RouteId}/departure.ics?dayOfWeek={dayOfWeek}";
+
+            // Load the route itself — drives the return-trip pairing control (#3)
+            _route = await Http.GetFromJsonAsync($"/api/routes/{RouteId}", AppJsonContext.Default.RouteDto);
 
             // Load the active monitoring window — drives NextSample's window-open detection
             // so the card switches to "Idle / Window closed" instead of "Due now" after the

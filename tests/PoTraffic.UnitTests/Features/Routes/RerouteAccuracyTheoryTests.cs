@@ -146,7 +146,7 @@ public sealed class RerouteAccuracyTheoryTests
             .Returns(new TravelResult(300, currentDistance, "{}"));
 
         ITrafficProviderFactory providerFactory = BuildProviderFactory(mockProvider);
-        var handler = new ExecutePollCommandHandler(db, providerFactory, NullLogger<ExecutePollCommandHandler>.Instance);
+        var handler = new ExecutePollCommandHandler(db, providerFactory, PoTraffic.UnitTests.Helpers.AlertTestHelper.NoOp(db), NullLogger<ExecutePollCommandHandler>.Instance);
 
         // Act
         bool success = await handler.Handle(new ExecutePollCommand(routeId), CancellationToken.None);
@@ -229,7 +229,7 @@ public sealed class RerouteAccuracyTheoryTests
                 .Returns(new TravelResult(300, currentDistance, "{}"));
 
             ITrafficProviderFactory providerFactory = BuildProviderFactory(mockProvider);
-            var handler = new ExecutePollCommandHandler(db, providerFactory, NullLogger<ExecutePollCommandHandler>.Instance);
+            var handler = new ExecutePollCommandHandler(db, providerFactory, PoTraffic.UnitTests.Helpers.AlertTestHelper.NoOp(db), NullLogger<ExecutePollCommandHandler>.Instance);
 
             await handler.Handle(new ExecutePollCommand(routeId), CancellationToken.None);
 

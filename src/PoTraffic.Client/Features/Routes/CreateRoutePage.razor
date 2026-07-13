@@ -17,12 +17,12 @@
     }
 
     <RadzenFormField Text="Origin Address" class="rz-w-100 rz-mb-1">
-        <RadzenTextBox @bind-Value="_origin" />
+        <AddressAutocomplete @bind-Value="_origin" Placeholder="Start typing an address…" />
     </RadzenFormField>
     <small class="pt-field-hint">Enter a full street address or place name (e.g. "1600 Amphitheatre Pkwy, Mountain View").</small>
 
     <RadzenFormField Text="Destination Address" class="rz-w-100 rz-mb-1">
-        <RadzenTextBox @bind-Value="_destination" />
+        <AddressAutocomplete @bind-Value="_destination" Placeholder="Start typing an address…" />
     </RadzenFormField>
     <small class="pt-field-hint">We verify both addresses when you save; unrecognized addresses are rejected.</small>
     <div class="rz-mb-3"></div>

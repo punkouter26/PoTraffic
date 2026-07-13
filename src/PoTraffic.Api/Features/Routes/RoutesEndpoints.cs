@@ -33,6 +33,7 @@ public static class RoutesEndpoints
         group.MapPut("{routeId:guid}", UpdateRoute);
         group.MapDelete("{routeId:guid}", DeleteRoute);
         group.MapPost("{routeId:guid}/check-now", CheckNow);
+        group.MapPost("{routeId:guid}/return-trip", CreateReturnTrip);
 
         return app;
     }
@@ -143,6 +144,24 @@ public static class RoutesEndpoints
 
         bool deleted = await sender.Send(new DeleteRouteCommand(routeId, userId.Value));
         return deleted ? Results.NoContent() : Results.NotFound();
+    }
+
+    // POST /api/routes/{routeId}/return-trip — create + link the reverse-direction route (#3)
+    private static async Task<IResult> CreateReturnTrip(
+        Guid routeId,
+        HttpContext context,
+        ISender sender,
+        ILogger<LogCategory> logger)
+    {
+        Guid? userId = ExtractUserId(context.User, logger);
+        if (userId is null) return Results.Unauthorized();
+
+        CreateRouteResult result = await sender.Send(new CreateReturnTripCommand(routeId, userId.Value));
+        return result.IsSuccess
+            ? Results.Created($"/api/routes/{result.Route!.Id}", result.Route)
+            : result.ErrorCode == "NOT_FOUND"
+                ? Results.NotFound()
+                : Results.UnprocessableEntity(new { error = result.ErrorCode });
     }
 
     // POST /api/routes/{routeId}/check-now — instant poll, result not persisted

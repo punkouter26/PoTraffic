@@ -1,0 +1,49 @@
+.pt-ac {
+    position: relative;
+    width: 100%;
+}
+
+.pt-ac-input {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--pt-border-strong, #c9ccd1);
+    border-radius: var(--pt-radius-sm, 6px);
+    background: var(--pt-bg-surface);
+    color: var(--pt-fg-primary);
+    font: inherit;
+}
+
+.pt-ac-input:focus {
+    outline: none;
+    border-color: var(--pt-color-brand-400);
+    box-shadow: 0 0 0 2px var(--pt-color-brand-100, rgba(99, 102, 241, 0.25));
+}
+
+.pt-ac-list {
+    position: absolute;
+    top: calc(100% + 0.2rem);
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    margin: 0;
+    padding: 0.25rem;
+    list-style: none;
+    max-height: 16rem;
+    overflow-y: auto;
+    background: var(--pt-bg-surface);
+    border: 1px solid var(--pt-border-subtle);
+    border-radius: var(--pt-radius-md, 10px);
+    box-shadow: var(--pt-elev-3, 0 8px 24px rgba(0, 0, 0, 0.18));
+}
+
+.pt-ac-item {
+    padding: 0.5rem 0.6rem;
+    border-radius: var(--pt-radius-sm, 6px);
+    font-size: 0.9rem;
+    color: var(--pt-fg-primary);
+    cursor: pointer;
+}
+
+.pt-ac-item:hover {
+    background: var(--pt-bg-elev-1);
+}

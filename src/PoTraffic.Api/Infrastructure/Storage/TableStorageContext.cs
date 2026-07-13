@@ -5,6 +5,7 @@ using Azure;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using PoTraffic.Api.Features.Admin.Entities;
+using PoTraffic.Api.Features.Alerts.Entities;
 using PoTraffic.Api.Features.Auth.Entities;
 using PoTraffic.Api.Features.Config.Entities;
 using PoTraffic.Api.Features.MonitoringWindows.Entities;
@@ -38,6 +39,9 @@ public sealed class TableStorageContext
         [typeof(SystemConfiguration)] = new("SystemConfigurations", _ => "main", e => ((SystemConfiguration)e).Key),
         [typeof(TripleTestSession)] = new("TripleTestSessions", _ => "main", e => ((TripleTestSession)e).Id.ToString()),
         [typeof(TripleTestShot)] = new("TripleTestShots", _ => "main", e => ((TripleTestShot)e).Id.ToString()),
+        // Alerts + push subscriptions partition by user for efficient per-user reads (#1).
+        [typeof(Alert)] = new("Alerts", e => ((Alert)e).UserId.ToString(), e => ((Alert)e).Id.ToString()),
+        [typeof(UserPushSubscription)] = new("PushSubscriptions", e => ((UserPushSubscription)e).UserId.ToString(), e => ((UserPushSubscription)e).Id.ToString()),
     };
 
     private static readonly JsonSerializerOptions JsonOpts = new(); // nav properties carry [JsonIgnore]
@@ -59,6 +63,8 @@ public sealed class TableStorageContext
     internal readonly List<SystemConfiguration> _configs = new();
     internal readonly List<TripleTestSession> _tripleTestSessions = new();
     internal readonly List<TripleTestShot> _tripleTestShots = new();
+    internal readonly List<Alert> _alerts = new();
+    internal readonly List<UserPushSubscription> _pushSubscriptions = new();
 
     private readonly object _gate = new();
     private readonly ITableStore? _store;
@@ -136,6 +142,16 @@ public sealed class TableStorageContext
     public IQueryable<TripleTestShot> TripleTestShots
     {
         get { lock (_gate) return _tripleTestShots.AsQueryable(); }
+    }
+
+    public IQueryable<Alert> Alerts
+    {
+        get { lock (_gate) return _alerts.AsQueryable(); }
+    }
+
+    public IQueryable<UserPushSubscription> PushSubscriptions
+    {
+        get { lock (_gate) return _pushSubscriptions.AsQueryable(); }
     }
 
     // ── Legacy aliases (post-refactor) ──────────────────────────────────────
@@ -491,6 +507,8 @@ public sealed class TableStorageContext
         if (type == typeof(SystemConfiguration)) return _configs;
         if (type == typeof(TripleTestSession)) return _tripleTestSessions;
         if (type == typeof(TripleTestShot)) return _tripleTestShots;
+        if (type == typeof(Alert)) return _alerts;
+        if (type == typeof(UserPushSubscription)) return _pushSubscriptions;
         throw new InvalidOperationException($"TableStorageContext: unknown entity type {type.FullName}");
     }
 

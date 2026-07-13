@@ -76,7 +76,7 @@ public sealed class ExecutePollHandlerFailureTests
 
         ILogger<ExecutePollCommandHandler> logger = Substitute.For<ILogger<ExecutePollCommandHandler>>();
         ITrafficProviderFactory providerFactory = BuildProviderFactory(mockProvider);
-        var handler = new ExecutePollCommandHandler(db, providerFactory, logger);
+        var handler = new ExecutePollCommandHandler(db, providerFactory, PoTraffic.UnitTests.Helpers.AlertTestHelper.NoOp(db), logger);
 
         // Act
         bool result = await handler.Handle(new ExecutePollCommand(routeId), CancellationToken.None);
@@ -101,7 +101,7 @@ public sealed class ExecutePollHandlerFailureTests
 
         ITrafficProviderFactory providerFactory = BuildProviderFactory(mockProvider);
         var handler = new ExecutePollCommandHandler(
-            db, providerFactory, Substitute.For<ILogger<ExecutePollCommandHandler>>());
+            db, providerFactory, PoTraffic.UnitTests.Helpers.AlertTestHelper.NoOp(db), Substitute.For<ILogger<ExecutePollCommandHandler>>());
 
         // Act
         await handler.Handle(new ExecutePollCommand(routeId), CancellationToken.None);
@@ -125,7 +125,7 @@ public sealed class ExecutePollHandlerFailureTests
 
         ILogger<ExecutePollCommandHandler> logger = Substitute.For<ILogger<ExecutePollCommandHandler>>();
         ITrafficProviderFactory providerFactory = BuildProviderFactory(mockProvider);
-        var handler = new ExecutePollCommandHandler(db, providerFactory, logger);
+        var handler = new ExecutePollCommandHandler(db, providerFactory, PoTraffic.UnitTests.Helpers.AlertTestHelper.NoOp(db), logger);
 
         // Act
         await handler.Handle(new ExecutePollCommand(routeId), CancellationToken.None);
@@ -152,7 +152,7 @@ public sealed class ExecutePollHandlerFailureTests
 
         ITrafficProviderFactory providerFactory = BuildProviderFactory(mockProvider);
         var handler = new ExecutePollCommandHandler(
-            db, providerFactory, Substitute.For<ILogger<ExecutePollCommandHandler>>());
+            db, providerFactory, PoTraffic.UnitTests.Helpers.AlertTestHelper.NoOp(db), Substitute.For<ILogger<ExecutePollCommandHandler>>());
 
         // Act — must not throw; scheduler cannot handle uncaught exceptions in this design
         Func<Task> act = async () =>

@@ -98,7 +98,7 @@ public sealed class RerouteDetectionTests
             .Returns(new TravelResult(320, 6200, "{}"));
 
         ITrafficProviderFactory providerFactory = BuildProviderFactory(mockProvider);
-        var handler = new ExecutePollCommandHandler(db, providerFactory, NullLogger<ExecutePollCommandHandler>.Instance);
+        var handler = new ExecutePollCommandHandler(db, providerFactory, PoTraffic.UnitTests.Helpers.AlertTestHelper.NoOp(db), NullLogger<ExecutePollCommandHandler>.Instance);
 
         // Act
         bool result = await handler.Handle(new ExecutePollCommand(routeId), CancellationToken.None);
@@ -129,7 +129,7 @@ public sealed class RerouteDetectionTests
             .Returns(new TravelResult(320, 6200, "{}"));
 
         ITrafficProviderFactory providerFactory = BuildProviderFactory(mockProvider);
-        var handler = new ExecutePollCommandHandler(db, providerFactory, NullLogger<ExecutePollCommandHandler>.Instance);
+        var handler = new ExecutePollCommandHandler(db, providerFactory, PoTraffic.UnitTests.Helpers.AlertTestHelper.NoOp(db), NullLogger<ExecutePollCommandHandler>.Instance);
 
         // Act
         bool result = await handler.Handle(new ExecutePollCommand(routeId), CancellationToken.None);
@@ -157,7 +157,7 @@ public sealed class RerouteDetectionTests
             .Returns(new TravelResult(320, 6200, "{}"));
 
         ITrafficProviderFactory providerFactory = BuildProviderFactory(mockProvider);
-        var handler = new ExecutePollCommandHandler(db, providerFactory, NullLogger<ExecutePollCommandHandler>.Instance);
+        var handler = new ExecutePollCommandHandler(db, providerFactory, PoTraffic.UnitTests.Helpers.AlertTestHelper.NoOp(db), NullLogger<ExecutePollCommandHandler>.Instance);
 
         // Act
         bool result = await handler.Handle(new ExecutePollCommand(routeId), CancellationToken.None);

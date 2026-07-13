@@ -20,6 +20,10 @@ public sealed class Route
     public string? JobChainId { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
 
+    /// <summary>Links this route to its reverse-direction counterpart (#3). Set on both
+    /// routes when a return trip is created; null for standalone routes.</summary>
+    public Guid? ReturnRouteId { get; set; }
+
     [JsonIgnore]
     public User User { get; set; } = null!;
     [JsonIgnore]

@@ -1,3 +1,45 @@
+/* #2 — "add to calendar" action inside the departure banner */
+.pt-departure-banner-body {
+    flex: 1 1 auto;
+}
+
+.pt-departure-ics {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.4rem 0.75rem;
+    border-radius: var(--pt-radius-pill, 999px);
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-decoration: none;
+    color: var(--pt-fg-on-brand, #fff);
+    background: var(--pt-glass-bg-strong, rgba(255, 255, 255, 0.18));
+    border: 1px solid var(--pt-glass-border, rgba(255, 255, 255, 0.3));
+    transition: transform var(--pt-dur-fast, 120ms) var(--pt-ease-out, ease-out);
+}
+
+.pt-departure-ics:hover {
+    transform: translateY(-1px);
+}
+
+/* #3 — return-trip pairing bar */
+.pt-returntrip-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.6rem 1rem;
+    border-radius: var(--pt-radius-md, 12px);
+    background: var(--pt-bg-elev-1);
+    border: 1px solid var(--pt-border-subtle);
+}
+
+.pt-returntrip-label {
+    font-size: 0.9rem;
+    color: var(--pt-fg-secondary);
+}
+
 /* #4 — day-of-week comparison card */
 .pt-weekday-summary {
     color: var(--pt-fg-secondary);

@@ -63,7 +63,7 @@ public sealed class ExecutePollHandlerTests
 
         ITrafficProviderFactory providerFactory = BuildProviderFactory(mockProvider);
 
-        var handler = new ExecutePollCommandHandler(db, providerFactory, NullLogger<ExecutePollCommandHandler>.Instance);
+        var handler = new ExecutePollCommandHandler(db, providerFactory, PoTraffic.UnitTests.Helpers.AlertTestHelper.NoOp(db), NullLogger<ExecutePollCommandHandler>.Instance);
 
         // Act
         bool result = await handler.Handle(new ExecutePollCommand(routeId), CancellationToken.None);

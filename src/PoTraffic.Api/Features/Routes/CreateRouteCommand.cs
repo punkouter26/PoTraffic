@@ -158,7 +158,8 @@ public sealed class CreateRouteCommandHandler(
             w.StartTime.ToString("HH:mm"),
             w.EndTime.ToString("HH:mm"),
             DecodeDaysOfWeek(w.DaysOfWeekMask),
-            w.IsActive)).ToList());
+            w.IsActive)).ToList(),
+        r.ReturnRouteId);
 
     private static IReadOnlyList<string> DecodeDaysOfWeek(byte mask)
     {

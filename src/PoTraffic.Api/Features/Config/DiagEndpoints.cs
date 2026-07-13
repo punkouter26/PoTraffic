@@ -51,17 +51,15 @@ public static class DiagEndpoints
             HealthReport report = await healthCheckService.CheckHealthAsync();
 
             // Build connection status
-            var connections = report.Entries.Select(e => new
-            {
-                name = e.Key,
-                status = e.Value.Status.ToString(),
-                description = e.Value.Description ?? "",
-                durationMs = e.Value.Duration.TotalMilliseconds,
-                exception = e.Value.Exception?.Message ?? ""
-            }).ToList();
+            var connections = report.Entries.Select(e => new DiagConnection(
+                Name: e.Key,
+                Status: e.Value.Status.ToString(),
+                Description: e.Value.Description ?? "",
+                DurationMs: e.Value.Duration.TotalMilliseconds,
+                Exception: e.Value.Exception?.Message ?? "")).ToList();
 
             // Build masked configuration keys (non-sensitive only)
-            var configKeys = new List<object>();
+            var configKeys = new List<DiagConfigKey>();
             var sensitivePatterns = new[] { "Key", "Secret", "Password", "Token", "ConnectionString", "ApiKey" };
 
             foreach (var section in configuration.GetChildren())
@@ -71,27 +69,23 @@ public static class DiagEndpoints
                     bool isSensitive = sensitivePatterns.Any(p =>
                         key.Key.Contains(p, StringComparison.OrdinalIgnoreCase));
 
-                    configKeys.Add(new
-                    {
-                        path = $"{section.Key}:{key.Key}",
-                        value = isSensitive ? MaskValue(key.Value ?? "") : key.Value ?? "(empty)",
-                        isSensitive
-                    });
+                    configKeys.Add(new DiagConfigKey(
+                        Path: $"{section.Key}:{key.Key}",
+                        Value: isSensitive ? MaskValue(key.Value ?? "") : key.Value ?? "(empty)",
+                        IsSensitive: isSensitive));
                 }
             }
 
             // Build environment info
-            var envInfo = new
-            {
-                environment = env.EnvironmentName,
-                applicationName = env.ApplicationName,
-                contentRootPath = env.ContentRootPath,
-                isDevelopment = env.IsDevelopment(),
-                isProduction = env.IsProduction(),
-                isTesting = env.IsEnvironment("Testing")
-            };
+            var envInfo = new DiagEnvInfo(
+                Environment: env.EnvironmentName,
+                ApplicationName: env.ApplicationName,
+                ContentRootPath: env.ContentRootPath,
+                IsDevelopment: env.IsDevelopment(),
+                IsProduction: env.IsProduction(),
+                IsTesting: env.IsEnvironment("Testing"));
 
-            string html = GenerateDiagHtml(connections.Cast<object>().ToList(), configKeys, envInfo, report.Status);
+            string html = GenerateDiagHtml(connections, configKeys, envInfo, report.Status);
             return (IResult)Results.Content(html, "text/html");
         })
         .ExcludeFromDescription()
@@ -110,12 +104,11 @@ public static class DiagEndpoints
     }
 
     private static string GenerateDiagHtml(
-        List<object> connections,
-        List<object> configKeys,
-        object envInfo,
+        List<DiagConnection> connections,
+        List<DiagConfigKey> configKeys,
+        DiagEnvInfo envInfo,
         HealthStatus overallStatus)
     {
-        dynamic env = envInfo;
         string statusColor = overallStatus switch
         {
             HealthStatus.Healthy => "#22c55e",
@@ -180,15 +173,14 @@ public static class DiagEndpoints
                     </tr>
                 </thead>
                 <tbody>
-                    {string.Join("\n", connections.Select(c =>
+                    {string.Join("\n", connections.Select(conn =>
         {
-            dynamic conn = c;
-            string dotClass = conn.status == "Healthy" ? "dot-healthy" : conn.status == "Degraded" ? "dot-degraded" : "dot-unhealthy";
+            string dotClass = conn.Status == "Healthy" ? "dot-healthy" : conn.Status == "Degraded" ? "dot-degraded" : "dot-unhealthy";
             return $@"<tr>
-                            <td><span class=""status-dot {dotClass}""></span>{conn.name}</td>
-                            <td><span class=""status-badge status-{conn.status.ToString().ToLower()}"">{conn.status}</span></td>
-                            <td>{conn.durationMs:F2}</td>
-                            <td style=""color: #94a3b8; font-size: 0.875rem;"">{conn.description} {conn.exception}</td>
+                            <td><span class=""status-dot {dotClass}""></span>{conn.Name}</td>
+                            <td><span class=""status-badge status-{conn.Status.ToString().ToLower()}"">{conn.Status}</span></td>
+                            <td>{conn.DurationMs:F2}</td>
+                            <td style=""color: #94a3b8; font-size: 0.875rem;"">{conn.Description} {conn.Exception}</td>
                         </tr>";
         }))}
                 </tbody>
@@ -205,13 +197,12 @@ public static class DiagEndpoints
                     </tr>
                 </thead>
                 <tbody>
-                    {string.Join("\n", configKeys.Select(c =>
+                    {string.Join("\n", configKeys.Select(cfg =>
         {
-            dynamic cfg = c;
-            string valueClass = cfg.isSensitive ? "sensitive" : "";
+            string valueClass = cfg.IsSensitive ? "sensitive" : "";
             return $@"<tr>
-                            <td>{cfg.path}</td>
-                            <td class=""{valueClass}"">{cfg.value}</td>
+                            <td>{cfg.Path}</td>
+                            <td class=""{valueClass}"">{cfg.Value}</td>
                         </tr>";
         }))}
                 </tbody>
@@ -223,23 +214,23 @@ public static class DiagEndpoints
             <div class=""env-grid"">
                 <div class=""env-item"">
                     <label>Environment</label>
-                    <value>{env.environment}</value>
+                    <value>{envInfo.Environment}</value>
                 </div>
                 <div class=""env-item"">
                     <label>Application Name</label>
-                    <value>{env.applicationName}</value>
+                    <value>{envInfo.ApplicationName}</value>
                 </div>
                 <div class=""env-item"">
                     <label>Development</label>
-                    <value>{env.isDevelopment}</value>
+                    <value>{envInfo.IsDevelopment}</value>
                 </div>
                 <div class=""env-item"">
                     <label>Production</label>
-                    <value>{env.isProduction}</value>
+                    <value>{envInfo.IsProduction}</value>
                 </div>
                 <div class=""env-item"">
                     <label>Testing</label>
-                    <value>{env.isTesting}</value>
+                    <value>{envInfo.IsTesting}</value>
                 </div>
             </div>
         </div>
@@ -250,3 +241,30 @@ public static class DiagEndpoints
 </html>";
     }
 }
+
+// Internal DTOs for the diagnostic HTML renderer. Replaces the prior anonymous
+// types that were passed via `object` and reflected through `dynamic` — that
+// pattern worked but defeated Roslyn's static analysis and would have failed
+// under trimming/AOT. Records give us the same shape with full type safety.
+// Field names preserve the previous camelCase JSON-style keys used in the
+// HTML so this is a purely internal refactor; the rendered output is unchanged.
+
+internal sealed record DiagConnection(
+    string Name,
+    string Status,
+    string Description,
+    double DurationMs,
+    string Exception);
+
+internal sealed record DiagConfigKey(
+    string Path,
+    string Value,
+    bool IsSensitive);
+
+internal sealed record DiagEnvInfo(
+    string Environment,
+    string ApplicationName,
+    string ContentRootPath,
+    bool IsDevelopment,
+    bool IsProduction,
+    bool IsTesting);

@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using PoTraffic.Client.Infrastructure.Logging;
 using PoTraffic.Shared.DTOs.Account;
 using PoTraffic.Shared.DTOs.Admin;
+using PoTraffic.Shared.DTOs.Alerts;
 using PoTraffic.Shared.DTOs.Auth;
 using PoTraffic.Shared.DTOs.History;
 using PoTraffic.Shared.DTOs.Routes;
@@ -44,6 +45,7 @@ internal sealed record ClientLogBatch(List<ClientLogEntry> Entries);
 [JsonSerializable(typeof(PagedResult<RouteDto>))]
 [JsonSerializable(typeof(RouteDto))]
 [JsonSerializable(typeof(CreateRouteRequest))]
+[JsonSerializable(typeof(List<PlaceSuggestionDto>))]
 [JsonSerializable(typeof(CheckNowResponse))]
 [JsonSerializable(typeof(SeedDataRequest))]
 [JsonSerializable(typeof(SeedResult))]
@@ -54,6 +56,10 @@ internal sealed record ClientLogBatch(List<ClientLogEntry> Entries);
 [JsonSerializable(typeof(PagedResult<PollRecordDto>))]
 [JsonSerializable(typeof(BaselineResponse))]
 [JsonSerializable(typeof(WeekdayComparisonDto))]
+[JsonSerializable(typeof(List<AlertDto>))]
+[JsonSerializable(typeof(AlertDto))]
+[JsonSerializable(typeof(PushSubscriptionRequest))]
+[JsonSerializable(typeof(VapidPublicKeyResponse))]
 [JsonSerializable(typeof(StopSessionRequest))]
 [JsonSerializable(typeof(SaveWindowRequest))]
 [JsonSerializable(typeof(ClientLogBatch))]

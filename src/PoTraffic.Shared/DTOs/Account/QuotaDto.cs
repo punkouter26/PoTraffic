@@ -4,4 +4,7 @@ public sealed record QuotaDto(
     int DailyLimit,
     int UsedToday,
     int Remaining,
-    DateTimeOffset ResetsAtUtc);
+    DateTimeOffset ResetsAtUtc,
+    int PollsToday = 0,
+    decimal EstimatedCostTodayUsd = 0,
+    decimal ProjectedMonthlyCostUsd = 0);

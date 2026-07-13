@@ -7,12 +7,14 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using PoTraffic.Api.Features.Account;
 using PoTraffic.Api.Features.Admin;
+using PoTraffic.Api.Features.Alerts;
 using PoTraffic.Api.Features.Auth;
 using PoTraffic.Api.Features.Config;
 using PoTraffic.Api.Features.Diagnostics;
 using PoTraffic.Api.Features.History;
 using PoTraffic.Api.Features.Maintenance;
 using PoTraffic.Api.Features.MonitoringWindows;
+using PoTraffic.Api.Features.Places;
 using PoTraffic.Api.Features.Routes;
 using PoTraffic.Api.Infrastructure;
 using PoTraffic.Api.Infrastructure.Caching;
@@ -138,6 +140,8 @@ try
     builder.Services.AddScoped<TripleTestShotJob>();
     builder.Services.AddSecurityServices(builder.Configuration, builder.Environment.EnvironmentName);
     builder.Services.AddTrafficProviders(builder.Configuration, builder.Environment);
+    builder.Services.AddAlertServices();
+    builder.Services.AddPlacesServices();
 
     // ── Request dispatch (validation-first, see Infrastructure/Dispatch) ─────
     builder.Services.AddDispatcher(typeof(Program).Assembly);
@@ -303,6 +307,8 @@ try
     app.MapRoutesEndpoints();
     app.MapWindowsEndpoints();
     app.MapHistoryEndpoints();
+    app.MapAlertsEndpoints();
+    app.MapPlacesEndpoints();
     app.MapSystemEndpoints();
     app.MapDiagEndpoints();
     app.MapTestingEndpoints(app.Environment);

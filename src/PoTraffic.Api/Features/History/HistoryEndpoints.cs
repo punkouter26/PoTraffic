@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
+using PoTraffic.Api.Features.Routes;
 using PoTraffic.Api.Infrastructure.Security;
+using PoTraffic.Shared.DTOs.Routes;
 
 namespace PoTraffic.Api.Features.History;
 
@@ -75,6 +77,35 @@ public static class HistoryEndpoints
             Guid userId = ctx.User.GetUserId();
             var result = await sender.Send(new GetWeekdayComparisonQuery(routeId, userId));
             return Results.Ok(result);
+        });
+
+        // GET /api/routes/{routeId} — single route (drives the return-trip link, #3)
+        group.MapGet("", async (
+            Guid routeId,
+            ISender sender,
+            HttpContext ctx) =>
+        {
+            Guid userId = ctx.User.GetUserId();
+            RouteDto? route = await sender.Send(new GetRouteByIdQuery(routeId, userId));
+            return route is null ? Results.NotFound() : Results.Ok(route);
+        });
+
+        // GET /api/routes/{routeId}/departure.ics?dayOfWeek=Monday — calendar reminder (#2)
+        group.MapGet("/departure.ics", async (
+            Guid routeId,
+            ISender sender,
+            HttpContext ctx,
+            [FromQuery] string dayOfWeek = "Monday") =>
+        {
+            Guid userId = ctx.User.GetUserId();
+            RouteDto? route = await sender.Send(new GetRouteByIdQuery(routeId, userId));
+            if (route is null) return Results.NotFound();
+
+            var optimal = await sender.Send(new GetOptimalDepartureQuery(routeId, userId, dayOfWeek));
+            if (optimal is null) return Results.NoContent();
+
+            string ics = DepartureCalendar.Build(routeId, route.DestinationAddress, optimal);
+            return Results.File(System.Text.Encoding.UTF8.GetBytes(ics), "text/calendar", "departure.ics");
         });
 
         return routes;

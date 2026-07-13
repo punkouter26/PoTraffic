@@ -1,0 +1,172 @@
+@using PoTraffic.Shared.DTOs.Alerts
+@using Microsoft.AspNetCore.Components.Authorization
+@implements IAsyncDisposable
+@inject HttpClient Http
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthState
+
+<AuthorizeView>
+    <Authorized>
+        <div class="pt-bell">
+            <button class="pt-bell-btn" @onclick="Toggle" aria-label="Notifications" title="Notifications">
+                🔔
+                @if (_unreadCount > 0)
+                {
+                    <span class="pt-bell-badge">@(_unreadCount > 9 ? "9+" : _unreadCount.ToString())</span>
+                }
+            </button>
+
+            @if (_open)
+            {
+                <div class="pt-bell-panel">
+                    <div class="pt-bell-head">
+                        <span>Notifications</span>
+                        @if (_alerts.Any(a => !a.IsRead))
+                        {
+                            <button class="pt-bell-link" @onclick="MarkAllReadAsync">Mark all read</button>
+                        }
+                    </div>
+
+                    @if (!_pushEnabled)
+                    {
+                        <button class="pt-bell-enable" @onclick="EnablePushAsync" disabled="@_enabling">
+                            @(_enabling ? "Enabling…" : "🔔 Enable push notifications")
+                        </button>
+                        @if (_pushError is not null)
+                        {
+                            <div class="pt-bell-error">@_pushError</div>
+                        }
+                    }
+
+                    @if (_alerts.Count == 0)
+                    {
+                        <div class="pt-bell-empty">No alerts yet. We'll warn you when a commute runs heavy.</div>
+                    }
+                    else
+                    {
+                        <ul class="pt-bell-list">
+                            @foreach (AlertDto a in _alerts)
+                            {
+                                <li class="pt-bell-item @(a.IsRead ? "" : "pt-bell-unread")" @onclick="() => OpenAlertAsync(a)">
+                                    <span class="pt-bell-icon">@(a.Kind == "Reroute" ? "🔀" : "🚗")</span>
+                                    <span class="pt-bell-text">
+                                        <span class="pt-bell-msg">@a.Message</span>
+                                        <span class="pt-bell-time">@a.CreatedAt.ToLocalTime().ToString("MMM d, HH:mm")</span>
+                                    </span>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </div>
+            }
+        </div>
+    </Authorized>
+</AuthorizeView>
+
+@code {
+    private bool _open;
+    private bool _pushEnabled;
+    private bool _enabling;
+    private string? _pushError;
+    private int _unreadCount;
+    private List<AlertDto> _alerts = [];
+    private System.Timers.Timer? _timer;
+    private IJSObjectReference? _push;
+    private bool _authenticated;
+
+    protected override async Task OnInitializedAsync()
+    {
+        AuthenticationState state = await AuthState.GetAuthenticationStateAsync();
+        _authenticated = state.User.Identity?.IsAuthenticated == true;
+        if (!_authenticated)
+            return;
+
+        await RefreshAsync();
+        _timer = new System.Timers.Timer(TimeSpan.FromSeconds(30).TotalMilliseconds) { AutoReset = true };
+        _timer.Elapsed += async (_, _) => { try { await RefreshAsync(); } catch { } };
+        _timer.Start();
+    }
+
+    private async Task RefreshAsync()
+    {
+        List<AlertDto>? alerts = await Http.GetFromJsonAsync("/api/alerts", AppJsonContext.Default.ListAlertDto);
+        if (alerts is not null)
+        {
+            _alerts = alerts;
+            _unreadCount = alerts.Count(a => !a.IsRead);
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void Toggle() => _open = !_open;
+
+    private async Task OpenAlertAsync(AlertDto a)
+    {
+        if (!a.IsRead)
+        {
+            try { await Http.PostAsync($"/api/alerts/{a.Id}/read", null); } catch { }
+        }
+        _open = false;
+        Nav.NavigateTo($"/routes/{a.RouteId}");
+    }
+
+    private async Task MarkAllReadAsync()
+    {
+        try { await Http.PostAsync("/api/alerts/read-all", null); } catch { }
+        await RefreshAsync();
+    }
+
+    private async Task<IJSObjectReference> PushModule() =>
+        _push ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/pt-push.js");
+
+    private async Task EnablePushAsync()
+    {
+        _enabling = true;
+        _pushError = null;
+        try
+        {
+            IJSObjectReference mod = await PushModule();
+            if (!await mod.InvokeAsync<bool>("isSupported"))
+            {
+                _pushError = "Push isn't supported in this browser.";
+                return;
+            }
+
+            VapidPublicKeyResponse? vapid = await Http.GetFromJsonAsync(
+                "/api/push/vapid-public-key", AppJsonContext.Default.VapidPublicKeyResponse);
+            if (vapid is null)
+                return;
+
+            string[]? sub = await mod.InvokeAsync<string[]>("subscribe", vapid.PublicKey);
+            if (sub is null || sub.Length < 3)
+            {
+                _pushError = "Notification permission was denied.";
+                return;
+            }
+
+            await Http.PostAsJsonAsync("/api/push/subscribe",
+                new PushSubscriptionRequest(sub[0], sub[1], sub[2]),
+                AppJsonContext.Default.PushSubscriptionRequest);
+            _pushEnabled = true;
+        }
+        catch
+        {
+            _pushError = "Couldn't enable push notifications.";
+        }
+        finally
+        {
+            _enabling = false;
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _timer?.Stop();
+        _timer?.Dispose();
+        if (_push is not null)
+        {
+            try { await _push.DisposeAsync(); } catch { }
+        }
+    }
+}
