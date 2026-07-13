@@ -90,6 +90,34 @@ else
                     ReroutedFlags="@_trendRerouted" />
     </RadzenCard>
 
+    @* #4: Day-of-week comparison — which days run worse *@
+    @if (_weekdayComparison is not null && _weekdayComparison.Days.Any(d => d.SampleCount > 0))
+    {
+        <RadzenCard class="rz-mb-4">
+            <RadzenText TextStyle="TextStyle.H6" class="rz-mb-1">Which days run worst?</RadzenText>
+            @if (_weekdaySummary is not null)
+            {
+                <RadzenText TextStyle="TextStyle.Body2" class="rz-mb-3 pt-weekday-summary">@_weekdaySummary</RadzenText>
+            }
+            <div class="pt-weekday-grid">
+                @foreach (WeekdayMeanDto d in _weekdayComparison.Days)
+                {
+                    <div class="pt-weekday-label">@d.DayOfWeek[..3]</div>
+                    <div class="pt-weekday-track">
+                        @if (d.SampleCount > 0)
+                        {
+                            <div class="pt-weekday-bar @WeekdayBarClass(d)"
+                                 style="width:@(WeekdayBarPercent(d).ToString("F0"))%"></div>
+                        }
+                    </div>
+                    <div class="pt-weekday-value">
+                        @(d.SampleCount > 0 ? $"{d.MeanDurationSeconds / 60:F0}m" : "—")
+                    </div>
+                }
+            </div>
+        </RadzenCard>
+    }
+
     @* UX-9: Raw poll table — collapsed by default for stat-lovers *@
     <PollHistoryTable Polls="_todayPolls" />
 }
@@ -110,6 +138,20 @@ else
     private bool[] _trendRerouted = [];
     private OptimalDepartureDto? _optimalDeparture;
     private string _optimalDepartureLabel = string.Empty;
+    private WeekdayComparisonDto? _weekdayComparison;
+    private string? _weekdaySummary;
+
+    private double WeekdayMaxMean =>
+        _weekdayComparison?.Days.Where(d => d.SampleCount > 0)
+            .Select(d => d.MeanDurationSeconds).DefaultIfEmpty(0).Max() ?? 0;
+
+    private double WeekdayBarPercent(WeekdayMeanDto d) =>
+        WeekdayMaxMean > 0 ? Math.Max(4, d.MeanDurationSeconds / WeekdayMaxMean * 100) : 0;
+
+    private string WeekdayBarClass(WeekdayMeanDto d) =>
+        d.DayOfWeek == _weekdayComparison?.WorstDay ? "pt-weekday-worst"
+        : d.DayOfWeek == _weekdayComparison?.BestDay ? "pt-weekday-best"
+        : "pt-weekday-normal";
     private SessionDto? _activeSession;
     private MonitoringWindowDto? _activeWindow;
     private PollRecordDto? LatestPoll => _todayPolls.OrderByDescending(p => p.PolledAtDateTime).FirstOrDefault();
@@ -227,6 +269,22 @@ else
         StateHasChanged();
     }
 
+    /// <summary>"Fridays run 22% slower than Mondays" — null until both a best and a
+    /// materially-slower worst day exist.</summary>
+    private static string? BuildWeekdaySummary(WeekdayComparisonDto? c)
+    {
+        if (c?.BestDay is null || c.WorstDay is null || c.BestDay == c.WorstDay)
+            return null;
+        double best = c.Days.First(d => d.DayOfWeek == c.BestDay).MeanDurationSeconds;
+        double worst = c.Days.First(d => d.DayOfWeek == c.WorstDay).MeanDurationSeconds;
+        if (best <= 0)
+            return null;
+        int pct = (int)Math.Round((worst - best) / best * 100);
+        return pct < 5
+            ? "Your commute is fairly consistent across the week."
+            : $"{c.WorstDay}s run {pct}% slower than {c.BestDay}s.";
+    }
+
     protected override async Task LoadDataAsync()
     {
         _loading = true;
@@ -300,6 +358,11 @@ else
                 _optimalDepartureLabel = $"Best departure: {h:D2}:{m:D2} " +
                     $"(~{optimal.PredictedDurationSeconds / 60:F0} min)";
             }
+
+            // Load per-weekday comparison (#4)
+            _weekdayComparison = await Http.GetFromJsonAsync(
+                $"/api/routes/{RouteId}/weekday-comparison", AppJsonContext.Default.WeekdayComparisonDto);
+            _weekdaySummary = BuildWeekdaySummary(_weekdayComparison);
         }
         catch
         {
