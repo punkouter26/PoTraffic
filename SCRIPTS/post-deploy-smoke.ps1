@@ -108,6 +108,9 @@ catch {
 }
 
 # ── Check 2: render-tree (index.html → dotnet.{hash}.js) ─────────────────────
+# Fix #5b — index.html always contains the permanent <div id="blazor-error-ui">
+# element, so a present match is NOT a failure signal. We only fail if there's no
+# dotnet.{hash}.js boot stub at all (the WASM entry point).
 try {
     $resp = Invoke-WebRequest -Uri "$BaseUrl/" -UseBasicParsing -SkipCertificateCheck -TimeoutSec 30
     if ($resp.StatusCode -ne 200) {
@@ -115,15 +118,17 @@ try {
     }
     else {
         $html = $resp.Content
-        if ($html -match 'blazor-error-ui') {
-            Run-Check 'render-tree' 'Fail' "blazor-error-ui present in served HTML"
-        }
-        elseif ($html -notmatch '_framework/dotnet\.[a-z0-9]+\.js') {
-            Run-Check 'render-tree' 'Fail' "No dotnet boot stub found in served HTML"
+        # .NET 10 uses _framework/blazor.webassembly.js as the entry stub;
+        # .NET 8 used _framework/dotnet.[hash].js. Accept either.
+        $dotnetMatch = ($html -match '_framework/dotnet\.[a-z0-9]+\.js')
+        $blazorMatch = ($html -match '_framework/blazor\.webassembly(?:\.[a-z0-9]+)?\.js')
+        if (-not ($dotnetMatch -or $blazorMatch)) {
+            Run-Check 'render-tree' 'Fail' "No WASM entry script found in served HTML — WASM won't load"
         }
         else {
-            $stub = ($matches[0] -replace '_framework/', '')
-            if ($ExpectedDotnetHash -and ($stub -ne "dotnet.$ExpectedDotnetHash.js")) {
+            $stub = if ($dotnetMatch) { ($matches[0] -replace '_framework/', '') }
+                    else { 'blazor.webassembly.js' }
+            if ($ExpectedDotnetHash -and $dotnetMatch -and ($stub -ne "dotnet.$ExpectedDotnetHash.js")) {
                 Run-Check 'render-tree' 'Fail' "Hash mismatch: served=$stub expected=dotnet.$ExpectedDotnetHash.js"
             }
             else {
@@ -165,8 +170,34 @@ catch {
     Run-Check 'blazor-boot' 'Fail' $_.Exception.Message
 }
 
-# ── Check 3: /diag/keyvault (admin cookie optional) ─────────────────────────
-$diagHeaders = @{}
+# ── Check 2b: blazor.boot.json (Fix #5) ─────────────────────────────────────
+# Confirms the WASM runtime manifest is reachable. In the deploy that
+# produced NotFoundPage for every route, the manifest returned 401 and the
+# client assembly never loaded. Probing this catches the regression class
+# before users do.
+try {
+    $bootResp = Invoke-WebRequest -Uri "$BaseUrl/_framework/blazor.boot.json" -UseBasicParsing -SkipCertificateCheck -TimeoutSec 15
+    if ($bootResp.StatusCode -ne 200) {
+        Run-Check 'blazor-boot' 'Fail' "HTTP $($bootResp.StatusCode) — WASM client cannot boot (manifest unreachable)"
+    }
+    else {
+        $boot = $bootResp.Content | ConvertFrom-Json -ErrorAction SilentlyContinue
+        $entry = $boot.entryAssembly
+        $assetCount = $boot.totalAssets
+        if ($entry -ne 'PoTraffic.Client.dll') {
+            Run-Check 'blazor-boot' 'Fail' "entryAssembly=$entry expected=PoTraffic.Client.dll"
+        }
+        elseif (-not $assetCount -or $assetCount -lt 5) {
+            Run-Check 'blazor-boot' 'Fail' "totalAssets=$assetCount (too few — manifest looks incomplete)"
+        }
+        else {
+            Run-Check 'blazor-boot' 'Pass' "entry=$entry totalAssets=$assetCount manifestLen=$($bootResp.Content.Length)"
+        }
+    }
+}
+catch {
+    Run-Check 'blazor-boot' 'Fail' $_.Exception.Message
+}
 if ($AdminCookieValue) {
     $diagHeaders['Cookie'] = ".PoTraffic.Auth=$AdminCookieValue"
 }

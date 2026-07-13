@@ -378,13 +378,18 @@ try
     // the user can sign in, and client-side <AuthorizeRouteView> gates the UI. The
     // deny-by-default fallback (§4.5) only guards the API endpoints.
     //
-    // Note: With UseBlazorFrameworkFiles() wired above (Fix #1), the runtime
-    // manifest (blazor.boot.json) is served at the middleware layer and is
-    // exempt from the FallbackPolicy by framework design. MapStaticAssets() is
-    // kept for fingerprinted asset endpoints (the per-file routes it generates
-    // carry AllowAnonymous); the catch-all runtime manifest is now answered by
-    // the earlier UseBlazorFrameworkFiles() call.
-    app.MapStaticAssets().AllowAnonymous();
+    // NOTE: We intentionally do NOT call MapStaticAssets() here. In .NET 10 it
+    // registers ENDPOINT routes for every fingerprinted /_framework/* asset; but
+    // UseBlazorFrameworkFiles() (wired above at the middleware layer) ALSO claims
+    // /_framework/*. For a WASM asset request, routing selects the MapStaticAssets
+    // endpoint while the UseBlazorFrameworkFiles StaticFileMiddleware runs first and
+    // ends the pipeline — so EndpointMiddleware never executes the selected endpoint,
+    // throwing InvalidOperationException "The request reached the end of the pipeline
+    // without executing the endpoint" → HTTP 500 for EVERY /_framework/* asset under
+    // in-process IIS hosting (the Blazor client then cannot boot; every route renders
+    // NotFound). UseBlazorFrameworkFiles + UseStaticFiles + MapFallbackToFile is the
+    // complete, supported hosting pipeline for a hosted Blazor WASM app; MapStaticAssets
+    // is for the HOST's own static web assets, of which there are none here.
 
     // Fix #9 — /.well-known/blazor-boot — minimal re-probe endpoint for ops.
     // Always anonymous. Always synthesises a real blazor.boot.json from the
@@ -441,7 +446,33 @@ try
     }
     else
     {
-        app.MapFallbackToFile("index.html").AllowAnonymous();
+        // Fix #11b — explicit / route reads index.html from any static-asset
+        // content root (handles composite-provider layouts).
+        app.MapGet("/", (IWebHostEnvironment webEnv) =>
+        {
+            string indexPath = PoTraffic.Api.Infrastructure.BlazorBootManifestBuilder.ResolveIndexHtml(webEnv);
+            return File.Exists(indexPath)
+                ? Results.File(indexPath, "text/html")
+                : Results.NotFound(new { error = "index.html not present", path = indexPath, webRoot = webEnv.WebRootPath });
+        }).AllowAnonymous().ExcludeFromDescription();
+
+        // Fix #11c — SPA fallback for any non-API, non-framework GET. Returns
+        // index.html so the Blazor Router can take over client-side. Skips /api,
+        // /_framework, /.well-known, /health — those have their own handlers.
+        app.MapFallback((HttpContext ctx, IWebHostEnvironment webEnv) =>
+        {
+            if (ctx.Request.Path.StartsWithSegments("/api")
+                || ctx.Request.Path.StartsWithSegments("/_framework")
+                || ctx.Request.Path.StartsWithSegments("/.well-known")
+                || ctx.Request.Path.StartsWithSegments("/health"))
+            {
+                return Results.NotFound();
+            }
+            string indexPath = PoTraffic.Api.Infrastructure.BlazorBootManifestBuilder.ResolveIndexHtml(webEnv);
+            return File.Exists(indexPath)
+                ? Results.File(indexPath, "text/html")
+                : Results.NotFound();
+        }).AllowAnonymous().ExcludeFromDescription();
     }
 
     // ── Startup: hydrate the working set from Table Storage + seed configuration ──
@@ -691,6 +722,18 @@ internal static partial class BlazorBootManifestBuilder
 
 // Marker for WebApplicationFactory<Program> in integration tests
 public partial class Program { }
+
+/// <summary>
+/// Payload shape for Fix #10 — client-side unhandled error reports. Keep
+/// fields primitive so System.Text.Json source-gen-friendly payloads succeed
+/// without reflection at AOT.
+/// </summary>
+public sealed record ClientErrorReport(
+    [property: System.Text.Json.Serialization.JsonPropertyName("url")] string Url,
+    [property: System.Text.Json.Serialization.JsonPropertyName("userAgent")] string? UserAgent,
+    [property: System.Text.Json.Serialization.JsonPropertyName("appVersion")] string? AppVersion,
+    [property: System.Text.Json.Serialization.JsonPropertyName("message")] string? Message,
+    [property: System.Text.Json.Serialization.JsonPropertyName("stack")] string? Stack);
 }
 // end BlazorBootManifestBuilder
 

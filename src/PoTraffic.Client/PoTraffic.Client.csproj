@@ -6,6 +6,8 @@
     <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
     <RootNamespace>PoTraffic.Client</RootNamespace>
     <AssemblyName>PoTraffic.Client</AssemblyName>
+    <!-- Configured for static-asset emit + index.html override; runtime manifest
+         synthesis happens server-side via BlazorBootManifestBuilder (Fix #11). -->
     <!-- Do NOT mark the Blazor WASM app assembly IsTrimmable. Routable @page components are
          discovered by the framework's runtime route-table scan, which the trimmer can't see;
          member-trimming the app assembly strips those pages from the published build (the "/"
