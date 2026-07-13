@@ -23,7 +23,9 @@
 @using PoTraffic.Client.Infrastructure.Http
 @using PoTraffic.Shared.DTOs.History
 
-@* App-wide default: every routable page requires an authenticated user unless it opts
-   out with [AllowAnonymous]. Prevents a page from silently rendering to anonymous users
-   (protected chrome flashing before the 401-bounce) when someone forgets [Authorize]. *@
-@attribute [Authorize]
+@* Fix #3 — Removed global [Authorize]. Authorization is now enforced at the
+   Router layer (App.razor's <AuthorizeRouteView> with <NotAuthorized> sending
+   anonymous users to RedirectToLogin). Pages no longer inherit a silent
+   auth requirement that breaks library/layout components (NavMenu, BottomNav)
+   which intentionally render auth-conditional UI. Admin-only pages still
+   declare [Authorize(Roles="Administrator")] explicitly. *@

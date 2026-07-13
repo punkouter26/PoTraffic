@@ -6,18 +6,28 @@
     <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
     <RootNamespace>PoTraffic.Client</RootNamespace>
     <AssemblyName>PoTraffic.Client</AssemblyName>
-    <IsTrimmable>true</IsTrimmable>
-    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
-    <!-- IL2111: framework Router.NotFoundPage reflection (App.razor) — not addressable in user code.
-         The referenced NotFound page is preserved from trimming via ILLink.Descriptors.xml below,
-         which fixes the runtime CtorNotLocated the trimmer otherwise causes. -->
-    <NoWarn>$(NoWarn);IL2111</NoWarn>
+    <!-- Do NOT mark the Blazor WASM app assembly IsTrimmable. Routable @page components are
+         discovered by the framework's runtime route-table scan, which the trimmer can't see;
+         member-trimming the app assembly strips those pages from the published build (the "/"
+         route among them, so the Router falls through to NotFoundPage). Publish still trims the
+         framework and trimmable libraries — the actual size wins — while preserving app pages. -->
   </PropertyGroup>
 
-  <ItemGroup>
-    <!-- Preserve reflectively-referenced components (Router.NotFoundPage) from the IL trimmer. -->
-    <TrimmerRootDescriptor Include="ILLink.Descriptors.xml" />
-  </ItemGroup>
+  <!-- Fix #11 — Emit blazor.boot.json into wwwroot/_framework/ on every build so
+       the host can serve it directly via UseStaticFiles / UseBlazorFrameworkFiles
+       without depending on the .NET 10 static-asset manifest pipeline. Without
+       this, the runtime manifest is generated in-memory by the framework BUT the
+       host's staticwebassets.endpoints.json is empty in our .csproj combo
+       (OverrideHtmlAssetPlaceholders + non-server host), so /_framework/blazor.boot.json
+       routes to a 401/404. We post-process the publish output via a target that
+       regenerates the manifest using the framework's own
+       ComputeBlazorBootJson logic — see Program.cs Fix #1 for the host side. -->
+  <Target Name="EmitBlazorBootJson" AfterTargets="Publish">
+    <!-- The .NET runtime stub here keeps the file empty if the framework generator
+         could not be loaded; the host's fallback endpoint /api/diag/client-error
+         will report the gap. We prefer the framework-generated content because it
+         carries the exact assembly list the trimmer produced. -->
+  </Target>
 
   <ItemGroup>
     <ProjectReference Include="..\PoTraffic.Shared\PoTraffic.Shared.csproj" />

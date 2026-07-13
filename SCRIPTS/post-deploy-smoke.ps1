@@ -136,6 +136,35 @@ catch {
     Run-Check 'render-tree' 'Fail' $_.Exception.Message
 }
 
+# ── Check 2b: blazor.boot.json (Fix #5) ─────────────────────────────────────
+# Confirms the WASM runtime manifest is reachable. In the deploy that
+# produced NotFoundPage for every route, the manifest returned 401 and the
+# client assembly never loaded. Probing this catches the regression class
+# before users do.
+try {
+    $bootResp = Invoke-WebRequest -Uri "$BaseUrl/_framework/blazor.boot.json" -UseBasicParsing -SkipCertificateCheck -TimeoutSec 15
+    if ($bootResp.StatusCode -ne 200) {
+        Run-Check 'blazor-boot' 'Fail' "HTTP $($bootResp.StatusCode) — WASM client cannot boot (manifest unreachable)"
+    }
+    else {
+        $boot = $bootResp.Content | ConvertFrom-Json -ErrorAction SilentlyContinue
+        $entry = $boot.entryAssembly
+        $assetCount = $boot.totalAssets
+        if ($entry -ne 'PoTraffic.Client.dll') {
+            Run-Check 'blazor-boot' 'Fail' "entryAssembly=$entry expected=PoTraffic.Client.dll"
+        }
+        elseif (-not $assetCount -or $assetCount -lt 5) {
+            Run-Check 'blazor-boot' 'Fail' "totalAssets=$assetCount (too few — manifest looks incomplete)"
+        }
+        else {
+            Run-Check 'blazor-boot' 'Pass' "entry=$entry totalAssets=$assetCount manifestLen=$($bootResp.Content.Length)"
+        }
+    }
+}
+catch {
+    Run-Check 'blazor-boot' 'Fail' $_.Exception.Message
+}
+
 # ── Check 3: /diag/keyvault (admin cookie optional) ─────────────────────────
 $diagHeaders = @{}
 if ($AdminCookieValue) {

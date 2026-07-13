@@ -2,6 +2,7 @@
 @attribute [AllowAnonymous]
 @using Microsoft.AspNetCore.Components.Authorization
 @inject NavigationManager Nav
+@inject AuthenticationStateProvider Auth
 
 <AuthorizeView>
     <Authorizing>
@@ -14,3 +15,22 @@
         @{ Nav.NavigateTo("/login", forceLoad: false); }
     </NotAuthorized>
 </AuthorizeView>
+
+@code {
+    // Fix #4 — Run the redirect in OnInitializedAsync (not during render) so it
+    // fires exactly once per component lifetime. The previous render-block
+    // Nav.NavigateTo could re-trigger mid-tree and cause a flicker between
+    // NotFound and the target page on first paint.
+    protected override async Task OnInitializedAsync()
+    {
+        AuthenticationState state = await Auth.GetAuthenticationStateAsync();
+        string target = state.User.Identity?.IsAuthenticated == true
+            ? "/dashboard"
+            : "/login";
+        // Avoid a redundant navigation if we're already on the target route.
+        if (!Nav.Uri.EndsWith(target, StringComparison.OrdinalIgnoreCase))
+        {
+            Nav.NavigateTo(target, forceLoad: false);
+        }
+    }
+}

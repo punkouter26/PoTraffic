@@ -27,14 +27,31 @@ internal static class SecurityExtensions
                 options.SlidingExpiration = true;
                 options.ExpireTimeSpan = TimeSpan.FromDays(14);
                 // API host — return status codes instead of redirecting to a login page.
+                // Fix #2 — include WWW-Authenticate and a JSON hint so a 401 isn't
+                // a dead end for first-time users (browser, CLI, or wasm client).
                 options.Events.OnRedirectToLogin = ctx =>
                 {
                     ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                    ctx.Response.Headers["WWW-Authenticate"] =
+                        "Cookie realm=\"PoTraffic\", path=\"/.auth/login\"";
+                    // Skip the body for non-HTML requests (API, framework assets) so
+                    // the WASM boot.json loader sees a clean 401 it can retry on.
+                    if (!ctx.Request.Path.StartsWithSegments("/_framework") &&
+                        !ctx.Request.Path.StartsWithSegments("/_content"))
+                    {
+                        ctx.Response.ContentType = "application/problem+json";
+                        return ctx.Response.WriteAsync(
+                            "{\"type\":\"https://tools.ietf.org/html/rfc9110#section-15.5.2\"," +
+                            "\"title\":\"Unauthorized\",\"status\":401," +
+                            "\"detail\":\"Session expired or absent. Sign in at /login.\"," +
+                            "\"loginUrl\":\"/login\"}");
+                    }
                     return Task.CompletedTask;
                 };
                 options.Events.OnRedirectToAccessDenied = ctx =>
                 {
                     ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
+                    ctx.Response.Headers["WWW-Authenticate"] = "Cookie realm=\"PoTraffic\"";
                     return Task.CompletedTask;
                 };
             });
