@@ -402,16 +402,13 @@ try
         .AllowAnonymous().ExcludeFromDescription()
         .CacheOutput(p => p.Expire(TimeSpan.FromSeconds(60)));
 
-    // Fix #11 — Serve the same synthesised manifest at /_framework/blazor.boot.json.
-    // In our .NET 10 publish output the manifest is generated in-memory by the
-    // framework but the host's staticwebassets.endpoints.json is empty (because
-    // we don't consume placeholders). Hooking a real route here unblocks the
-    // WASM runtime startup; the client will load assemblies from disk-based
-    // fingerprinted URLs the same way as before.
-    app.MapGet("/_framework/blazor.boot.json", (IWebHostEnvironment webEnv) =>
-        Results.Json(BlazorBootManifestBuilder.Build(webEnv), contentType: "application/json"))
-        .AllowAnonymous().ExcludeFromDescription()
-        .CacheOutput(p => p.Expire(TimeSpan.FromSeconds(60)));
+    // NOTE: We do NOT map an endpoint for /_framework/blazor.boot.json. The .NET 8+
+    // WASM runtime embeds the boot manifest in the fingerprinted dotnet.{hash}.js and
+    // does not fetch a standalone blazor.boot.json, so that legacy path is unused.
+    // Worse, mapping it as an endpoint reintroduces the UseBlazorFrameworkFiles/endpoint
+    // pipeline collision that 500s every /_framework/* request. The ops re-probe at
+    // /.well-known/blazor-boot above (a non-/_framework path) still exposes the
+    // synthesised manifest without colliding with the framework-files middleware.
 
     // Fix #10 — client-side unhandled error sink (paired with blazor-error-ui
     // observer in wwwroot/js/blazor-error-reporter.js). Anonymous so the
