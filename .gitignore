@@ -152,4 +152,5 @@ output.json
 .windsurfrules
 
 # dotnet tool manifests local overrides
-.config/dotnet-tools.json
+# Tracked per AGENTS.md §11 / local-tools skill — do not ignore.
+!.config/dotnet-tools.json
