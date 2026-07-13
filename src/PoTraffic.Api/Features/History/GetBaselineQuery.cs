@@ -2,7 +2,8 @@ using PoTraffic.Api.Infrastructure.Storage;
 
 using Microsoft.Extensions.Logging;
 
-
+using PoTraffic.Api.Features.Routes.Entities;
+using PoTraffic.Shared.Constants;
 using PoTraffic.Shared.DTOs.History;
 
 namespace PoTraffic.Api.Features.History;
@@ -32,15 +33,27 @@ public sealed class GetBaselineQueryHandler
         bool owned = _db.Routes
             .Any(r => r.Id == query.RouteId && r.UserId == query.UserId);
         if (!owned)
-            return Task.FromResult(new BaselineResponse(query.RouteId, query.DayOfWeek, 0, []));
+            return Task.FromResult(new BaselineResponse(query.RouteId, query.DayOfWeek, 0, [], true));
 
-        // Group polls by 15-minute bucket; compute mean + sample stddev.
-        var buckets = _db.Polls
+        List<PollRecord> allPolls = _db.Polls
             .Where(p => p.RouteId == query.RouteId && !p.IsDeleted)
-            .GroupBy(p => (p.PolledAt.Hour * 4) + (p.PolledAt.Minute / 15))
             .ToList();
 
-        var slots = buckets
+        // Baseline is now day-of-week specific (#4): a Friday baseline reflects only
+        // Friday history. Times/day-of-week are UTC, matching the polling model.
+        bool daySpecific = Enum.TryParse(query.DayOfWeek, ignoreCase: true, out DayOfWeek dow);
+        List<PollRecord> dayPolls = daySpecific
+            ? allPolls.Where(p => p.PolledAt.DayOfWeek == dow).ToList()
+            : allPolls;
+
+        // Fall back to all days when this weekday hasn't accumulated enough samples yet,
+        // so a new route still renders a usable baseline instead of a blank chart.
+        bool fellBack = dayPolls.Count < QuotaConstants.BaselineMinSessionCount
+            && allPolls.Count > dayPolls.Count;
+        List<PollRecord> source = fellBack ? allPolls : dayPolls;
+
+        var slots = source
+            .GroupBy(p => (p.PolledAt.Hour * 4) + (p.PolledAt.Minute / 15))
             .Select(g =>
             {
                 var durations = g.Select(p => (double)p.TravelDurationSeconds).ToList();
@@ -62,6 +75,7 @@ public sealed class GetBaselineQueryHandler
             query.RouteId,
             query.DayOfWeek,
             slots.Sum(s => s.SessionCount),
-            slots));
+            slots,
+            DayOfWeekSpecific: !fellBack));
     }
 }

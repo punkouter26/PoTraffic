@@ -37,7 +37,15 @@
     <PackageVersion Include="Azure.Data.Tables" Version="12.11.0" />
     <PackageVersion Include="Azure.Extensions.AspNetCore.Configuration.Secrets" Version="1.5.1" />
     <PackageVersion Include="Azure.Identity" Version="1.21.0" />
-    <PackageVersion Include="Azure.Monitor.OpenTelemetry.Exporter" Version="1.4.0" />
+    <!-- Azure Monitor distro (§6.3) — brings the AI exporters + Live Metrics. -->
+    <PackageVersion Include="Azure.Monitor.OpenTelemetry.AspNetCore" Version="1.5.0" />
+  </ItemGroup>
+
+  <ItemGroup Label="Identity / OIDC token validation">
+    <!-- §4.3 — validate the Microsoft id_token (JWKS signature + shape-based issuer/tenant).
+         Pinned to the family version already in the graph (via Azure.Identity) to avoid drift. -->
+    <PackageVersion Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" Version="8.14.0" />
+    <PackageVersion Include="Microsoft.IdentityModel.JsonWebTokens" Version="8.14.0" />
   </ItemGroup>
 
   <ItemGroup Label="OpenTelemetry">

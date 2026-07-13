@@ -4,7 +4,10 @@ obj/
 
 # Visual Studio / JetBrains
 .vs/
-.vscode/
+# Ignore .vscode CONTENTS but keep the shared F5 wiring (Rule 3.4). Use .vscode/* (not
+# .vscode/) so the negations below can re-include specific files — a directory-level
+# ignore is never descended into, so file negations under it would be dead.
+.vscode/*
 !.vscode/launch.json
 !.vscode/tasks.json
 *.user

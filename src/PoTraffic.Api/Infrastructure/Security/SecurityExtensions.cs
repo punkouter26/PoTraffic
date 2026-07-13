@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using PoTraffic.Api.Features.Auth;
 using PoTraffic.Api.Infrastructure.Resilience;
@@ -50,6 +51,14 @@ internal static class SecurityExtensions
                 p.RequireAuthenticatedUser();
                 p.RequireAssertion(ctx => ProductionMicrosoftAuthPolicy.Evaluate(environmentName, ctx));
             });
+
+            // §4.5 — deny-by-default. Any endpoint WITHOUT explicit authorization metadata
+            // now requires an authenticated user, so a forgotten [RequireAuthorization] can
+            // never leave a feature endpoint anonymous. Genuinely public surfaces (auth/login
+            // flow, /health, /diag, SPA shell + static assets) opt out via .AllowAnonymous().
+            opts.FallbackPolicy = new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .Build();
         });
 
         // Persist Data Protection keys (cookie + OAuth state encryption) to the local
@@ -59,6 +68,8 @@ internal static class SecurityExtensions
             .SetApplicationName("PoTraffic")
             .PersistKeysToFileSystem(
                 new DirectoryInfo(Path.Combine(Directory.GetCurrentDirectory(), "keys")));
+        // §4.3 — singleton id_token validator: caches/auto-refreshes the /common JWKS.
+        services.AddSingleton<MicrosoftIdTokenValidator>();
         // Typed Microsoft OAuth client — resilience wired via the "external-auth" pipeline.
         services.AddHttpClient<MicrosoftExternalIdentityProvider>()
             .AddResilienceHandler(ResiliencePipelineExtensions.ExternalAuthPipeline);

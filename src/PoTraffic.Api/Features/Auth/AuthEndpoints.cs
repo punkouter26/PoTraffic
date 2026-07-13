@@ -12,7 +12,9 @@ public static class AuthEndpoints
 {
     public static IEndpointRouteBuilder MapAuthEndpoints(this IEndpointRouteBuilder app)
     {
-        RouteGroupBuilder group = app.MapGroup("/api/auth").WithTags("Auth");
+        // The entire sign-in surface is anonymous by design: it is how a caller BECOMES
+        // authenticated (§4.5 deny-by-default fallback would otherwise lock out login).
+        RouteGroupBuilder group = app.MapGroup("/api/auth").WithTags("Auth").AllowAnonymous();
 
         // Sign-in is Microsoft OAuth only outside the Testing environment.
         // Sessions are server-managed HttpOnly cookies (BFF) — no tokens reach the client.

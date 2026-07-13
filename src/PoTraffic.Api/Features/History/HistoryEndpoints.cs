@@ -66,6 +66,17 @@ public static class HistoryEndpoints
             return result is null ? Results.NoContent() : Results.Ok(result);
         });
 
+        // GET /api/routes/{routeId}/weekday-comparison — mean travel time per day-of-week (#4)
+        group.MapGet("/weekday-comparison", async (
+            Guid routeId,
+            ISender sender,
+            HttpContext ctx) =>
+        {
+            Guid userId = ctx.User.GetUserId();
+            var result = await sender.Send(new GetWeekdayComparisonQuery(routeId, userId));
+            return Results.Ok(result);
+        });
+
         return routes;
     }
 }

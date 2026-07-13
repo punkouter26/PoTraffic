@@ -1,0 +1,40 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      // Rule 5.3 — local Table Storage runs against Azurite in the "PoTraffic" Docker container.
+      "label": "azurite-up",
+      "type": "shell",
+      "command": "docker compose up -d",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "silent", "panel": "shared" }
+    },
+    {
+      // Default build task; F5 runs this first (which itself starts Azurite).
+      "label": "build",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "build",
+        "${workspaceFolder}/src/PoTraffic.Api/PoTraffic.Api.csproj",
+        "-c",
+        "Debug",
+        "/property:GenerateFullPaths=true",
+        "/consoleloggerparameters:NoSummary"
+      ],
+      "dependsOn": ["azurite-up"],
+      "dependsOrder": "sequence",
+      "problemMatcher": "$msCompile",
+      "group": { "kind": "build", "isDefault": true }
+    },
+    {
+      "label": "test",
+      "type": "shell",
+      "command": "pwsh",
+      "args": ["-NoProfile", "-File", "${workspaceFolder}/SCRIPTS/run-tests.ps1"],
+      "problemMatcher": [],
+      "group": { "kind": "test", "isDefault": true }
+    }
+  ]
+}

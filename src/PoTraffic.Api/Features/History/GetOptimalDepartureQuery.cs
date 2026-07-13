@@ -2,7 +2,8 @@ using PoTraffic.Api.Infrastructure.Storage;
 
 using Microsoft.Extensions.Logging;
 
-
+using PoTraffic.Api.Features.Routes.Entities;
+using PoTraffic.Shared.Constants;
 using PoTraffic.Shared.DTOs.History;
 
 namespace PoTraffic.Api.Features.History;
@@ -34,9 +35,22 @@ public sealed class GetOptimalDepartureQueryHandler
         if (!owned)
             return Task.FromResult<OptimalDepartureDto?>(null);
 
-        // Group polls by 5-minute bucket (post-refactor; was SQL STDEV in EF era).
-        var buckets = _db.Polls
+        List<PollRecord> allPolls = _db.Polls
             .Where(p => p.RouteId == query.RouteId && !p.IsDeleted)
+            .ToList();
+
+        // Day-of-week specific (#4), with an all-days fallback when the requested weekday
+        // is still sparse so the "best time to leave" card isn't blank on new routes.
+        bool daySpecific = Enum.TryParse(query.DayOfWeek, ignoreCase: true, out DayOfWeek dow);
+        List<PollRecord> dayPolls = daySpecific
+            ? allPolls.Where(p => p.PolledAt.DayOfWeek == dow).ToList()
+            : allPolls;
+        List<PollRecord> source = dayPolls.Count < QuotaConstants.BaselineMinSessionCount
+            ? allPolls
+            : dayPolls;
+
+        // Group polls by 5-minute bucket (post-refactor; was SQL STDEV in EF era).
+        var buckets = source
             .GroupBy(p => (p.PolledAt.Hour * 60) + (p.PolledAt.Minute / 5) * 5)
             .Select(g => new
             {

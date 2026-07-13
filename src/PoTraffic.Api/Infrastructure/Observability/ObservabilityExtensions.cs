@@ -1,4 +1,4 @@
-using Azure.Monitor.OpenTelemetry.Exporter;
+using Azure.Monitor.OpenTelemetry.AspNetCore;
 using System.Reflection;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -22,51 +22,49 @@ internal static class ObservabilityExtensions
             logging.IncludeScopes = true;
         });
 
-        builder.Services.AddOpenTelemetry()
+        // ── OpenTelemetry pipeline (§6.3) ─────────────────────────────────────
+        // Head sampling is owned solely by CompositeRoutingSampler:
+        //   • Dev / Test → 100 % capture.
+        //   • Prod → rate-limited (10 healthy + 1 job trace per second), error/parent bypass.
+        // When an App Insights connection string is present we use the Azure Monitor distro
+        // so Live Metrics is active and the AI exporters + instrumentation are wired for us;
+        // its default sampler is then overridden by CompositeRoutingSampler.
+        string? appInsightsConnStr = ResolveAppInsightsConnectionString(builder.Configuration);
+        bool isProd = builder.Environment.IsProduction();
+
+        var otel = builder.Services.AddOpenTelemetry()
             .ConfigureResource(r => r.AddService(roleName))
             .WithMetrics(metrics => metrics
                 .AddMeter("Microsoft.AspNetCore.Hosting")
-                .AddMeter("Microsoft.AspNetCore.Server.Kestrel"))
-            .WithTracing(tracing =>
+                .AddMeter("Microsoft.AspNetCore.Server.Kestrel"));
+
+        if (!string.IsNullOrWhiteSpace(appInsightsConnStr))
+        {
+            otel.UseAzureMonitor(o =>
+            {
+                o.ConnectionString = appInsightsConnStr;
+                o.EnableLiveMetrics = true;       // §6.3 — Live Metrics stays active.
+                o.SamplingRatio = 1.0f;           // don't re-drop what the head sampler kept.
+            });
+            otel.WithTracing(tracing =>
+            {
+                tracing.SetSampler(new CompositeRoutingSampler(isProd));
+                if (!string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]))
+                    tracing.AddOtlpExporter();
+            });
+        }
+        else
+        {
+            otel.WithTracing(tracing =>
             {
                 tracing
+                    .SetSampler(new CompositeRoutingSampler(isProd))
                     .AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation();
                 if (!string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]))
                     tracing.AddOtlpExporter();
-        });
-
-        // ── Azure Monitor tracing (CompositeRoutingSampler Strategy pattern) ──
-        // CI/CD rule #8 — strict adaptive sampling in Production:
-        //   • RecordsAll exceptions, errors, and dependencies that failed.
-        //   • Samples 5% of healthy request traces and 1% of noisy background-job traces.
-        //   • Honours parentContext and Sampler overrides from incoming Activity.
-        // This keeps App Insights ingest under the 100MB/day quota while never
-        // losing exception/dependency-failure signal.
-        string? appInsightsConnStr = ResolveAppInsightsConnectionString(builder.Configuration);
-        bool isProd = builder.Environment.IsProduction();
-        builder.Services.AddOpenTelemetry()
-            .ConfigureResource(r => r.AddService(roleName))
-            .WithTracing(tracing =>
-            {
-                tracing
-                    .SetSampler(new CompositeRoutingSampler(prodRatio: isProd ? 0.05 : 0.5))
-                    .AddAspNetCoreInstrumentation();
-
-                if (!string.IsNullOrWhiteSpace(appInsightsConnStr))
-                {
-                    tracing.AddAzureMonitorTraceExporter(opts =>
-                    {
-                        opts.ConnectionString = appInsightsConnStr;
-                        if (isProd)
-                        {
-                            // Adaptive sampling: keep errors, drop successful traces beyond 5%.
-                            // Exceptions bypass the sampler and are always recorded.
-                            opts.SamplingRatio = 0.05f;
-                        }
-                    });
-                }
             });
+        }
 
         // ── Serilog as sole MEL backend ───────────────────────────────────────
         builder.Host.UseSerilog((ctx, services, cfg) =>

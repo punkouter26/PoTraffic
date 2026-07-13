@@ -59,21 +59,14 @@
 @code {
     private string _origin = string.Empty;
     private string _destination = string.Empty;
-    // Defaults: a typical morning commute window (07:00–09:00 local). Most users
-    // monitor a rush-hour window, so this is a better starting point than "now →
-    // now+1h"; they can adjust before submitting. Times are shown as wall-clock
-    // local and converted to UTC on submit (see ToUtcHHmm / PollRouteJob).
-    private DateTime? _startTime = LocalTimeToday(7, 0);
-    private DateTime? _endTime  = LocalTimeToday(9, 0);
+    // Defaults: start = the user's current local wall-clock time, end = 2 hours later.
+    // Times are shown as wall-clock local and converted to UTC on submit
+    // (see ToUtcHHmm / PollRouteJob).
+    private DateTime? _startTime = LocalNowToMinute();
+    private DateTime? _endTime  = LocalNowToMinute().AddHours(2);
 
-    internal static DateTime LocalTimeToday(int hour, int minute)
-    {
-        DateTime now = DateTime.Now;
-        return new DateTime(now.Year, now.Month, now.Day, hour, minute, 0, DateTimeKind.Unspecified);
-    }
-
-    // Current local wall-clock truncated to the minute. Used by WindowConfigPanel
-    // when adding a window to an existing route (defaults to now → now+1h there).
+    // Current local wall-clock truncated to the minute. Also used by WindowConfigPanel
+    // when adding a window to an existing route (defaults to now → now+2h there).
     internal static DateTime LocalNowToMinute()
     {
         DateTime now = DateTime.Now;

@@ -176,12 +176,12 @@
         }
     }
 
-    // Defaults for a new schedule: start = local time now, end = one hour later.
+    // Defaults for a new schedule: start = local time now, end = two hours later.
     // Window times are stored/interpreted server-side as UTC (see PollRouteJob),
     // but we display defaults in local time so they match the user's wall clock.
     // Editing an existing window overwrites these in LoadWindowAsync.
     private DateTime? _startTime = Routes.CreateRoutePage.LocalNowToMinute();
-    private DateTime? _endTime = Routes.CreateRoutePage.LocalNowToMinute().AddHours(1);
+    private DateTime? _endTime = Routes.CreateRoutePage.LocalNowToMinute().AddHours(2);
 
     /// <summary>Convert local wall-clock <paramref name="local"/> to UTC and return "HH:mm".
     /// Delegates to <see cref="Routes.CreateRoutePage.ToUtcHHmm"/> so behavior is consistent.</summary>

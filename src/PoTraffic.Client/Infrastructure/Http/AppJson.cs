@@ -53,6 +53,7 @@ internal sealed record ClientLogBatch(List<ClientLogEntry> Entries);
 [JsonSerializable(typeof(List<SessionDto>))]
 [JsonSerializable(typeof(PagedResult<PollRecordDto>))]
 [JsonSerializable(typeof(BaselineResponse))]
+[JsonSerializable(typeof(WeekdayComparisonDto))]
 [JsonSerializable(typeof(StopSessionRequest))]
 [JsonSerializable(typeof(SaveWindowRequest))]
 [JsonSerializable(typeof(ClientLogBatch))]

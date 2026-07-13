@@ -74,6 +74,10 @@ dotnet build
 **Fixed ports:** API HTTP `5000`, HTTPS `5001`. Blazor WASM is hosted by the API
 (no CORS).
 
+**F5 (Rule 3.4):** `.vscode/launch.json` + `tasks.json` are committed (git-tracked via
+a `.vscode/*` + negation in `.gitignore`). F5 runs the `build` task, which first starts
+Azurite (`azurite-up` → `docker compose up -d`), then launches the API on 5000/5001.
+
 ## 5. Configuration
 
 - `appsettings.json` — non-sensitive defaults only.
@@ -89,6 +93,14 @@ dotnet build
   delta (JSON snapshot diff + queued deletes) — one table per entity, poll
   records partitioned by `RouteId`. Prod fails fast if storage is unreachable;
   Dev degrades to memory-only (surfaced by the `storage` health check).
+- **Concurrency-safe writes (Rule 5.5):** the context tracks each row's ETag
+  (from hydration + every successful write). `SaveChangesAsync` orders **rewrite
+  (upsert) before delete** so a crash never drops a row before its replacement is
+  durable; deletes colliding with an upsert of the same key are skipped. Upserts
+  are ETag-guarded conditional writes (`UpdateEntity(ifMatch)` for known rows,
+  `AddEntity` for new); on any concurrency conflict (409/412/404) the in-memory
+  set is authoritative, so `AzureTableStore.WriteAsync` rewrites unconditionally
+  and adopts the fresh ETag (409 treated as success). Deletes stay idempotent.
 
 ## 6. Auth (Rules 6 + 13)
 
@@ -104,6 +116,19 @@ dotnet build
   cookie (`.PoTraffic.Auth`) issued by `CookieSignIn`; the WASM client never
   sees a token. Client auth state comes from `GET /api/auth/me`
   (`CookieAuthenticationStateProvider`). There is no password or JWT stack.
+- **id_token validation (Rule 4.3):** the OAuth code exchange trusts identity
+  ONLY after `MicrosoftIdTokenValidator` validates the Microsoft `id_token` —
+  JWKS signature (from the `/common` OIDC metadata), audience (= client id),
+  lifetime, and a **shape-based issuer validator** pinning the issuer to the
+  token's `tid` and the `ExternalAuth:Microsoft:AllowedTenantIds` allow-list
+  (empty = any Microsoft/personal tenant). The unauthenticated Graph userinfo
+  call was removed.
+- **Deny-by-default authz (Rule 4.5):** `AddAuthorization` sets a `FallbackPolicy`
+  requiring an authenticated user, so any endpoint without explicit auth metadata
+  is protected. Public surfaces opt out via `.AllowAnonymous()`: the `/api/auth`
+  group, `/api/system/features`, `/health*`, `/diag-*`, `/e2e/*`, `/error`,
+  OpenAPI/Scalar, static assets, and the SPA fallback. Unknown `/api/*` routes
+  return a clean 404 via `app.Map("/api/{**rest}", …)` (not SPA HTML, not 401).
 
 ## 7. Quality Bar
 
@@ -123,8 +148,15 @@ dotnet build
 ## 8. Observability (Rule 8)
 
 - Serilog is wired as the MEL backend.
-- OpenTelemetry exports traces + metrics to App Insights when
-  `ApplicationInsights:ConnectionString` is set.
+- OpenTelemetry exports traces + metrics to App Insights when a connection string
+  is set — via the **Azure Monitor distro** (`UseAzureMonitor`), which also keeps
+  **Live Metrics** active (Rule 6.3). Without a connection string, tracing falls
+  back to manual AspNetCore/HttpClient instrumentation + optional OTLP.
+- **Sampling (Rule 6.3):** head sampling is owned solely by `CompositeRoutingSampler`:
+  Dev/Test = 100 %; Prod = rate-limited (10 healthy + 1 job trace/sec, token bucket),
+  with parent-sampled and error-tagged spans bypassing the limiter. The distro's
+  `SamplingRatio` is pinned to `1.0` so it never re-drops what the head sampler kept.
+  (Full error-complete traces would need a tail/collector stage — out of scope.)
 - `LogContextEnrichmentMiddleware` pushes `UserId` and `Environment` into every
   Serilog log scope.
 - `/diag` (HTML) — connection status + masked keys. Available in dev and prod
@@ -214,10 +246,15 @@ The [maddhruv/absolute](https://github.com/maddhruv/absolute) workflow pack
 
 ## 13. Audit Trail
 
-Verified properties of the codebase as of 2026-07-02:
+Verified properties of the codebase as of 2026-07-13:
 
 | Concern | Status | Notes |
 |---|---|---|
+| Microsoft `id_token` validated (JWKS + shape-based issuer/tenant, Rule 4.3) | ✅ `MicrosoftIdTokenValidator`; Graph userinfo trust removed |
+| Deny-by-default `FallbackPolicy` (Rule 4.5) | ✅ `SecurityExtensions.AddAuthorization`; public routes `.AllowAnonymous()`; unknown `/api/*` → 404 |
+| Concurrency-safe writes: ETag-guarded, rewrite-then-delete (Rule 5.5) | ✅ `TableStore.WriteAsync` + `TableStorageContext.SaveChangesAsync`; validated by `PersistenceRoundTripTests` |
+| Sampling 100 % non-prod / 10-per-sec prod cap + Live Metrics (Rule 6.3) | ✅ `CompositeRoutingSampler` + Azure Monitor distro `UseAzureMonitor(EnableLiveMetrics)` |
+| F5 portability (`.vscode/launch.json` + `tasks.json`, Rule 3.4) | ✅ Committed; F5 starts Azurite → build → run |
 | `<Nullable>enable</Nullable>` | ✅ Enforced | `Directory.Build.props` |
 | `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>` | ✅ Enforced | `Directory.Build.props` |
 | `<EnableTrimAnalyzer>true</EnableTrimAnalyzer>` | ✅ Enforced in `PoTraffic.Shared`, `PoTraffic.Client` |

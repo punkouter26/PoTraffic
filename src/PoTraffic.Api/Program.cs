@@ -267,9 +267,10 @@ try
     if (app.Environment.IsDevelopment())
     {
         app.UseDeveloperExceptionPage();
-        // OpenAPI document at /openapi/v1.json; Scalar UI at /scalar/v1
-        app.MapOpenApi();
-        app.MapScalarApiReference();
+        // OpenAPI document at /openapi/v1.json; Scalar UI at /scalar/v1.
+        // Anonymous — dev-only API docs must not trip the deny-by-default fallback (§4.5).
+        app.MapOpenApi().AllowAnonymous();
+        app.MapScalarApiReference().AllowAnonymous();
     }
 
     app.UseStatusCodePages();
@@ -306,8 +307,9 @@ try
     app.MapDiagEndpoints();
     app.MapTestingEndpoints(app.Environment);
 
-    // Error endpoint
-    app.MapGet("/error", () => Results.Problem()).ExcludeFromDescription();
+    // Error endpoint — anonymous so the exception handler re-execute path is never
+    // blocked by the deny-by-default fallback (§4.5).
+    app.MapGet("/error", () => Results.Problem()).ExcludeFromDescription().AllowAnonymous();
 
     // ── Readiness probe — distinct from /health so App Service readiness probes
     // don't depend on hydration completing. Returns 503 while HydrateAsync is in
@@ -341,8 +343,17 @@ try
         }
     }).AllowAnonymous();
 
+    // Unknown API routes return a clean 404 instead of falling through to the SPA shell
+    // (which would serve index.html for an API call, and — under the §4.5 deny-by-default
+    // policy — turn a method mismatch into a misleading 401). Real endpoints are more
+    // specific than this catch-all, so they always win; anonymous so the 404 isn't challenged.
+    app.Map("/api/{**rest}", () => Results.NotFound()).AllowAnonymous().ExcludeFromDescription();
+
     // ── Serve Blazor WASM fallback (non-API requests) ─────────────────────────
-    app.MapStaticAssets();
+    // Static assets + the SPA shell are anonymous: the WASM client must load BEFORE
+    // the user can sign in, and client-side <AuthorizeRouteView> gates the UI. The
+    // deny-by-default fallback (§4.5) only guards the API endpoints.
+    app.MapStaticAssets().AllowAnonymous();
 
     if (app.Environment.IsEnvironment("Testing"))
     {
@@ -351,17 +362,17 @@ try
 
         if (File.Exists(testingIndexPath))
         {
-            app.MapGet("/index.html", () => Results.File(testingIndexPath, "text/html"));
-            app.MapFallback(() => Results.File(testingIndexPath, "text/html"));
+            app.MapGet("/index.html", () => Results.File(testingIndexPath, "text/html")).AllowAnonymous();
+            app.MapFallback(() => Results.File(testingIndexPath, "text/html")).AllowAnonymous();
         }
         else
         {
-            app.MapFallbackToFile("index.html");
+            app.MapFallbackToFile("index.html").AllowAnonymous();
         }
     }
     else
     {
-        app.MapFallbackToFile("index.html");
+        app.MapFallbackToFile("index.html").AllowAnonymous();
     }
 
     // ── Startup: hydrate the working set from Table Storage + seed configuration ──

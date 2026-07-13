@@ -1,5 +1,4 @@
 using System.Net.Http.Json;
-using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Options;
 
@@ -8,17 +7,19 @@ namespace PoTraffic.Api.Features.Auth;
 public sealed class MicrosoftExternalIdentityProvider : IExternalIdentityProvider
 {
     private const string Authority = "https://login.microsoftonline.com/common/oauth2/v2.0";
-    private const string UserInfoEndpoint = "https://graph.microsoft.com/oidc/userinfo";
 
     private readonly HttpClient _http;
     private readonly IOptions<ExternalAuthConfiguration> _options;
+    private readonly MicrosoftIdTokenValidator _idTokenValidator;
 
     public MicrosoftExternalIdentityProvider(
         HttpClient http,
-        IOptions<ExternalAuthConfiguration> options)
+        IOptions<ExternalAuthConfiguration> options,
+        MicrosoftIdTokenValidator idTokenValidator)
     {
         _http = http;
         _options = options;
+        _idTokenValidator = idTokenValidator;
     }
 
     public string ProviderName => "microsoft";
@@ -71,35 +72,16 @@ public sealed class MicrosoftExternalIdentityProvider : IExternalIdentityProvide
             return null;
 
         MicrosoftTokenResponse? token = await tokenResponse.Content.ReadFromJsonAsync<MicrosoftTokenResponse>(cancellationToken: ct);
-        if (token is null || string.IsNullOrWhiteSpace(token.AccessToken))
+        if (token is null || string.IsNullOrWhiteSpace(token.IdToken))
             return null;
 
-        using HttpRequestMessage request = new(HttpMethod.Get, UserInfoEndpoint);
-        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token.AccessToken);
-
-        using HttpResponseMessage userInfoResponse = await _http.SendAsync(request, ct);
-        if (!userInfoResponse.IsSuccessStatusCode)
-            return null;
-
-        MicrosoftUserInfoResponse? userInfo = await userInfoResponse.Content.ReadFromJsonAsync<MicrosoftUserInfoResponse>(cancellationToken: ct);
-        if (userInfo is null || string.IsNullOrWhiteSpace(userInfo.Sub))
-            return null;
-
-        string email = userInfo.Email ?? userInfo.PreferredUsername ?? string.Empty;
-        if (string.IsNullOrWhiteSpace(email))
-            return null;
-
-        bool isEmailVerified = userInfo.EmailVerified ?? !string.IsNullOrWhiteSpace(userInfo.Email);
-        return new ExternalIdentity(userInfo.Sub, email, isEmailVerified);
+        // §4.3 — trust the identity ONLY after validating the id_token's signature (JWKS),
+        // audience, lifetime, and issuer/tenant. The token arrives over the server-to-server
+        // TLS code exchange, but we still verify it cryptographically rather than trusting
+        // an unauthenticated Graph userinfo call.
+        return await _idTokenValidator.ValidateAsync(token.IdToken, cfg.ClientId, cfg.AllowedTenantIds, ct);
     }
 
     private sealed record MicrosoftTokenResponse(
-        [property: JsonPropertyName("access_token")] string AccessToken,
         [property: JsonPropertyName("id_token")] string? IdToken);
-
-    private sealed record MicrosoftUserInfoResponse(
-        [property: JsonPropertyName("sub")] string Sub,
-        [property: JsonPropertyName("email")] string? Email,
-        [property: JsonPropertyName("preferred_username")] string? PreferredUsername,
-        [property: JsonPropertyName("email_verified")] bool? EmailVerified);
 }

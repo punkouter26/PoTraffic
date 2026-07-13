@@ -63,6 +63,8 @@ public sealed class TableStorageContext
     private readonly object _gate = new();
     private readonly ITableStore? _store;
     private readonly Dictionary<object, string> _snapshots = new(ReferenceEqualityComparer.Instance);
+    // Last-known ETag per tracked entity → drives optimistic-concurrency conditional writes (§5.5).
+    private readonly Dictionary<object, string> _etags = new(ReferenceEqualityComparer.Instance);
     private readonly List<TableOp> _pendingDeletes = [];
 
     // PollRecords are the unbounded, dominant table and carry a large RawProviderResponse
@@ -275,6 +277,7 @@ public sealed class TableStorageContext
             return;
 
         _snapshots.Remove(entity);
+        _etags.Remove(entity);
         _dirtyPolls.Remove(entity);
         if (Maps.TryGetValue(typeof(T), out EntityMap? map))
             _pendingDeletes.Add(new TableOp(TableOpKind.Delete, map.Table, map.Pk(entity), map.Rk(entity), null));
@@ -300,13 +303,13 @@ public sealed class TableStorageContext
         if (_store is null || !_durable)
             return 0;
 
-        List<TableOp> ops;
+        List<TableOp> upserts = [];
         List<(object Entity, string Json)> written = [];
+        Dictionary<(string, string, string), object> upsertKeyToEntity = [];
+        List<TableOp> deletes;
+
         lock (_gate)
         {
-            ops = [.. _pendingDeletes];
-            _pendingDeletes.Clear();
-
             foreach ((Type type, EntityMap map) in Maps)
             {
                 // PollRecord uses explicit change tracking — only serialise the ones that were
@@ -320,24 +323,38 @@ public sealed class TableStorageContext
                     string json = JsonSerializer.Serialize(entity, type, JsonOpts);
                     if (_snapshots.TryGetValue(entity, out string? prev) && prev == json)
                         continue;
-                    ops.Add(new TableOp(TableOpKind.Upsert, map.Table, map.Pk(entity), map.Rk(entity), json));
+                    string pk = map.Pk(entity), rk = map.Rk(entity);
+                    _etags.TryGetValue(entity, out string? etag);
+                    upserts.Add(new TableOp(TableOpKind.Upsert, map.Table, pk, rk, json, etag));
                     written.Add((entity, json));
+                    upsertKeyToEntity[(map.Table, pk, rk)] = entity;
                 }
             }
+
+            // Rewrite-then-delete (§5.5): new/updated rows are persisted BEFORE old rows are
+            // removed, so a crash mid-flush can never drop a row before its replacement is
+            // durable. A queued delete that collides with an upsert of the same key is dropped —
+            // the upsert (final state) wins.
+            deletes = _pendingDeletes
+                .Where(d => !upsertKeyToEntity.ContainsKey((d.Table, d.PartitionKey, d.RowKey)))
+                .ToList();
+            _pendingDeletes.Clear();
         }
 
+        List<TableOp> ops = [.. upserts, .. deletes];
         if (ops.Count == 0)
             return 0;
 
+        IReadOnlyList<TableWriteResult> results;
         try
         {
-            await _store.ApplyAsync(ops, ct);
+            results = await _store.ApplyAsync(ops, ct);
         }
         catch
         {
             // Re-queue deletes so the next save retries them; dirty entities are
             // re-detected automatically because their snapshots were not updated.
-            lock (_gate) _pendingDeletes.AddRange(ops.Where(o => o.Kind == TableOpKind.Delete));
+            lock (_gate) _pendingDeletes.AddRange(deletes);
             throw;
         }
 
@@ -350,6 +367,12 @@ public sealed class TableStorageContext
                 // next save. On failure we skip this block, so the flag survives and retries.
                 if (entity is PollRecord)
                     _dirtyPolls.Remove(entity);
+            }
+            // Adopt refreshed ETags so the NEXT save issues a correctly-guarded conditional write.
+            foreach (TableWriteResult r in results)
+            {
+                if (upsertKeyToEntity.TryGetValue((r.Table, r.PartitionKey, r.RowKey), out object? entity))
+                    _etags[entity] = r.ETag;
             }
         }
         return ops.Count;
@@ -397,12 +420,12 @@ public sealed class TableStorageContext
             int totalEntities = 0;
             foreach ((Type type, EntityMap map) in Maps)
             {
-                IReadOnlyList<(string, string, string Json)> rows = await _store.ReadAllAsync(map.Table, ct);
+                IReadOnlyList<(string, string, string Json, string ETag)> rows = await _store.ReadAllAsync(map.Table, ct);
                 lock (_gate)
                 {
                     IList list = GetListUntyped(type);
                     list.Clear();
-                    foreach ((_, _, string json) in rows)
+                    foreach ((_, _, string json, string etag) in rows)
                     {
                         object? entity = JsonSerializer.Deserialize(json, type, JsonOpts);
                         if (entity is null)
@@ -411,6 +434,8 @@ public sealed class TableStorageContext
                         // Snapshot the canonical re-serialised form so the first save
                         // after startup only writes genuine changes.
                         _snapshots[entity] = JsonSerializer.Serialize(entity, type, JsonOpts);
+                        // Track the row ETag so post-startup writes are concurrency-guarded (§5.5).
+                        _etags[entity] = etag;
                     }
                 }
                 HydrationLog.TableLoaded(logger, map.Table, rows.Count);
