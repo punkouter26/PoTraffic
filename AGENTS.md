@@ -41,9 +41,17 @@ PoTraffic.Api             // Single host — Features/<Feature>/ slices (endpoin
 PoTraffic.Client          // Blazor WASM — hosted by Api, no CORS
 PoTraffic.Shared          // DTOs/Enums/Constants shared between Api ↔ Client
 tests/
-  PoTraffic.Tests         // Unit + Integration (folder split via <Compile/>)
+  PoTraffic.UnitTests     // STRICT Unit tier — no I/O (enforced by UnitTierGuard)
+  PoTraffic.Tests         // Integration tier — WebApplicationFactory + Testcontainers Azurite
   PoTraffic.Tests.E2E     // Playwright (Ui/) + HTTP (Api/) end-to-end scenarios
 ```
+
+> **Test-tier target (tracked):** the guardrail calls for a **two-tier** layout —
+> `PoTraffic.Tests` (Unit **and** Integration) + `PoTraffic.Tests.E2E`. Today Unit
+> lives in a separate `PoTraffic.UnitTests` project so the I/O ban can be enforced
+> assembly-wide via the `UnitTierGuard` module initializer. Merging Unit into
+> `PoTraffic.Tests` (under a `Unit/` folder) is the pending reconciliation; it must
+> preserve or replace that I/O guard, and requires Docker/Azurite to verify green.
 
 **Rules:**
 - No Onion/Clean layer projects — slices live in `PoTraffic.Api/Features/<FeatureName>/`
@@ -85,6 +93,9 @@ Azurite (`azurite-up` → `docker compose up -d`), then launches the API on 5000
 - `appsettings.Testing.json` — E2E / integration test overrides.
 - **Production secrets:** Azure Key Vault `kv-poshared` in `rg-poshared`. Prefix
   is `PoTraffic--` (mapped to `:` by `PrefixKeyVaultSecretManager`).
+- **DataProtection key ring:** `SecurityExtensions` persists keys to a local `keys/`
+  folder (encrypts the auth cookie + OAuth state). That folder is **gitignored** —
+  never commit key material. Multi-instance/prod should persist to Blob/Key Vault.
 - **Web Push (#1):** set `Push:VapidPublicKey` / `Push:VapidPrivateKey` / `Push:Subject`
   (Key Vault). If unset, `VapidKeyProvider` generates an ephemeral pair per process (dev only;
   browser subscriptions reset on restart). Reuses `GoogleMaps:ApiKey` for Places autocomplete (#9).
@@ -262,7 +273,7 @@ Verified properties of the codebase as of 2026-07-13:
 | `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>` | ✅ Enforced | `Directory.Build.props` |
 | `<EnableTrimAnalyzer>true</EnableTrimAnalyzer>` | ✅ Enforced in `PoTraffic.Shared`, `PoTraffic.Client` |
 | CPM (no inline `Version` in `.csproj`) | ✅ Verified | `Directory.Packages.props` |
-| Vertical Slice Architecture (no `Services/`, `Repositories/`, `DTOs/` at project root) | ✅ Verified |
+| Vertical Slice Architecture (no `Services/`, `Repositories/`, `DTOs/` at project root) | ⚠️ Mostly — no forbidden root folders, but some slices read another slice's `Entities` (History→Routes, Alerts→Routes+MonitoringWindows) and Routes↔MonitoringWindows is bidirectional. `Route`/`PollRecord`/`MonitoringWindow` are **accepted shared domain entities**; the Routes↔MonitoringWindows cycle is flagged for a targeted decoupling. |
 | Slug-pattern `Po{Name}` | ✅ All assemblies/root namespaces |
 | GUEST → `InvalidOperationException` in Production | ✅ Verified in `GuestAuthExtensions.MapGuestEndpoints` |
 | Microsoft OAuth required in Dev/Prod | ✅ Verified in `ProductionMicrosoftAuthPolicy` |

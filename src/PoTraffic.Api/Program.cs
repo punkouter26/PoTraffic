@@ -5,7 +5,6 @@ using PoTraffic.Api.Features.Admin;
 using PoTraffic.Api.Features.Alerts;
 using PoTraffic.Api.Features.Auth;
 using PoTraffic.Api.Features.Config;
-using PoTraffic.Api.Features.Diagnostics;
 using PoTraffic.Api.Features.History;
 using PoTraffic.Api.Features.Maintenance;
 using PoTraffic.Api.Features.MonitoringWindows;
@@ -62,6 +61,9 @@ try
     builder.Services.AddTrafficProviders(builder.Configuration, builder.Environment);
     builder.Services.AddAlertServices();
     builder.Services.AddPlacesServices();
+    // /diag/keyvault probe dependency — was injected but never registered (endpoint 500'd).
+    // NoOp is the safe default; swap for a Key Vault-backed probe to exercise identity wiring.
+    builder.Services.AddSingleton<KeyVaultSecretProbe, KeyVaultSecretProbeNoOp>();
 
     // Request dispatch (validation-first, see Infrastructure/Dispatch) + FluentValidation.
     builder.Services.AddDispatcher(typeof(Program).Assembly);

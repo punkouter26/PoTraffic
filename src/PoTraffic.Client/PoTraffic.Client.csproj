@@ -17,6 +17,15 @@
     <OverrideHtmlAssetPlaceholders>false</OverrideHtmlAssetPlaceholders>
     <RootNamespace>PoTraffic.Client</RootNamespace>
     <AssemblyName>PoTraffic.Client</AssemblyName>
+    <!-- Run the trim analyzer for OUR code without marking the app assembly IsTrimmable
+         (routable @page components must survive — see note below). Surfaces IL2xxx
+         trim-safety warnings in the client project so trimming stays clean.
+         IL2111 is suppressed: it originates in framework-generated App.razor Router
+         code (Router.NotFoundPage setter is accessed via reflection) — inherent to a
+         hosted Blazor WASM app that is deliberately NOT IsTrimmable, and not actionable
+         in our source. All other trim warnings remain build-breaking. -->
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <NoWarn>$(NoWarn);IL2111</NoWarn>
     <!-- Do NOT mark the Blazor WASM app assembly IsTrimmable. Routable @page components are
          discovered by the framework's runtime route-table scan, which the trimmer can't see;
          member-trimming the app assembly strips those pages from the published build (the "/"
