@@ -90,6 +90,13 @@ public sealed class ExternalAuthService(
             user.LastLoginAt = DateTimeOffset.UtcNow;
             if (identity.IsEmailVerified)
                 user.IsEmailVerified = true;
+            // Refresh the auth provider on every login. Accounts created under the previous
+            // JWT/password stack (removed in the BFF migration) — or any pre-BFF record — carry
+            // a stale or empty AuthProvider. The Production authorization policy requires the
+            // auth_provider claim to equal "microsoft", so without this refresh such a user is
+            // issued a valid session cookie (and appears signed in) yet is 403'd on every
+            // protected endpoint, surfacing as unexplained "operation failed" errors.
+            user.AuthProvider = authProvider.ProviderName.ToLowerInvariant();
             // Ensure admin role is always set correctly — guards against DB records created before this rule
             if (isAdmin && user.Role != "Administrator")
                 user.Role = "Administrator";

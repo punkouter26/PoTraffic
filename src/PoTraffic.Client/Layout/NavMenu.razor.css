@@ -1,37 +1,57 @@
-/* ── PoTraffic top app shell (Rule 6 — Left=Brand / Center=Actions / Right=User) ── */
+/* ── PoTraffic top app shell (Rule 6 — Left=Brand / Center=Actions / Right=User) ──
+   Tokens come from wwwroot/css/pt-tokens.css so the bar reskins with the theme. */
 
 .app-shell {
     display: grid;
     grid-template-columns: auto 1fr auto;
     align-items: center;
-    gap: 1rem;
-    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-    color: #fff;
-    padding: 0.55rem 1.25rem;
-    min-height: 3.5rem;
+    gap: var(--pt-space-4);
+    background: linear-gradient(180deg, #142137 0%, var(--pt-color-neutral-900) 100%);
+    color: var(--pt-color-neutral-0);
+    padding: 0 var(--pt-space-6);
+    min-height: 3.75rem;
     position: sticky;
     top: 0;
-    z-index: 100;
-    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.07);
+    z-index: var(--pt-z-nav);
+    border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+    box-shadow: var(--pt-elev-2);
 }
 
+/* ── Brand (left) — wordmark with a small accent mark ── */
+
 .app-shell-brand {
-    font-weight: 800;
-    font-size: 1.15rem;
-    letter-spacing: 0;
-    background: linear-gradient(135deg, #fff 0%, #90caf9 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--pt-space-2);
+    font-weight: var(--pt-weight-bold);
+    font-size: var(--pt-text-lg);
+    letter-spacing: -0.01em;
+    color: var(--pt-color-neutral-0);
     text-decoration: none;
-    padding: 0.25rem 0;
     white-space: nowrap;
+    transition: opacity var(--pt-dur-fast) var(--pt-ease);
 }
+
+.app-shell-brand::before {
+    content: "";
+    width: 0.6rem;
+    height: 0.6rem;
+    border-radius: var(--pt-radius-xs);
+    background: linear-gradient(135deg, var(--pt-color-brand-400), var(--pt-color-info));
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.16);
+    flex-shrink: 0;
+}
+
+.app-shell-brand:hover {
+    opacity: 0.85;
+}
+
+/* ── Center actions ── */
 
 .app-shell-actions {
     display: flex;
     align-items: center;
-    gap: 0.25rem;
+    gap: var(--pt-space-1);
     justify-content: center;
     min-width: 0;
 }
@@ -40,28 +60,43 @@
     display: flex;
     align-items: center;
     justify-content: flex-end;
+    gap: var(--pt-space-2);
     position: relative;
 }
 
+/* ── Nav links — hover tint, filled pill on active ── */
+
 .app-nav-link {
-    color: rgba(255, 255, 255, 0.78) !important;
-    padding: 0.45rem 0.85rem;
-    border-radius: 8px;
+    color: rgba(226, 232, 240, 0.70) !important;
+    padding: var(--pt-space-2) var(--pt-space-3);
+    border-radius: var(--pt-radius-sm);
     text-decoration: none;
-    font-size: 0.92rem;
-    font-weight: 500;
-    transition: background 0.15s, color 0.15s;
+    font-size: var(--pt-text-sm);
+    font-weight: var(--pt-weight-medium);
+    letter-spacing: 0.01em;
+    box-shadow: inset 0 0 0 1px transparent;
+    transition: background var(--pt-dur-fast) var(--pt-ease),
+                color var(--pt-dur-fast) var(--pt-ease),
+                box-shadow var(--pt-dur-fast) var(--pt-ease);
     white-space: nowrap;
 }
 
 .app-nav-link:hover {
-    background: rgba(255, 255, 255, 0.08);
-    color: #fff !important;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--pt-color-neutral-0) !important;
 }
 
 .app-nav-link.active {
-    background: rgba(255, 255, 255, 0.12);
-    color: #fff !important;
+    background: rgba(59, 130, 246, 0.16);
+    box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.35);
+    color: var(--pt-color-neutral-0) !important;
+}
+
+/* Accessibility: visible keyboard focus on the dark bar. */
+.app-nav-link:focus-visible,
+.pt-user-chip-btn:focus-visible {
+    outline: 2px solid var(--pt-color-brand-400);
+    outline-offset: 2px;
 }
 
 /* ── User chip (top-right) ── */
@@ -69,36 +104,39 @@
 .pt-user-chip-btn {
     display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    color: #fff;
-    padding: 0.3rem 0.6rem;
-    border-radius: 999px;
+    gap: var(--pt-space-2);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    color: var(--pt-color-neutral-0);
+    padding: var(--pt-space-1) var(--pt-space-3) var(--pt-space-1) var(--pt-space-1);
+    border-radius: var(--pt-radius-full);
     cursor: pointer;
-    font-size: 0.85rem;
-    font-weight: 500;
+    font-size: var(--pt-text-sm);
+    font-weight: var(--pt-weight-medium);
     line-height: 1;
-    transition: background 0.15s;
-    max-width: 18rem;
+    transition: background var(--pt-dur-fast) var(--pt-ease),
+                border-color var(--pt-dur-fast) var(--pt-ease);
+    max-width: 16rem;
 }
 
 .pt-user-chip-btn:hover {
-    background: rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.10);
+    border-color: rgba(255, 255, 255, 0.24);
 }
 
 .pt-user-avatar {
-    width: 1.6rem;
-    height: 1.6rem;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%);
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: var(--pt-radius-full);
+    background: var(--pt-color-brand-600);
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-weight: 700;
-    color: #fff;
-    font-size: 0.8rem;
+    font-weight: var(--pt-weight-bold);
+    color: var(--pt-color-neutral-0);
+    font-size: var(--pt-text-xs);
     flex-shrink: 0;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.30);
 }
 
 .pt-user-chip-label {
@@ -109,41 +147,45 @@
 
 .pt-user-caret {
     font-size: 0.7rem;
-    opacity: 0.7;
+    opacity: 0.6;
 }
 
 /* ── Dropdown menu ── */
 
 .pt-user-dropdown {
     position: absolute;
-    top: calc(100% + 0.5rem);
+    top: calc(100% + var(--pt-space-2));
     right: 0;
     min-width: 16rem;
-    background: #fff;
-    color: #1e293b;
-    border-radius: 10px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
-    z-index: 200;
-    padding: 0.4rem 0;
+    background: var(--pt-bg-surface);
+    color: var(--pt-fg-primary);
+    border: 1px solid var(--pt-border-subtle);
+    border-radius: var(--pt-radius-lg);
+    box-shadow: var(--pt-elev-3);
+    z-index: var(--pt-z-pop);
+    padding: var(--pt-space-2) 0;
+    overflow: hidden;
+    animation: pt-slide-down var(--pt-dur-fast) var(--pt-ease-out);
 }
 
 .pt-user-dropdown-header {
-    padding: 0.6rem 0.9rem;
-    border-bottom: 1px solid #e2e8f0;
+    padding: var(--pt-space-2) var(--pt-space-4);
+    border-bottom: 1px solid var(--pt-border-subtle);
+    margin-bottom: var(--pt-space-1);
 }
 
 .pt-user-dropdown-label {
-    font-size: 0.7rem;
+    font-size: var(--pt-text-xs);
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: #64748b;
-    margin-bottom: 0.2rem;
+    color: var(--pt-fg-secondary);
+    margin-bottom: var(--pt-space-1);
 }
 
 .pt-user-dropdown-email {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: #1e293b;
+    font-size: var(--pt-text-sm);
+    font-weight: var(--pt-weight-semibold);
+    color: var(--pt-fg-primary);
     word-break: break-all;
 }
 
@@ -153,19 +195,20 @@
     text-align: left;
     background: transparent;
     border: 0;
-    padding: 0.55rem 0.9rem;
-    font-size: 0.88rem;
-    color: #1e293b;
+    padding: var(--pt-space-3) var(--pt-space-4);
+    font-size: var(--pt-text-sm);
+    color: var(--pt-fg-primary);
     text-decoration: none;
     cursor: pointer;
+    transition: background var(--pt-dur-fast) var(--pt-ease);
 }
 
 .pt-dropdown-item:hover {
-    background: #f1f5f9;
+    background: var(--pt-color-neutral-100);
 }
 
 .pt-dropdown-item.danger {
-    color: #b91c1c;
+    color: var(--pt-color-danger);
 }
 
 .pt-dropdown-item.danger:hover {
@@ -174,19 +217,19 @@
 
 .pt-dropdown-divider {
     height: 1px;
-    background: #e2e8f0;
-    margin: 0.3rem 0;
+    background: var(--pt-border-subtle);
+    margin: var(--pt-space-1) 0;
 }
 
 /* ── Mock-data banner (top notice, full width) ── */
 
 .pt-mock-banner {
-    background: linear-gradient(90deg, #fbbf24 0%, #f59e0b 100%);
+    background: linear-gradient(90deg, var(--pt-color-warning) 0%, #d97706 100%);
     color: #422006;
     text-align: center;
-    padding: 0.4rem 1rem;
-    font-weight: 700;
-    font-size: 0.75rem;
+    padding: var(--pt-space-2) var(--pt-space-4);
+    font-weight: var(--pt-weight-bold);
+    font-size: var(--pt-text-xs);
     letter-spacing: 0.08em;
     text-transform: uppercase;
 }
@@ -195,17 +238,17 @@
 
 @media (max-width: 640px) {
     .app-shell {
-        padding: 0.5rem 0.85rem;
-        gap: 0.5rem;
+        padding: 0 var(--pt-space-3);
+        gap: var(--pt-space-2);
+        min-height: 3.5rem;
     }
 
     .app-shell-brand {
-        font-size: var(--pt-text-lg);
+        font-size: var(--pt-text-base);
     }
 
     .app-nav-link {
         padding: var(--pt-space-2) var(--pt-space-3);
-        font-size: var(--pt-text-sm);
     }
 
     .pt-user-chip-label {
@@ -214,16 +257,15 @@
 }
 
 /* ── Overlay behind the user menu ──
-   MUST stay below .app-shell (position:sticky; z-index:100). The header is its own
-   stacking context, so the dropdown's z-index:200 only ranks *within* the header —
-   at the root the whole header ranks at 100. A root-level overlay above 100 would
-   paint over the dropdown and swallow its clicks (Sign Out looks dead, just closes
-   the menu). At 90 the overlay still covers all page content below the header to
-   catch outside clicks, while the dropdown inside the header stays clickable. */
+   MUST stay below .app-shell (position:sticky; z-index:--pt-z-nav). The header is its own
+   stacking context, so the dropdown's z-index only ranks *within* the header — at the root
+   the whole header ranks at --pt-z-nav. A root-level overlay above that would paint over the
+   dropdown and swallow its clicks (Sign Out looks dead, just closes the menu). Kept just
+   below the nav so it still covers page content to catch outside clicks. */
 
 .pt-overlay {
     position: fixed;
     inset: 0;
-    z-index: 90;
+    z-index: calc(var(--pt-z-nav) - 10);
     background: transparent;
 }

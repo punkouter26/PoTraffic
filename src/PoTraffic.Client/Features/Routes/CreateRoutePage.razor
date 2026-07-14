@@ -148,14 +148,33 @@
 
             if (!createResp.IsSuccessStatusCode)
             {
-                var errBody = await createResp.Content.ReadFromJsonAsync(AppJsonContext.Default.JsonElement);
-                string? errorCode = errBody.TryGetProperty("error", out var prop) ? prop.GetString() : null;
+                // A session/authorization failure returns a ProblemDetails body with no "error"
+                // field, so surface it as an auth problem rather than a misleading "bad address".
+                if (createResp.StatusCode is System.Net.HttpStatusCode.Unauthorized
+                                          or System.Net.HttpStatusCode.Forbidden)
+                {
+                    _error = "Your session has expired. Please sign in again.";
+                    Nav.NavigateTo("/login?returnUrl=/routes/create");
+                    return;
+                }
+
+                // Only our structured 4xx responses carry an "error" code and use plain
+                // "application/json"; ProblemDetails (401/403/500) uses "application/problem+json",
+                // so we skip parsing those and fall through to the status-code messages below.
+                string? errorCode = null;
+                if (createResp.Content.Headers.ContentType?.MediaType == "application/json")
+                {
+                    var errBody = await createResp.Content.ReadFromJsonAsync(AppJsonContext.Default.JsonElement);
+                    errorCode = errBody.TryGetProperty("error", out var prop) ? prop.GetString() : null;
+                }
+
                 _error = errorCode switch
                 {
                     "MAPS_KEY_MISSING" => "Maps integration is not configured on the server.",
                     "ADDRESS_NOT_FOUND" => "We couldn't find that address. Please check and try again.",
                     "GEOCODE_FAILED"   => "We couldn't find that address. Please check and try again.",
                     "SAME_COORDINATES" => "Origin and destination resolve to the same location. Please use different addresses.",
+                    _ when (int)createResp.StatusCode >= 500 => "Something went wrong on our end. Please try again in a moment.",
                     _                  => "Failed to create route. Please verify your addresses."
                 };
                 return;
