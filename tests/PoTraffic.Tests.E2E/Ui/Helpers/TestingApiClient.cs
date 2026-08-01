@@ -71,22 +71,26 @@ public sealed class TestingApiClient
         return body?.Email;
     }
 
-    /// <summary>Seeds a route for the given user and returns (RouteId, OriginCoords, DestCoords).</summary>
-    public async Task<(RouteId RouteId, string OriginCoords, string DestCoords)> SeedRouteAsync(
+    /// <summary>
+    /// Seeds a route for the given user and returns its id and the two addresses as
+    /// stored, which is what callers match route cards on.
+    /// </summary>
+    public async Task<(RouteId RouteId, string OriginAddress, string DestinationAddress)> SeedRouteAsync(
         string email,
         string originAddress,
         string destinationAddress,
         CancellationToken ct = default)
     {
-        HttpResponseMessage response = await _http.PostAsJsonAsync(
+        using HttpResponseMessage response = await _http.PostAsJsonAsync(
             "/e2e/seed-route",
             new SeedRouteRequest(email, originAddress, destinationAddress),
             ct);
         response.EnsureSuccessStatusCode();
+
         SeedRouteResponse? body = await response.Content.ReadFromJsonAsync<SeedRouteResponse>(cancellationToken: ct);
         if (body is null || body.RouteId.IsEmpty)
             throw new InvalidOperationException("seed-route endpoint did not return a RouteId.");
-        return (body.RouteId, body.OriginCoords, body.DestCoords);
+        return (body.RouteId, body.OriginAddress, body.DestinationAddress);
     }
 
     private sealed record SeedAdminResponse(
@@ -108,13 +112,26 @@ public sealed class TestingApiClient
         [property: JsonPropertyName("role")] string? Role,
         [property: JsonPropertyName("authProvider")] string? AuthProvider);
 
+    /// <summary>
+    /// Mirrors the request <c>/e2e/seed-route</c> binds. The names previously sent
+    /// (<c>email</c>/<c>origin</c>/<c>destination</c>) matched none of the endpoint's
+    /// parameters, so every field bound to null and the handler rejected the call with
+    /// "User 'null' not found" — a 404 that read as a missing route rather than a
+    /// malformed body. <c>Provider</c> is required too, and defaults to Google Maps (0).
+    /// </summary>
     private sealed record SeedRouteRequest(
-        [property: JsonPropertyName("email")] string Email,
-        [property: JsonPropertyName("origin")] string Origin,
-        [property: JsonPropertyName("destination")] string Destination);
+        [property: JsonPropertyName("userEmail")] string UserEmail,
+        [property: JsonPropertyName("originAddress")] string OriginAddress,
+        [property: JsonPropertyName("destinationAddress")] string DestinationAddress,
+        [property: JsonPropertyName("provider")] int Provider = 0);
 
+    /// <summary>
+    /// Mirrors what the endpoint returns: the seeded route and its two addresses. The
+    /// previous <c>originCoords</c>/<c>destCoords</c> names matched nothing on the wire
+    /// and deserialised to null.
+    /// </summary>
     private sealed record SeedRouteResponse(
         [property: JsonPropertyName("routeId")] RouteId RouteId,
-        [property: JsonPropertyName("originCoords")] string OriginCoords,
-        [property: JsonPropertyName("destCoords")] string DestCoords);
+        [property: JsonPropertyName("originAddress")] string OriginAddress,
+        [property: JsonPropertyName("destinationAddress")] string DestinationAddress);
 }
