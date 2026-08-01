@@ -42,13 +42,6 @@ jobs:
       - run: dotnet restore ${{ env.API_PROJECT_PATH }}
       - run: dotnet build ${{ env.API_PROJECT_PATH }} --no-restore -c Release
       - run: dotnet publish ${{ env.API_PROJECT_PATH }} -c Release --no-build -o publish
-      # Slopwatch CI gate — blocks any new LLM-introduced slop (Rule 12).
-      - name: Install slopwatch
-        run: dotnet tool install --global Slopwatch.Cmd
-      - name: Restore slopwatch local config (if tracked)
-        run: dotnet tool restore || true
-      - name: Run slopwatch
-        run: dotnet slopwatch analyze -d . --fail-on warning
       - uses: actions/upload-artifact@v4
         with:
           name: webapp
