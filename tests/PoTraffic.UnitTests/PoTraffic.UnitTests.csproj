@@ -26,6 +26,12 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\PoTraffic.Shared\PoTraffic.Shared.csproj" />
     <ProjectReference Include="..\..\src\PoTraffic.API\PoTraffic.API.csproj" />
+    <!--
+      The client's departure solver is pure arithmetic over baseline slots — no I/O,
+      no JS interop, no component. It belongs in the strict Unit tier, and it is the
+      one piece of client code that decides what time a user actually leaves.
+    -->
+    <ProjectReference Include="..\..\src\PoTraffic.Client\PoTraffic.Client.csproj" />
   </ItemGroup>
 
   <ItemGroup>

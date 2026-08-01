@@ -16,12 +16,20 @@
     <span class="pt-breadcrumb-current">Route Detail</span>
 </nav>
 
-@if (_loading)
+@if (IsFirstLoad)
 {
     <PtProgressLine AriaLabel="Loading route" />
 }
 else
 {
+    @if (IsOffline || IsStale)
+    {
+        <div class="pt-stale-banner" role="status">
+            @(IsOffline ? "⚠︎ Offline — showing the last data received." :
+                          "⚠︎ Can't reach the server — retrying.")
+        </div>
+    }
+
     @* UI-2: Optimal departure is the headline — always visible, not hidden *@
     @if (_optimalDeparture is not null)
     {
@@ -90,7 +98,20 @@ else
             }
             <div class="pt-stat-block @(next.Live ? "pt-stat-green" : "pt-stat-amber")">
                 <div class="pt-stat-label">Next Sample ETA</div>
-                <div class="pt-stat-value @(next.Live ? "pt-poll-live" : "")">@next.Value</div>
+                <div class="pt-stat-value @(next.Live ? "pt-poll-live" : "")">
+                    @if (next.CountdownTargetUtc is { } target)
+                    {
+                        @* #4: ticks every second on its own, instead of freezing
+                           between the page's 15-second refreshes. *@
+                        <LiveCountdown TargetUtc="target"
+                                       PeriodHint="@TimeSpan.FromMinutes(_activeSession?.Schedule?.PollIntervalMinutes ?? 5)"
+                                       DueText="due now" />
+                    }
+                    else
+                    {
+                        @next.Value
+                    }
+                </div>
                 @if (!string.IsNullOrEmpty(next.Detail))
                 {
                     <div class="pt-stat-meta">@next.Detail</div>
@@ -98,6 +119,11 @@ else
             </div>
         </div>
     </RadzenCard>
+
+    @* #1/#2: arrival solver and departure scrubber, both answered client-side
+       from the baseline this page has already downloaded. *@
+    <DeparturePlanner Slots="_baselineSlots"
+                      SuggestedDepartureMinute="_optimalDeparture?.TimeSlotBucket" />
 
     @* Monitoring window configuration *@
     <WindowConfigPanel RouteId="RouteId" OnSaved="OnWindowSaved" />
@@ -109,7 +135,26 @@ else
         <TrendChart Points="@_trendPoints"
                     Baseline="@_trendBaseline"
                     UpperBand="@_trendUpperBand"
-                    ReroutedFlags="@_trendRerouted" />
+                    ReroutedFlags="@_trendRerouted"
+                    Labels="@_trendLabels"
+                    OnPointSelected="OnTrendPointSelected" />
+
+        @if (_selectedPoll is { } selected)
+        {
+            <div class="pt-trend-selection">
+                <span class="pt-trend-selection-time">@selected.PolledAtDateTime.ToString("HH:mm:ss")</span>
+                <span class="pt-trend-selection-value">@(selected.TravelDurationSeconds / 60) min</span>
+                <span class="pt-trend-selection-meta">
+                    @($"{selected.DistanceMetres * 0.000621371:F1} mi") · @selected.Provider
+                    @if (selected.IsRerouted)
+                    {
+                        <span class="pt-trend-selection-flag">rerouted</span>
+                    }
+                </span>
+                <button type="button" class="pt-trend-selection-clear"
+                        aria-label="Clear selection" @onclick="() => _selectedPoll = null">✕</button>
+            </div>
+        }
     </RadzenCard>
 
     @* #4: Day-of-week comparison — which days run worse *@
@@ -149,13 +194,14 @@ else
 @code {
     [Parameter] public Guid RouteId { get; set; }
 
-    private bool _loading = true;
     private List<PollRecordDto> _todayPolls = [];
     private List<BaselineSlotDto> _baselineSlots = [];
     private double[] _trendPoints = [];
     private double[] _trendBaseline = [];
     private double[] _trendUpperBand = [];
     private bool[] _trendRerouted = [];
+    private string[] _trendLabels = [];
+    private PollRecordDto? _selectedPoll;
     private OptimalDepartureDto? _optimalDeparture;
     private string _optimalDepartureLabel = string.Empty;
     private WeekdayComparisonDto? _weekdayComparison;
@@ -180,7 +226,18 @@ else
     // and re-sorting up to 300 records each time is pure waste. Refreshed in LoadDataAsync.
     private PollRecordDto? LatestPoll { get; set; }
 
-    private readonly record struct NextSampleInfo(string Value, string Detail, bool Live);
+    /// <param name="Value">Static headline, used when there is nothing to count down to.</param>
+    /// <param name="Detail">Supporting line under the headline.</param>
+    /// <param name="Live">Whether the window is currently sampling.</param>
+    /// <param name="CountdownTargetUtc">
+    /// When set, the headline is rendered as a self-ticking countdown to this instant
+    /// instead of <paramref name="Value"/>.
+    /// </param>
+    private readonly record struct NextSampleInfo(
+        string Value,
+        string Detail,
+        bool Live,
+        DateTimeOffset? CountdownTargetUtc = null);
 
     // Headline + detail describing when the next traffic sample is expected to complete.
     // Every schedule decision below — is the window open, when does it reopen, what cadence
@@ -227,17 +284,15 @@ else
             }
 
             DateTime nextLocal = nextPoll.ToLocalTime().DateTime;
-            TimeSpan remaining = nextLocal - DateTime.Now;
 
-            if (remaining <= TimeSpan.Zero)
-            {
-                return new NextSampleInfo("Due now", "expected any moment", Live: true);
-            }
-
+            // Hand the instant to LiveCountdown rather than formatting a remaining-minutes
+            // string here: this getter only runs on the page's refresh, so a string computed
+            // now would sit frozen for the next fifteen seconds.
             return new NextSampleInfo(
-                $"in {Math.Ceiling(remaining.TotalMinutes):F0} min",
-                $"~{nextLocal:HH:mm:ss} · every {schedule.PollIntervalMinutes} min",
-                Live: false);
+                Value: string.Empty,
+                Detail: $"~{nextLocal:HH:mm:ss} · every {schedule.PollIntervalMinutes} min",
+                Live: false,
+                CountdownTargetUtc: nextPoll);
         }
     }
     // Observer pattern — PollingComponentBase base handles the timer loop
@@ -245,9 +300,13 @@ else
 
     private async Task OnWindowSaved()
     {
-        await LoadDataAsync();
+        await RefreshAsync();
         StateHasChanged();
     }
+
+    /// <summary>Clicking a sample on the chart surfaces its raw record beneath (#8).</summary>
+    private void OnTrendPointSelected(int index) =>
+        _selectedPoll = index >= 0 && index < _todayPolls.Count ? _todayPolls[index] : null;
 
     /// <summary>Creates (or re-uses) the reverse-direction route and navigates to it (#3).</summary>
     private async Task CreateReturnTripAsync()
@@ -285,83 +344,79 @@ else
 
     protected override async Task LoadDataAsync()
     {
-        _loading = true;
-        try
+        // Failures propagate deliberately: PollingComponentBase turns them into backoff
+        // and the stale banner. Swallowing them here would report every refresh as a
+        // success and keep hammering an endpoint that is down.
+        string dayOfWeek = DateTime.Today.DayOfWeek.ToString();
+        _icsHref = $"/api/routes/{RouteId}/departure.ics?dayOfWeek={dayOfWeek}";
+        string sinceUtc = Uri.EscapeDataString(DateTime.UtcNow.AddHours(-24).ToString("o"));
+
+        // None of these six reads depends on another's result, so they all go out at
+        // once. Awaited one-by-one, a refresh cost the SUM of six round-trips — every
+        // 15 seconds, per open tab.
+        Task<RouteDto?> routeTask =
+            Http.GetFromJsonAsync($"/api/routes/{RouteId}", AppJsonContext.Default.RouteDto);
+        Task<List<SessionDto>?> sessionsTask =
+            Http.GetFromJsonAsync($"/api/routes/{RouteId}/sessions", AppJsonContext.Default.ListSessionDto);
+        Task<PagedResult<PollRecordDto>?> historyTask =
+            Http.GetFromJsonAsync($"/api/routes/{RouteId}/poll-history?page=1&pageSize=300&sinceUtc={sinceUtc}", AppJsonContext.Default.PagedResultPollRecordDto);
+        Task<BaselineResponse?> baselineTask =
+            Http.GetFromJsonAsync($"/api/routes/{RouteId}/baseline?dayOfWeek={dayOfWeek}", AppJsonContext.Default.BaselineResponse);
+        Task<OptimalDepartureDto?> optimalTask =
+            Http.GetFromJsonAsync($"/api/routes/{RouteId}/optimal-departure?dayOfWeek={dayOfWeek}", AppJsonContext.Default.OptimalDepartureDto);
+        Task<WeekdayComparisonDto?> weekdayTask =
+            Http.GetFromJsonAsync($"/api/routes/{RouteId}/weekday-comparison", AppJsonContext.Default.WeekdayComparisonDto);
+
+        await Task.WhenAll(routeTask, sessionsTask, historyTask, baselineTask, optimalTask, weekdayTask);
+
+        // The route itself — drives the return-trip pairing control (#3)
+        _route = await routeTask;
+
+        // Today's active monitoring session — carries the server-computed poll schedule
+        // that drives the Next Sample ETA card
+        DateOnly today = DateOnly.FromDateTime(DateTime.UtcNow.Date);
+        _activeSession = (await sessionsTask)?.FirstOrDefault(
+            s => s.State == SessionState.Active && s.SessionDate == today);
+
+        // Past 24h poll records
+        PagedResult<PollRecordDto>? historyResult = await historyTask;
+        if (historyResult is not null)
         {
-            string dayOfWeek = DateTime.Today.DayOfWeek.ToString();
-            _icsHref = $"/api/routes/{RouteId}/departure.ics?dayOfWeek={dayOfWeek}";
-            string sinceUtc = Uri.EscapeDataString(DateTime.UtcNow.AddHours(-24).ToString("o"));
+            _todayPolls = [.. historyResult.Items];
+            LatestPoll = _todayPolls.MaxBy(p => p.PolledAtDateTime);
+            _trendPoints = [.. _todayPolls.Select(p => p.TravelDurationSeconds / 60.0)];
+            _trendRerouted = [.. _todayPolls.Select(p => p.IsRerouted)];
+            // Chart tooltips name the sample by wall-clock time (#8).
+            _trendLabels = [.. _todayPolls.Select(p => p.PolledAtDateTime.ToString("HH:mm"))];
 
-            // None of these seven reads depends on another's result, so they all go out at
-            // once. Awaited one-by-one, a refresh cost the SUM of seven round-trips — every
-            // 15 seconds, per open tab.
-            Task<RouteDto?> routeTask =
-                Http.GetFromJsonAsync($"/api/routes/{RouteId}", AppJsonContext.Default.RouteDto);
-            Task<List<SessionDto>?> sessionsTask =
-                Http.GetFromJsonAsync($"/api/routes/{RouteId}/sessions", AppJsonContext.Default.ListSessionDto);
-            Task<PagedResult<PollRecordDto>?> historyTask =
-                Http.GetFromJsonAsync($"/api/routes/{RouteId}/poll-history?page=1&pageSize=300&sinceUtc={sinceUtc}", AppJsonContext.Default.PagedResultPollRecordDto);
-            Task<BaselineResponse?> baselineTask =
-                Http.GetFromJsonAsync($"/api/routes/{RouteId}/baseline?dayOfWeek={dayOfWeek}", AppJsonContext.Default.BaselineResponse);
-            Task<OptimalDepartureDto?> optimalTask =
-                Http.GetFromJsonAsync($"/api/routes/{RouteId}/optimal-departure?dayOfWeek={dayOfWeek}", AppJsonContext.Default.OptimalDepartureDto);
-            Task<WeekdayComparisonDto?> weekdayTask =
-                Http.GetFromJsonAsync($"/api/routes/{RouteId}/weekday-comparison", AppJsonContext.Default.WeekdayComparisonDto);
-
-            await Task.WhenAll(routeTask, sessionsTask, historyTask, baselineTask, optimalTask, weekdayTask);
-
-            // The route itself — drives the return-trip pairing control (#3)
-            _route = await routeTask;
-
-            // Today's active monitoring session — carries the server-computed poll schedule
-            // that drives the Next Sample ETA card
-            DateOnly today = DateOnly.FromDateTime(DateTime.UtcNow.Date);
-            _activeSession = (await sessionsTask)?.FirstOrDefault(
-                s => s.State == SessionState.Active && s.SessionDate == today);
-
-            // Past 24h poll records
-            PagedResult<PollRecordDto>? historyResult = await historyTask;
-            if (historyResult is not null)
-            {
-                _todayPolls = [.. historyResult.Items];
-                LatestPoll = _todayPolls.MaxBy(p => p.PolledAtDateTime);
-                _trendPoints = _todayPolls.Select(p => p.TravelDurationSeconds / 60.0).ToArray();
-                _trendRerouted = _todayPolls.Select(p => p.IsRerouted).ToArray();
-            }
-
-            BaselineResponse? baseline = await baselineTask;
-            if (baseline is not null)
-            {
-                _baselineSlots = [.. baseline.Slots];
-                _trendBaseline = _baselineSlots.Select(s => s.MeanDurationSeconds / 60.0).ToArray();
-                _trendUpperBand = _baselineSlots
-                    .Select(s => s.StdDevDurationSeconds.HasValue
-                        ? (s.MeanDurationSeconds + s.StdDevDurationSeconds.Value) / 60.0
-                        : s.MeanDurationSeconds / 60.0)
-                    .ToArray();
-            }
-
-            OptimalDepartureDto? optimal = await optimalTask;
-            if (optimal is not null)
-            {
-                _optimalDeparture = optimal;
-                int h = optimal.TimeSlotBucket / 60;
-                int m = optimal.TimeSlotBucket % 60;
-                _optimalDepartureLabel = $"Best departure: {h:D2}:{m:D2} " +
-                    $"(~{optimal.PredictedDurationSeconds / 60:F0} min)";
-            }
-
-            // Per-weekday comparison (#4)
-            _weekdayComparison = await weekdayTask;
-            _weekdaySummary = BuildWeekdaySummary(_weekdayComparison);
+            // A selection from the previous payload may no longer exist.
+            if (_selectedPoll is not null && !_todayPolls.Contains(_selectedPoll))
+                _selectedPoll = null;
         }
-        catch
+
+        BaselineResponse? baseline = await baselineTask;
+        if (baseline is not null)
         {
-            // Silently handled — partial data shown
+            _baselineSlots = [.. baseline.Slots];
+            _trendBaseline = [.. _baselineSlots.Select(s => s.MeanDurationSeconds / 60.0)];
+            _trendUpperBand = [.. _baselineSlots
+                .Select(s => s.StdDevDurationSeconds.HasValue
+                    ? (s.MeanDurationSeconds + s.StdDevDurationSeconds.Value) / 60.0
+                    : s.MeanDurationSeconds / 60.0)];
         }
-        finally
+
+        OptimalDepartureDto? optimal = await optimalTask;
+        if (optimal is not null)
         {
-            _loading = false;
+            _optimalDeparture = optimal;
+            int h = optimal.TimeSlotBucket / 60;
+            int m = optimal.TimeSlotBucket % 60;
+            _optimalDepartureLabel = $"Best departure: {h:D2}:{m:D2} " +
+                $"(~{optimal.PredictedDurationSeconds / 60:F0} min)";
         }
+
+        // Per-weekday comparison (#4)
+        _weekdayComparison = await weekdayTask;
+        _weekdaySummary = BuildWeekdaySummary(_weekdayComparison);
     }
 }

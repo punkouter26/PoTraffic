@@ -36,4 +36,14 @@ builder.Services.AddRadzenComponents();
 // PoTraffic native-browser interop (audio feedback, touch gestures)
 builder.Services.AddScoped<PtInterop>();
 
+// Last-known-good payloads, so the dashboard and the command palette paint before
+// the first round-trip completes.
+builder.Services.AddScoped<ClientCache>();
+
+// One shared visibility/connectivity subscription driving every polling page.
+builder.Services.AddScoped<PageActivityMonitor>();
+
+// Holds deletes for a grace period so "Undo" has something to undo.
+builder.Services.AddScoped<PendingDeletionService>();
+
 await builder.Build().RunAsync();

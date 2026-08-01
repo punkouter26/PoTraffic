@@ -43,9 +43,8 @@ public sealed class GetOptimalDepartureQueryHandler
         List<PollRecord> dayPolls = daySpecific
             ? allPolls.Where(p => p.PolledAt.DayOfWeek == dow).ToList()
             : allPolls;
-        List<PollRecord> source = dayPolls.Count < QuotaConstants.BaselineMinSessionCount
-            ? allPolls
-            : dayPolls;
+        bool fellBack = dayPolls.Count < QuotaConstants.BaselineMinSessionCount;
+        List<PollRecord> source = fellBack ? allPolls : dayPolls;
 
         // Group polls by 5-minute bucket (post-refactor; was SQL STDEV in EF era).
         var buckets = source
@@ -68,13 +67,14 @@ public sealed class GetOptimalDepartureQueryHandler
             .ToList();
 
         int startBucket = optimal.First().Bucket;
-        int endBucket = optimal.Last().Bucket;
 
         return Task.FromResult<OptimalDepartureDto?>(new OptimalDepartureDto(
             query.DayOfWeek,
             startBucket,
             minMean,
             minMean * 0.95,
-            minMean * 1.05));
+            minMean * 1.05,
+            SampleCount: source.Count,
+            DayOfWeekSpecific: !fellBack));
     }
 }

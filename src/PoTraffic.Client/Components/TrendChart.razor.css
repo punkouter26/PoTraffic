@@ -1,9 +1,52 @@
+/* Positioning context for the tooltip pt-chart.js appends. Because that element is
+   created in JS it carries no scope attribute, so its own rules live in app.css. */
+.pt-trend-host {
+    position: relative;
+}
+
 .pt-trend-canvas {
     display: block;
     width: 100%;
     height: 240px;
     border-radius: var(--pt-radius-md);
     background: var(--pt-bg-elev-1);
+    cursor: crosshair;
+    touch-action: pan-y;
+}
+
+.pt-trend-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--pt-space-2);
+    margin-top: var(--pt-space-2);
+    min-height: 1.5rem;
+}
+
+.pt-trend-hint,
+.pt-trend-zoom-label {
+    font-size: var(--pt-text-xs);
+    color: var(--pt-fg-tertiary);
+}
+
+.pt-trend-zoom-label {
+    color: var(--pt-fg-secondary);
+    font-weight: var(--pt-weight-medium);
+}
+
+.pt-trend-zoom-reset {
+    background: var(--pt-bg-tint);
+    border: 1px solid var(--pt-border-subtle);
+    border-radius: var(--pt-radius-full);
+    color: var(--pt-fg-body);
+    cursor: pointer;
+    font-size: var(--pt-text-xs);
+    padding: 0.15rem 0.6rem;
+    transition: background-color var(--pt-dur-fast) var(--pt-ease);
+}
+
+.pt-trend-zoom-reset:hover {
+    background: var(--pt-bg-tint-strong);
 }
 
 .pt-trend-empty {

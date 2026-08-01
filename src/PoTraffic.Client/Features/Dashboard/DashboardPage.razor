@@ -5,8 +5,11 @@
 @using PoTraffic.Shared.Enums
 @using PoTraffic.Client.Features.Routes
 @inherits PollingComponentBase
+@implements IDisposable
 @inject HttpClient Http
 @inject NavigationManager Nav
+@inject ClientCache Cache
+@inject PendingDeletionService Pending
 
 @using PoTraffic.Shared.Constants
 
@@ -17,7 +20,7 @@
 @* C2: Compact status bar replaces 4 KPI cards *@
 <div class="pt-status-bar">
     @{
-        int activeCount = _routes.Count(r => r.MonitoringStatus == MonitoringStatus.Active);
+        int activeCount = VisibleRoutes.Count(r => r.MonitoringStatus == MonitoringStatus.Active);
         string dotClass = activeCount > 0 ? "pt-status-dot-green" : "pt-status-dot-amber";
         int quotaTotal = QuotaConstants.DefaultDailyQuota;
         double quotaPct = quotaTotal > 0 ? Math.Min(100, (double)_quotaConsumed / quotaTotal * 100) : 0;
@@ -27,8 +30,20 @@
     <div class="pt-status-metrics">
         <span class="pt-status-item">
             <span class="pt-status-dot @dotClass"></span>
-            @activeCount of @_routes.Count routes active
+            @activeCount of @VisibleRoutes.Count routes active
         </span>
+        @if (IsOffline)
+        {
+            <span class="pt-status-item pt-status-offline" title="Showing the last data received">
+                ⚠︎ Offline
+            </span>
+        }
+        else if (IsStale)
+        {
+            <span class="pt-status-item pt-status-offline" title="Couldn't reach the server — retrying with backoff">
+                ⚠︎ Reconnecting
+            </span>
+        }
         <span class="pt-status-item">
             <span class="pt-quota-chip">
                 <span class="pt-quota-ring" style="@quotaRingStyle" aria-hidden="true"></span>
@@ -50,7 +65,7 @@
     @* Show the status-bar add button only when routes exist. On the empty
        dashboard the empty-state CTA (and the mobile FAB) already provide it —
        avoids three competing "Add Route" buttons on first load. *@
-    @if (_loading || _routes.Count > 0)
+    @if (ShowSkeletons || VisibleRoutes.Count > 0)
     {
         <div class="pt-status-bar-actions">
             <RadzenButton Text="+ Add Route" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Small"
@@ -66,9 +81,11 @@
     </RadzenAlert>
 }
 
-@if (_loading)
+@if (ShowSkeletons)
 {
-    @* TASK #9: Skeleton placeholders avoid layout flash while routes load *@
+    @* TASK #9: Skeleton placeholders avoid layout flash while routes load.
+       Shown only when there is genuinely nothing to draw — a cached snapshot
+       or a background refresh must never blank a populated dashboard. *@
     <div class="pt-skeleton-stack" aria-busy="true" aria-label="Loading routes">
         @for (int i = 0; i < 3; i++)
         {
@@ -80,7 +97,22 @@
         }
     </div>
 }
-else if (_routes.Count == 0)
+else if (VisibleRoutes.Count == 0 && !_hydrated)
+{
+    @* Nothing loaded and nothing cached — this is a failure, not an empty account.
+       Showing "No routes yet" here would tell a user their routes had vanished. *@
+    <div class="pt-empty-state">
+        <div class="pt-empty-state-emoji" aria-hidden="true">📡</div>
+        <div class="pt-empty-state-title">Couldn't load your routes</div>
+        <div class="pt-empty-state-text">
+            @(IsOffline ? "You're offline. We'll refresh as soon as you're back."
+                        : "The server didn't respond. Retrying automatically.")
+        </div>
+        <RadzenButton Text="Retry now" ButtonStyle="ButtonStyle.Light" Icon="refresh"
+                      Click="@RefreshAsync" />
+    </div>
+}
+else if (VisibleRoutes.Count == 0)
 {
     <div class="pt-empty-state">
         <div class="pt-empty-state-emoji" aria-hidden="true">🛣️</div>
@@ -96,19 +128,22 @@ else
        Virtualize keeps only the visible cards in the DOM. With 10+ routes
        the user can scroll without paying the cost of 100+ RadzenCards. *@
     <div class="pt-route-cards pt-stagger" role="list">
-        <Virtualize Items="_routes" Context="route" ItemSize="180" OverscanCount="2">
+        <Virtualize Items="VisibleRoutes" Context="route" ItemSize="180" OverscanCount="2">
             <div role="listitem">
                 <SwipeableRouteCard Route="route"
                            OptimalDeparture="@(_optimalDepartures.GetValueOrDefault(route.Id))"
                            RecentPolls="@(_recentPolls.GetValueOrDefault(route.Id, []))"
-                           OnDeleted="@LoadDataAsync"
-                           OnRefresh="@LoadDataAsync" />
+                           OnDeleted="@RefreshAsync"
+                           OnRefresh="@RefreshAsync" />
             </div>
         </Virtualize>
     </div>
 }
 
 @code {
+    /// <summary>How stale a cached snapshot may be and still be worth painting on mount.</summary>
+    private static readonly TimeSpan CacheMaxAge = TimeSpan.FromHours(12);
+
     private List<RouteDto> _routes = [];
     private Dictionary<RouteId, OptimalDepartureDto> _optimalDepartures = [];
     private Dictionary<RouteId, List<PollRecordDto>> _recentPolls = [];
@@ -116,74 +151,146 @@ else
     private int _pollsToday;
     private decimal _estimatedCostToday;
     private decimal _projectedMonthlyCost;
-    private bool _loading = true;
+    private bool _hydrated;
 
     protected override TimeSpan PollingInterval => TimeSpan.FromSeconds(60);
 
+    /// <summary>
+    /// Routes with a pending delete are hidden immediately, so the swipe feels instant
+    /// while the request itself is still parked behind the undo window (#3). Cached
+    /// rather than derived per read — the markup reads it several times per render.
+    /// </summary>
+    private List<RouteDto> VisibleRoutes { get; set; } = [];
+
+    private void RecomputeVisible() =>
+        VisibleRoutes = [.. _routes.Where(r => !Pending.IsPending(r.Id))];
+
+    /// <summary>
+    /// Skeletons only when there is genuinely nothing to show. A cached snapshot or a
+    /// background refresh must never blank a dashboard the user is already reading.
+    /// </summary>
+    private bool ShowSkeletons => IsFirstLoad && !_hydrated;
+
+    protected override void OnInitialized() => Pending.Changed += OnPendingChanged;
+
+    private void OnPendingChanged()
+    {
+        RecomputeVisible();
+        InvokeAsync(StateHasChanged);
+    }
+
     protected override async Task LoadDataAsync()
     {
-        _loading = true;
-        try
+        // First paint comes from the last snapshot, if there is one — real routes on
+        // screen before the network has answered (#5).
+        if (IsFirstLoad)
+            await HydrateFromCacheAsync();
+
+        string dayOfWeek = DateTime.Today.DayOfWeek.ToString();
+
+        // The route list and the quota card are independent — one round-trip, not two.
+        Task<PagedResult<RouteDto>?> routesTask =
+            Http.GetFromJsonAsync("/api/routes?page=1&pageSize=100", AppJsonContext.Default.PagedResultRouteDto);
+        Task<QuotaDto?> quotaTask =
+            Http.GetFromJsonAsync("/api/account/quota", AppJsonContext.Default.QuotaDto);
+
+        PagedResult<RouteDto>? result = await routesTask;
+        if (result is not null)
+            _routes = [.. result.Items];
+
+        QuotaDto? quota = await quotaTask;
+        if (quota is not null)
         {
-            string dayOfWeek = DateTime.Today.DayOfWeek.ToString();
+            _quotaConsumed = quota.UsedToday;
+            _pollsToday = quota.PollsToday;
+            _estimatedCostToday = quota.EstimatedCostTodayUsd;
+            _projectedMonthlyCost = quota.ProjectedMonthlyCostUsd;
+        }
 
-            // The route list and the quota card are independent — one round-trip, not two.
-            Task<PagedResult<RouteDto>?> routesTask =
-                Http.GetFromJsonAsync("/api/routes?page=1&pageSize=100", AppJsonContext.Default.PagedResultRouteDto);
-            Task<QuotaDto?> quotaTask =
-                Http.GetFromJsonAsync("/api/account/quota", AppJsonContext.Default.QuotaDto);
+        // UI-2/UI-12: Load optimal departure + 24h trend for each route. Every route's
+        // pair is independent of every other's, so they all go out at once — awaiting
+        // them in a loop made the refresh cost the SUM of 2×N latencies every 60s.
+        // Per-route failures stay non-fatal.
+        Dictionary<RouteId, OptimalDepartureDto> departures = [];
+        Dictionary<RouteId, List<PollRecordDto>> polls = [];
+        string sinceUtc = Uri.EscapeDataString(DateTime.UtcNow.AddHours(-24).ToString("o"));
 
-            PagedResult<RouteDto>? result = await routesTask;
-            if (result is not null)
-                _routes = [.. result.Items];
-
-            QuotaDto? quota = await quotaTask;
-            if (quota is not null)
+        await Task.WhenAll(_routes.Select(async route =>
+        {
+            try
             {
-                _quotaConsumed = quota.UsedToday;
-                _pollsToday = quota.PollsToday;
-                _estimatedCostToday = quota.EstimatedCostTodayUsd;
-                _projectedMonthlyCost = quota.ProjectedMonthlyCostUsd;
+                Task<OptimalDepartureDto?> optimalTask = Http.GetFromJsonAsync(
+                    $"/api/routes/{route.Id}/optimal-departure?dayOfWeek={dayOfWeek}", AppJsonContext.Default.OptimalDepartureDto);
+                Task<PagedResult<PollRecordDto>?> historyTask = Http.GetFromJsonAsync(
+                    $"/api/routes/{route.Id}/poll-history?page=1&pageSize=60&sinceUtc={sinceUtc}", AppJsonContext.Default.PagedResultPollRecordDto);
+
+                OptimalDepartureDto? optimal = await optimalTask;
+                if (optimal is not null)
+                    departures[route.Id] = optimal;
+
+                PagedResult<PollRecordDto>? history = await historyTask;
+                if (history is not null && history.Items.Count > 0)
+                    polls[route.Id] = [.. history.Items];
             }
-
-            // UI-2/UI-12: Load optimal departure + 24h trend for each route. Every route's
-            // pair is independent of every other's, so they all go out at once — awaiting
-            // them in a loop made the refresh cost the SUM of 2×N latencies every 60s.
-            // Per-route failures stay non-fatal.
-            _optimalDepartures = [];
-            _recentPolls = [];
-            string sinceUtc = Uri.EscapeDataString(DateTime.UtcNow.AddHours(-24).ToString("o"));
-
-            await Task.WhenAll(_routes.Select(async route =>
+            catch
             {
-                try
-                {
-                    Task<OptimalDepartureDto?> optimalTask = Http.GetFromJsonAsync(
-                        $"/api/routes/{route.Id}/optimal-departure?dayOfWeek={dayOfWeek}", AppJsonContext.Default.OptimalDepartureDto);
-                    Task<PagedResult<PollRecordDto>?> historyTask = Http.GetFromJsonAsync(
-                        $"/api/routes/{route.Id}/poll-history?page=1&pageSize=60&sinceUtc={sinceUtc}", AppJsonContext.Default.PagedResultPollRecordDto);
+                // Individual route failure doesn't break the dashboard
+            }
+        }));
 
-                    OptimalDepartureDto? optimal = await optimalTask;
-                    if (optimal is not null)
-                        _optimalDepartures[route.Id] = optimal;
+        // Swapped in wholesale rather than cleared up front: clearing first would blank
+        // every card for the duration of the fan-out.
+        _optimalDepartures = departures;
+        _recentPolls = polls;
+        _hydrated = true;
+        RecomputeVisible();
 
-                    PagedResult<PollRecordDto>? history = await historyTask;
-                    if (history is not null && history.Items.Count > 0)
-                        _recentPolls[route.Id] = [.. history.Items];
-                }
-                catch
-                {
-                    // Individual route failure doesn't break the dashboard
-                }
-            }));
-        }
-        catch
-        {
-            // Silently handled — data shown may be partial
-        }
-        finally
-        {
-            _loading = false;
-        }
+        await PersistSnapshotAsync(quota);
     }
+
+    /// <summary>Paints the last stored snapshot. A miss simply leaves the skeletons up.</summary>
+    private async Task HydrateFromCacheAsync()
+    {
+        DashboardSnapshot? snapshot = await Cache.GetAsync(
+            ClientCacheKeys.Dashboard, AppJsonContext.Default.DashboardSnapshot, CacheMaxAge);
+
+        if (snapshot is null || snapshot.Routes.Count == 0)
+            return;
+
+        _routes = snapshot.Routes;
+        _optimalDepartures = snapshot.Insights
+            .Where(i => i.OptimalDeparture is not null)
+            .ToDictionary(i => i.RouteId, i => i.OptimalDeparture!);
+        _recentPolls = snapshot.Insights
+            .Where(i => i.RecentPolls.Count > 0)
+            .ToDictionary(i => i.RouteId, i => i.RecentPolls);
+
+        if (snapshot.Quota is { } quota)
+        {
+            _quotaConsumed = quota.UsedToday;
+            _pollsToday = quota.PollsToday;
+            _estimatedCostToday = quota.EstimatedCostTodayUsd;
+            _projectedMonthlyCost = quota.ProjectedMonthlyCostUsd;
+        }
+
+        _hydrated = true;
+        RecomputeVisible();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    /// <summary>Stores the fresh payload for the next cold start and for the command palette.</summary>
+    private async Task PersistSnapshotAsync(QuotaDto? quota)
+    {
+        List<RouteInsight> insights = [.. _routes.Select(r => new RouteInsight(
+            r.Id,
+            _optimalDepartures.GetValueOrDefault(r.Id),
+            _recentPolls.GetValueOrDefault(r.Id, [])))];
+
+        await Cache.SetAsync(
+            ClientCacheKeys.Dashboard,
+            new DashboardSnapshot(_routes, quota, insights),
+            AppJsonContext.Default.DashboardSnapshot);
+    }
+
+    public void Dispose() => Pending.Changed -= OnPendingChanged;
 }

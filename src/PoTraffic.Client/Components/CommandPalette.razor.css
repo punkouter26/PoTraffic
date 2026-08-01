@@ -1,0 +1,195 @@
+/* #7 — command palette and the keyboard-shortcut sheet. */
+
+.pt-palette-scrim {
+    background: rgba(var(--pt-shadow-rgb), 0.45);
+    inset: 0;
+    position: fixed;
+    z-index: var(--pt-z-modal);
+}
+
+.pt-palette {
+    animation: pt-slide-down var(--pt-dur-fast) var(--pt-ease);
+    backdrop-filter: blur(var(--pt-glass-blur)) saturate(var(--pt-glass-saturate));
+    background: var(--pt-glass-bg-strong);
+    border: 1px solid var(--pt-glass-border);
+    border-radius: var(--pt-radius-lg);
+    box-shadow: var(--pt-elev-4);
+    left: 50%;
+    max-width: calc(100vw - 2rem);
+    overflow: hidden;
+    position: fixed;
+    top: 12vh;
+    transform: translateX(-50%);
+    width: 34rem;
+    z-index: calc(var(--pt-z-modal) + 1);
+}
+
+.pt-palette-input-row {
+    align-items: center;
+    border-bottom: 1px solid var(--pt-border-subtle);
+    display: flex;
+    gap: var(--pt-space-2);
+    padding: var(--pt-space-3) var(--pt-space-4);
+}
+
+.pt-palette-prompt {
+    color: var(--pt-fg-tertiary);
+    font-size: var(--pt-text-lg);
+}
+
+.pt-palette-input {
+    background: transparent;
+    border: none;
+    color: var(--pt-fg-primary);
+    flex: 1;
+    font-size: var(--pt-text-lg);
+    min-width: 0;
+    outline: none;
+}
+
+.pt-palette-input::placeholder {
+    color: var(--pt-fg-tertiary);
+}
+
+.pt-palette-list {
+    list-style: none;
+    margin: 0;
+    max-height: 22rem;
+    overflow-y: auto;
+    padding: var(--pt-space-1);
+}
+
+.pt-palette-item {
+    align-items: center;
+    border-radius: var(--pt-radius-sm);
+    cursor: pointer;
+    display: flex;
+    gap: var(--pt-space-3);
+    padding: 0.5rem 0.75rem;
+}
+
+.pt-palette-item.active {
+    background: var(--pt-color-brand-100);
+}
+
+:root[data-theme="dark"] .pt-palette-item.active {
+    background: var(--pt-color-brand-800);
+}
+
+.pt-palette-icon {
+    flex-shrink: 0;
+}
+
+.pt-palette-text {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.pt-palette-title {
+    color: var(--pt-fg-primary);
+    font-size: var(--pt-text-sm);
+    font-weight: var(--pt-weight-medium);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pt-palette-subtitle {
+    color: var(--pt-fg-tertiary);
+    font-size: var(--pt-text-xs);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pt-palette-group {
+    color: var(--pt-fg-tertiary);
+    flex-shrink: 0;
+    font-size: var(--pt-text-xs);
+    text-transform: uppercase;
+}
+
+.pt-palette-empty,
+.pt-palette-footer {
+    color: var(--pt-fg-tertiary);
+    font-size: var(--pt-text-xs);
+    padding: var(--pt-space-3) var(--pt-space-4);
+}
+
+.pt-palette-empty {
+    font-size: var(--pt-text-sm);
+}
+
+.pt-palette-footer {
+    border-top: 1px solid var(--pt-border-subtle);
+}
+
+/* ── Shortcut sheet ──────────────────────────────────────────────────── */
+
+.pt-shortcuts {
+    background: var(--pt-bg-surface);
+    border: 1px solid var(--pt-border-subtle);
+    border-radius: var(--pt-radius-lg);
+    box-shadow: var(--pt-elev-4);
+    left: 50%;
+    max-width: calc(100vw - 2rem);
+    padding: var(--pt-space-5);
+    position: fixed;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 26rem;
+    z-index: calc(var(--pt-z-modal) + 1);
+}
+
+.pt-shortcuts-title {
+    color: var(--pt-fg-primary);
+    font-size: var(--pt-text-lg);
+    font-weight: var(--pt-weight-semibold);
+    margin: 0 0 var(--pt-space-4);
+}
+
+.pt-shortcuts-list {
+    display: grid;
+    gap: var(--pt-space-2) var(--pt-space-4);
+    grid-template-columns: auto 1fr;
+    margin: 0 0 var(--pt-space-4);
+}
+
+.pt-shortcuts-list dt {
+    white-space: nowrap;
+}
+
+.pt-shortcuts-list dd {
+    color: var(--pt-fg-secondary);
+    font-size: var(--pt-text-sm);
+    margin: 0;
+}
+
+.pt-shortcuts-close {
+    background: var(--pt-color-brand-600);
+    border: none;
+    border-radius: var(--pt-radius-sm);
+    color: var(--pt-fg-on-brand);
+    cursor: pointer;
+    font-size: var(--pt-text-sm);
+    padding: 0.4rem 1rem;
+}
+
+kbd {
+    background: var(--pt-bg-tint);
+    border: 1px solid var(--pt-border-subtle);
+    border-radius: var(--pt-radius-xs);
+    color: var(--pt-fg-body);
+    font-family: inherit;
+    font-size: var(--pt-text-xs);
+    padding: 0.1rem 0.35rem;
+}
+
+@media (max-width: 560px) {
+    .pt-palette {
+        top: 4vh;
+        width: calc(100vw - 2rem);
+    }
+}

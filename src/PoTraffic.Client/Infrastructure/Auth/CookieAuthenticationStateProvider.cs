@@ -11,7 +11,8 @@ namespace PoTraffic.Client.Infrastructure.Auth;
 /// server-managed HttpOnly cookie the WASM app can never read. Auth state is
 /// derived from GET /api/auth/me; the client holds no tokens.
 /// </summary>
-public sealed class CookieAuthenticationStateProvider(HttpClient http) : AuthenticationStateProvider
+public sealed class CookieAuthenticationStateProvider(HttpClient http, ClientCache cache)
+    : AuthenticationStateProvider
 {
     public override async Task<AuthenticationState> GetAuthenticationStateAsync()
     {
@@ -26,6 +27,10 @@ public sealed class CookieAuthenticationStateProvider(HttpClient http) : Authent
             // (avoids a console 401 on first paint), so treat the sentinel as signed-out.
             if (me is null || me.UserId.IsEmpty)
                 return Anonymous();
+
+            // Namespace cached snapshots to this identity. Without it, a shared browser
+            // would serve the previous account's routes to whoever signs in next.
+            cache.UseScope(me.UserId.ToString());
 
             ClaimsIdentity identity = new(
             [
@@ -58,6 +63,11 @@ public sealed class CookieAuthenticationStateProvider(HttpClient http) : Authent
         {
             // Cookie will expire server-side regardless; proceed to local sign-out.
         }
+
+        // Cached snapshots and cached API responses outlive the cookie, so signing out
+        // has to take them with it.
+        await cache.ClearAllAsync();
+
         NotifyAuthenticationStateChanged(Task.FromResult(Anonymous()));
     }
 

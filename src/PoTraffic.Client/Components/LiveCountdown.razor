@@ -1,0 +1,98 @@
+@implements IDisposable
+
+@* ──────────────────────────────────────────────────────────────────────
+   #4 — a countdown that actually counts down.
+
+   The Next Sample ETA used to be computed once per 15s data refresh, so the
+   number sat frozen and then jumped. This owns a 1-second ticker and re-renders
+   only itself, so the page feels alive between polls without re-running the
+   parent's seven-request refresh.
+   ────────────────────────────────────────────────────────────────────── *@
+
+<span class="pt-countdown @(Elapsed ? "pt-countdown-due" : "")">
+    @if (ShowRing)
+    {
+        <span class="pt-countdown-ring" style="--pt-countdown-pct:@ProgressPercent" aria-hidden="true"></span>
+    }
+    <span class="pt-countdown-text">@Text</span>
+</span>
+
+@code {
+    /// <summary>Instant being counted down to. Null renders <see cref="FallbackText"/>.</summary>
+    [Parameter, EditorRequired] public DateTimeOffset? TargetUtc { get; set; }
+
+    /// <summary>
+    /// When the countdown started, used to fill the ring. Defaults to one
+    /// <see cref="PeriodHint"/> before <see cref="TargetUtc"/> when not supplied.
+    /// </summary>
+    [Parameter] public DateTimeOffset? StartedUtc { get; set; }
+
+    /// <summary>Expected gap between events, used to size the ring when no start is known.</summary>
+    [Parameter] public TimeSpan PeriodHint { get; set; } = TimeSpan.FromMinutes(5);
+
+    /// <summary>Shown when <see cref="TargetUtc"/> is null.</summary>
+    [Parameter] public string FallbackText { get; set; } = "—";
+
+    /// <summary>Shown once the target instant has passed.</summary>
+    [Parameter] public string DueText { get; set; } = "due now";
+
+    /// <summary>Draws the draining progress ring beside the text.</summary>
+    [Parameter] public bool ShowRing { get; set; } = true;
+
+    private Timer? _ticker;
+
+    protected override void OnInitialized() =>
+        _ticker = new Timer(_ => Tick(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+
+    /// <summary>
+    /// A tick can land in the window between the renderer tearing down and the timer
+    /// being disposed, where InvokeAsync throws. Nothing to recover — just stop.
+    /// </summary>
+    private void Tick()
+    {
+        try { InvokeAsync(StateHasChanged); }
+        catch (ObjectDisposedException) { _ticker?.Dispose(); }
+    }
+
+    private TimeSpan? Remaining =>
+        TargetUtc is { } target ? target - DateTimeOffset.UtcNow : null;
+
+    private bool Elapsed => Remaining is { } r && r <= TimeSpan.Zero;
+
+    private string Text
+    {
+        get
+        {
+            if (Remaining is not { } remaining)
+                return FallbackText;
+            if (remaining <= TimeSpan.Zero)
+                return DueText;
+            if (remaining.TotalHours >= 1)
+                return $"in {(int)remaining.TotalHours}h {remaining.Minutes:D2}m";
+            if (remaining.TotalMinutes >= 1)
+                return $"in {remaining.Minutes}:{remaining.Seconds:D2}";
+            return $"in {remaining.Seconds}s";
+        }
+    }
+
+    /// <summary>0–100 of the interval still to run. Drains clockwise as the sample nears.</summary>
+    private string ProgressPercent
+    {
+        get
+        {
+            if (Remaining is not { } remaining || remaining <= TimeSpan.Zero)
+                return "0";
+
+            DateTimeOffset start = StartedUtc ?? TargetUtc!.Value - PeriodHint;
+            double span = (TargetUtc!.Value - start).TotalMilliseconds;
+            if (span <= 0)
+                return "0";
+
+            double pct = remaining.TotalMilliseconds / span * 100;
+            return Math.Clamp(pct, 0, 100)
+                .ToString("F1", System.Globalization.CultureInfo.InvariantCulture);
+        }
+    }
+
+    public void Dispose() => _ticker?.Dispose();
+}

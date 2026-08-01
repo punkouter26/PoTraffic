@@ -1,0 +1,324 @@
+@using PoTraffic.Shared.DTOs.Routes
+@using PoTraffic.Client.Infrastructure.Http
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+@inject HttpClient Http
+@inject ClientCache Cache
+@inject NotificationService NotificationService
+
+@* ──────────────────────────────────────────────────────────────────────
+   #7 — Ctrl/Cmd+K command palette and global shortcuts.
+
+   Routes come from the dashboard snapshot in ClientCache rather than a fetch of
+   its own, so the palette opens instantly and works on a cold, offline start.
+   ────────────────────────────────────────────────────────────────────── *@
+
+@if (_open)
+{
+    <div class="pt-palette-scrim" @onclick="Close"></div>
+    <div class="pt-palette" role="dialog" aria-modal="true" aria-label="Command palette">
+        <div class="pt-palette-input-row">
+            <span class="pt-palette-prompt" aria-hidden="true">⌘</span>
+            <input @ref="_input" class="pt-palette-input" type="text" autocomplete="off" spellcheck="false"
+                   placeholder="Jump to a route, or type a command…"
+                   value="@_query"
+                   aria-label="Search commands and routes"
+                   @oninput="OnQueryChanged" @onkeydown="OnKeyDown" />
+        </div>
+
+        @if (_matches.Count == 0)
+        {
+            <div class="pt-palette-empty">No matches for “@_query”</div>
+        }
+        else
+        {
+            <ul class="pt-palette-list" role="listbox">
+                @for (int i = 0; i < _matches.Count; i++)
+                {
+                    int index = i;
+                    PaletteCommand command = _matches[i];
+                    <li role="option" aria-selected="@(index == _selected)"
+                        class="pt-palette-item @(index == _selected ? "active" : "")"
+                        @onclick="() => RunAsync(command)"
+                        @onmouseenter="() => _selected = index">
+                        <span class="pt-palette-icon" aria-hidden="true">@command.Icon</span>
+                        <span class="pt-palette-text">
+                            <span class="pt-palette-title">@command.Title</span>
+                            @if (command.Subtitle is not null)
+                            {
+                                <span class="pt-palette-subtitle">@command.Subtitle</span>
+                            }
+                        </span>
+                        <span class="pt-palette-group">@command.Group</span>
+                    </li>
+                }
+            </ul>
+        }
+
+        <div class="pt-palette-footer">
+            <kbd>↑</kbd><kbd>↓</kbd> navigate · <kbd>↵</kbd> run · <kbd>esc</kbd> close · <kbd>?</kbd> shortcuts
+        </div>
+    </div>
+}
+
+@if (_showHelp)
+{
+    <div class="pt-palette-scrim" @onclick="() => _showHelp = false"></div>
+    <div class="pt-shortcuts" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
+        <h2 class="pt-shortcuts-title">Keyboard shortcuts</h2>
+        <dl class="pt-shortcuts-list">
+            <dt><kbd>Ctrl</kbd>+<kbd>K</kbd></dt><dd>Open the command palette</dd>
+            <dt><kbd>/</kbd></dt><dd>Search your routes</dd>
+            <dt><kbd>n</kbd></dt><dd>Add a new route</dd>
+            <dt><kbd>c</kbd></dt><dd>Pick a route to check now</dd>
+            <dt><kbd>?</kbd></dt><dd>This list</dd>
+            <dt><kbd>esc</kbd></dt><dd>Close any overlay</dd>
+        </dl>
+        <button type="button" class="pt-shortcuts-close" @onclick="() => _showHelp = false">Close</button>
+    </div>
+}
+
+@code {
+    private bool _open;
+    private bool _showHelp;
+    private string _query = string.Empty;
+    private int _selected;
+    private bool _focusPending;
+
+    private List<RouteDto> _routes = [];
+    private List<PaletteCommand> _matches = [];
+
+    private ElementReference _input;
+    private IJSObjectReference? _module;
+    private IJSObjectReference? _unregister;
+    private DotNetObjectReference<CommandPalette>? _selfRef;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                _module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/pt-hotkeys.js");
+                _selfRef = DotNetObjectReference.Create(this);
+                _unregister = await _module.InvokeAsync<IJSObjectReference>(
+                    "register", _selfRef, nameof(OnShortcutAsync));
+            }
+            catch
+            {
+                // No hotkeys is a degraded experience, not a broken page.
+            }
+        }
+
+        if (_focusPending)
+        {
+            _focusPending = false;
+            try { await _input.FocusAsync(); } catch { /* element already gone */ }
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnShortcutAsync(string key)
+    {
+        switch (key)
+        {
+            case "palette":
+            case "search":
+                await OpenAsync();
+                break;
+            case "new":
+                Nav.NavigateTo("/routes/create");
+                break;
+            case "check":
+                // Deliberately opens the palette pre-filtered rather than polling
+                // immediately: Check Now bills a real traffic-provider request, and a
+                // bare keystroke should not be able to spend money by accident.
+                await OpenAsync("check ");
+                break;
+            case "help":
+                _showHelp = !_showHelp;
+                break;
+            case "escape":
+                _open = false;
+                _showHelp = false;
+                break;
+        }
+        StateHasChanged();
+    }
+
+    private async Task OpenAsync(string initialQuery = "")
+    {
+        _open = true;
+        _showHelp = false;
+        _query = initialQuery;
+        _selected = 0;
+        _focusPending = true;
+        await LoadRoutesAsync();
+        Rebuild();
+    }
+
+    private void Close()
+    {
+        _open = false;
+        _query = string.Empty;
+    }
+
+    /// <summary>
+    /// Reads the routes the dashboard last cached. Deliberately not a fetch: the palette
+    /// must open instantly, and a slightly stale route name is harmless — activating the
+    /// command navigates to live data anyway.
+    /// </summary>
+    private async Task LoadRoutesAsync()
+    {
+        DashboardSnapshot? snapshot = await Cache.GetAsync(
+            ClientCacheKeys.Dashboard, AppJsonContext.Default.DashboardSnapshot, TimeSpan.FromDays(7));
+        _routes = snapshot?.Routes ?? [];
+    }
+
+    private void OnQueryChanged(ChangeEventArgs e)
+    {
+        _query = e.Value?.ToString() ?? string.Empty;
+        _selected = 0;
+        Rebuild();
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case "ArrowDown":
+                if (_matches.Count > 0)
+                    _selected = (_selected + 1) % _matches.Count;
+                break;
+            case "ArrowUp":
+                if (_matches.Count > 0)
+                    _selected = (_selected - 1 + _matches.Count) % _matches.Count;
+                break;
+            case "Enter":
+                if (_selected >= 0 && _selected < _matches.Count)
+                    await RunAsync(_matches[_selected]);
+                break;
+            case "Escape":
+                Close();
+                break;
+        }
+    }
+
+    private void Rebuild()
+    {
+        _matches = [.. AllCommands()
+            .Select(c => (Command: c, Score: FuzzyMatch.Score(c.SearchText, _query)))
+            .Where(x => x.Score is not null)
+            .OrderByDescending(x => x.Score!.Value)
+            .ThenBy(x => x.Command.Title, StringComparer.OrdinalIgnoreCase)
+            .Take(12)
+            .Select(x => x.Command)];
+
+        _selected = Math.Clamp(_selected, 0, Math.Max(0, _matches.Count - 1));
+    }
+
+    private IEnumerable<PaletteCommand> AllCommands()
+    {
+        yield return new PaletteCommand("📋", "Dashboard", null, "Go",
+            () => { Nav.NavigateTo("/dashboard"); return Task.CompletedTask; });
+        yield return new PaletteCommand("➕", "Add route", "Track a new commute", "Go",
+            () => { Nav.NavigateTo("/routes/create"); return Task.CompletedTask; });
+        yield return new PaletteCommand("⚙️", "Settings", null, "Go",
+            () => { Nav.NavigateTo("/settings"); return Task.CompletedTask; });
+        yield return new PaletteCommand("⌨️", "Keyboard shortcuts", null, "Help",
+            () => { _showHelp = true; return Task.CompletedTask; });
+
+        foreach (RouteDto route in _routes)
+        {
+            string label = RouteLabel(route);
+            RouteId id = route.Id;
+
+            yield return new PaletteCommand("🛣️", label, "Open route detail", "Route",
+                () => { Nav.NavigateTo($"/routes/{id}"); return Task.CompletedTask; });
+
+            yield return new PaletteCommand("⚡", $"Check now: {label}", "Poll live travel time", "Action",
+                () => CheckNowAsync(id, label));
+        }
+    }
+
+    private static string RouteLabel(RouteDto route) =>
+        $"{route.OriginAddress.Split(',')[0].Trim()} → {route.DestinationAddress.Split(',')[0].Trim()}";
+
+    private async Task RunAsync(PaletteCommand command)
+    {
+        Close();
+        StateHasChanged();
+        await command.Run();
+    }
+
+    private async Task CheckNowAsync(RouteId routeId, string label)
+    {
+        try
+        {
+            HttpResponseMessage response = await Http.PostAsync($"/api/routes/{routeId}/check-now", null);
+            if (response.IsSuccessStatusCode)
+            {
+                CheckNowResponse? data =
+                    await response.Content.ReadFromJsonAsync(AppJsonContext.Default.CheckNowResponse);
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Info,
+                    Summary = label,
+                    Detail = data is null
+                        ? "Live travel time retrieved"
+                        : $"{data.DurationSeconds / 60} min — {data.DistanceMetres / 1000.0:F1} km",
+                    Duration = 6000
+                });
+            }
+            else
+            {
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Check Now failed",
+                    Detail = response.StatusCode == System.Net.HttpStatusCode.ServiceUnavailable
+                        ? "Traffic provider unavailable — try again later."
+                        : $"Request failed ({(int)response.StatusCode}).",
+                    Duration = 5000
+                });
+            }
+        }
+        catch
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Check Now failed",
+                Detail = "Couldn't reach the server.",
+                Duration = 5000
+            });
+        }
+    }
+
+    /// <summary>One entry in the palette.</summary>
+    private sealed record PaletteCommand(
+        string Icon,
+        string Title,
+        string? Subtitle,
+        string Group,
+        Func<Task> Run)
+    {
+        /// <summary>What the fuzzy matcher scores against.</summary>
+        public string SearchText => Subtitle is null ? Title : $"{Title} {Subtitle}";
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_unregister is not null)
+        {
+            try { await _unregister.InvokeVoidAsync("call", null); } catch { /* page tearing down */ }
+            try { await _unregister.DisposeAsync(); } catch { /* ignore */ }
+        }
+        if (_module is not null)
+        {
+            try { await _module.DisposeAsync(); } catch { /* ignore */ }
+        }
+        _selfRef?.Dispose();
+    }
+}

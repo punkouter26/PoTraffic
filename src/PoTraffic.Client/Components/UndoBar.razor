@@ -1,0 +1,73 @@
+@implements IDisposable
+@inject PendingDeletionService Pending
+
+@* ──────────────────────────────────────────────────────────────────────
+   #3 — the undo affordance the old "Undo within 5 seconds…" toast only
+   promised. Lives in the layout so it survives page navigation while a
+   delete is still parked, and so exactly one exists no matter how many
+   cards are on screen.
+   ────────────────────────────────────────────────────────────────────── *@
+
+@if (Pending.Current is { } deletion)
+{
+    <div class="pt-undo-bar" role="status" aria-live="polite">
+        <span class="pt-undo-icon" aria-hidden="true">🗑️</span>
+        <span class="pt-undo-text">
+            Deleted <strong>@deletion.Label</strong>
+        </span>
+        <button type="button" class="pt-undo-action" @onclick="() => Pending.Undo(deletion.RouteId)">
+            <span class="pt-undo-ring" style="--pt-undo-pct:@RemainingPercent(deletion)" aria-hidden="true"></span>
+            Undo
+            <span class="pt-undo-secs">@RemainingSeconds(deletion)s</span>
+        </button>
+    </div>
+}
+
+@code {
+    private Timer? _ticker;
+
+    protected override void OnInitialized()
+    {
+        Pending.Changed += OnChanged;
+
+        // The countdown has to move between state changes, so it needs its own tick.
+        // 250ms keeps the ring visibly smooth without being a render treadmill; it only
+        // re-renders while something is actually pending.
+        _ticker = new Timer(_ =>
+        {
+            if (Pending.Current is not null)
+                Render();
+        }, null, TimeSpan.FromMilliseconds(250), TimeSpan.FromMilliseconds(250));
+    }
+
+    private void OnChanged() => Render();
+
+    /// <summary>
+    /// A tick or a service event can land after the renderer has torn down, where
+    /// InvokeAsync throws. Nothing to recover — just stop ticking.
+    /// </summary>
+    private void Render()
+    {
+        try { InvokeAsync(StateHasChanged); }
+        catch (ObjectDisposedException) { _ticker?.Dispose(); }
+    }
+
+    private static double RemainingMs(PendingDeletion d) =>
+        Math.Max(0, (d.ExpiresAtUtc - DateTimeOffset.UtcNow).TotalMilliseconds);
+
+    private static int RemainingSeconds(PendingDeletion d) =>
+        (int)Math.Ceiling(RemainingMs(d) / 1000);
+
+    /// <summary>0–100, draining as the grace period runs out. Drives the conic ring.</summary>
+    private static string RemainingPercent(PendingDeletion d)
+    {
+        double pct = RemainingMs(d) / PendingDeletionService.GracePeriod.TotalMilliseconds * 100;
+        return Math.Clamp(pct, 0, 100).ToString("F1", System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    public void Dispose()
+    {
+        Pending.Changed -= OnChanged;
+        _ticker?.Dispose();
+    }
+}

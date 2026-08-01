@@ -1,8 +1,9 @@
 @using PoTraffic.Shared.DTOs.Routes
 @using PoTraffic.Shared.DTOs.History
+@implements IDisposable
 @inject PtInterop Pt
-@inject HttpClient Http
 @inject NotificationService NotificationService
+@inject PendingDeletionService Pending
 
 @* ──────────────────────────────────────────────────────────────────────
    SwipeableRouteCard — adds mobile swipe-to-delete + long-press menu on
@@ -43,6 +44,22 @@
     protected override void OnInitialized()
     {
         _selfRef = DotNetObjectReference.Create(this);
+        Pending.Changed += OnPendingChanged;
+    }
+
+    /// <summary>
+    /// Keeps the slide-out state tied to the service rather than to a local flag: an undo
+    /// restores the route, and the card has to come back with it instead of staying
+    /// visually deleted because a bool was never reset.
+    /// </summary>
+    private void OnPendingChanged()
+    {
+        bool nowPending = Pending.IsPending(Route.Id);
+        if (nowPending == _pendingDelete)
+            return;
+
+        _pendingDelete = nowPending;
+        InvokeAsync(StateHasChanged);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -78,34 +95,20 @@
         }
     }
 
+    /// <summary>
+    /// Plays the slide-out, then hands the delete to the card's own scheduler so the
+    /// swipe is undoable through the same window the button uses (#3). Nothing is sent
+    /// to the server until that window closes.
+    /// </summary>
     private async Task TryDeleteWithUndoAsync()
     {
         if (_pendingDelete) return;
         _pendingDelete = true;
         StateHasChanged();
+
         await Task.Delay(500); // let the slide-out play
-        try
-        {
-            await Http.DeleteAsync($"/api/routes/{Route.Id}");
-            NotificationService.Notify(new NotificationMessage
-            {
-                Severity = NotificationSeverity.Warning,
-                Summary = "Route deleted",
-                Detail = "Undo within 5 seconds…",
-                Duration = 5000
-            });
-            await OnDeleted.InvokeAsync();
-        }
-        catch
-        {
-            _pendingDelete = false;
-            NotificationService.Notify(new NotificationMessage
-            {
-                Severity = NotificationSeverity.Error,
-                Summary = "Delete failed",
-                Duration = 4000
-            });
-        }
+
+        _routeCard?.ScheduleDelete();
     }
 
     private Task ShowLongPressMenuAsync()
@@ -121,10 +124,10 @@
         return Task.CompletedTask;
     }
 
-    public ValueTask DisposeAsync()
+    public void Dispose()
     {
+        Pending.Changed -= OnPendingChanged;
         _ = _gestureCleanup?.DisposeAsync();
         _selfRef?.Dispose();
-        return ValueTask.CompletedTask;
     }
 }

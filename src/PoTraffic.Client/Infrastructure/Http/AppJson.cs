@@ -22,6 +22,32 @@ public sealed record SaveWindowRequest(string StartTime, string EndTime, byte Da
 internal sealed record ClientLogBatch(List<ClientLogEntry> Entries);
 
 /// <summary>
+/// Everything the dashboard renders, in one cacheable payload.
+///
+/// <para>
+/// Persisted by <see cref="PoTraffic.Client.Infrastructure.ClientCache"/> so a return visit
+/// paints real routes immediately instead of skeletons, and so the command palette can search
+/// routes without waiting for — or duplicating — the dashboard's fetch.
+/// </para>
+/// </summary>
+public sealed record DashboardSnapshot(
+    List<RouteDto> Routes,
+    QuotaDto? Quota,
+    List<RouteInsight> Insights);
+
+/// <summary>Per-route dashboard extras, kept as a list because the snapshot round-trips through JSON.</summary>
+public sealed record RouteInsight(
+    RouteId RouteId,
+    OptimalDepartureDto? OptimalDeparture,
+    List<PollRecordDto> RecentPolls);
+
+/// <summary>Keys used with <see cref="PoTraffic.Client.Infrastructure.ClientCache"/>.</summary>
+public static class ClientCacheKeys
+{
+    public const string Dashboard = "dashboard";
+}
+
+/// <summary>
 /// Source-generated JSON metadata for every payload the WASM client sends or
 /// receives. Required by the trim analyzer: reflection-based System.Text.Json
 /// (IL2026) cannot be statically verified under trimming.
@@ -63,4 +89,5 @@ internal sealed record ClientLogBatch(List<ClientLogEntry> Entries);
 [JsonSerializable(typeof(StopSessionRequest))]
 [JsonSerializable(typeof(SaveWindowRequest))]
 [JsonSerializable(typeof(ClientLogBatch))]
+[JsonSerializable(typeof(DashboardSnapshot))]
 internal sealed partial class AppJsonContext : JsonSerializerContext;

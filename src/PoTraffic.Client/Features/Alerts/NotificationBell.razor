@@ -5,6 +5,7 @@
 @inject IJSRuntime JS
 @inject NavigationManager Nav
 @inject AuthenticationStateProvider AuthState
+@inject PageActivityMonitor Activity
 
 <AuthorizeView>
     <Authorized>
@@ -82,10 +83,25 @@
         if (!_authenticated)
             return;
 
+        await Activity.EnsureStartedAsync();
+        Activity.Resumed += OnResumedAsync;
+
         await RefreshAsync();
         _timer = new System.Timers.Timer(TimeSpan.FromSeconds(30).TotalMilliseconds) { AutoReset = true };
-        _timer.Elapsed += async (_, _) => { try { await RefreshAsync(); } catch { } };
+        // Skip the tick outright while the tab is hidden or offline: an alert nobody can
+        // see is not worth a request every 30 seconds, and the resume handler catches up.
+        _timer.Elapsed += async (_, _) =>
+        {
+            if (!Activity.IsVisible || !Activity.IsOnline)
+                return;
+            try { await RefreshAsync(); } catch { }
+        };
         _timer.Start();
+    }
+
+    private async Task OnResumedAsync()
+    {
+        try { await RefreshAsync(); } catch { /* transient */ }
     }
 
     private async Task RefreshAsync()
@@ -162,6 +178,7 @@
 
     public async ValueTask DisposeAsync()
     {
+        Activity.Resumed -= OnResumedAsync;
         _timer?.Stop();
         _timer?.Dispose();
         if (_push is not null)

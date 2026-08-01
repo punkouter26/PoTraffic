@@ -1,0 +1,291 @@
+/* #1 + #2 — arrival solver and departure scrubber. */
+
+.pt-planner-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--pt-space-2);
+    margin-bottom: var(--pt-space-3);
+}
+
+.pt-planner-modes {
+    display: inline-flex;
+    background: var(--pt-bg-tint);
+    border-radius: var(--pt-radius-full);
+    padding: 2px;
+}
+
+.pt-planner-mode {
+    background: none;
+    border: none;
+    border-radius: var(--pt-radius-full);
+    color: var(--pt-fg-secondary);
+    cursor: pointer;
+    font-size: var(--pt-text-sm);
+    font-weight: var(--pt-weight-medium);
+    padding: 0.3rem 0.85rem;
+    transition: background-color var(--pt-dur-fast) var(--pt-ease),
+                color var(--pt-dur-fast) var(--pt-ease);
+}
+
+.pt-planner-mode.active {
+    background: var(--pt-bg-surface);
+    box-shadow: var(--pt-elev-1);
+    color: var(--pt-fg-primary);
+}
+
+.pt-planner-empty {
+    color: var(--pt-fg-secondary);
+    font-size: var(--pt-text-sm);
+    padding: var(--pt-space-4) 0;
+}
+
+/* ── Confidence selector ─────────────────────────────────────────────── */
+
+.pt-planner-confidence {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--pt-space-2);
+    margin-bottom: var(--pt-space-3);
+}
+
+.pt-conf-chip {
+    background: var(--pt-bg-tint);
+    border: 1px solid transparent;
+    border-radius: var(--pt-radius-full);
+    color: var(--pt-fg-secondary);
+    cursor: pointer;
+    font-size: var(--pt-text-xs);
+    font-weight: var(--pt-weight-medium);
+    padding: 0.2rem 0.7rem;
+    transition: background-color var(--pt-dur-fast) var(--pt-ease),
+                border-color var(--pt-dur-fast) var(--pt-ease),
+                color var(--pt-dur-fast) var(--pt-ease);
+}
+
+.pt-conf-chip.active {
+    background: var(--pt-color-brand-100);
+    border-color: var(--pt-color-brand-300);
+    color: var(--pt-color-brand-700);
+}
+
+:root[data-theme="dark"] .pt-conf-chip.active {
+    background: var(--pt-color-brand-800);
+    border-color: var(--pt-color-brand-600);
+    color: var(--pt-color-brand-100);
+}
+
+.pt-planner-confidence-note {
+    color: var(--pt-fg-tertiary);
+    font-size: var(--pt-text-xs);
+}
+
+/* ── Inputs ──────────────────────────────────────────────────────────── */
+
+.pt-planner-row {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--pt-space-3);
+    margin-bottom: var(--pt-space-3);
+}
+
+.pt-planner-label {
+    color: var(--pt-fg-secondary);
+    font-size: var(--pt-text-sm);
+}
+
+.pt-planner-time {
+    background: var(--pt-bg-surface);
+    border: 1px solid var(--pt-border-strong);
+    border-radius: var(--pt-radius-sm);
+    color: var(--pt-fg-primary);
+    font-size: var(--pt-text-base);
+    font-weight: var(--pt-weight-semibold);
+    padding: 0.3rem 0.5rem;
+}
+
+.pt-planner-scrub-time {
+    color: var(--pt-fg-primary);
+    font-size: var(--pt-text-lg);
+    font-weight: var(--pt-weight-semibold);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── Answer block ────────────────────────────────────────────────────── */
+
+.pt-planner-answer {
+    background: linear-gradient(135deg, var(--pt-success-bg-from), var(--pt-success-bg-to));
+    border: 1px solid var(--pt-success-border);
+    border-radius: var(--pt-radius-md);
+    margin-bottom: var(--pt-space-3);
+    padding: var(--pt-space-3) var(--pt-space-4);
+}
+
+.pt-planner-answer-soft {
+    background: var(--pt-bg-tint);
+    border-color: var(--pt-border-subtle);
+}
+
+.pt-planner-answer-lead {
+    color: var(--pt-success-fg);
+    font-size: var(--pt-text-xs);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.pt-planner-answer-soft .pt-planner-answer-lead {
+    color: var(--pt-fg-muted);
+}
+
+.pt-planner-answer-time {
+    color: var(--pt-success-fg-strong);
+    font-size: var(--pt-text-3xl);
+    font-weight: var(--pt-weight-bold);
+    font-variant-numeric: tabular-nums;
+    line-height: var(--pt-leading-tight);
+}
+
+.pt-planner-answer-soft .pt-planner-answer-time {
+    color: var(--pt-fg-primary);
+}
+
+.pt-planner-answer-meta {
+    color: var(--pt-success-fg);
+    font-size: var(--pt-text-sm);
+}
+
+.pt-planner-answer-soft .pt-planner-answer-meta {
+    color: var(--pt-fg-secondary);
+}
+
+.pt-planner-answer-warn {
+    color: var(--pt-color-warning);
+    font-size: var(--pt-text-xs);
+    margin-top: var(--pt-space-1);
+}
+
+/* ── Confidence ladder ───────────────────────────────────────────────── */
+
+.pt-planner-ladder {
+    border-top: 1px solid var(--pt-border-subtle);
+    margin-bottom: var(--pt-space-3);
+    padding-top: var(--pt-space-2);
+}
+
+.pt-planner-ladder-row {
+    align-items: baseline;
+    border-radius: var(--pt-radius-sm);
+    display: grid;
+    grid-template-columns: 5.5rem 4.5rem 1fr;
+    gap: var(--pt-space-2);
+    padding: 0.2rem 0.35rem;
+}
+
+.pt-planner-ladder-row.active {
+    background: var(--pt-bg-tint);
+}
+
+.pt-planner-ladder-label {
+    color: var(--pt-fg-body);
+    font-size: var(--pt-text-sm);
+    font-weight: var(--pt-weight-medium);
+}
+
+.pt-planner-ladder-time {
+    color: var(--pt-fg-primary);
+    font-size: var(--pt-text-sm);
+    font-variant-numeric: tabular-nums;
+    font-weight: var(--pt-weight-semibold);
+}
+
+.pt-planner-ladder-note {
+    color: var(--pt-fg-tertiary);
+    font-size: var(--pt-text-xs);
+}
+
+/* ── Day strip / scrub track ─────────────────────────────────────────── */
+
+.pt-planner-strip-wrap {
+    position: relative;
+}
+
+.pt-planner-strip {
+    align-items: flex-end;
+    background: var(--pt-bg-sunken);
+    border-radius: var(--pt-radius-sm);
+    display: flex;
+    gap: 1px;
+    height: 56px;
+    overflow: hidden;
+    padding: 2px;
+}
+
+.pt-planner-bar {
+    background: var(--pt-color-brand-300);
+    border-radius: 1px 1px 0 0;
+    flex: 1 1 0;
+    /* --pt-bar-h is a 0–1 fraction set per bar from the predicted duration. */
+    height: calc(var(--pt-bar-h, 0.5) * 100%);
+    min-width: 0;
+    transition: background-color var(--pt-dur-fast) var(--pt-ease);
+}
+
+.pt-planner-bar-estimated {
+    background: var(--pt-border-strong);
+    opacity: 0.55;
+}
+
+.pt-planner-bar-selected {
+    background: var(--pt-color-brand-600);
+}
+
+/* The range input sits transparently over the strip so dragging the bars scrubs,
+   while keeping native keyboard support and the accessibility semantics. */
+.pt-planner-range {
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+    cursor: ew-resize;
+    height: 56px;
+    inset: 0;
+    margin: 0;
+    position: absolute;
+    width: 100%;
+}
+
+.pt-planner-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    background: var(--pt-color-brand-600);
+    border: 2px solid var(--pt-bg-surface);
+    border-radius: var(--pt-radius-full);
+    box-shadow: var(--pt-elev-2);
+    height: 18px;
+    width: 18px;
+}
+
+.pt-planner-range::-moz-range-thumb {
+    background: var(--pt-color-brand-600);
+    border: 2px solid var(--pt-bg-surface);
+    border-radius: var(--pt-radius-full);
+    box-shadow: var(--pt-elev-2);
+    height: 18px;
+    width: 18px;
+}
+
+.pt-planner-range:focus-visible {
+    outline: 2px solid var(--pt-color-brand-500);
+    outline-offset: 2px;
+}
+
+.pt-planner-axis {
+    color: var(--pt-fg-tertiary);
+    display: flex;
+    font-size: var(--pt-text-xs);
+    font-variant-numeric: tabular-nums;
+    justify-content: space-between;
+    margin-top: var(--pt-space-1);
+}

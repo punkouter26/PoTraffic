@@ -1,0 +1,76 @@
+/* #3 — the undo affordance for a deletion still inside its grace period. */
+
+.pt-undo-bar {
+    align-items: center;
+    animation: pt-slide-up var(--pt-dur-base) var(--pt-ease);
+    backdrop-filter: blur(var(--pt-glass-blur)) saturate(var(--pt-glass-saturate));
+    background: var(--pt-glass-bg-strong);
+    border: 1px solid var(--pt-glass-border);
+    border-radius: var(--pt-radius-full);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 5rem);
+    box-shadow: var(--pt-elev-3);
+    display: flex;
+    gap: var(--pt-space-3);
+    left: 50%;
+    max-width: calc(100vw - 2rem);
+    padding: 0.55rem 0.7rem 0.55rem 1rem;
+    position: fixed;
+    transform: translateX(-50%);
+    z-index: var(--pt-z-toast);
+}
+
+.pt-undo-icon {
+    flex-shrink: 0;
+}
+
+.pt-undo-text {
+    color: var(--pt-fg-body);
+    font-size: var(--pt-text-sm);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pt-undo-action {
+    align-items: center;
+    background: var(--pt-color-brand-600);
+    border: none;
+    border-radius: var(--pt-radius-full);
+    color: var(--pt-fg-on-brand);
+    cursor: pointer;
+    display: inline-flex;
+    flex-shrink: 0;
+    font-size: var(--pt-text-sm);
+    font-weight: var(--pt-weight-semibold);
+    gap: 0.4rem;
+    padding: 0.35rem 0.85rem;
+    transition: background-color var(--pt-dur-fast) var(--pt-ease);
+}
+
+.pt-undo-action:hover {
+    background: var(--pt-color-brand-700);
+}
+
+/* Ring drains over the grace period. --pt-undo-pct is 0–100 remaining. */
+.pt-undo-ring {
+    background: conic-gradient(
+        var(--pt-fg-on-brand) calc(var(--pt-undo-pct, 0) * 1%),
+        rgba(255, 255, 255, 0.3) 0);
+    border-radius: var(--pt-radius-full);
+    display: inline-block;
+    height: 12px;
+    width: 12px;
+}
+
+.pt-undo-secs {
+    font-variant-numeric: tabular-nums;
+    opacity: 0.8;
+}
+
+@media (max-width: 480px) {
+    .pt-undo-bar {
+        left: var(--pt-space-4);
+        right: var(--pt-space-4);
+        transform: none;
+    }
+}

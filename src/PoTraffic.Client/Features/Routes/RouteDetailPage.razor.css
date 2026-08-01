@@ -86,3 +86,52 @@
     text-align: right;
     color: var(--pt-fg-primary);
 }
+
+/* #8 — raw record for the sample clicked on the trend chart. */
+.pt-trend-selection {
+    align-items: center;
+    background: var(--pt-bg-tint);
+    border-radius: var(--pt-radius-sm);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--pt-space-3);
+    margin-top: var(--pt-space-3);
+    padding: var(--pt-space-2) var(--pt-space-3);
+}
+
+.pt-trend-selection-time {
+    color: var(--pt-fg-primary);
+    font-variant-numeric: tabular-nums;
+    font-weight: var(--pt-weight-semibold);
+}
+
+.pt-trend-selection-value {
+    color: var(--pt-color-brand-600);
+    font-weight: var(--pt-weight-semibold);
+}
+
+.pt-trend-selection-meta {
+    color: var(--pt-fg-secondary);
+    flex: 1;
+    font-size: var(--pt-text-sm);
+    min-width: 0;
+}
+
+.pt-trend-selection-flag {
+    color: var(--pt-color-danger);
+    font-weight: var(--pt-weight-semibold);
+    margin-left: var(--pt-space-2);
+}
+
+.pt-trend-selection-clear {
+    background: none;
+    border: none;
+    color: var(--pt-fg-tertiary);
+    cursor: pointer;
+    font-size: var(--pt-text-sm);
+    padding: 0.1rem 0.35rem;
+}
+
+.pt-trend-selection-clear:hover {
+    color: var(--pt-fg-body);
+}

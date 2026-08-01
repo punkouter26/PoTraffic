@@ -1,0 +1,89 @@
+@using PoTraffic.Shared.Constants
+
+@* ──────────────────────────────────────────────────────────────────────
+   #9 — replaces the dead-end "Still building your baseline…" string.
+
+   A new route used to show a sentence with no end in sight. This shows how
+   far along it is, what unlocks, and — once the route crosses the threshold
+   — marks the moment, so the wait reads as a streak worth completing rather
+   than as the feature being broken.
+   ────────────────────────────────────────────────────────────────────── *@
+
+<div class="pt-confidence @(_justConfident ? "pt-confidence-celebrate" : "")" title="@Tooltip">
+    <div class="pt-confidence-track" role="progressbar"
+         aria-valuenow="@Percent" aria-valuemin="0" aria-valuemax="100"
+         aria-label="Baseline confidence">
+        <div class="pt-confidence-fill @LevelClass"
+             style="--pt-confidence-pct:@PercentCss"></div>
+    </div>
+    <span class="pt-confidence-label">
+        <span class="pt-confidence-level @LevelClass">@LevelLabel</span>
+        <span class="pt-confidence-count">@SampleCount / @Target samples</span>
+    </span>
+</div>
+
+@code {
+    /// <summary>Poll records behind this route's recommendation.</summary>
+    [Parameter, EditorRequired] public int SampleCount { get; set; }
+
+    /// <summary>
+    /// False when the recommendation had to fall back to all-days data because this
+    /// weekday was still sparse. Reported in the tooltip so the number is not oversold.
+    /// </summary>
+    [Parameter] public bool DayOfWeekSpecific { get; set; } = true;
+
+    private int _previousCount = -1;
+    private bool _justConfident;
+
+    private static int Target => QuotaConstants.BaselineConfidentSampleCount;
+
+    private int Percent => (int)Math.Round(
+        Math.Clamp((double)SampleCount / Target, 0, 1) * 100);
+
+    private string PercentCss =>
+        Percent.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    private string LevelLabel => SampleCount switch
+    {
+        0 => "No data yet",
+        < QuotaConstants.BaselineMinSessionCount => "Collecting",
+        < 20 => "Low confidence",
+        < QuotaConstants.BaselineConfidentSampleCount => "Firming up",
+        _ => "Confident"
+    };
+
+    private string LevelClass => SampleCount switch
+    {
+        < QuotaConstants.BaselineMinSessionCount => "pt-confidence-none",
+        < 20 => "pt-confidence-low",
+        < QuotaConstants.BaselineConfidentSampleCount => "pt-confidence-mid",
+        _ => "pt-confidence-high"
+    };
+
+    private string Tooltip
+    {
+        get
+        {
+            string basis = DayOfWeekSpecific
+                ? "Based on this weekday's own history."
+                : "Not enough history for this weekday yet — using all days.";
+            return SampleCount >= Target
+                ? $"{SampleCount} samples. {basis}"
+                : $"{SampleCount} of {Target} samples. {basis}";
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        // Fire the celebration on the transition only, not on every render once past
+        // the threshold — and never on first load, where crossing is not news.
+        bool crossed = _previousCount >= 0
+            && _previousCount < QuotaConstants.BaselineConfidentSampleCount
+            && SampleCount >= QuotaConstants.BaselineConfidentSampleCount;
+
+        if (crossed)
+            _justConfident = true;
+
+        _previousCount = SampleCount;
+    }
+}

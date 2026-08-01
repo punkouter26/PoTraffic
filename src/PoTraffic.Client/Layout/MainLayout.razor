@@ -12,10 +12,15 @@
 
     <main>
         <article class="content">
+            <InstallPrompt />
             @Body
         </article>
     </main>
 
     <BottomNav />
 </div>
+
+@* Global overlays — one instance each, above the page so they survive navigation. *@
+<CommandPalette />
+<UndoBar />
 

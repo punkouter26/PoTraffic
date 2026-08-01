@@ -733,3 +733,61 @@ code {
     color: var(--pt-fg-tertiary);
     white-space: nowrap;
 }
+
+/* ═══════════════════════════════════════════════
+   #8: Chart hover tooltip.
+
+   Created by pt-chart.js rather than by Razor markup, so it carries no scoped-CSS
+   attribute and cannot live in TrendChart.razor.css. Positioned against
+   .pt-trend-host, which supplies the containing block.
+═══════════════════════════════════════════════ */
+.pt-chart-tip {
+    position: absolute;
+    top: 8px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity var(--pt-dur-fast) var(--pt-ease);
+    background: var(--pt-glass-bg-strong);
+    backdrop-filter: blur(var(--pt-glass-blur));
+    border: 1px solid var(--pt-border-subtle);
+    border-radius: var(--pt-radius-sm);
+    box-shadow: var(--pt-elev-2);
+    padding: 0.4rem 0.6rem;
+    font-size: 0.75rem;
+    line-height: 1.45;
+    color: var(--pt-fg-body);
+    white-space: nowrap;
+    z-index: var(--pt-z-pop);
+}
+
+.pt-chart-tip.visible { opacity: 1; }
+
+.pt-chart-tip strong {
+    color: var(--pt-fg-primary);
+    font-variant-numeric: tabular-nums;
+}
+
+.pt-chart-tip-flag {
+    color: var(--pt-color-danger);
+    font-weight: var(--pt-weight-semibold);
+}
+
+/* ═══════════════════════════════════════════════
+   #6: Connectivity indicators. The polling base stands down while a tab is
+   hidden or offline; these tell the user why the numbers stopped moving.
+═══════════════════════════════════════════════ */
+.pt-status-offline {
+    color: var(--pt-color-warning);
+    font-weight: var(--pt-weight-medium);
+}
+
+.pt-stale-banner {
+    background: var(--pt-bg-tint);
+    border: 1px solid var(--pt-border-subtle);
+    border-left: 3px solid var(--pt-color-warning);
+    border-radius: var(--pt-radius-sm);
+    color: var(--pt-fg-secondary);
+    font-size: 0.8rem;
+    margin-bottom: 1rem;
+    padding: 0.5rem 0.75rem;
+}

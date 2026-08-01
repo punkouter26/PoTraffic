@@ -1,0 +1,39 @@
+{
+  "name": "PoTraffic — Commute Volatility",
+  "short_name": "PoTraffic",
+  "description": "Know when to leave. PoTraffic measures how much your commute actually varies and tells you the departure that gets you there on time.",
+  "id": "/",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0b1220",
+  "theme_color": "#3b82f6",
+  "categories": ["travel", "navigation", "productivity"],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Add a route",
+      "short_name": "Add route",
+      "url": "/routes/create"
+    },
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "url": "/dashboard"
+    }
+  ]
+}

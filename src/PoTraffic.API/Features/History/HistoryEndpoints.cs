@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using PoTraffic.API.Features.Routes;
+using PoTraffic.API.Infrastructure.Http;
 using PoTraffic.API.Infrastructure.Security;
 using PoTraffic.Shared.DTOs.Routes;
 
@@ -30,7 +31,7 @@ public static class HistoryEndpoints
             UserId userId = ctx.User.GetUserId();
             var result = await sender.Send(
                 new GetPollHistoryQuery(routeId, userId, page, pageSize, sinceUtc));
-            return Results.Ok(result);
+            return ConditionalJson.Ok(ctx, result);
         });
 
         // GET /api/routes/{routeId}/baseline?dayOfWeek=Monday
@@ -42,7 +43,7 @@ public static class HistoryEndpoints
         {
             UserId userId = ctx.User.GetUserId();
             var result = await sender.Send(new GetBaselineQuery(routeId, userId, dayOfWeek));
-            return Results.Ok(result);
+            return ConditionalJson.Ok(ctx, result);
         });
 
         // GET /api/routes/{routeId}/sessions
@@ -53,7 +54,7 @@ public static class HistoryEndpoints
         {
             UserId userId = ctx.User.GetUserId();
             var result = await sender.Send(new GetSessionsQuery(routeId, userId));
-            return Results.Ok(result);
+            return ConditionalJson.Ok(ctx, result);
         });
 
         // GET /api/routes/{routeId}/optimal-departure?dayOfWeek=Monday
@@ -65,7 +66,7 @@ public static class HistoryEndpoints
         {
             UserId userId = ctx.User.GetUserId();
             var result = await sender.Send(new GetOptimalDepartureQuery(routeId, userId, dayOfWeek));
-            return result is null ? Results.NoContent() : Results.Ok(result);
+            return result is null ? Results.NoContent() : ConditionalJson.Ok(ctx, result);
         });
 
         // GET /api/routes/{routeId}/weekday-comparison — mean travel time per day-of-week (#4)
@@ -76,7 +77,7 @@ public static class HistoryEndpoints
         {
             UserId userId = ctx.User.GetUserId();
             var result = await sender.Send(new GetWeekdayComparisonQuery(routeId, userId));
-            return Results.Ok(result);
+            return ConditionalJson.Ok(ctx, result);
         });
 
         // GET /api/routes/{routeId} — single route (drives the return-trip link, #3)
@@ -87,7 +88,7 @@ public static class HistoryEndpoints
         {
             UserId userId = ctx.User.GetUserId();
             RouteDto? route = await sender.Send(new GetRouteByIdQuery(routeId, userId));
-            return route is null ? Results.NotFound() : Results.Ok(route);
+            return route is null ? Results.NotFound() : ConditionalJson.Ok(ctx, route);
         });
 
         // GET /api/routes/{routeId}/departure.ics?dayOfWeek=Monday — calendar reminder (#2)

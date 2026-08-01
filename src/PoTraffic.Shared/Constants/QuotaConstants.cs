@@ -5,6 +5,11 @@ public static class QuotaConstants
     public const int DefaultDailyQuota = 10;
     public const int RerouteDistanceThresholdPercent = 15;
     public const int BaselineMinSessionCount = 3;
+
+    // Samples at which a route's baseline is treated as trustworthy enough to plan
+    // against. Below it the client shows how far along the route is rather than
+    // presenting an estimate built on a handful of points as settled fact.
+    public const int BaselineConfidentSampleCount = 60;
     public const int PollIntervalMinutes = 5;
     public const int RetentionDays = 90;
 

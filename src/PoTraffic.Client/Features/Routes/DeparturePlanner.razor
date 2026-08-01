@@ -1,0 +1,288 @@
+@using PoTraffic.Shared.DTOs.History
+@inject PtInterop Pt
+
+@* ──────────────────────────────────────────────────────────────────────
+   #1 + #2 — "Arrive by" solver and departure scrubber.
+
+   Everything here runs against DepartureModel, built from the baseline the
+   page already downloaded. Dragging the slider and retargeting the arrival
+   time are array lookups: no request, no spinner, no latency.
+   ────────────────────────────────────────────────────────────────────── *@
+
+<RadzenCard class="rz-mb-4 pt-planner">
+    <div class="pt-planner-head">
+        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-0">Plan this trip</RadzenText>
+        <div class="pt-planner-modes" role="tablist" aria-label="Planning mode">
+            <button type="button" role="tab" class="pt-planner-mode @(_mode == PlannerMode.ArriveBy ? "active" : "")"
+                    aria-selected="@(_mode == PlannerMode.ArriveBy)" @onclick="() => SetMode(PlannerMode.ArriveBy)">
+                Arrive by
+            </button>
+            <button type="button" role="tab" class="pt-planner-mode @(_mode == PlannerMode.DepartAt ? "active" : "")"
+                    aria-selected="@(_mode == PlannerMode.DepartAt)" @onclick="() => SetMode(PlannerMode.DepartAt)">
+                Depart at
+            </button>
+        </div>
+    </div>
+
+    @if (_model.IsEmpty)
+    {
+        <div class="pt-planner-empty">
+            Not enough history yet to plan against. Once this route has a few samples the
+            planner will solve departures for you.
+        </div>
+    }
+    else
+    {
+        @* ── Confidence selector — how much of the volatility band to plan against ── *@
+        <div class="pt-planner-confidence" role="radiogroup" aria-label="Planning confidence">
+            @foreach (ConfidenceLevel level in ConfidenceLevel.All)
+            {
+                <button type="button" role="radio" aria-checked="@(_confidence == level)"
+                        class="pt-conf-chip @(_confidence == level ? "active" : "")"
+                        title="@level.Description"
+                        @onclick="() => SetConfidence(level)">
+                    @level.Label
+                </button>
+            }
+            <span class="pt-planner-confidence-note">@_confidence.Description</span>
+        </div>
+
+        @if (_mode == PlannerMode.ArriveBy)
+        {
+            <div class="pt-planner-row">
+                <label class="pt-planner-label" for="pt-arrival-input">I need to be there by</label>
+                <input id="pt-arrival-input" class="pt-planner-time" type="time" step="900"
+                       value="@MinutesToTimeValue(_arrivalMinute)"
+                       @onchange="OnArrivalChanged" />
+            </div>
+
+            @if (_solution is { } solution)
+            {
+                <div class="pt-planner-answer @(solution.IsInterpolated ? "pt-planner-answer-soft" : "")">
+                    <div class="pt-planner-answer-lead">Leave by</div>
+                    <div class="pt-planner-answer-time">@FormatClock(solution.DepartureMinuteOfDay)</div>
+                    <div class="pt-planner-answer-meta">
+                        ~@FormatDuration(solution.PredictedSeconds) drive ·
+                        arrives @FormatClock((int)Math.Round(solution.ArrivalMinuteOfDay))
+                        @if (solution.SlackMinutes >= 1)
+                        {
+                            <text> · @($"{solution.SlackMinutes:F0}") min to spare</text>
+                        }
+                    </div>
+                    @if (solution.IsInterpolated)
+                    {
+                        <div class="pt-planner-answer-warn">
+                            No samples at that hour yet — estimated from the surrounding slots.
+                        </div>
+                    }
+                </div>
+
+                @* Every confidence level at once: the trade-off is the decision. *@
+                <div class="pt-planner-ladder">
+                    @foreach (ConfidenceLevel level in ConfidenceLevel.All)
+                    {
+                        DepartureSolution? alt = _model.SolveLatestDeparture(_arrivalMinute, level.Z);
+                        <div class="pt-planner-ladder-row @(level == _confidence ? "active" : "")">
+                            <span class="pt-planner-ladder-label">@level.Label</span>
+                            <span class="pt-planner-ladder-time">
+                                @(alt is null ? "not reachable" : FormatClock(alt.DepartureMinuteOfDay))
+                            </span>
+                            <span class="pt-planner-ladder-note">@level.Description</span>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="pt-planner-answer pt-planner-answer-warn">
+                    Even leaving at midnight this route doesn't reach
+                    @FormatClock(_arrivalMinute) at that confidence.
+                </div>
+            }
+        }
+        else
+        {
+            <div class="pt-planner-row">
+                <label class="pt-planner-label" for="pt-departure-slider">Departure</label>
+                <span class="pt-planner-scrub-time">@FormatClock(_scrubSlot * DepartureModel.SlotMinutes)</span>
+            </div>
+
+            <div class="pt-planner-answer">
+                <div class="pt-planner-answer-lead">Predicted drive</div>
+                <div class="pt-planner-answer-time">@FormatDuration(ScrubSeconds)</div>
+                <div class="pt-planner-answer-meta">
+                    arrives @FormatClock(ScrubArrivalMinute)
+                    @if (_model.StdDevSeconds(_scrubSlot) > 0)
+                    {
+                        <text> · ±@FormatDuration(_model.StdDevSeconds(_scrubSlot)) typical swing</text>
+                    }
+                    @if (!_model.HasSamples(_scrubSlot))
+                    {
+                        <text> · estimated</text>
+                    }
+                    else
+                    {
+                        <text> · @_model.SampleCount(_scrubSlot) samples</text>
+                    }
+                </div>
+            </div>
+        }
+
+        @* ── The day strip. Doubles as the scrub track: every bar is a quarter-hour,
+             height is that slot's predicted duration, and the range input sits
+             transparently over it so drag/keyboard both work with no JS. ── *@
+        <div class="pt-planner-strip-wrap">
+            <div class="pt-planner-strip" aria-hidden="true">
+                @for (int slot = 0; slot < DepartureModel.SlotsPerDay; slot++)
+                {
+                    <span class="pt-planner-bar @BarClass(slot)"
+                          style="--pt-bar-h:@BarHeight(slot)"></span>
+                }
+            </div>
+            <input id="pt-departure-slider" class="pt-planner-range" type="range"
+                   min="0" max="@(DepartureModel.SlotsPerDay - 1)" step="1"
+                   value="@_scrubSlot"
+                   aria-label="Departure time"
+                   aria-valuetext="@FormatClock(_scrubSlot * DepartureModel.SlotMinutes)"
+                   @oninput="OnScrub" />
+            <div class="pt-planner-axis" aria-hidden="true">
+                <span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>24:00</span>
+            </div>
+        </div>
+    }
+</RadzenCard>
+
+@code {
+    /// <summary>Baseline slots for the day being planned. Rebuilt into a curve on change.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<BaselineSlotDto> Slots { get; set; } = [];
+
+    /// <summary>
+    /// Server-recommended departure, used to seed the scrubber so the card opens on the
+    /// answer the rest of the page is already showing. Minutes past midnight.
+    /// </summary>
+    [Parameter] public int? SuggestedDepartureMinute { get; set; }
+
+    private enum PlannerMode { ArriveBy, DepartAt }
+
+    private DepartureModel _model = DepartureModel.Build([]);
+    private PlannerMode _mode = PlannerMode.ArriveBy;
+    private ConfidenceLevel _confidence = ConfidenceLevel.Safe;
+    private int _arrivalMinute = 9 * 60;
+    private int _scrubSlot;
+    private bool _seeded;
+
+    private DepartureSolution? _solution;
+
+    private double ScrubSeconds => _model.PredictSeconds(_scrubSlot, _confidence.Z);
+
+    private int ScrubArrivalMinute =>
+        (int)Math.Round((_scrubSlot * DepartureModel.SlotMinutes) + (ScrubSeconds / 60.0));
+
+    protected override void OnParametersSet()
+    {
+        _model = DepartureModel.Build(Slots);
+
+        if (!_seeded && !_model.IsEmpty)
+        {
+            // Open on the server's recommendation when there is one, otherwise on the
+            // current quarter-hour, so the first thing shown is relevant to right now.
+            int seedMinute = SuggestedDepartureMinute
+                ?? (DateTime.Now.Hour * 60) + DateTime.Now.Minute;
+            _scrubSlot = Math.Clamp(
+                seedMinute / DepartureModel.SlotMinutes, 0, DepartureModel.SlotsPerDay - 1);
+            _seeded = true;
+        }
+
+        Solve();
+    }
+
+    private void Solve() => _solution = _model.IsEmpty
+        ? null
+        : _model.SolveLatestDeparture(_arrivalMinute, _confidence.Z);
+
+    private void SetMode(PlannerMode mode)
+    {
+        if (_mode == mode) return;
+        _mode = mode;
+        // Switching to the scrubber lands on the answer just solved, so the two
+        // views agree instead of showing unrelated times.
+        if (mode == PlannerMode.DepartAt && _solution is { } s)
+            _scrubSlot = s.DepartureSlot;
+        _ = Pt.PlayAsync("click");
+    }
+
+    private void SetConfidence(ConfidenceLevel level)
+    {
+        _confidence = level;
+        Solve();
+        _ = Pt.PlayAsync("click");
+    }
+
+    private void OnArrivalChanged(ChangeEventArgs e)
+    {
+        if (TryParseTimeValue(e.Value?.ToString(), out int minutes))
+        {
+            _arrivalMinute = minutes;
+            Solve();
+        }
+    }
+
+    private void OnScrub(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int slot))
+            _scrubSlot = Math.Clamp(slot, 0, DepartureModel.SlotsPerDay - 1);
+    }
+
+    /// <summary>Bar height as a 0–1 fraction of the day's slowest slot.</summary>
+    private string BarHeight(int slot)
+    {
+        (double min, double max) = _model.Range;
+        double span = max - min;
+        // A flat day would divide by zero; show it as a uniform mid-height strip.
+        double fraction = span <= 0 ? 0.5 : (_model.PredictSeconds(slot) - min) / span;
+        return (0.08 + (fraction * 0.92))
+            .ToString("F3", System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    private string BarClass(int slot)
+    {
+        int selected = _mode == PlannerMode.DepartAt ? _scrubSlot : _solution?.DepartureSlot ?? -1;
+        if (slot == selected) return "pt-planner-bar-selected";
+        if (!_model.HasSamples(slot)) return "pt-planner-bar-estimated";
+        return string.Empty;
+    }
+
+    private static string FormatClock(int minuteOfDay)
+    {
+        int m = ((minuteOfDay % 1440) + 1440) % 1440;
+        return $"{m / 60:D2}:{m % 60:D2}";
+    }
+
+    private static string FormatDuration(double seconds)
+    {
+        int totalMinutes = (int)Math.Round(seconds / 60.0);
+        return totalMinutes >= 60
+            ? $"{totalMinutes / 60}h {totalMinutes % 60:D2}m"
+            : $"{totalMinutes} min";
+    }
+
+    /// <summary>Formats minutes-past-midnight for an &lt;input type="time"&gt; value.</summary>
+    private static string MinutesToTimeValue(int minuteOfDay) => FormatClock(minuteOfDay);
+
+    private static bool TryParseTimeValue(string? value, out int minuteOfDay)
+    {
+        minuteOfDay = 0;
+        if (string.IsNullOrWhiteSpace(value))
+            return false;
+
+        // The time input yields "HH:mm" (or "HH:mm:ss" when a step demands seconds).
+        string[] parts = value.Split(':');
+        if (parts.Length < 2
+            || !int.TryParse(parts[0], out int hours)
+            || !int.TryParse(parts[1], out int minutes))
+            return false;
+
+        minuteOfDay = Math.Clamp((hours * 60) + minutes, 0, 1439);
+        return true;
+    }
+}
