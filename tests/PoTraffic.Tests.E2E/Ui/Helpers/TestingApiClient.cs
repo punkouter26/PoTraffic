@@ -24,26 +24,51 @@ public sealed class TestingApiClient
         _http = http;
     }
 
-    /// <summary>Promotes a deterministic admin user via the testing-only endpoint.</summary>
+    /// <summary>
+    /// Promotes a deterministic admin user via the testing-only endpoint.
+    ///
+    /// <para>
+    /// Must be a POST: <c>TestingEndpoints</c> maps <c>/e2e/seed-admin</c> with
+    /// <c>MapPost</c>. A GET does not match the route, falls through to the SPA
+    /// fallback, and returns <c>index.html</c> — which surfaced as the opaque
+    /// "'&lt;' is an invalid start of a value" JSON error that failed every scenario
+    /// needing an admin session.
+    /// </para>
+    /// </summary>
     public async Task<string> SeedAdminAsync(CancellationToken ct = default)
     {
-        SeedAdminResponse? response = await _http.GetFromJsonAsync<SeedAdminResponse>("/e2e/seed-admin", ct);
+        using HttpResponseMessage result = await _http.PostAsync("/e2e/seed-admin", content: null, ct);
+        result.EnsureSuccessStatusCode();
+
+        SeedAdminResponse? response =
+            await result.Content.ReadFromJsonAsync<SeedAdminResponse>(cancellationToken: ct);
         if (response is null || string.IsNullOrWhiteSpace(response.Email))
             throw new InvalidOperationException("seed-admin endpoint returned no email.");
         return response.Email;
     }
 
-    /// <summary>Issues a BFF cookie for the given email + role via the dev-login endpoint.</summary>
+    /// <summary>
+    /// Issues a BFF cookie for the given email + role via the dev-login endpoint and
+    /// returns the signed-in email, or null when the call failed.
+    ///
+    /// <para>
+    /// The cookie lands in this client's handler, not in the Playwright browser — UI
+    /// tests still authenticate the page through
+    /// <c>PlaywrightTestBase.AuthenticateViaDevLoginAsync</c>. Callers use this purely
+    /// as a precondition check that the account resolves.
+    /// </para>
+    /// </summary>
     public async Task<string?> DevLoginAsync(string email, string role = "Commuter", CancellationToken ct = default)
     {
-        HttpResponseMessage response = await _http.PostAsJsonAsync(
+        using HttpResponseMessage response = await _http.PostAsJsonAsync(
             "/e2e/dev-login",
             new DevLoginRequest(email, role),
             ct);
         if (!response.IsSuccessStatusCode)
             return null;
+
         DevLoginResponse? body = await response.Content.ReadFromJsonAsync<DevLoginResponse>(cancellationToken: ct);
-        return body?.SessionId;
+        return body?.Email;
     }
 
     /// <summary>Seeds a route for the given user and returns (RouteId, OriginCoords, DestCoords).</summary>
@@ -71,9 +96,17 @@ public sealed class TestingApiClient
         [property: JsonPropertyName("email")] string Email,
         [property: JsonPropertyName("role")] string Role);
 
+    /// <summary>
+    /// Mirrors the <c>AuthMeResponse</c> that <c>/e2e/dev-login</c> actually returns.
+    /// It previously declared a <c>sessionId</c> the endpoint has never sent, so the
+    /// property deserialised to null on every successful call and the helper reported
+    /// failure on HTTP 200.
+    /// </summary>
     private sealed record DevLoginResponse(
-        [property: JsonPropertyName("sessionId")] string? SessionId,
-        [property: JsonPropertyName("email")] string? Email);
+        [property: JsonPropertyName("userId")] string? UserId,
+        [property: JsonPropertyName("email")] string? Email,
+        [property: JsonPropertyName("role")] string? Role,
+        [property: JsonPropertyName("authProvider")] string? AuthProvider);
 
     private sealed record SeedRouteRequest(
         [property: JsonPropertyName("email")] string Email,
