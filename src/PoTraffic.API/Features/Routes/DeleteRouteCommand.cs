@@ -32,9 +32,7 @@ public sealed class DeleteRouteCommandHandler : IRequestHandler<DeleteRouteComma
 
     public async Task<bool> Handle(DeleteRouteCommand cmd, CancellationToken ct)
     {
-        EntityRoute? route = _db.Routes
-            .FirstOrDefault(r => r.Id == cmd.RouteId && r.UserId == cmd.UserId
-                && r.MonitoringStatus != (int)MonitoringStatus.Deleted);
+        EntityRoute? route = _db.GetOwnedRoute(cmd.RouteId, cmd.UserId, excludeDeleted: true);
 
         if (route is null)
             return false;

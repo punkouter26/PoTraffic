@@ -110,13 +110,13 @@ else if (AllDone)
     private sealed record ShotDisplayRow(
         string Label, string Offset, DateTime? ExpectedAt, DateTimeOffset? FiredAt,
         string Duration, string Distance, bool? IsSuccess, string? ErrorCode,
-        int ShotIndex, bool IsAverage, bool IsWinner);
+        bool IsAverage, bool IsWinner);
 
     private List<ShotDisplayRow> GetDisplayRows()
     {
         DateTime scheduledLocal = Session.ScheduledAt.ToLocalTime().DateTime;
 
-        var rows = Session.Shots
+        List<ShotDisplayRow> rows = [.. Session.Shots
             .OrderBy(s => s.ShotIndex)
             .Select(s => new ShotDisplayRow(
                 Label: $"Shot {s.ShotIndex + 1}",
@@ -127,16 +127,14 @@ else if (AllDone)
                 Distance: FormatDistance(s.DistanceMetres),
                 IsSuccess: s.IsSuccess,
                 ErrorCode: s.ErrorCode,
-                ShotIndex: s.ShotIndex,
                 IsAverage: false,
-                IsWinner: s.ShotIndex == Session.IdealShotIndex))
-            .ToList<ShotDisplayRow>();
+                IsWinner: s.ShotIndex == Session.IdealShotIndex))];
 
         rows.Add(new ShotDisplayRow(
             Label: "Average", Offset: "—", ExpectedAt: null, FiredAt: null,
             Duration: FormatDuration((int?)Session.AverageDurationSeconds),
             Distance: FormatDistance((int?)Session.AverageDistanceMetres),
-            IsSuccess: null, ErrorCode: null, ShotIndex: -1, IsAverage: true, IsWinner: false));
+            IsSuccess: null, ErrorCode: null, IsAverage: true, IsWinner: false));
 
         return rows;
     }

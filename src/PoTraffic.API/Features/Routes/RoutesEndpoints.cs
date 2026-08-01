@@ -1,10 +1,8 @@
-
 using System.Security.Claims;
-using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
-using PoTraffic.API.Infrastructure.Providers;
+using Microsoft.Extensions.Logging;
 using PoTraffic.API.Infrastructure.Security;
 using PoTraffic.Shared.DTOs.Routes;
 using PoTraffic.Shared.Enums;
@@ -101,12 +99,7 @@ public static class RoutesEndpoints
 
         return result.IsSuccess
             ? Results.Created($"/api/routes/{result.Route!.Id}", result.Route)
-            : result.ErrorCode switch
-            {
-                "GEOCODE_FAILED" => Results.UnprocessableEntity(new { error = result.ErrorCode }),
-                "SAME_COORDINATES" => Results.UnprocessableEntity(new { error = result.ErrorCode }),
-                _ => Results.UnprocessableEntity(new { error = result.ErrorCode })
-            };
+            : Results.UnprocessableEntity(new { error = result.ErrorCode });
     }
 
     // PUT /api/routes/{routeId}
@@ -124,13 +117,9 @@ public static class RoutesEndpoints
 
         return result.IsSuccess
             ? Results.Ok(result.Route)
-            : result.ErrorCode switch
-            {
-                "NOT_FOUND" => Results.NotFound(),
-                "GEOCODE_FAILED" => Results.UnprocessableEntity(new { error = result.ErrorCode }),
-                "SAME_COORDINATES" => Results.UnprocessableEntity(new { error = result.ErrorCode }),
-                _ => Results.UnprocessableEntity(new { error = result.ErrorCode })
-            };
+            : result.ErrorCode == RouteErrorCodes.NotFound
+                ? Results.NotFound()
+                : Results.UnprocessableEntity(new { error = result.ErrorCode });
     }
 
     // DELETE /api/routes/{routeId}
@@ -159,7 +148,7 @@ public static class RoutesEndpoints
         CreateRouteResult result = await sender.Send(new CreateReturnTripCommand(routeId, userId.Value));
         return result.IsSuccess
             ? Results.Created($"/api/routes/{result.Route!.Id}", result.Route)
-            : result.ErrorCode == "NOT_FOUND"
+            : result.ErrorCode == RouteErrorCodes.NotFound
                 ? Results.NotFound()
                 : Results.UnprocessableEntity(new { error = result.ErrorCode });
     }
@@ -168,29 +157,22 @@ public static class RoutesEndpoints
     private static async Task<IResult> CheckNow(
         RouteId routeId,
         HttpContext context,
-        ITrafficProviderFactory providerFactory,
         ISender sender,
         ILogger<LogCategory> logger)
     {
         UserId? userId = ExtractUserId(context.User, logger);
         if (userId is null) return Results.Unauthorized();
 
-        // Verify ownership via direct single-route query (O(1) vs loading 1000 routes)
-        RouteDto? route = await sender.Send(new GetRouteByIdQuery(routeId, userId.Value));
-        if (route is null) return Results.NotFound();
+        CheckNowResult result = await sender.Send(new CheckNowCommand(routeId, userId.Value));
 
-        // Resolve provider and get live travel time without persisting
-        ITrafficProvider provider = providerFactory.GetProvider(route.Provider);
-        TravelResult? travelResult = await provider.GetTravelTimeAsync(
-            route.OriginCoordinates, route.DestinationCoordinates);
-
-        return travelResult is null
-            ? Results.StatusCode(503)
-            : Results.Ok(new
+        if (result.IsSuccess)
+            return Results.Ok(new
             {
-                durationSeconds = travelResult.DurationSeconds,
-                distanceMetres = travelResult.DistanceMetres
+                durationSeconds = result.DurationSeconds,
+                distanceMetres = result.DistanceMetres
             });
+
+        return result.ErrorCode == RouteErrorCodes.NotFound ? Results.NotFound() : Results.StatusCode(503);
     }
 
 }

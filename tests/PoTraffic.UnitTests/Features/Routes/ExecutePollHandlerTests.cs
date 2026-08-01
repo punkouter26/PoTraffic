@@ -7,28 +7,19 @@ using PoTraffic.API.Infrastructure.Storage;
 
 using PoTraffic.API.Infrastructure.Providers;
 using PoTraffic.Shared.Enums;
+using PoTraffic.UnitTests.Helpers;
 
 namespace PoTraffic.UnitTests.Features.Routes;
 
 public sealed class ExecutePollHandlerTests
 {
-    private static TableStorageContext CreateDb()
-    {
-        return new TableStorageContext();
-    }
 
-    private static ITrafficProviderFactory BuildProviderFactory(ITrafficProvider provider)
-    {
-        var factory = Substitute.For<ITrafficProviderFactory>();
-        factory.GetProvider(Arg.Any<RouteProvider>()).Returns(provider);
-        return factory;
-    }
 
     [Fact]
     public async Task ExecutePollHandler_WhenProviderSucceeds_RecordsPollData()
     {
         // Arrange
-        TableStorageContext db = CreateDb();
+        TableStorageContext db = TestDoubles.CreateDb();
 
         RouteId routeId = RouteId.New();
         SessionId sessionId = SessionId.New();
@@ -61,7 +52,7 @@ public sealed class ExecutePollHandlerTests
             .GetTravelTimeAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(new TravelResult(300, 5000, "{}"));
 
-        ITrafficProviderFactory providerFactory = BuildProviderFactory(mockProvider);
+        ITrafficProviderFactory providerFactory = TestDoubles.ProviderFactory(mockProvider);
 
         var handler = new ExecutePollCommandHandler(db, providerFactory, PoTraffic.UnitTests.Helpers.AlertTestHelper.NoOp(db), NullLogger<ExecutePollCommandHandler>.Instance);
 

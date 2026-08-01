@@ -29,8 +29,11 @@ public sealed class ScheduledJobEntity : ITableEntity
     /// <summary>Job status: Pending, Running, Completed, Cancelled.</summary>
     public string Status { get; set; } = "Pending";
 
-    /// <summary>CRON expression for recurring jobs (null for one-shot jobs).</summary>
-    public string? CronExpression { get; set; }
+    /// <summary>
+    /// UTC time of day ("HH:mm") at which a recurring job fires; null for one-shot jobs.
+    /// Stored as a string because Table Storage has no TimeOnly column type.
+    /// </summary>
+    public string? DailyAtUtc { get; set; }
 
     /// <summary>Last time this recurring job ran (null if never).</summary>
     public DateTimeOffset? LastRunAt { get; set; }

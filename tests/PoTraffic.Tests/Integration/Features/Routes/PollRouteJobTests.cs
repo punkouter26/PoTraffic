@@ -33,8 +33,7 @@ public sealed class PollRouteJobTests
         }
         public void Cancel(string jobId) { }
         public int CancelPendingPollJobsForRoute(RouteId routeId) => 0;
-        public void ScheduleRecurring(string jobId, Func<Task> job, string cronExpression) { }
-        public void CancelRecurring(string jobId) { }
+        public void ScheduleRecurring(string jobId, Func<Task> job, TimeOnly dailyAtUtc) { }
     }
 
     private sealed class RecordingSender : ISender

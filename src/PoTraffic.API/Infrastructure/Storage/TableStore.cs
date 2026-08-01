@@ -57,8 +57,9 @@ public sealed class AzureTableStore(TableServiceClient tableService) : ITableSto
 
     public async Task EnsureTablesAsync(IEnumerable<string> tables, CancellationToken ct = default)
     {
-        foreach (string table in tables)
-            await tableService.CreateTableIfNotExistsAsync(table, ct);
+        // Independent per-table calls on a thread-safe client — issued in one wave so cold
+        // start isn't the sum of ~11 sequential round-trips.
+        await Task.WhenAll(tables.Select(table => tableService.CreateTableIfNotExistsAsync(table, ct)));
     }
 
     public async Task<IReadOnlyList<(string, string, string, string)>> ReadAllAsync(string table, CancellationToken ct = default)
@@ -85,12 +86,95 @@ public sealed class AzureTableStore(TableServiceClient tableService) : ITableSto
         }
     }
 
+    /// <summary>Azure Table Storage caps an entity-group transaction at 100 actions.</summary>
+    private const int MaxTransactionSize = 100;
+
     public async Task<IReadOnlyList<TableWriteResult>> ApplyAsync(IReadOnlyList<TableOp> ops, CancellationToken ct = default)
     {
         List<TableWriteResult> results = [];
+
+        // A transaction is scoped to one table + one partition, so that is the natural grouping.
+        // PollRecords partition by route, which is what makes this pay: the nightly prune marks
+        // every expired record for a route dirty, and those all land in one partition —
+        // N sequential round-trips become ceil(N/100).
+        foreach (IGrouping<(string Table, string PartitionKey), TableOp> group in
+                 ops.GroupBy(op => (op.Table, op.PartitionKey)))
+        {
+            TableClient client = Client(group.Key.Table);
+
+            foreach (TableOp[] chunk in group.Chunk(MaxTransactionSize))
+            {
+                // A single row is cheaper written directly than wrapped in a transaction, and
+                // a repeated row key is rejected outright by the transaction API.
+                if (chunk.Length == 1 || HasDuplicateRowKeys(chunk))
+                {
+                    await ApplyRowByRowAsync(client, chunk, results, ct);
+                    continue;
+                }
+
+                try
+                {
+                    results.AddRange(await SubmitBatchAsync(client, group.Key, chunk, ct));
+                }
+                catch (RequestFailedException)
+                {
+                    // Transactions are all-or-nothing, so one stale ETag or already-deleted row
+                    // fails the whole chunk. The row-by-row path resolves those conflicts
+                    // individually (see WriteAsync), so it is the correct fallback — never a
+                    // reason to fail the flush.
+                    await ApplyRowByRowAsync(client, chunk, results, ct);
+                }
+            }
+        }
+
+        return results;
+    }
+
+    private static bool HasDuplicateRowKeys(TableOp[] chunk)
+        => chunk.Select(op => op.RowKey).Distinct(StringComparer.Ordinal).Count() != chunk.Length;
+
+    /// <summary>
+    /// Submits one entity-group transaction. Upserts go in unconditionally rather than
+    /// ETag-guarded: <see cref="WriteAsync"/> already resolves every conflict by rewriting, so
+    /// the guarded attempt only ever costs an extra round-trip to reach the same final state.
+    /// </summary>
+    private static async Task<IReadOnlyList<TableWriteResult>> SubmitBatchAsync(
+        TableClient client,
+        (string Table, string PartitionKey) key,
+        TableOp[] chunk,
+        CancellationToken ct)
+    {
+        List<TableTransactionAction> actions = [.. chunk.Select(op => op.Kind == TableOpKind.Upsert
+            ? new TableTransactionAction(
+                TableTransactionActionType.UpsertReplace,
+                new TableEntity(op.PartitionKey, op.RowKey) { ["Data"] = op.Json })
+            : new TableTransactionAction(
+                TableTransactionActionType.Delete,
+                new TableEntity(op.PartitionKey, op.RowKey),
+                ETag.All))];
+
+        Response<IReadOnlyList<Response>> response = await client.SubmitTransactionAsync(actions, ct);
+
+        List<TableWriteResult> results = [];
+        for (int i = 0; i < chunk.Length; i++)
+        {
+            if (chunk[i].Kind != TableOpKind.Upsert)
+                continue;
+            results.Add(new TableWriteResult(
+                key.Table, key.PartitionKey, chunk[i].RowKey,
+                response.Value[i].Headers.ETag?.ToString() ?? ETag.All.ToString()));
+        }
+        return results;
+    }
+
+    private static async Task ApplyRowByRowAsync(
+        TableClient client,
+        IReadOnlyList<TableOp> ops,
+        List<TableWriteResult> results,
+        CancellationToken ct)
+    {
         foreach (TableOp op in ops)
         {
-            TableClient client = Client(op.Table);
             if (op.Kind == TableOpKind.Upsert)
             {
                 TableEntity entity = new(op.PartitionKey, op.RowKey) { ["Data"] = op.Json };
@@ -109,7 +193,6 @@ public sealed class AzureTableStore(TableServiceClient tableService) : ITableSto
                 }
             }
         }
-        return results;
     }
 
     /// <summary>

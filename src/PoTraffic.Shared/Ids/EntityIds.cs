@@ -13,6 +13,13 @@ namespace PoTraffic.Shared.Ids;
 // Construct with New() for a fresh identifier, or From(guid) at a genuine boundary
 // (deserialisation, a claim value, a legacy column). Prefer passing the typed value
 // through and unwrapping as late as possible.
+//
+// The near-identical member lists below are NOT redundancy that a shared base could remove.
+// Structs cannot inherit, and a `static virtual` default on IStronglyTypedId<TSelf> is only
+// callable through a constrained type parameter — never as `RouteId.New()`. Parse/TryParse
+// are likewise required on the concrete type by IParsable<T>, which is what makes minimal-API
+// route binding work with no extra code. Only genuinely unused members have been trimmed:
+// Empty and IsEmpty exist solely on the identifiers that actually use them.
 
 /// <summary>Identifies a <c>User</c>.</summary>
 [JsonConverter(typeof(StronglyTypedIdJsonConverter<UserId>))]
@@ -40,7 +47,6 @@ public readonly record struct RouteId(Guid Value) : IStronglyTypedId<RouteId>, I
 {
     public static RouteId From(Guid value) => new(value);
     public static RouteId New() => new(Guid.NewGuid());
-    public static RouteId Empty => default;
     public bool IsEmpty => Value == Guid.Empty;
     public override string ToString() => Value.ToString();
 
@@ -60,8 +66,6 @@ public readonly record struct WindowId(Guid Value) : IStronglyTypedId<WindowId>,
 {
     public static WindowId From(Guid value) => new(value);
     public static WindowId New() => new(Guid.NewGuid());
-    public static WindowId Empty => default;
-    public bool IsEmpty => Value == Guid.Empty;
     public override string ToString() => Value.ToString();
 
     public static WindowId Parse(string s, IFormatProvider? provider = null) => new(Guid.Parse(s));
@@ -80,8 +84,6 @@ public readonly record struct SessionId(Guid Value) : IStronglyTypedId<SessionId
 {
     public static SessionId From(Guid value) => new(value);
     public static SessionId New() => new(Guid.NewGuid());
-    public static SessionId Empty => default;
-    public bool IsEmpty => Value == Guid.Empty;
     public override string ToString() => Value.ToString();
 
     public static SessionId Parse(string s, IFormatProvider? provider = null) => new(Guid.Parse(s));
@@ -100,8 +102,6 @@ public readonly record struct PollRecordId(Guid Value) : IStronglyTypedId<PollRe
 {
     public static PollRecordId From(Guid value) => new(value);
     public static PollRecordId New() => new(Guid.NewGuid());
-    public static PollRecordId Empty => default;
-    public bool IsEmpty => Value == Guid.Empty;
     public override string ToString() => Value.ToString();
 
     public static PollRecordId Parse(string s, IFormatProvider? provider = null) => new(Guid.Parse(s));
@@ -120,8 +120,6 @@ public readonly record struct AlertId(Guid Value) : IStronglyTypedId<AlertId>, I
 {
     public static AlertId From(Guid value) => new(value);
     public static AlertId New() => new(Guid.NewGuid());
-    public static AlertId Empty => default;
-    public bool IsEmpty => Value == Guid.Empty;
     public override string ToString() => Value.ToString();
 
     public static AlertId Parse(string s, IFormatProvider? provider = null) => new(Guid.Parse(s));
@@ -141,8 +139,6 @@ public readonly record struct PushSubscriptionId(Guid Value)
 {
     public static PushSubscriptionId From(Guid value) => new(value);
     public static PushSubscriptionId New() => new(Guid.NewGuid());
-    public static PushSubscriptionId Empty => default;
-    public bool IsEmpty => Value == Guid.Empty;
     public override string ToString() => Value.ToString();
 
     public static PushSubscriptionId Parse(string s, IFormatProvider? provider = null) => new(Guid.Parse(s));
@@ -162,8 +158,6 @@ public readonly record struct TripleTestSessionId(Guid Value)
 {
     public static TripleTestSessionId From(Guid value) => new(value);
     public static TripleTestSessionId New() => new(Guid.NewGuid());
-    public static TripleTestSessionId Empty => default;
-    public bool IsEmpty => Value == Guid.Empty;
     public override string ToString() => Value.ToString();
 
     public static TripleTestSessionId Parse(string s, IFormatProvider? provider = null) => new(Guid.Parse(s));
@@ -183,8 +177,6 @@ public readonly record struct TripleTestShotId(Guid Value)
 {
     public static TripleTestShotId From(Guid value) => new(value);
     public static TripleTestShotId New() => new(Guid.NewGuid());
-    public static TripleTestShotId Empty => default;
-    public bool IsEmpty => Value == Guid.Empty;
     public override string ToString() => Value.ToString();
 
     public static TripleTestShotId Parse(string s, IFormatProvider? provider = null) => new(Guid.Parse(s));

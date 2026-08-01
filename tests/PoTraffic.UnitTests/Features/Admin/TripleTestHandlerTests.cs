@@ -7,6 +7,7 @@ using PoTraffic.API.Infrastructure.Storage;
 using PoTraffic.API.Infrastructure.Providers;
 using PoTraffic.API.Infrastructure.Scheduling;
 using PoTraffic.Shared.Enums;
+using PoTraffic.UnitTests.Helpers;
 
 namespace PoTraffic.UnitTests.Features.Admin;
 
@@ -16,17 +17,7 @@ namespace PoTraffic.UnitTests.Features.Admin;
 /// </summary>
 public sealed class TripleTestHandlerTests
 {
-    private static TableStorageContext CreateDb()
-    {
-        return new TableStorageContext();
-    }
 
-    private static ITrafficProviderFactory BuildProviderFactory(ITrafficProvider provider)
-    {
-        var factory = Substitute.For<ITrafficProviderFactory>();
-        factory.GetProvider(Arg.Any<RouteProvider>()).Returns(provider);
-        return factory;
-    }
 
     // ── StartTripleTestCommand tests ──────────────────────────────────────────
 
@@ -34,12 +25,12 @@ public sealed class TripleTestHandlerTests
     public async Task StartTripleTest_WhenOriginGeocodeFails_ReturnsGeocodeError()
     {
         // Arrange
-        TableStorageContext db = CreateDb();
+        TableStorageContext db = TestDoubles.CreateDb();
         var fakeProvider = Substitute.For<ITrafficProvider>();
         fakeProvider.GeocodeAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns((string?)null);  // geocode always fails
 
-        ITrafficProviderFactory factory = BuildProviderFactory(fakeProvider);
+        ITrafficProviderFactory factory = TestDoubles.ProviderFactory(fakeProvider);
         IJobScheduler scheduler = Substitute.For<IJobScheduler>();
         scheduler.Schedule(Arg.Any<Expression<Func<Task>>>(), Arg.Any<TimeSpan>()).Returns("fake-job-id");
         var handler = new StartTripleTestCommandHandler(
@@ -60,12 +51,12 @@ public sealed class TripleTestHandlerTests
     public async Task StartTripleTest_WhenDestinationGeocodeFails_ReturnsGeocodeError()
     {
         // Arrange
-        TableStorageContext db = CreateDb();
+        TableStorageContext db = TestDoubles.CreateDb();
         var fakeProvider = Substitute.For<ITrafficProvider>();
         fakeProvider.GeocodeAsync("Origin", Arg.Any<CancellationToken>()).Returns("1.0,1.0");
         fakeProvider.GeocodeAsync("BadDest", Arg.Any<CancellationToken>()).Returns((string?)null);
 
-        ITrafficProviderFactory factory = BuildProviderFactory(fakeProvider);
+        ITrafficProviderFactory factory = TestDoubles.ProviderFactory(fakeProvider);
         IJobScheduler scheduler = Substitute.For<IJobScheduler>();
         scheduler.Schedule(Arg.Any<Expression<Func<Task>>>(), Arg.Any<TimeSpan>()).Returns("fake-job-id");
         var handler = new StartTripleTestCommandHandler(
@@ -85,12 +76,12 @@ public sealed class TripleTestHandlerTests
     public async Task StartTripleTest_WhenValid_CreatesSessionWith3ShotStubsAndSchedules3Jobs()
     {
         // Arrange
-        TableStorageContext db = CreateDb();
+        TableStorageContext db = TestDoubles.CreateDb();
         var fakeProvider = Substitute.For<ITrafficProvider>();
         fakeProvider.GeocodeAsync("A", Arg.Any<CancellationToken>()).Returns("1.0,1.0");
         fakeProvider.GeocodeAsync("B", Arg.Any<CancellationToken>()).Returns("2.0,2.0");
 
-        ITrafficProviderFactory factory = BuildProviderFactory(fakeProvider);
+        ITrafficProviderFactory factory = TestDoubles.ProviderFactory(fakeProvider);
         IJobScheduler scheduler = Substitute.For<IJobScheduler>();
         scheduler.Schedule(Arg.Any<Expression<Func<Task>>>(), Arg.Any<TimeSpan>()).Returns("fake-job-id");
 
@@ -133,12 +124,12 @@ public sealed class TripleTestHandlerTests
     public async Task StartTripleTest_WhenSameCoordinates_ReturnsSameCoordinatesError()
     {
         // Arrange
-        TableStorageContext db = CreateDb();
+        TableStorageContext db = TestDoubles.CreateDb();
         var fakeProvider = Substitute.For<ITrafficProvider>();
         fakeProvider.GeocodeAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns("1.0,1.0");  // both addresses resolve to same coords
 
-        ITrafficProviderFactory factory = BuildProviderFactory(fakeProvider);
+        ITrafficProviderFactory factory = TestDoubles.ProviderFactory(fakeProvider);
         IJobScheduler scheduler = Substitute.For<IJobScheduler>();
         var handler = new StartTripleTestCommandHandler(
             db, factory, scheduler, NullLogger<StartTripleTestCommandHandler>.Instance);
@@ -159,7 +150,7 @@ public sealed class TripleTestHandlerTests
     public async Task GetTripleTestSession_WhenAllShotsSucceed_ReturnsCorrectWinnerAndAverage()
     {
         // Arrange
-        TableStorageContext db = CreateDb();
+        TableStorageContext db = TestDoubles.CreateDb();
 
         TripleTestSessionId sessionId = TripleTestSessionId.New();
         var session = new TripleTestSession
@@ -199,7 +190,7 @@ public sealed class TripleTestHandlerTests
     public async Task GetTripleTestSession_WhenOneShotFails_WinnerFromRemaining()
     {
         // Arrange
-        TableStorageContext db = CreateDb();
+        TableStorageContext db = TestDoubles.CreateDb();
 
         TripleTestSessionId sessionId = TripleTestSessionId.New();
         var session = new TripleTestSession
@@ -237,7 +228,7 @@ public sealed class TripleTestHandlerTests
     public async Task GetTripleTestSession_WhenAllShotsFail_IdealShotIndexIsNull()
     {
         // Arrange
-        TableStorageContext db = CreateDb();
+        TableStorageContext db = TestDoubles.CreateDb();
 
         TripleTestSessionId sessionId = TripleTestSessionId.New();
         var session = new TripleTestSession
@@ -274,7 +265,7 @@ public sealed class TripleTestHandlerTests
     public async Task GetTripleTestSession_WhenSessionNotFound_ReturnsNull()
     {
         // Arrange
-        TableStorageContext db = CreateDb();
+        TableStorageContext db = TestDoubles.CreateDb();
         var handler = new GetTripleTestSessionQueryHandler(db);
 
         // Act
@@ -288,7 +279,7 @@ public sealed class TripleTestHandlerTests
     public async Task GetTripleTestSession_WhenPartiallyCompleted_ReturnsPartialAverages()
     {
         // Arrange — only 1 of 3 shots complete
-        TableStorageContext db = CreateDb();
+        TableStorageContext db = TestDoubles.CreateDb();
 
         TripleTestSessionId sessionId = TripleTestSessionId.New();
         var session = new TripleTestSession

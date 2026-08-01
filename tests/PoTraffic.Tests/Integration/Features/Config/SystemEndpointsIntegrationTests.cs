@@ -5,7 +5,7 @@ namespace PoTraffic.Tests.Features.Config;
 
 public sealed class SystemEndpointsIntegrationTests : BaseIntegrationTest
 {
-    [Fact]
+    [SkipUnlessAzuriteAvailable]
     public async Task GetFeatureFlags_InTesting_ReturnsMockProvidersEnabled()
     {
         HttpClient client = CreateClient();

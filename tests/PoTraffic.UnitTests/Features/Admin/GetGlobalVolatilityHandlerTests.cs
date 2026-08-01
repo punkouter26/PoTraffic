@@ -4,6 +4,7 @@ using PoTraffic.API.Features.Admin;
 using PoTraffic.API.Infrastructure.Storage;
 
 using PoTraffic.Shared.DTOs.Admin;
+using PoTraffic.UnitTests.Helpers;
 
 
 namespace PoTraffic.UnitTests.Features.Admin;
@@ -14,16 +15,12 @@ namespace PoTraffic.UnitTests.Features.Admin;
 /// </summary>
 public sealed class GetGlobalVolatilityHandlerTests
 {
-    private static TableStorageContext CreateDb()
-    {
-        return new TableStorageContext();
-    }
 
     [Fact]
     public async Task GetGlobalVolatility_GroupsByDayOfWeekAndSlot()
     {
         // Arrange
-        TableStorageContext db = CreateDb();
+        TableStorageContext db = TestDoubles.CreateDb();
 
         UserId userId = UserId.New();
         RouteId routeId = RouteId.New();
@@ -68,7 +65,7 @@ public sealed class GetGlobalVolatilityHandlerTests
     [Fact]
     public async Task GetGlobalVolatility_WhenNoRecords_ReturnsEmpty()
     {
-        TableStorageContext db = CreateDb();
+        TableStorageContext db = TestDoubles.CreateDb();
 
         var handler = new GetGlobalVolatilityHandler(db, NullLogger<GetGlobalVolatilityHandler>.Instance);
 

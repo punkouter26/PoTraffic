@@ -1,5 +1,7 @@
 global using Xunit;
 global using FluentAssertions;
+global using PoTraffic.Tests;
+global using PoTraffic.Tests.Helpers;
 global using PoTraffic.API.Features.Auth;
 global using PoTraffic.API.Features.Routes;
 global using PoTraffic.API.Features.MonitoringWindows;

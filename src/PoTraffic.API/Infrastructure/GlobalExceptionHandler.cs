@@ -8,8 +8,10 @@ namespace PoTraffic.API.Infrastructure;
 /// Global exception handler — maps known exception types to structured HTTP responses.
 /// <list type="bullet">
 ///   <item><see cref="ValidationException"/> → 422 Unprocessable Entity</item>
-///   <item><see cref="DbUpdateException"/> (Unique Constraint) → 409 Conflict</item>
+///   <item><see cref="GeocodingConfigurationException"/> → 422 with <see cref="RouteErrorCodes.MapsKeyMissing"/></item>
 /// </list>
+/// Mapping happens here, by exception type, so every call site is covered by construction —
+/// a per-handler <c>catch</c> only covers the one handler that remembered to write it.
 /// </summary>
 public sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IExceptionHandler
 {
@@ -39,22 +41,22 @@ public sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logge
             return true;
         }
 
-        // Post-refactor: SQL-specific duplicate-key detection (DbUpdateException + SqlException 2601)
-        // is gone. The in-memory Table Storage backend has no equivalent exception; uniqueness is
-        // enforced by the handler-level guards (see e.g. CreateRouteCommand). We keep a fallback
-        // here for any future storage that surfaces InvalidOperationException with "duplicate" in
-        // its message.
-        if (exception is InvalidOperationException iopex && iopex.Message.Contains("duplicate", StringComparison.OrdinalIgnoreCase))
+        // Server misconfiguration (e.g. a missing Maps key), not bad user input. Handled here
+        // rather than per-handler: create-route caught it and answered with an actionable code,
+        // while the update / verify-address / triple-test paths let the identical failure
+        // surface as an opaque 500.
+        if (exception is GeocodingConfigurationException geocodeConfigEx)
         {
-            logger.LogWarning("Conflict detected at {Path}: {Message}", httpContext.Request.Path, iopex.Message);
+            logger.LogError(geocodeConfigEx, "Geocoding is not configured on the server ({Path}).",
+                httpContext.Request.Path);
 
-            httpContext.Response.StatusCode = (int)HttpStatusCode.Conflict;
+            httpContext.Response.StatusCode = (int)HttpStatusCode.UnprocessableEntity;
             await httpContext.Response.WriteAsJsonAsync(new
             {
-                type = "https://tools.ietf.org/html/rfc7231#section-6.5.8",
-                title = "Conflict",
-                status = 409,
-                detail = "This route already exists and is active."
+                type = "https://tools.ietf.org/html/rfc4918#section-11.2",
+                title = "Geocoding Not Configured",
+                status = 422,
+                error = RouteErrorCodes.MapsKeyMissing
             }, cancellationToken);
 
             return true;

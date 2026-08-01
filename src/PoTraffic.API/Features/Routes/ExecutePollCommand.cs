@@ -106,27 +106,28 @@ public sealed class ExecutePollCommandHandler(
             RawProviderResponse = travelResult.RawJson
         };
 
-        // 6. Reroute detection
-        List<PollRecord> priorRecords = db.PollRecords
-            .Where(p => p.SessionId == session.Id && !p.IsDeleted)
-            .OrderByDescending(p => p.PolledAt)
-            .ToList();
+        // 6. Reroute detection. Only the single most recent prior record is needed alongside
+        // the median, so this takes a linear MaxBy rather than sorting the whole session.
+        List<PollRecord> priorRecords = [.. db.PollRecords
+            .Where(p => p.SessionId == session.Id && !p.IsDeleted)];
 
         if (priorRecords.Count >= 2)
         {
+            PollRecord mostRecentPrior = priorRecords.MaxBy(p => p.PolledAt)!;
+
             // Calculate session median distance from all prior records
             double medianDistance = CalculateMedian(priorRecords.Select(p => (double)p.DistanceMetres).ToList());
             double threshold = medianDistance * (1.0 + QuotaConstants.RerouteDistanceThresholdPercent / 100.0);
 
             bool currentElevated = record.DistanceMetres >= threshold;
-            bool priorElevated = priorRecords[0].DistanceMetres >= threshold;
+            bool priorElevated = mostRecentPrior.DistanceMetres >= threshold;
 
             if (currentElevated && priorElevated)
             {
                 record.IsRerouted = true;
                 logger.LogInformation(
                     "Reroute detected for route {RouteId}: current={Current}m, prior={Prior}m, median={Median}m",
-                    cmd.RouteId, record.DistanceMetres, priorRecords[0].DistanceMetres, medianDistance);
+                    cmd.RouteId, record.DistanceMetres, mostRecentPrior.DistanceMetres, medianDistance);
             }
         }
 

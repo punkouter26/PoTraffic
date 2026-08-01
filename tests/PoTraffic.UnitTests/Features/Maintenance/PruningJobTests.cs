@@ -2,6 +2,7 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using PoTraffic.API.Features.Maintenance;
 using PoTraffic.API.Infrastructure.Storage;
+using PoTraffic.UnitTests.Helpers;
 
 
 namespace PoTraffic.UnitTests.Features.Maintenance;
@@ -12,16 +13,12 @@ namespace PoTraffic.UnitTests.Features.Maintenance;
 /// </summary>
 public sealed class PruningJobTests
 {
-    private static TableStorageContext CreateDb()
-    {
-        return new TableStorageContext();
-    }
 
     [Fact]
     public async Task PruneJob_MarksOldRecordsDeleted_DoesNotTouchRecentRecords()
     {
         // Arrange
-        TableStorageContext db = CreateDb();
+        TableStorageContext db = TestDoubles.CreateDb();
 
         RouteId routeId = RouteId.New();
         DateTime cutoff = DateTime.UtcNow.AddDays(-90);
@@ -65,7 +62,7 @@ public sealed class PruningJobTests
     [Fact]
     public async Task PruneJob_WhenNoOldRecords_ReturnsZero()
     {
-        TableStorageContext db = CreateDb();
+        TableStorageContext db = TestDoubles.CreateDb();
 
         var handler = new PruneOldPollRecordsCommandHandler(db, NullLogger<PruneOldPollRecordsCommandHandler>.Instance);
 
@@ -78,7 +75,7 @@ public sealed class PruningJobTests
     public async Task PruneJob_DoesNotTouchRecordExactlyAtBoundary()
     {
         // Record exactly 90 days ago should NOT be pruned (boundary is exclusive)
-        TableStorageContext db = CreateDb();
+        TableStorageContext db = TestDoubles.CreateDb();
         RouteId routeId = RouteId.New();
 
         // Exactly 90 days — borderline (should NOT be deleted per spec: < 90 days window means > 90 days is deleted)

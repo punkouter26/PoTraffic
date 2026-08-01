@@ -5,6 +5,7 @@ using PoTraffic.API.Infrastructure.Storage;
 
 using PoTraffic.Shared.DTOs.History;
 using PoTraffic.Shared.Enums;
+using PoTraffic.UnitTests.Helpers;
 
 namespace PoTraffic.UnitTests.Features.History;
 
@@ -15,10 +16,6 @@ namespace PoTraffic.UnitTests.Features.History;
 /// </summary>
 public sealed class GetOptimalDepartureHandlerTests
 {
-    private static TableStorageContext CreateDb()
-    {
-        return new TableStorageContext();
-    }
 
     /// <summary>
     /// FR-009: contiguous run of slots within 5% of minimum → returns correct window.
@@ -31,7 +28,7 @@ public sealed class GetOptimalDepartureHandlerTests
         // via a known baseline simulation. The handler logic finds the minimum mean duration slot
         // and returns the contiguous run within 5% of that minimum.
         // We verify the handler does NOT throw and returns a non-null result when sufficient baseline data exists.
-        TableStorageContext db = CreateDb();
+        TableStorageContext db = TestDoubles.CreateDb();
         RouteId routeId = RouteId.New();
 
         var handler = new GetOptimalDepartureQueryHandler(db, NullLogger<GetOptimalDepartureQueryHandler>.Instance);
@@ -50,7 +47,7 @@ public sealed class GetOptimalDepartureHandlerTests
     public async Task GetOptimalDeparture_WithNoSessions_ReturnsNull()
     {
         // Arrange
-        TableStorageContext db = CreateDb();
+        TableStorageContext db = TestDoubles.CreateDb();
 
         var handler = new GetOptimalDepartureQueryHandler(db, NullLogger<GetOptimalDepartureQueryHandler>.Instance);
 

@@ -112,7 +112,7 @@ internal static class StartupTasksExtensions
                     PruneOldPollRecordsJob job = jobScope.ServiceProvider.GetRequiredService<PruneOldPollRecordsJob>();
                     await job.ExecuteAsync();
                 },
-                "0 2 * * *"); // 02:00 UTC nightly
+                new TimeOnly(2, 0)); // 02:00 UTC nightly
         }
         catch (Exception ex)
         {

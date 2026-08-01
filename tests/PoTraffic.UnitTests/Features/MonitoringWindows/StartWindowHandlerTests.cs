@@ -8,6 +8,7 @@ using PoTraffic.API.Infrastructure.Scheduling;
 
 using PoTraffic.Shared.Constants;
 using PoTraffic.Shared.Enums;
+using PoTraffic.UnitTests.Helpers;
 
 namespace PoTraffic.UnitTests.Features.MonitoringWindows;
 
@@ -17,15 +18,11 @@ namespace PoTraffic.UnitTests.Features.MonitoringWindows;
 /// </summary>
 public sealed class StartWindowHandlerTests
 {
-    private static TableStorageContext CreateDb()
-    {
-        return new TableStorageContext();
-    }
 
     private static async Task<(TableStorageContext Db, UserId UserId, WindowId WindowId)> SeedWithSessionsAsync(
         int sessionCount)
     {
-        TableStorageContext db = CreateDb();
+        TableStorageContext db = TestDoubles.CreateDb();
         UserId userId = UserId.New();
         RouteId routeId = RouteId.New();
         WindowId windowId = WindowId.New();
@@ -152,7 +149,7 @@ public sealed class StartWindowHandlerTests
     public async Task StartWindow_WhenWindowNotFound_ReturnsNotFoundError()
     {
         // Arrange
-        TableStorageContext db = CreateDb();
+        TableStorageContext db = TestDoubles.CreateDb();
 
         IJobScheduler scheduler = Substitute.For<IJobScheduler>();
         var handler = new StartWindowCommandHandler(db, scheduler, NullLogger<StartWindowCommandHandler>.Instance);
@@ -170,7 +167,7 @@ public sealed class StartWindowHandlerTests
     public async Task StartWindow_WhenSessionAlreadyExistsForRouteToday_ReturnsExistingSessionIdempotently()
     {
         // Arrange — create route+window, manually seed a session for it today
-        TableStorageContext db = CreateDb();
+        TableStorageContext db = TestDoubles.CreateDb();
         UserId userId = UserId.New();
         RouteId routeId = RouteId.New();
         WindowId windowId = WindowId.New();

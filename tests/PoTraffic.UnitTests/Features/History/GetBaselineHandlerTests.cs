@@ -6,6 +6,7 @@ using PoTraffic.API.Infrastructure.Storage;
 using PoTraffic.Shared.DTOs.History;
 using PoTraffic.Shared.Constants;
 using PoTraffic.Shared.Enums;
+using PoTraffic.UnitTests.Helpers;
 
 namespace PoTraffic.UnitTests.Features.History;
 
@@ -16,10 +17,6 @@ namespace PoTraffic.UnitTests.Features.History;
 /// </summary>
 public sealed class GetBaselineHandlerTests
 {
-    private static TableStorageContext CreateDb()
-    {
-        return new TableStorageContext();
-    }
 
     /// <summary>
     /// FR-012: fewer than 3 distinct sessions for a slot → null StdDevDurationSeconds.
@@ -31,7 +28,7 @@ public sealed class GetBaselineHandlerTests
     public async Task GetBaselineHandler_WhenFewerThanThreeSessions_ReturnsEmptySlotList()
     {
         // Arrange
-        TableStorageContext db = CreateDb();
+        TableStorageContext db = TestDoubles.CreateDb();
 
         RouteId routeId = RouteId.New();
         var handler = new GetBaselineQueryHandler(db, NullLogger<GetBaselineQueryHandler>.Instance);
@@ -52,7 +49,7 @@ public sealed class GetBaselineHandlerTests
     public async Task GetBaselineHandler_ReturnsCorrectRouteId()
     {
         // Arrange
-        TableStorageContext db = CreateDb();
+        TableStorageContext db = TestDoubles.CreateDb();
         RouteId routeId = RouteId.New();
 
         var handler = new GetBaselineQueryHandler(db, NullLogger<GetBaselineQueryHandler>.Instance);

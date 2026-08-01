@@ -39,15 +39,16 @@ public interface IJobScheduler
     int CancelPendingPollJobsForRoute(RouteId routeId);
 
     /// <summary>
-    /// Register a recurring job with a CRON expression.
+    /// Register a job to run once a day at a fixed UTC time.
     /// </summary>
+    /// <remarks>
+    /// Deliberately a <see cref="TimeOnly"/> rather than a CRON string: daily-at-a-time is the
+    /// only recurrence this app schedules, and expressing it directly removes a general CRON
+    /// parser (fields, ranges, lists, steps, plus a minute-by-minute scan up to a year out)
+    /// that nothing exercised and no test covered.
+    /// </remarks>
     /// <param name="jobId">Stable identifier for the recurring job (replaces previous registration).</param>
     /// <param name="job">Async function to execute.</param>
-    /// <param name="cronExpression">CRON expression (e.g. "0 2 * * *" for daily at 02:00 UTC).</param>
-    void ScheduleRecurring(string jobId, Func<Task> job, string cronExpression);
-
-    /// <summary>
-    /// Cancel a recurring job by its stable identifier.
-    /// </summary>
-    void CancelRecurring(string jobId);
+    /// <param name="dailyAtUtc">Time of day, UTC, at which the job fires.</param>
+    void ScheduleRecurring(string jobId, Func<Task> job, TimeOnly dailyAtUtc);
 }

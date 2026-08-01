@@ -1,8 +1,6 @@
-using PoTraffic.API.Infrastructure.Storage;
-
 using Microsoft.Extensions.Logging;
-
-
+using PoTraffic.API.Features.Config;
+using PoTraffic.API.Infrastructure.Storage;
 using PoTraffic.Shared.DTOs.Admin;
 using PoTraffic.Shared.Enums;
 
@@ -36,12 +34,7 @@ public sealed class GetPollCostSummaryHandler : IRequestHandler<GetPollCostSumma
         if (polls.Count == 0)
             return Task.FromResult<IReadOnlyList<PollCostSummaryDto>>(Array.Empty<PollCostSummaryDto>());
 
-        var configs = _db.Configurations
-            .Where(c => c.Key.StartsWith("cost.perpoll."))
-            .ToList();
-
-        double googleCost = GetCost(configs, "cost.perpoll.googlemaps");
-        double tomtomCost = GetCost(configs, "cost.perpoll.tomtom");
+        PollCostRates rates = PollCostRates.Load(_db);
         DateTimeOffset now = DateTimeOffset.UtcNow;
 
         var summary = polls
@@ -49,22 +42,15 @@ public sealed class GetPollCostSummaryHandler : IRequestHandler<GetPollCostSumma
             .GroupBy(p => (RouteProvider)routesById[p.RouteId].Provider)
             .Select(g =>
             {
-                RouteProvider provider = g.Key;
-                double costPerPoll = provider == RouteProvider.TomTom ? tomtomCost : googleCost;
+                int pollCount = g.Count();
                 return new PollCostSummaryDto(
                     AsOfUtc: now,
-                    Provider: provider,
-                    TotalPollCount: g.Count(),
-                    TotalEstimatedCostUsd: g.Count() * costPerPoll);
+                    Provider: g.Key,
+                    TotalPollCount: pollCount,
+                    TotalEstimatedCostUsd: (double)(pollCount * rates.For(g.Key)));
             })
             .ToList();
 
         return Task.FromResult<IReadOnlyList<PollCostSummaryDto>>(summary);
-    }
-
-    private static double GetCost(List<PoTraffic.API.Features.Config.SystemConfiguration> configs, string key)
-    {
-        string? value = configs.FirstOrDefault(c => c.Key == key)?.Value;
-        return double.TryParse(value, out double result) ? result : 0.0;
     }
 }

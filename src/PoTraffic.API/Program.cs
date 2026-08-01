@@ -61,9 +61,6 @@ try
     builder.Services.AddTrafficProviders(builder.Configuration, builder.Environment);
     builder.Services.AddAlertServices();
     builder.Services.AddPlacesServices();
-    // /diag/keyvault probe dependency — was injected but never registered (endpoint 500'd).
-    // NoOp is the safe default; swap for a Key Vault-backed probe to exercise identity wiring.
-    builder.Services.AddSingleton<KeyVaultSecretProbe, KeyVaultSecretProbeNoOp>();
 
     // Request dispatch (validation-first, see Infrastructure/Dispatch) + FluentValidation.
     builder.Services.AddDispatcher(typeof(Program).Assembly);

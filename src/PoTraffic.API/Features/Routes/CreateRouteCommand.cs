@@ -80,29 +80,21 @@ public sealed class CreateRouteCommandHandler(
         // Strategy pattern — select provider via factory (resolves keyed DI lookup)
         ITrafficProvider provider = providerFactory.GetProvider(cmd.Provider);
 
-        string? originCoords;
-        string? destCoords;
-        try
+        // A GeocodingConfigurationException (server misconfiguration, e.g. a missing Maps key)
+        // is deliberately NOT caught here — GlobalExceptionHandler maps it to the same 422 +
+        // MAPS_KEY_MISSING for every geocoding call site, not just this one.
+        string? originCoords = await provider.GeocodeAsync(cmd.OriginAddress, ct);
+        if (originCoords is null)
         {
-            originCoords = await provider.GeocodeAsync(cmd.OriginAddress, ct);
-            if (originCoords is null)
-            {
-                logger.LogWarning("Geocode failed for origin address {AddressRef}", PiiRedactor.Redact(cmd.OriginAddress));
-                return new CreateRouteResult(false, RouteErrorCodes.AddressNotFound, null);
-            }
-
-            destCoords = await provider.GeocodeAsync(cmd.DestinationAddress, ct);
-            if (destCoords is null)
-            {
-                logger.LogWarning("Geocode failed for destination address {AddressRef}", PiiRedactor.Redact(cmd.DestinationAddress));
-                return new CreateRouteResult(false, RouteErrorCodes.AddressNotFound, null);
-            }
+            logger.LogWarning("Geocode failed for origin address {AddressRef}", PiiRedactor.Redact(cmd.OriginAddress));
+            return new CreateRouteResult(false, RouteErrorCodes.AddressNotFound, null);
         }
-        catch (GeocodingConfigurationException ex)
+
+        string? destCoords = await provider.GeocodeAsync(cmd.DestinationAddress, ct);
+        if (destCoords is null)
         {
-            // Server misconfiguration (e.g. missing Maps key) — distinct from a bad address.
-            logger.LogError(ex, "Geocoding is not configured on the server.");
-            return new CreateRouteResult(false, RouteErrorCodes.MapsKeyMissing, null);
+            logger.LogWarning("Geocode failed for destination address {AddressRef}", PiiRedactor.Redact(cmd.DestinationAddress));
+            return new CreateRouteResult(false, RouteErrorCodes.AddressNotFound, null);
         }
 
         if (originCoords == destCoords)
@@ -153,23 +145,6 @@ public sealed class CreateRouteCommandHandler(
         (MonitoringStatus)r.MonitoringStatus,
         r.JobChainId,
         r.CreatedAt,
-        r.Windows.Select(w => new MonitoringWindowDto(
-            w.Id,
-            w.StartTime.ToString("HH:mm"),
-            w.EndTime.ToString("HH:mm"),
-            DecodeDaysOfWeek(w.DaysOfWeekMask),
-            w.IsActive)).ToList(),
+        r.Windows.Select(w => w.ToDto()).ToList(),
         r.ReturnRouteId);
-
-    private static IReadOnlyList<string> DecodeDaysOfWeek(byte mask)
-    {
-        string[] names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-        var days = new List<string>();
-        for (int i = 0; i < 7; i++)
-        {
-            if ((mask & (1 << i)) != 0)
-                days.Add(names[i]);
-        }
-        return days;
-    }
 }

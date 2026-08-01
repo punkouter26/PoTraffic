@@ -6,6 +6,7 @@ using PoTraffic.API.Infrastructure.Storage;
 using PoTraffic.API.Infrastructure.Scheduling;
 
 using PoTraffic.Shared.Enums;
+using PoTraffic.UnitTests.Helpers;
 
 namespace PoTraffic.UnitTests.Features.MonitoringWindows;
 
@@ -15,15 +16,11 @@ namespace PoTraffic.UnitTests.Features.MonitoringWindows;
 /// </summary>
 public sealed class WindowLifecycleTests
 {
-    private static TableStorageContext CreateDb()
-    {
-        return new TableStorageContext();
-    }
 
     private static async Task<(TableStorageContext Db, SessionId SessionId, RouteId RouteId, UserId UserId)> SeedActiveSessionAsync(
         string? jobChainId = "job-abc-123")
     {
-        TableStorageContext db = CreateDb();
+        TableStorageContext db = TestDoubles.CreateDb();
         UserId userId = UserId.New();
         RouteId routeId = RouteId.New();
         SessionId sessionId = SessionId.New();
@@ -132,7 +129,7 @@ public sealed class WindowLifecycleTests
     public async Task StopWindow_WhenSessionNotFound_ReturnsFalse()
     {
         // Arrange
-        TableStorageContext db = CreateDb();
+        TableStorageContext db = TestDoubles.CreateDb();
 
         IJobScheduler scheduler = Substitute.For<IJobScheduler>();
         var handler = new StopWindowCommandHandler(db, scheduler, NullLogger<StopWindowCommandHandler>.Instance);

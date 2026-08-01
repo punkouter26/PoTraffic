@@ -36,8 +36,17 @@ public static class RouteOwnershipExtensions
     /// True when <paramref name="routeId"/> exists and is owned by <paramref name="userId"/>.
     /// Cheaper than <see cref="GetOwnedRoute"/> when the route entity itself isn't needed.
     /// </summary>
-    public static bool OwnsRoute(this TableStorageContext db, RouteId routeId, UserId userId)
-        => db.Routes.Any(r => r.Id == routeId && r.UserId == userId);
+    public static bool OwnsRoute(
+        this TableStorageContext db,
+        RouteId routeId,
+        UserId userId,
+        bool excludeDeleted = false)
+    {
+        return db.Routes.Any(r =>
+            r.Id == routeId
+            && r.UserId == userId
+            && (!excludeDeleted || r.MonitoringStatus != (int)MonitoringStatus.Deleted));
+    }
 
     /// <summary>
     /// The set of route ids owned by <paramref name="userId"/> — used to scope

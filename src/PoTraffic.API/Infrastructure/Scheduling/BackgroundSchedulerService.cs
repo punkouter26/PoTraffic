@@ -140,70 +140,46 @@ public sealed class BackgroundSchedulerService : BackgroundService
         if (_tableScheduler is null)
             return;
 
-        // Process one-shot jobs
-        IReadOnlyList<ScheduledJobEntity> oneShotJobs = _tableScheduler.GetDueOneShotJobs();
-        foreach (ScheduledJobEntity job in oneShotJobs)
-        {
-            if (ct.IsCancellationRequested) break;
-            await ExecuteOneShotJob(job, ct);
-        }
-
-        // Process recurring jobs
-        IReadOnlyList<ScheduledJobEntity> recurringJobs = _tableScheduler.GetDueRecurringJobs();
-        foreach (ScheduledJobEntity job in recurringJobs)
-        {
-            if (ct.IsCancellationRequested) break;
-            await ExecuteRecurringJob(job, ct);
-        }
+        await RunDueJobs("One-shot", _tableScheduler.GetDueOneShotJobs(), _tableScheduler.MarkCompleted, ct);
+        await RunDueJobs("Recurring", _tableScheduler.GetDueRecurringJobs(), _tableScheduler.MarkRecurringCompleted, ct);
     }
 
-    private async Task ExecuteOneShotJob(ScheduledJobEntity job, CancellationToken ct)
+    /// <summary>
+    /// Runs a batch of due jobs. One-shot and recurring differ only in how a success is
+    /// recorded, so <paramref name="markCompleted"/> is the sole variation point.
+    /// </summary>
+    private async Task RunDueJobs(
+        string kind,
+        IReadOnlyList<ScheduledJobEntity> jobs,
+        Action<ScheduledJobEntity> markCompleted,
+        CancellationToken ct)
     {
-        using Activity? activity = s_activitySource.StartActivity(
-            $"Job.{job.TypeName.Split('.').Last()}.{job.MethodName}");
-
-        activity?.SetTag("job.id", job.RowKey);
-        activity?.SetTag("job.type", job.TypeName);
-        activity?.SetTag("job.method", job.MethodName);
-
-        _tableScheduler!.MarkRunning(job);
-
-        try
+        foreach (ScheduledJobEntity job in jobs)
         {
-            await InvokeJobMethod(job, ct);
-            _tableScheduler.MarkCompleted(job);
-            _logger.LogDebug("One-shot job {JobId} completed", job.RowKey);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "One-shot job {JobId} failed", job.RowKey);
-            _tableScheduler.MarkFailed(job, ex.Message);
-        }
-    }
+            if (ct.IsCancellationRequested) break;
 
-    private async Task ExecuteRecurringJob(ScheduledJobEntity job, CancellationToken ct)
-    {
-        using Activity? activity = s_activitySource.StartActivity(
-            $"Job.{job.TypeName.Split('.').Last()}.{job.MethodName}");
+            using Activity? activity = s_activitySource.StartActivity(
+                $"Job.{job.TypeName.Split('.').Last()}.{job.MethodName}");
 
-        activity?.SetTag("job.id", job.RowKey);
-        activity?.SetTag("job.type", job.TypeName);
-        activity?.SetTag("job.method", job.MethodName);
-        activity?.SetTag("job.cron", job.CronExpression);
+            activity?.SetTag("job.id", job.RowKey);
+            activity?.SetTag("job.type", job.TypeName);
+            activity?.SetTag("job.method", job.MethodName);
+            activity?.SetTag("job.daily_at", job.DailyAtUtc);
 
-        _tableScheduler!.MarkRunning(job);
+            _tableScheduler!.MarkRunning(job);
 
-        try
-        {
-            await InvokeJobMethod(job, ct);
-            _tableScheduler.MarkRecurringCompleted(job);
-            _logger.LogDebug("Recurring job {JobId} completed, next fire at {FireAt}",
-                job.RowKey, job.FireAt);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Recurring job {JobId} failed", job.RowKey);
-            _tableScheduler.MarkFailed(job, ex.Message);
+            try
+            {
+                await InvokeJobMethod(job, ct);
+                markCompleted(job);
+                _logger.LogDebug("{Kind} job {JobId} completed, next fire at {FireAt}",
+                    kind, job.RowKey, job.FireAt);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "{Kind} job {JobId} failed", kind, job.RowKey);
+                _tableScheduler.MarkFailed(job, ex.Message);
+            }
         }
     }
 
@@ -233,24 +209,16 @@ public sealed class BackgroundSchedulerService : BackgroundService
 
         object?[] args = DeserializeArgs(job.ArgsJson, method.GetParameters());
 
-        Task result;
-        if (method.ReturnType == typeof(Task))
+        // IsAssignableFrom covers Task and Task<T> alike (the result of a Task<T> job is
+        // discarded); anything else is a sync method and has already run by the time
+        // Invoke returns.
+        if (!typeof(Task).IsAssignableFrom(method.ReturnType))
         {
-            result = (Task)method.Invoke(jobInstance, args)!;
-        }
-        else if (method.ReturnType == typeof(Task<>))
-        {
-            // For Task<T>, we still await it but discard the result
-            result = (Task)method.Invoke(jobInstance, args)!;
-        }
-        else
-        {
-            // Sync method — wrap in Task.CompletedTask
             method.Invoke(jobInstance, args);
             return;
         }
 
-        await result.WaitAsync(ct);
+        await ((Task)method.Invoke(jobInstance, args)!).WaitAsync(ct);
     }
 
     private static object?[] DeserializeArgs(string argsJson, ParameterInfo[] parameters)

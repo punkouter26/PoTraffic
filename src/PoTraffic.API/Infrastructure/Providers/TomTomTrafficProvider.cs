@@ -87,6 +87,10 @@ public sealed class TomTomTrafficProvider : ITrafficProvider
 
             int duration = (int)Math.Round(route.Duration);
             int distance = (int)Math.Round(route.Distance);
+
+            // Re-serialised from the projection rather than kept as the raw body — see the
+            // matching note in GoogleMapsTrafficProvider. Bounding what lands on every
+            // PollRecord matters more here than saving one small serialize per poll.
             string rawJson = System.Text.Json.JsonSerializer.Serialize(response);
 
             _logger.LogDebug(

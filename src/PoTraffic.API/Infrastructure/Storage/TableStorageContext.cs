@@ -27,22 +27,31 @@ namespace PoTraffic.API.Infrastructure.Storage;
 /// </summary>
 public sealed class TableStorageContext
 {
-    private sealed record EntityMap(string Table, Func<object, string> Pk, Func<object, string> Rk);
+    /// <summary>
+    /// Everything the context needs to know about an entity type: its table, its key
+    /// projections, and the backing working-set list. Registering the list here (rather than
+    /// in a parallel type-test chain) means adding an entity type is a single edit.
+    /// </summary>
+    private sealed record EntityMap(
+        string Table,
+        Func<object, string> Pk,
+        Func<object, string> Rk,
+        Func<TableStorageContext, IList> List);
 
     private static readonly Dictionary<Type, EntityMap> Maps = new()
     {
-        [typeof(User)] = new("Users", _ => "main", e => ((User)e).Id.ToString()),
-        [typeof(EntityRoute)] = new("Routes", _ => "main", e => ((EntityRoute)e).Id.ToString()),
-        [typeof(MonitoringWindow)] = new("MonitoringWindows", _ => "main", e => ((MonitoringWindow)e).Id.ToString()),
-        [typeof(MonitoringSession)] = new("MonitoringSessions", _ => "main", e => ((MonitoringSession)e).Id.ToString()),
+        [typeof(User)] = new("Users", _ => "main", e => ((User)e).Id.ToString(), c => c._users),
+        [typeof(EntityRoute)] = new("Routes", _ => "main", e => ((EntityRoute)e).Id.ToString(), c => c._routes),
+        [typeof(MonitoringWindow)] = new("MonitoringWindows", _ => "main", e => ((MonitoringWindow)e).Id.ToString(), c => c._windows),
+        [typeof(MonitoringSession)] = new("MonitoringSessions", _ => "main", e => ((MonitoringSession)e).Id.ToString(), c => c._sessions),
         // Polls partition by route for efficient per-route reads and pruning.
-        [typeof(PollRecord)] = new("PollRecords", e => ((PollRecord)e).RouteId.ToString(), e => ((PollRecord)e).Id.ToString()),
-        [typeof(SystemConfiguration)] = new("SystemConfigurations", _ => "main", e => ((SystemConfiguration)e).Key),
-        [typeof(TripleTestSession)] = new("TripleTestSessions", _ => "main", e => ((TripleTestSession)e).Id.ToString()),
-        [typeof(TripleTestShot)] = new("TripleTestShots", _ => "main", e => ((TripleTestShot)e).Id.ToString()),
+        [typeof(PollRecord)] = new("PollRecords", e => ((PollRecord)e).RouteId.ToString(), e => ((PollRecord)e).Id.ToString(), c => c._polls),
+        [typeof(SystemConfiguration)] = new("SystemConfigurations", _ => "main", e => ((SystemConfiguration)e).Key, c => c._configs),
+        [typeof(TripleTestSession)] = new("TripleTestSessions", _ => "main", e => ((TripleTestSession)e).Id.ToString(), c => c._tripleTestSessions),
+        [typeof(TripleTestShot)] = new("TripleTestShots", _ => "main", e => ((TripleTestShot)e).Id.ToString(), c => c._tripleTestShots),
         // Alerts + push subscriptions partition by user for efficient per-user reads (#1).
-        [typeof(Alert)] = new("Alerts", e => ((Alert)e).UserId.ToString(), e => ((Alert)e).Id.ToString()),
-        [typeof(UserPushSubscription)] = new("PushSubscriptions", e => ((UserPushSubscription)e).UserId.ToString(), e => ((UserPushSubscription)e).Id.ToString()),
+        [typeof(Alert)] = new("Alerts", e => ((Alert)e).UserId.ToString(), e => ((Alert)e).Id.ToString(), c => c._alerts),
+        [typeof(UserPushSubscription)] = new("PushSubscriptions", e => ((UserPushSubscription)e).UserId.ToString(), e => ((UserPushSubscription)e).Id.ToString(), c => c._pushSubscriptions),
     };
 
     private static readonly JsonSerializerOptions JsonOpts = new(); // nav properties carry [JsonIgnore]
@@ -162,7 +171,6 @@ public sealed class TableStorageContext
     public IQueryable<MonitoringSession> MonitoringSessions => Sessions;
     public IQueryable<SystemConfiguration> SystemConfigurations => Configurations;
     public IQueryable<MonitoringWindow> MonitoringWindows => Windows;
-    public IQueryable<EntityRoute> EntityRoutes => Routes;
 
     // ── Write operations (Add / Remove) ─────────────────────────────────────
 
@@ -192,6 +200,8 @@ public sealed class TableStorageContext
     private static readonly ConcurrentDictionary<Type, IdAccessor?> s_idProperties = new();
     private static readonly MethodInfo GetListMethod = typeof(TableStorageContext)
         .GetMethod(nameof(GetList), BindingFlags.NonPublic | BindingFlags.Instance)!;
+    private static readonly MethodInfo AddMethod = typeof(TableStorageContext)
+        .GetMethod(nameof(Add), BindingFlags.Public | BindingFlags.Instance)!;
 
     /// <summary>True for the strongly-typed id structs declared in PoTraffic.Shared.Ids.</summary>
     private static bool IsStronglyTypedId(Type type)
@@ -227,55 +237,69 @@ public sealed class TableStorageContext
         AddNavigationChildren(entity, typeof(T));
     }
 
-    private void AddNavigationChildren(object entity, Type type)
+    /// <summary>
+    /// A cascade-able navigation collection on a parent type, with every reflection lookup
+    /// it needs already resolved: the child element type, the child's back-reference to the
+    /// parent, and the closed <c>Add&lt;TChild&gt;</c>. Resolved once per parent type —
+    /// <see cref="Add{T}"/> runs on the poll hot path and in bulk from the seeder, so a
+    /// per-call <c>GetProperties</c> scan (and a per-child <c>MakeGenericMethod</c>) is pure waste.
+    /// </summary>
+    private sealed record NavigationCascade(
+        PropertyInfo Collection,
+        PropertyInfo? ForeignKey,
+        MethodInfo AddChild,
+        MethodInfo GetChildList);
+
+    private static readonly ConcurrentDictionary<Type, NavigationCascade[]> s_navigationCascades = new();
+
+    private static NavigationCascade[] ResolveNavigationCascades(Type type)
     {
+        List<NavigationCascade> cascades = [];
+
         foreach (PropertyInfo prop in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
         {
             if (!typeof(IEnumerable).IsAssignableFrom(prop.PropertyType) || prop.PropertyType == typeof(string))
                 continue;
 
-            if (prop.PropertyType.GetGenericArguments().Length != 1)
+            Type[] generics = prop.PropertyType.GetGenericArguments();
+            if (generics.Length != 1 || !IsKnownEntityType(generics[0]))
                 continue;
 
-            Type elementType = prop.PropertyType.GetGenericArguments()[0];
-
-            // Only cascade for known entity types
-            if (!IsKnownEntityType(elementType))
-                continue;
-
-            if (prop.GetValue(entity) is IEnumerable collection)
-            {
-                // Get the backing list for this element type to check for duplicates
-                var existingList = (IList)GetListMethod.MakeGenericMethod(elementType)
-                    .Invoke(this, null)!;
-
-                // Try to find the FK navigation property on the child type that points back to the parent
-                PropertyInfo? fkProp = FindForeignKeyProperty(elementType, type);
-
-                foreach (object child in collection)
-                {
-                    // Set reverse navigation property (e.g. MonitoringWindow.Route = route)
-                    if (fkProp is not null && fkProp.GetValue(child) is null)
-                        fkProp.SetValue(child, entity);
-
-                    // Skip if already added (prevents double-add when handler explicitly adds children)
-                    if (existingList.Contains(child))
-                        continue;
-
-                    MethodInfo addMethod = typeof(TableStorageContext)
-                        .GetMethod(nameof(Add), BindingFlags.Public | BindingFlags.Instance)!
-                        .MakeGenericMethod(elementType);
-                    addMethod.Invoke(this, [child]);
-                }
-            }
+            Type elementType = generics[0];
+            cascades.Add(new NavigationCascade(
+                prop,
+                // The child's back-reference to the parent (e.g. MonitoringWindow.Route : Route).
+                elementType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                    .FirstOrDefault(p => p.PropertyType == type),
+                AddMethod.MakeGenericMethod(elementType),
+                GetListMethod.MakeGenericMethod(elementType)));
         }
+
+        return [.. cascades];
     }
 
-    private static PropertyInfo? FindForeignKeyProperty(Type childType, Type parentType)
+    private void AddNavigationChildren(object entity, Type type)
     {
-        // Look for a property whose type matches the parent type (e.g. MonitoringWindow.Route : Route)
-        return childType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .FirstOrDefault(p => p.PropertyType == parentType);
+        foreach (NavigationCascade cascade in s_navigationCascades.GetOrAdd(type, static t => ResolveNavigationCascades(t)))
+        {
+            if (cascade.Collection.GetValue(entity) is not IEnumerable collection)
+                continue;
+
+            // Backing list for this element type — used to skip children a handler already added.
+            var existingList = (IList)cascade.GetChildList.Invoke(this, null)!;
+
+            foreach (object child in collection)
+            {
+                // Set reverse navigation property (e.g. MonitoringWindow.Route = route)
+                if (cascade.ForeignKey is not null && cascade.ForeignKey.GetValue(child) is null)
+                    cascade.ForeignKey.SetValue(child, entity);
+
+                if (existingList.Contains(child))
+                    continue;
+
+                cascade.AddChild.Invoke(this, [child]);
+            }
+        }
     }
 
     private static bool IsKnownEntityType(Type type)
@@ -327,16 +351,6 @@ public sealed class TableStorageContext
         _dirtyPolls.Remove(entity);
         if (Maps.TryGetValue(typeof(T), out EntityMap? map))
             _pendingDeletes.Add(new TableOp(TableOpKind.Delete, map.Table, map.Pk(entity), map.Rk(entity), null));
-    }
-
-    /// <summary>
-    /// Materialises the current snapshot of <typeparamref name="T"/> as a
-    /// <see cref="List{T}"/>. Used by handlers that need to mutate the
-    /// underlying collection after a query (e.g. .ToList() + foreach + SaveChangesAsync).
-    /// </summary>
-    public List<T> ToList<T>() where T : class
-    {
-        lock (_gate) return new List<T>(GetList<T>());
     }
 
     /// <summary>
@@ -463,10 +477,18 @@ public sealed class TableStorageContext
                 Maps.Values.Select(m => m.Table).Append(Scheduling.TableStorageJobScheduler.TableName),
                 ct);
 
+            // The tables are independent and the store client is safe for concurrent use, so
+            // read them in one wave — sequential reads made cold start (which gates
+            // /health/ready) the sum of every table's latency.
+            (Type Type, EntityMap Map)[] tables = [.. Maps.Select(kv => (kv.Key, kv.Value))];
+            IReadOnlyList<(string, string, string Json, string ETag)>[] tableRows =
+                await Task.WhenAll(tables.Select(t => _store.ReadAllAsync(t.Map.Table, ct)));
+
             int totalEntities = 0;
-            foreach ((Type type, EntityMap map) in Maps)
+            for (int i = 0; i < tables.Length; i++)
             {
-                IReadOnlyList<(string, string, string Json, string ETag)> rows = await _store.ReadAllAsync(map.Table, ct);
+                (Type type, EntityMap map) = tables[i];
+                IReadOnlyList<(string, string, string Json, string ETag)> rows = tableRows[i];
                 lock (_gate)
                 {
                     IList list = GetListUntyped(type);
@@ -528,19 +550,9 @@ public sealed class TableStorageContext
     }
 
     private IList GetListUntyped(Type type)
-    {
-        if (type == typeof(User)) return _users;
-        if (type == typeof(EntityRoute)) return _routes;
-        if (type == typeof(MonitoringWindow)) return _windows;
-        if (type == typeof(MonitoringSession)) return _sessions;
-        if (type == typeof(PollRecord)) return _polls;
-        if (type == typeof(SystemConfiguration)) return _configs;
-        if (type == typeof(TripleTestSession)) return _tripleTestSessions;
-        if (type == typeof(TripleTestShot)) return _tripleTestShots;
-        if (type == typeof(Alert)) return _alerts;
-        if (type == typeof(UserPushSubscription)) return _pushSubscriptions;
-        throw new InvalidOperationException($"TableStorageContext: unknown entity type {type.FullName}");
-    }
+        => Maps.TryGetValue(type, out EntityMap? map)
+            ? map.List(this)
+            : throw new InvalidOperationException($"TableStorageContext: unknown entity type {type.FullName}");
 
     private List<T> GetList<T>() where T : class => (List<T>)GetListUntyped(typeof(T));
 
@@ -566,8 +578,8 @@ public sealed class TableStorageContext
                     });
                 }
             }
-            Ensure("cost.perpoll.googlemaps", "0.005", "Cost per poll - Google Maps", false);
-            Ensure("cost.perpoll.tomtom", "0.004", "Cost per poll - TomTom", false);
+            Ensure(PollCostRates.GoogleMapsKey, "0.005", "Cost per poll - Google Maps", false);
+            Ensure(PollCostRates.TomTomKey, "0.004", "Cost per poll - TomTom", false);
             Ensure("quota.daily.default", "10", "Default daily session quota per user", false);
         }
     }

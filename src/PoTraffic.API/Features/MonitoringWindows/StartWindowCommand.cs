@@ -23,7 +23,7 @@ public sealed record StartWindowCommand(
 
 public sealed record StartWindowResult(
     bool IsSuccess,
-    string? ErrorCode,   // "NOT_FOUND" | "QUOTA_EXCEEDED"
+    string? ErrorCode,   // RouteErrorCodes.NotFound | "QUOTA_EXCEEDED"
     int QuotaRemaining,
     SessionId? SessionId);
 
@@ -60,11 +60,11 @@ public sealed class StartWindowCommandHandler : IRequestHandler<StartWindowComma
             .FirstOrDefault(w => w.Id == cmd.WindowId);
 
         if (window is null)
-            return new StartWindowResult(false, "NOT_FOUND", 0, null);
+            return new StartWindowResult(false, RouteErrorCodes.NotFound, 0, null);
 
         EntityRoute? route = _db.GetOwnedRoute(window.RouteId, cmd.UserId, excludeDeleted: true);
         if (route is null)
-            return new StartWindowResult(false, "NOT_FOUND", 0, null);
+            return new StartWindowResult(false, RouteErrorCodes.NotFound, 0, null);
 
         DateOnly today = DateOnly.FromDateTime(DateTimeOffset.UtcNow.Date);
 

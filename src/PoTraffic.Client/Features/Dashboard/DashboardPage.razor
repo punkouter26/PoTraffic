@@ -97,7 +97,7 @@ else
        the user can scroll without paying the cost of 100+ RadzenCards. *@
     <div class="pt-route-cards pt-stagger" role="list">
         <Virtualize Items="_routes" Context="route" ItemSize="180" OverscanCount="2">
-            <div role="listitem" style="--i:@(_indexOffset)">
+            <div role="listitem">
                 <SwipeableRouteCard Route="route"
                            OptimalDeparture="@(_optimalDepartures.GetValueOrDefault(route.Id))"
                            RecentPolls="@(_recentPolls.GetValueOrDefault(route.Id, []))"
@@ -117,7 +117,6 @@ else
     private decimal _estimatedCostToday;
     private decimal _projectedMonthlyCost;
     private bool _loading = true;
-    private int _indexOffset; // used to stagger the first batch; resets on reload
 
     protected override TimeSpan PollingInterval => TimeSpan.FromSeconds(60);
 
@@ -128,14 +127,17 @@ else
         {
             string dayOfWeek = DateTime.Today.DayOfWeek.ToString();
 
-            var result = await Http.GetFromJsonAsync("/api/routes?page=1&pageSize=100", AppJsonContext.Default.PagedResultRouteDto);
-            if (result is not null)
-            {
-                _routes = [.. result.Items];
-                _indexOffset = 0; // refresh re-staggers from the top
-            }
+            // The route list and the quota card are independent — one round-trip, not two.
+            Task<PagedResult<RouteDto>?> routesTask =
+                Http.GetFromJsonAsync("/api/routes?page=1&pageSize=100", AppJsonContext.Default.PagedResultRouteDto);
+            Task<QuotaDto?> quotaTask =
+                Http.GetFromJsonAsync("/api/account/quota", AppJsonContext.Default.QuotaDto);
 
-            var quota = await Http.GetFromJsonAsync("/api/account/quota", AppJsonContext.Default.QuotaDto);
+            PagedResult<RouteDto>? result = await routesTask;
+            if (result is not null)
+                _routes = [.. result.Items];
+
+            QuotaDto? quota = await quotaTask;
             if (quota is not null)
             {
                 _quotaConsumed = quota.UsedToday;
@@ -144,22 +146,28 @@ else
                 _projectedMonthlyCost = quota.ProjectedMonthlyCostUsd;
             }
 
-            // UI-2/UI-12: Load optimal departure + 24h trend for each route
-            // (a handful of calls for a typical user; per-route failures are non-fatal)
+            // UI-2/UI-12: Load optimal departure + 24h trend for each route. Every route's
+            // pair is independent of every other's, so they all go out at once — awaiting
+            // them in a loop made the refresh cost the SUM of 2×N latencies every 60s.
+            // Per-route failures stay non-fatal.
             _optimalDepartures = [];
             _recentPolls = [];
             string sinceUtc = Uri.EscapeDataString(DateTime.UtcNow.AddHours(-24).ToString("o"));
-            foreach (RouteDto route in _routes)
+
+            await Task.WhenAll(_routes.Select(async route =>
             {
                 try
                 {
-                    var optimal = await Http.GetFromJsonAsync(
+                    Task<OptimalDepartureDto?> optimalTask = Http.GetFromJsonAsync(
                         $"/api/routes/{route.Id}/optimal-departure?dayOfWeek={dayOfWeek}", AppJsonContext.Default.OptimalDepartureDto);
+                    Task<PagedResult<PollRecordDto>?> historyTask = Http.GetFromJsonAsync(
+                        $"/api/routes/{route.Id}/poll-history?page=1&pageSize=60&sinceUtc={sinceUtc}", AppJsonContext.Default.PagedResultPollRecordDto);
+
+                    OptimalDepartureDto? optimal = await optimalTask;
                     if (optimal is not null)
                         _optimalDepartures[route.Id] = optimal;
 
-                    var history = await Http.GetFromJsonAsync(
-                        $"/api/routes/{route.Id}/poll-history?page=1&pageSize=60&sinceUtc={sinceUtc}", AppJsonContext.Default.PagedResultPollRecordDto);
+                    PagedResult<PollRecordDto>? history = await historyTask;
                     if (history is not null && history.Items.Count > 0)
                         _recentPolls[route.Id] = [.. history.Items];
                 }
@@ -167,7 +175,7 @@ else
                 {
                     // Individual route failure doesn't break the dashboard
                 }
-            }
+            }));
         }
         catch
         {

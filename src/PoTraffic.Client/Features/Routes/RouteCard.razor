@@ -128,7 +128,12 @@
         }
     }
 
-    private async Task CheckNowAsync()
+    /// <summary>
+    /// Runs Check Now exactly as the card's own button does — including the distance readout
+    /// and the provider-unavailable branch. Public so <see cref="SwipeableRouteCard"/>'s
+    /// swipe gesture reuses this one implementation rather than issuing its own request.
+    /// </summary>
+    public async Task CheckNowAsync()
     {
         _checkingNow = true;
         try

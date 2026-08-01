@@ -1,8 +1,10 @@
 namespace PoTraffic.Shared.Constants;
 
 /// <summary>
-/// Canonical error codes returned by route creation/update flows so the client
-/// can disambiguate causes (server misconfiguration vs. bad user input).
+/// Canonical error codes returned by route and monitoring-window flows so the client
+/// can disambiguate causes (server misconfiguration vs. bad user input). These strings
+/// are a wire contract — both the API handlers and the Blazor client must reference the
+/// constants rather than restating the literals.
 /// </summary>
 public static class RouteErrorCodes
 {
@@ -14,6 +16,12 @@ public static class RouteErrorCodes
 
     /// <summary>Origin and destination resolved to the same coordinates.</summary>
     public const string SameCoordinates = "SAME_COORDINATES";
+
+    /// <summary>The geocoding call itself failed (provider error or unresolvable input).</summary>
+    public const string GeocodeFailed = "GEOCODE_FAILED";
+
+    /// <summary>The target route/window does not exist or is not owned by the caller.</summary>
+    public const string NotFound = "NOT_FOUND";
 }
 
 /// <summary>

@@ -1,3 +1,4 @@
+using PoTraffic.API.Features.Config;
 using PoTraffic.API.Infrastructure.Resilience;
 using PoTraffic.API.Infrastructure.Testing;
 using PoTraffic.Shared.Enums;
@@ -14,10 +15,12 @@ public static class ProviderExtensions
     /// </summary>
     public static IServiceCollection AddTrafficProviders(this IServiceCollection services, IConfiguration configuration, IWebHostEnvironment environment)
     {
-        bool useMockProviders = environment.IsEnvironment("Testing")
-            || configuration.GetValue<bool>("Features:UseMockProviders");
+        // Resolved once and registered so health checks and /api/system/features act on the
+        // same answer this registration did (see FeatureFlags).
+        FeatureFlags flags = FeatureFlags.Resolve(configuration, environment);
+        services.AddSingleton(flags);
 
-        if (useMockProviders)
+        if (flags.UseMockProviders)
         {
             // Integration/E2E isolation or local dev — replace production providers with mocks
             services.AddKeyedScoped<ITrafficProvider, MockTrafficProvider>(RouteProvider.GoogleMaps);

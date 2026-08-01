@@ -30,9 +30,7 @@ public sealed class GetOptimalDepartureQueryHandler
     public Task<OptimalDepartureDto?> Handle(GetOptimalDepartureQuery query, CancellationToken ct)
     {
         // Ownership guard — prevents IDOR
-        bool owned = _db.Routes
-            .Any(r => r.Id == query.RouteId && r.UserId == query.UserId);
-        if (!owned)
+        if (!_db.OwnsRoute(query.RouteId, query.UserId))
             return Task.FromResult<OptimalDepartureDto?>(null);
 
         List<PollRecord> allPolls = _db.Polls

@@ -15,7 +15,6 @@ public sealed class WasmForwardingLoggerProvider : ILoggerProvider
     private readonly HttpClient _httpClient;
     private readonly Channel<ClientLogEntry> _channel;
     private readonly CancellationTokenSource _cts = new();
-    private readonly Task _flushTask;
 
     // Stable id for this app load (browser tab). Stamped on every forwarded entry so a
     // tab's client-side logs correlate with each other on the server, instead of every
@@ -32,7 +31,9 @@ public sealed class WasmForwardingLoggerProvider : ILoggerProvider
         {
             FullMode = BoundedChannelFullMode.DropOldest
         });
-        _flushTask = FlushLoopAsync(_cts.Token);
+        // Fire-and-forget: the loop runs for the app's lifetime and stops on Dispose via
+        // the token. Nothing awaits it, so it is deliberately not retained.
+        _ = FlushLoopAsync(_cts.Token);
     }
 
     public ILogger CreateLogger(string categoryName) =>

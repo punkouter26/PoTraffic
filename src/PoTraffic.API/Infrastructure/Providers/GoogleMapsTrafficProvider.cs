@@ -98,6 +98,12 @@ public sealed class GoogleMapsTrafficProvider : ITrafficProvider
 
             int duration = element.DurationInTraffic?.Value ?? element.Duration.Value;
             int distance = element.Distance.Value;
+
+            // Deliberately re-serialised from the PROJECTION, not stored as the raw response
+            // body: Google's payload carries origin_addresses/destination_addresses (formatted
+            // street addresses), and this value is persisted on every PollRecord. Round-tripping
+            // through the record type is what keeps that PII out of storage — do not "optimise"
+            // this into reusing the response string.
             string rawJson = System.Text.Json.JsonSerializer.Serialize(response);
 
             _logger.LogDebug(

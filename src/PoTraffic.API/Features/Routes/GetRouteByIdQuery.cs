@@ -1,9 +1,5 @@
 using PoTraffic.API.Infrastructure.Storage;
-
-
 using PoTraffic.Shared.DTOs.Routes;
-
-using PoTraffic.Shared.Enums;
 
 namespace PoTraffic.API.Features.Routes;
 
@@ -18,12 +14,7 @@ public sealed class GetRouteByIdQueryHandler(TableStorageContext db)
 {
     public async Task<RouteDto?> Handle(GetRouteByIdQuery q, CancellationToken ct)
     {
-        EntityRoute? route = db.Routes
-            .FirstOrDefault(r =>
-                r.Id == q.RouteId
-                && r.UserId == q.UserId
-                && r.MonitoringStatus != (int)MonitoringStatus.Deleted);
-
+        EntityRoute? route = db.GetOwnedRoute(q.RouteId, q.UserId, excludeDeleted: true);
         return route is null ? null : CreateRouteCommandHandler.MapToDto(route);
     }
 }

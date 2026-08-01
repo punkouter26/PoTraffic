@@ -1,11 +1,8 @@
-using PoTraffic.API.Infrastructure.Storage;
-
 using Microsoft.Extensions.Logging;
-
-
 using PoTraffic.API.Infrastructure.Providers;
-
+using PoTraffic.API.Infrastructure.Storage;
 using PoTraffic.Shared.Enums;
+
 namespace PoTraffic.API.Features.Routes;
 
 /// <summary>
@@ -21,39 +18,26 @@ public sealed record CheckNowResult(
     int? DistanceMetres,
     string? ErrorCode);
 
-// Command pattern — encapsulates transient provider call as a discrete MediatR command
-public sealed class CheckNowCommandHandler : IRequestHandler<CheckNowCommand, CheckNowResult>
+// Command pattern — encapsulates transient provider call as a discrete dispatcher command
+public sealed class CheckNowCommandHandler(
+    TableStorageContext db,
+    ITrafficProviderFactory providerFactory,
+    ILogger<CheckNowCommandHandler> logger) : IRequestHandler<CheckNowCommand, CheckNowResult>
 {
-    private readonly TableStorageContext _db;
-    private readonly ITrafficProviderFactory _providerFactory;
-    private readonly ILogger<CheckNowCommandHandler> _logger;
-
-    public CheckNowCommandHandler(
-        TableStorageContext db,
-        ITrafficProviderFactory providerFactory,
-        ILogger<CheckNowCommandHandler> logger)
-    {
-        _db = db;
-        _providerFactory = providerFactory;
-        _logger = logger;
-    }
-
     public async Task<CheckNowResult> Handle(CheckNowCommand command, CancellationToken ct)
     {
-        // Verify ownership
-        EntityRoute? route = _db.Routes
-            .FirstOrDefault(r => r.Id == command.RouteId && r.UserId == command.UserId);
+        EntityRoute? route = db.GetOwnedRoute(command.RouteId, command.UserId, excludeDeleted: true);
 
         if (route is null)
-            return new CheckNowResult(false, null, null, "NOT_FOUND");
+            return new CheckNowResult(false, null, null, RouteErrorCodes.NotFound);
 
-        ITrafficProvider provider = _providerFactory.GetProvider((RouteProvider)route.Provider);
+        ITrafficProvider provider = providerFactory.GetProvider((RouteProvider)route.Provider);
         TravelResult? travel = await provider.GetTravelTimeAsync(
-            route.OriginCoordinates!, route.DestinationCoordinates!);
+            route.OriginCoordinates!, route.DestinationCoordinates!, ct);
 
         if (travel is null)
         {
-            _logger.LogWarning("CheckNow provider returned null for route {RouteId}", command.RouteId);
+            logger.LogWarning("CheckNow provider returned null for route {RouteId}", command.RouteId);
             return new CheckNowResult(false, null, null, "PROVIDER_ERROR");
         }
 

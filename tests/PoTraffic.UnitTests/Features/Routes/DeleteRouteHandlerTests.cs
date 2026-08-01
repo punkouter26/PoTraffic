@@ -7,6 +7,7 @@ using PoTraffic.API.Infrastructure.Storage;
 using PoTraffic.API.Infrastructure.Scheduling;
 
 using PoTraffic.Shared.Enums;
+using PoTraffic.UnitTests.Helpers;
 
 
 namespace PoTraffic.UnitTests.Features.Routes;
@@ -17,16 +18,12 @@ namespace PoTraffic.UnitTests.Features.Routes;
 /// </summary>
 public sealed class DeleteRouteHandlerTests
 {
-    private static TableStorageContext CreateDb()
-    {
-        return new TableStorageContext();
-    }
 
     [Fact]
     public async Task DeleteRoute_SoftDeletesRoute_AndReturnsTrue()
     {
         // Arrange
-        TableStorageContext db = CreateDb();
+        TableStorageContext db = TestDoubles.CreateDb();
 
         RouteId routeId = RouteId.New();
         UserId userId = UserId.New();
@@ -61,7 +58,7 @@ public sealed class DeleteRouteHandlerTests
     public async Task DeleteRoute_CancelsJob_WhenJobChainIdIsSet()
     {
         // Arrange
-        TableStorageContext db = CreateDb();
+        TableStorageContext db = TestDoubles.CreateDb();
 
         RouteId routeId = RouteId.New();
         UserId userId = UserId.New();
@@ -94,7 +91,7 @@ public sealed class DeleteRouteHandlerTests
     public async Task DeleteRoute_WhenRouteNotFound_ReturnsFalse()
     {
         // Arrange
-        TableStorageContext db = CreateDb();
+        TableStorageContext db = TestDoubles.CreateDb();
 
         IJobScheduler scheduler = Substitute.For<IJobScheduler>();
         var handler = new DeleteRouteCommandHandler(db, scheduler, NullLogger<DeleteRouteCommandHandler>.Instance);
@@ -111,7 +108,7 @@ public sealed class DeleteRouteHandlerTests
     public async Task DeleteRoute_WhenRouteOwnedByDifferentUser_ReturnsFalse()
     {
         // Arrange
-        TableStorageContext db = CreateDb();
+        TableStorageContext db = TestDoubles.CreateDb();
 
         RouteId routeId = RouteId.New();
         UserId realOwner = UserId.New();

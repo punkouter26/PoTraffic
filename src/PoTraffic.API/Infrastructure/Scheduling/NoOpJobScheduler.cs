@@ -12,6 +12,5 @@ internal sealed class NoOpJobScheduler : IJobScheduler
     public string Schedule(Expression<Func<Task>> job, TimeSpan delay) => "noop";
     public void Cancel(string jobId) { }
     public int CancelPendingPollJobsForRoute(RouteId routeId) => 0;
-    public void ScheduleRecurring(string jobId, Func<Task> job, string cronExpression) { }
-    public void CancelRecurring(string jobId) { }
+    public void ScheduleRecurring(string jobId, Func<Task> job, TimeOnly dailyAtUtc) { }
 }

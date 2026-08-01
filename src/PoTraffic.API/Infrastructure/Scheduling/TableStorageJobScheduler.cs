@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Globalization;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Text.Json;
@@ -46,25 +47,7 @@ public sealed class TableStorageJobScheduler : IJobScheduler
         _tableClient = tableServiceClient.GetTableClient(TableName);
     }
 
-    public string Enqueue(Expression<Func<Task>> job)
-    {
-        JobInvocationInfo info = ExtractInvocationInfo(job);
-        string jobId = Guid.NewGuid().ToString("N");
-
-        var entity = new ScheduledJobEntity
-        {
-            PartitionKey = OneShotPartition,
-            RowKey = jobId,
-            TypeName = info.TypeName,
-            MethodName = info.MethodName,
-            ArgsJson = info.ArgsJson,
-            FireAt = DateTimeOffset.UtcNow,
-            Status = "Pending"
-        };
-
-        _tableClient.UpsertEntity(entity);
-        return jobId;
-    }
+    public string Enqueue(Expression<Func<Task>> job) => Schedule(job, TimeSpan.Zero);
 
     public string Schedule(Expression<Func<Task>> job, TimeSpan delay)
     {
@@ -86,12 +69,14 @@ public sealed class TableStorageJobScheduler : IJobScheduler
         return jobId;
     }
 
-    public void Cancel(string jobId)
+    public void Cancel(string jobId) => CancelIn(OneShotPartition, jobId);
+
+    private void CancelIn(string partition, string jobId)
     {
         try
         {
             Response<ScheduledJobEntity> response = _tableClient.GetEntity<ScheduledJobEntity>(
-                OneShotPartition, jobId);
+                partition, jobId);
             ScheduledJobEntity entity = response.Value;
             entity.Status = "Cancelled";
             // Unconditional (ETag.All): a concurrent MarkRunning bumps the ETag, which would
@@ -137,10 +122,8 @@ public sealed class TableStorageJobScheduler : IJobScheduler
         return cancelled;
     }
 
-    public void ScheduleRecurring(string jobId, Func<Task> job, string cronExpression)
+    public void ScheduleRecurring(string jobId, Func<Task> job, TimeOnly dailyAtUtc)
     {
-        DateTimeOffset nextFireAt = ComputeNextFire(cronExpression, DateTimeOffset.UtcNow);
-
         // Store the function reference so BackgroundSchedulerService can invoke it
         RecurringJobFunctions[jobId] = job;
 
@@ -151,55 +134,26 @@ public sealed class TableStorageJobScheduler : IJobScheduler
             TypeName = nameof(Func<Task>),
             MethodName = "Invoke",
             ArgsJson = "[]",
-            FireAt = nextFireAt,
+            FireAt = ComputeNextFire(dailyAtUtc, DateTimeOffset.UtcNow),
             Status = "Pending",
-            CronExpression = cronExpression
+            DailyAtUtc = dailyAtUtc.ToString("HH:mm", CultureInfo.InvariantCulture)
         };
 
         _tableClient.UpsertEntity(entity);
     }
 
-    public void CancelRecurring(string jobId)
-    {
-        try
-        {
-            Response<ScheduledJobEntity> response = _tableClient.GetEntity<ScheduledJobEntity>(
-                RecurringPartition, jobId);
-            ScheduledJobEntity entity = response.Value;
-            entity.Status = "Cancelled";
-            _tableClient.UpdateEntity(entity, ETag.All);
-        }
-        catch (RequestFailedException ex) when (ex.Status == 404)
-        {
-            // Already cancelled or doesn't exist
-        }
-    }
+    /// <summary>Pending one-shot jobs that are due to fire. Used by BackgroundSchedulerService.</summary>
+    public IReadOnlyList<ScheduledJobEntity> GetDueOneShotJobs() => GetDueIn(OneShotPartition);
 
-    /// <summary>
-    /// Query pending one-shot jobs that are due to fire.
-    /// Used by BackgroundSchedulerService.
-    /// </summary>
-    public IReadOnlyList<ScheduledJobEntity> GetDueOneShotJobs()
+    /// <summary>Pending recurring jobs that are due to fire. Used by BackgroundSchedulerService.</summary>
+    public IReadOnlyList<ScheduledJobEntity> GetDueRecurringJobs() => GetDueIn(RecurringPartition);
+
+    private IReadOnlyList<ScheduledJobEntity> GetDueIn(string partition)
     {
         DateTimeOffset now = DateTimeOffset.UtcNow;
         return _tableClient
             .Query<ScheduledJobEntity>(e =>
-                e.PartitionKey == OneShotPartition &&
-                e.Status == "Pending" &&
-                e.FireAt <= now)
-            .ToList();
-    }
-
-    /// <summary>
-    /// Query pending recurring jobs that are due to fire.
-    /// Used by BackgroundSchedulerService.
-    /// </summary>
-    public IReadOnlyList<ScheduledJobEntity> GetDueRecurringJobs()
-    {
-        DateTimeOffset now = DateTimeOffset.UtcNow;
-        return _tableClient
-            .Query<ScheduledJobEntity>(e =>
-                e.PartitionKey == RecurringPartition &&
+                e.PartitionKey == partition &&
                 e.Status == "Pending" &&
                 e.FireAt <= now)
             .ToList();
@@ -231,7 +185,7 @@ public sealed class TableStorageJobScheduler : IJobScheduler
     {
         entity.Status = "Pending";
         entity.LastRunAt = DateTimeOffset.UtcNow;
-        entity.FireAt = ComputeNextFire(entity.CronExpression!, DateTimeOffset.UtcNow);
+        entity.FireAt = NextFireFor(entity, DateTimeOffset.UtcNow);
         entity.AttemptCount = 0;
         UpdateAndRefreshETag(entity);
     }
@@ -245,7 +199,7 @@ public sealed class TableStorageJobScheduler : IJobScheduler
         entity.ErrorMessage = error;
         if (entity.PartitionKey == RecurringPartition)
         {
-            entity.FireAt = ComputeNextFire(entity.CronExpression!, DateTimeOffset.UtcNow);
+            entity.FireAt = NextFireFor(entity, DateTimeOffset.UtcNow);
         }
         UpdateAndRefreshETag(entity);
     }
@@ -299,8 +253,8 @@ public sealed class TableStorageJobScheduler : IJobScheduler
         foreach (ScheduledJobEntity job in stale)
         {
             job.Status = "Pending";
-            if (job.PartitionKey == RecurringPartition && !string.IsNullOrEmpty(job.CronExpression))
-                job.FireAt = ComputeNextFire(job.CronExpression, DateTimeOffset.UtcNow);
+            if (job.PartitionKey == RecurringPartition)
+                job.FireAt = NextFireFor(job, DateTimeOffset.UtcNow);
             _tableClient.UpdateEntity(job, ETag.All);
         }
 
@@ -319,74 +273,26 @@ public sealed class TableStorageJobScheduler : IJobScheduler
             entity.ETag = etag;
     }
 
-    internal static DateTimeOffset ComputeNextFire(string cronExpression, DateTimeOffset after)
+    /// <summary>
+    /// Next occurrence of <paramref name="timeOfDayUtc"/> strictly after <paramref name="after"/>.
+    /// </summary>
+    internal static DateTimeOffset ComputeNextFire(TimeOnly timeOfDayUtc, DateTimeOffset after)
     {
-        // Simple CRON parser for standard 5-field expressions: minute hour dayOfMonth month dayOfWeek
-        // Delegates to ParseCronFields for the actual calculation.
-        string[] parts = cronExpression.Split(' ');
-        if (parts.Length != 5)
-            throw new ArgumentException($"Invalid CRON expression: {cronExpression}");
+        DateTimeOffset todayAtTime = new(
+            after.UtcDateTime.Date.Add(timeOfDayUtc.ToTimeSpan()), TimeSpan.Zero);
 
-        return ParseCronNextFire(parts, after);
+        return todayAtTime > after ? todayAtTime : todayAtTime.AddDays(1);
     }
 
-    private static DateTimeOffset ParseCronNextFire(string[] fields, DateTimeOffset after)
-    {
-        DateTimeOffset candidate = after.AddMinutes(1).ToUniversalTime();
-        candidate = new DateTimeOffset(candidate.Year, candidate.Month, candidate.Day,
-            candidate.Hour, candidate.Minute, 0, TimeSpan.Zero);
-
-        // Limit search to 366 days to avoid infinite loops
-        DateTimeOffset limit = after.AddDays(366);
-
-        while (candidate < limit)
-        {
-            if (MatchesCronField(fields[0], candidate.Minute) &&
-                MatchesCronField(fields[1], candidate.Hour) &&
-                MatchesCronField(fields[2], candidate.Day) &&
-                MatchesCronField(fields[3], candidate.Month) &&
-                MatchesCronField(fields[4], (int)candidate.DayOfWeek))
-            {
-                return candidate;
-            }
-
-            candidate = candidate.AddMinutes(1);
-        }
-
-        // Fallback: return 1 hour from now
-        return after.AddHours(1);
-    }
-
-    private static bool MatchesCronField(string field, int value)
-    {
-        if (field == "*") return true;
-
-        // Handle comma-separated values (e.g. "1,3,5")
-        if (field.Contains(','))
-            return field.Split(',').Any(f => MatchesCronField(f.Trim(), value));
-
-        // Handle ranges (e.g. "1-5")
-        if (field.Contains('-'))
-        {
-            string[] range = field.Split('-');
-            int min = int.Parse(range[0]);
-            int max = int.Parse(range[1]);
-            return value >= min && value <= max;
-        }
-
-        // Handle step values (e.g. "*/5")
-        if (field.Contains('/'))
-        {
-            string[] step = field.Split('/');
-            int interval = int.Parse(step[1]);
-            if (step[0] == "*")
-                return value % interval == 0;
-            int start = int.Parse(step[0]);
-            return value >= start && (value - start) % interval == 0;
-        }
-
-        return int.Parse(field) == value;
-    }
+    /// <summary>
+    /// Next fire time for a stored recurring job. A row whose <see cref="ScheduledJobEntity.DailyAtUtc"/>
+    /// is missing or unparseable is pushed a day out rather than left permanently due — that would
+    /// spin the job every tick.
+    /// </summary>
+    private static DateTimeOffset NextFireFor(ScheduledJobEntity entity, DateTimeOffset after)
+        => TimeOnly.TryParse(entity.DailyAtUtc, CultureInfo.InvariantCulture, out TimeOnly at)
+            ? ComputeNextFire(at, after)
+            : after.AddDays(1);
 
     private static JobInvocationInfo ExtractInvocationInfo(Expression<Func<Task>> job)
     {

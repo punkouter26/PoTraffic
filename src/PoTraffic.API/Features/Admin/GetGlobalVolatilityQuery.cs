@@ -27,35 +27,9 @@ public sealed class GetGlobalVolatilityHandler : IRequestHandler<GetGlobalVolati
     public Task<IReadOnlyList<GlobalVolatilitySlotDto>> Handle(GetGlobalVolatilityQuery query, CancellationToken ct)
     {
         // Snapshot to lists so the LINQ pipeline can run multiple times.
-        var polls = _db.Polls.Where(p => !p.IsDeleted).ToList();
-        var routesById = _db.Routes.ToDictionary(r => r.Id);
+        List<PollRecord> polls = _db.Polls.Where(p => !p.IsDeleted).ToList();
+        Dictionary<RouteId, EntityRoute> routesById = _db.Routes.ToDictionary(r => r.Id);
 
-        var slots = polls
-            .Where(p => routesById.ContainsKey(p.RouteId))
-            .GroupBy(p => new
-            {
-                DayOfWeek = p.PolledAt.DayOfWeek.ToString(),
-                TimeSlotBucket = p.PolledAt.Hour * 60 + (p.PolledAt.Minute / 5 * 5),
-                ProviderInt = routesById[p.RouteId].Provider
-            })
-            .Select(g =>
-            {
-                double mean = g.Average(p => (double)p.TravelDurationSeconds);
-                double stddev = g.Count() > 1
-                    ? Math.Sqrt(g.Average(p => Math.Pow((double)p.TravelDurationSeconds - mean, 2)))
-                    : 0;
-                return new GlobalVolatilitySlotDto(
-                    DayOfWeek: g.Key.DayOfWeek,
-                    TimeSlotBucket: g.Key.TimeSlotBucket,
-                    MeanDurationSeconds: Math.Round(mean, 1),
-                    StdDevDurationSeconds: Math.Round(stddev, 1),
-                    RouteCount: g.Select(p => p.RouteId).Distinct().Count(),
-                    Provider: (RouteProvider)g.Key.ProviderInt);
-            })
-            .OrderBy(s => s.DayOfWeek)
-            .ThenBy(s => s.TimeSlotBucket)
-            .ToList();
-
-        return Task.FromResult<IReadOnlyList<GlobalVolatilitySlotDto>>(slots);
+        return Task.FromResult(VolatilityAggregator.Aggregate(polls, routesById));
     }
 }

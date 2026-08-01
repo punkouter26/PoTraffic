@@ -7,6 +7,7 @@ using PoTraffic.API.Infrastructure.Storage;
 
 using PoTraffic.API.Infrastructure.Providers;
 using PoTraffic.Shared.Enums;
+using PoTraffic.UnitTests.Helpers;
 
 namespace PoTraffic.UnitTests.Features.Routes;
 
@@ -17,18 +18,7 @@ namespace PoTraffic.UnitTests.Features.Routes;
 /// </summary>
 public sealed class RerouteAccuracyTheoryTests
 {
-    private static TableStorageContext CreateDb()
-    {
-        return new TableStorageContext();
-    }
 
-    private static ITrafficProviderFactory BuildProviderFactory(ITrafficProvider provider)
-    {
-        var factory = Substitute.For<ITrafficProviderFactory>();
-        factory.GetProvider(Arg.Any<RouteProvider>()).Returns(provider);
-
-        return factory;
-    }
 
     /// <summary>
     /// Provides the 20-record synthetic test sequence.
@@ -96,7 +86,7 @@ public sealed class RerouteAccuracyTheoryTests
         bool expectedIsRerouted)
     {
         // Arrange
-        TableStorageContext db = CreateDb();
+        TableStorageContext db = TestDoubles.CreateDb();
         RouteId routeId = RouteId.New();
         SessionId sessionId = SessionId.New();
 
@@ -145,7 +135,7 @@ public sealed class RerouteAccuracyTheoryTests
             .GetTravelTimeAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(new TravelResult(300, currentDistance, "{}"));
 
-        ITrafficProviderFactory providerFactory = BuildProviderFactory(mockProvider);
+        ITrafficProviderFactory providerFactory = TestDoubles.ProviderFactory(mockProvider);
         var handler = new ExecutePollCommandHandler(db, providerFactory, PoTraffic.UnitTests.Helpers.AlertTestHelper.NoOp(db), NullLogger<ExecutePollCommandHandler>.Instance);
 
         // Act
@@ -180,7 +170,7 @@ public sealed class RerouteAccuracyTheoryTests
 
         foreach ((int[] priorDistances, int currentDistance, bool expected) in scenarios)
         {
-            TableStorageContext db = CreateDb();
+            TableStorageContext db = TestDoubles.CreateDb();
             RouteId routeId = RouteId.New();
             SessionId sessionId = SessionId.New();
 
@@ -228,7 +218,7 @@ public sealed class RerouteAccuracyTheoryTests
                 .GetTravelTimeAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
                 .Returns(new TravelResult(300, currentDistance, "{}"));
 
-            ITrafficProviderFactory providerFactory = BuildProviderFactory(mockProvider);
+            ITrafficProviderFactory providerFactory = TestDoubles.ProviderFactory(mockProvider);
             var handler = new ExecutePollCommandHandler(db, providerFactory, PoTraffic.UnitTests.Helpers.AlertTestHelper.NoOp(db), NullLogger<ExecutePollCommandHandler>.Instance);
 
             await handler.Handle(new ExecutePollCommand(routeId), CancellationToken.None);

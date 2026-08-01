@@ -25,7 +25,7 @@ public sealed record UpdateRouteCommand(
 
 public sealed record UpdateRouteResult(
     bool IsSuccess,
-    string? ErrorCode,   // "NOT_FOUND" | "GEOCODE_FAILED" | "SAME_COORDINATES"
+    string? ErrorCode,   // RouteErrorCodes: NOT_FOUND | GEOCODE_FAILED | SAME_COORDINATES
     RouteDto? Route);
 
 public sealed class UpdateRouteCommandHandler(
@@ -36,12 +36,10 @@ public sealed class UpdateRouteCommandHandler(
 {
     public async Task<UpdateRouteResult> Handle(UpdateRouteCommand cmd, CancellationToken ct)
     {
-        EntityRoute? route = db.Routes
-            .FirstOrDefault(r => r.Id == cmd.RouteId && r.UserId == cmd.UserId
-                && r.MonitoringStatus != (int)MonitoringStatus.Deleted);
+        EntityRoute? route = db.GetOwnedRoute(cmd.RouteId, cmd.UserId, excludeDeleted: true);
 
         if (route is null)
-            return new UpdateRouteResult(false, "NOT_FOUND", null);
+            return new UpdateRouteResult(false, RouteErrorCodes.NotFound, null);
 
         RouteProvider effectiveProvider = cmd.Provider ?? (RouteProvider)route.Provider;
         ITrafficProvider provider = providerFactory.GetProvider(effectiveProvider);
@@ -51,7 +49,7 @@ public sealed class UpdateRouteCommandHandler(
         {
             string? coords = await provider.GeocodeAsync(cmd.OriginAddress, ct);
             if (coords is null)
-                return new UpdateRouteResult(false, "GEOCODE_FAILED", null);
+                return new UpdateRouteResult(false, RouteErrorCodes.GeocodeFailed, null);
             route.OriginAddress = cmd.OriginAddress;
             route.OriginCoordinates = coords;
         }
@@ -60,13 +58,13 @@ public sealed class UpdateRouteCommandHandler(
         {
             string? coords = await provider.GeocodeAsync(cmd.DestinationAddress, ct);
             if (coords is null)
-                return new UpdateRouteResult(false, "GEOCODE_FAILED", null);
+                return new UpdateRouteResult(false, RouteErrorCodes.GeocodeFailed, null);
             route.DestinationAddress = cmd.DestinationAddress;
             route.DestinationCoordinates = coords;
         }
 
         if (route.OriginCoordinates == route.DestinationCoordinates)
-            return new UpdateRouteResult(false, "SAME_COORDINATES", null);
+            return new UpdateRouteResult(false, RouteErrorCodes.SameCoordinates, null);
 
         // Cancel + restart job chain if provider changes
         if (cmd.Provider.HasValue && (int)cmd.Provider.Value != route.Provider)

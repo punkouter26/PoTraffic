@@ -1,11 +1,6 @@
-using FluentValidation;
+using PoTraffic.API.Features.Config;
 using PoTraffic.API.Infrastructure.Storage;
-
-
-
-
 using PoTraffic.Shared.DTOs.Admin;
-
 using PoTraffic.Shared.Enums;
 
 namespace PoTraffic.API.Features.Admin;
@@ -41,12 +36,7 @@ public sealed class GetUsersHandler : IRequestHandler<GetUsersQuery, IReadOnlyLi
             .GroupBy(p => p.RouteId)
             .ToDictionary(g => g.Key, g => g.ToList());
 
-        List<SystemConfiguration> configs = _db.SystemConfigurations
-            .Where(c => c.Key.StartsWith("cost.perpoll."))
-            .ToList();
-
-        double googleCost = GetCost(configs, "cost.perpoll.googlemaps");
-        double tomtomCost = GetCost(configs, "cost.perpoll.tomtom");
+        PollCostRates rates = PollCostRates.Load(_db);
 
         return users.Select(u =>
         {
@@ -63,8 +53,7 @@ public sealed class GetUsersHandler : IRequestHandler<GetUsersQuery, IReadOnlyLi
                     int pollCount = grp
                         .SelectMany(r => pollsByRoute.TryGetValue(r.Id, out var p) ? p : [])
                         .Count();
-                    double costPerPoll = grp.Key == RouteProvider.TomTom ? tomtomCost : googleCost;
-                    return new ProviderBreakdownDto(grp.Key, pollCount, pollCount * costPerPoll);
+                    return new ProviderBreakdownDto(grp.Key, pollCount, (double)(pollCount * rates.For(grp.Key)));
                 })
                 .ToList();
 
@@ -80,11 +69,5 @@ public sealed class GetUsersHandler : IRequestHandler<GetUsersQuery, IReadOnlyLi
                 TodayEstimatedCostUsd: totalCost,
                 ProviderBreakdown: breakdown);
         }).ToList();
-    }
-
-    private static double GetCost(List<SystemConfiguration> configs, string key)
-    {
-        string? value = configs.FirstOrDefault(c => c.Key == key)?.Value;
-        return double.TryParse(value, out double result) ? result : 0.0;
     }
 }

@@ -19,7 +19,7 @@ public sealed record CreateWindowCommand(
 
 public sealed record CreateWindowResult(
     bool IsSuccess,
-    string? ErrorCode,   // "NOT_FOUND" | "WINDOW_ALREADY_ACTIVE"
+    string? ErrorCode,   // RouteErrorCodes.NotFound | "WINDOW_ALREADY_ACTIVE"
     WindowId? WindowId);
 
 public sealed class CreateWindowValidator : AbstractValidator<CreateWindowCommand>
@@ -51,13 +51,8 @@ public sealed class CreateWindowCommandHandler : IRequestHandler<CreateWindowCom
     public async Task<CreateWindowResult> Handle(CreateWindowCommand cmd, CancellationToken ct)
     {
         // Verify route ownership
-        bool routeExists = _db.Routes.Any(
-            r => r.Id == cmd.RouteId
-                && r.UserId == cmd.UserId
-                && r.MonitoringStatus != (int)MonitoringStatus.Deleted);
-
-        if (!routeExists)
-            return new CreateWindowResult(false, "NOT_FOUND", null);
+        if (!_db.OwnsRoute(cmd.RouteId, cmd.UserId, excludeDeleted: true))
+            return new CreateWindowResult(false, RouteErrorCodes.NotFound, null);
 
         // Only one active window per route is supported
         bool activeWindowExists = _db.MonitoringWindows

@@ -20,8 +20,7 @@ public sealed class GetWeekdayComparisonQueryHandler(TableStorageContext db)
 
     public Task<WeekdayComparisonDto> Handle(GetWeekdayComparisonQuery query, CancellationToken ct)
     {
-        bool owned = db.Routes.Any(r => r.Id == query.RouteId && r.UserId == query.UserId);
-        if (!owned)
+        if (!db.OwnsRoute(query.RouteId, query.UserId))
             return Task.FromResult(new WeekdayComparisonDto(query.RouteId, [], null, null));
 
         var byDay = db.Polls

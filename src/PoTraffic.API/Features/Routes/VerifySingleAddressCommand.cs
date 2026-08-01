@@ -48,7 +48,7 @@ public sealed class VerifySingleAddressCommandHandler
         string? coords = await provider.GeocodeAsync(cmd.Address, ct);
 
         return coords is null
-            ? new VerifySingleAddressResult(false, null, "GEOCODE_FAILED")
+            ? new VerifySingleAddressResult(false, null, RouteErrorCodes.GeocodeFailed)
             : new VerifySingleAddressResult(true, coords, null);
     }
 }

@@ -1,5 +1,5 @@
+using PoTraffic.API.Features.Config;
 using PoTraffic.API.Infrastructure.Storage;
-
 using PoTraffic.Shared.DTOs.Account;
 using PoTraffic.Shared.Enums;
 
@@ -49,19 +49,23 @@ public sealed class GetQuotaHandler : IRequestHandler<GetQuotaQuery, QuotaDto?>
 
         // Cost transparency (#8): today's provider spend, priced per-poll by each route's
         // provider (rates live in SystemConfiguration). Monthly projection extrapolates today.
-        decimal googleRate = ResolveRate("cost.perpoll.googlemaps", 0.005m);
-        decimal tomtomRate = ResolveRate("cost.perpoll.tomtom", 0.004m);
-        DateOnly todayDate = today;
+        PollCostRates rates = PollCostRates.Load(_db, googleMapsFallback: 0.005m, tomTomFallback: 0.004m);
+
+        // One pass over the poll table — a per-route Count() would rescan the whole
+        // (global) poll list once per route the user owns.
+        Dictionary<RouteId, int> pollsByRoute = _db.Polls
+            .Where(p => userRouteIds.Contains(p.RouteId) && !p.IsDeleted
+                        && DateOnly.FromDateTime(p.PolledAt.UtcDateTime) == today)
+            .GroupBy(p => p.RouteId)
+            .ToDictionary(g => g.Key, g => g.Count());
 
         int pollsToday = 0;
         decimal costToday = 0m;
-        foreach (var route in _db.Routes.Where(r => userRouteIds.Contains(r.Id)))
+        foreach (EntityRoute route in _db.Routes.Where(r => userRouteIds.Contains(r.Id)))
         {
-            int polls = _db.Polls.Count(p =>
-                p.RouteId == route.Id && !p.IsDeleted
-                && DateOnly.FromDateTime(p.PolledAt.UtcDateTime) == todayDate);
+            if (!pollsByRoute.TryGetValue(route.Id, out int polls)) continue;
             pollsToday += polls;
-            costToday += polls * (route.Provider == (int)RouteProvider.TomTom ? tomtomRate : googleRate);
+            costToday += polls * rates.For((RouteProvider)route.Provider);
         }
 
         return new QuotaDto(
@@ -72,16 +76,5 @@ public sealed class GetQuotaHandler : IRequestHandler<GetQuotaQuery, QuotaDto?>
             PollsToday: pollsToday,
             EstimatedCostTodayUsd: Math.Round(costToday, 4),
             ProjectedMonthlyCostUsd: Math.Round(costToday * 30, 2));
-    }
-
-    private decimal ResolveRate(string key, decimal fallback)
-    {
-        string? value = _db.SystemConfigurations
-            .Where(c => c.Key == key)
-            .Select(c => c.Value)
-            .FirstOrDefault();
-        return decimal.TryParse(value, System.Globalization.CultureInfo.InvariantCulture, out decimal rate)
-            ? rate
-            : fallback;
     }
 }

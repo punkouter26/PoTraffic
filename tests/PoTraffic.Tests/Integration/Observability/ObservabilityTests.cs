@@ -58,7 +58,7 @@ public sealed class ObservabilityTests : BaseIntegrationTest
     /// Smoke test — health endpoint returns 200 OK, confirming that OTel bootstrap
     /// in Program.cs does not cause a DI resolution failure or startup exception.
     /// </summary>
-    [Fact]
+    [SkipUnlessAzuriteAvailable]
     public async Task HealthEndpoint_Returns200_ConfirmingOTelBootstrapSucceeded()
     {
         // Arrange

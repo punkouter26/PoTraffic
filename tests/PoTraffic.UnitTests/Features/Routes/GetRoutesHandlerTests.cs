@@ -4,6 +4,7 @@ using PoTraffic.API.Features.Routes;
 using PoTraffic.API.Infrastructure.Storage;
 
 using PoTraffic.Shared.Enums;
+using PoTraffic.UnitTests.Helpers;
 
 
 namespace PoTraffic.UnitTests.Features.Routes;
@@ -14,16 +15,12 @@ namespace PoTraffic.UnitTests.Features.Routes;
 /// </summary>
 public sealed class GetRoutesHandlerTests
 {
-    private static TableStorageContext CreateDb()
-    {
-        return new TableStorageContext();
-    }
 
     [Fact]
     public async Task GetRoutes_ReturnsOnlyRoutesForRequestedUser()
     {
         // Arrange
-        TableStorageContext db = CreateDb();
+        TableStorageContext db = TestDoubles.CreateDb();
 
         UserId userId = UserId.New();
         UserId otherId = UserId.New();
@@ -68,7 +65,7 @@ public sealed class GetRoutesHandlerTests
     public async Task GetRoutes_ExcludesSoftDeletedRoutes()
     {
         // Arrange
-        TableStorageContext db = CreateDb();
+        TableStorageContext db = TestDoubles.CreateDb();
 
         UserId userId = UserId.New();
 
@@ -111,7 +108,7 @@ public sealed class GetRoutesHandlerTests
     public async Task GetRoutes_ReturnsEmptyPage_WhenUserHasNoRoutes()
     {
         // Arrange
-        TableStorageContext db = CreateDb();
+        TableStorageContext db = TestDoubles.CreateDb();
 
         var handler = new GetRoutesQueryHandler(db);
 
@@ -127,7 +124,7 @@ public sealed class GetRoutesHandlerTests
     public async Task GetRoutes_PaginatesCorrectly()
     {
         // Arrange
-        TableStorageContext db = CreateDb();
+        TableStorageContext db = TestDoubles.CreateDb();
 
         UserId userId = UserId.New();
 

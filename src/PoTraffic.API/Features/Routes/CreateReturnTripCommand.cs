@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using PoTraffic.API.Infrastructure.Storage;
 using PoTraffic.Shared.Enums;
 
 namespace PoTraffic.API.Features.Routes;
@@ -20,12 +21,9 @@ public sealed class CreateReturnTripCommandHandler(
 {
     public async Task<CreateRouteResult> Handle(CreateReturnTripCommand cmd, CancellationToken ct)
     {
-        EntityRoute? source = db.Routes.FirstOrDefault(r =>
-            r.Id == cmd.RouteId
-            && r.UserId == cmd.UserId
-            && r.MonitoringStatus != (int)MonitoringStatus.Deleted);
+        EntityRoute? source = db.GetOwnedRoute(cmd.RouteId, cmd.UserId, excludeDeleted: true);
         if (source is null)
-            return new CreateRouteResult(false, "NOT_FOUND", null);
+            return new CreateRouteResult(false, RouteErrorCodes.NotFound, null);
 
         // Idempotent — return the existing linked route if it's still live.
         if (source.ReturnRouteId is RouteId existingId)

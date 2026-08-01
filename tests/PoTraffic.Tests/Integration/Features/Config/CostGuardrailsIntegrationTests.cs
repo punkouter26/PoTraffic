@@ -7,7 +7,7 @@ namespace PoTraffic.Tests.Features.Config;
 
 public sealed class CostGuardrailsIntegrationTests : BaseIntegrationTest
 {
-    [Fact]
+    [SkipUnlessAzuriteAvailable]
     public void TestingConfiguration_DisablesRemoteCostSurfaces()
     {
         IServiceProvider services = GetServices();

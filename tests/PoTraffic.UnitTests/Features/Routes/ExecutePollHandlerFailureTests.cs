@@ -8,6 +8,7 @@ using PoTraffic.API.Infrastructure.Storage;
 
 using PoTraffic.API.Infrastructure.Providers;
 using PoTraffic.Shared.Enums;
+using PoTraffic.UnitTests.Helpers;
 
 namespace PoTraffic.UnitTests.Features.Routes;
 
@@ -18,22 +19,11 @@ namespace PoTraffic.UnitTests.Features.Routes;
 /// </summary>
 public sealed class ExecutePollHandlerFailureTests
 {
-    private static TableStorageContext CreateDb()
-    {
-        return new TableStorageContext();
-    }
 
-    private static ITrafficProviderFactory BuildProviderFactory(ITrafficProvider provider)
-    {
-        var factory = Substitute.For<ITrafficProviderFactory>();
-        factory.GetProvider(Arg.Any<RouteProvider>()).Returns(provider);
-
-        return factory;
-    }
 
     private static async Task<(TableStorageContext Db, RouteId RouteId, SessionId SessionId)> SeedAsync()
     {
-        TableStorageContext db = CreateDb();
+        TableStorageContext db = TestDoubles.CreateDb();
         RouteId routeId = RouteId.New();
         SessionId sessionId = SessionId.New();
 
@@ -75,7 +65,7 @@ public sealed class ExecutePollHandlerFailureTests
             .ThrowsAsync(new HttpRequestException("Connection refused"));
 
         ILogger<ExecutePollCommandHandler> logger = Substitute.For<ILogger<ExecutePollCommandHandler>>();
-        ITrafficProviderFactory providerFactory = BuildProviderFactory(mockProvider);
+        ITrafficProviderFactory providerFactory = TestDoubles.ProviderFactory(mockProvider);
         var handler = new ExecutePollCommandHandler(db, providerFactory, PoTraffic.UnitTests.Helpers.AlertTestHelper.NoOp(db), logger);
 
         // Act
@@ -99,7 +89,7 @@ public sealed class ExecutePollHandlerFailureTests
             .GetTravelTimeAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .ThrowsAsync(new HttpRequestException("Timeout"));
 
-        ITrafficProviderFactory providerFactory = BuildProviderFactory(mockProvider);
+        ITrafficProviderFactory providerFactory = TestDoubles.ProviderFactory(mockProvider);
         var handler = new ExecutePollCommandHandler(
             db, providerFactory, PoTraffic.UnitTests.Helpers.AlertTestHelper.NoOp(db), Substitute.For<ILogger<ExecutePollCommandHandler>>());
 
@@ -124,7 +114,7 @@ public sealed class ExecutePollHandlerFailureTests
             .ThrowsAsync(new HttpRequestException("DNS failure"));
 
         ILogger<ExecutePollCommandHandler> logger = Substitute.For<ILogger<ExecutePollCommandHandler>>();
-        ITrafficProviderFactory providerFactory = BuildProviderFactory(mockProvider);
+        ITrafficProviderFactory providerFactory = TestDoubles.ProviderFactory(mockProvider);
         var handler = new ExecutePollCommandHandler(db, providerFactory, PoTraffic.UnitTests.Helpers.AlertTestHelper.NoOp(db), logger);
 
         // Act
@@ -150,7 +140,7 @@ public sealed class ExecutePollHandlerFailureTests
             .GetTravelTimeAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .ThrowsAsync(new HttpRequestException("Network unreachable"));
 
-        ITrafficProviderFactory providerFactory = BuildProviderFactory(mockProvider);
+        ITrafficProviderFactory providerFactory = TestDoubles.ProviderFactory(mockProvider);
         var handler = new ExecutePollCommandHandler(
             db, providerFactory, PoTraffic.UnitTests.Helpers.AlertTestHelper.NoOp(db), Substitute.For<ILogger<ExecutePollCommandHandler>>());
 

@@ -38,15 +38,17 @@ public sealed class GetPollHistoryQueryHandler
         if (route is null)
             return new PagedResult<PollRecordDto>(query.Page, query.PageSize, 0, new List<PollRecordDto>());
 
-        var baseQuery = _db.PollRecords
+        // Materialise once: the filter runs over the whole (global) poll list, so
+        // counting and paging off the same IQueryable would scan — and re-sort — it twice.
+        List<PollRecord> matching = [.. _db.PollRecords
             .Where(p => p.RouteId == query.RouteId
                 && !p.IsDeleted
-                && (query.SinceUtc == null || p.PolledAt >= query.SinceUtc))
-            .OrderByDescending(p => p.PolledAt);
+                && (query.SinceUtc == null || p.PolledAt >= query.SinceUtc))];
 
-        int total = baseQuery.Count();
+        int total = matching.Count;
 
-        List<PollRecordDto> items = baseQuery
+        List<PollRecordDto> items = matching
+            .OrderByDescending(p => p.PolledAt)
             .Skip(skip)
             .Take(query.PageSize)
             .Select(p => new PollRecordDto(

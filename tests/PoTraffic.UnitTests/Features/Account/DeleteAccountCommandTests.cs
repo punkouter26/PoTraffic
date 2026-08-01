@@ -1,6 +1,7 @@
 using FluentAssertions;
 using PoTraffic.API.Features.Account;
 using PoTraffic.API.Infrastructure.Storage;
+using PoTraffic.UnitTests.Helpers;
 
 
 
@@ -12,16 +13,12 @@ namespace PoTraffic.UnitTests.Features.Account;
 /// </summary>
 public sealed class DeleteAccountCommandTests
 {
-    private static TableStorageContext CreateDb()
-    {
-        return new TableStorageContext();
-    }
 
     [Fact]
     public async Task DeleteAccount_RemovesUserAndCascadeRoutes()
     {
         // Arrange
-        TableStorageContext db = CreateDb();
+        TableStorageContext db = TestDoubles.CreateDb();
 
         UserId userId = UserId.New();
         RouteId routeId = RouteId.New();
@@ -51,7 +48,7 @@ public sealed class DeleteAccountCommandTests
     [Fact]
     public async Task DeleteAccount_WhenUserNotFound_ReturnsFalse()
     {
-        TableStorageContext db = CreateDb();
+        TableStorageContext db = TestDoubles.CreateDb();
 
         var handler = new DeleteAccountCommandHandler(db);
 

@@ -1,15 +1,9 @@
 using FluentValidation;
-using PoTraffic.API.Infrastructure.Storage;
-
-using PoTraffic.API.Infrastructure.Scheduling;
-
-
 using Microsoft.Extensions.Logging;
-
-
-
+using PoTraffic.API.Infrastructure.Logging;
 using PoTraffic.API.Infrastructure.Providers;
-
+using PoTraffic.API.Infrastructure.Scheduling;
+using PoTraffic.API.Infrastructure.Storage;
 using PoTraffic.Shared.Enums;
 
 namespace PoTraffic.API.Features.Admin;
@@ -33,8 +27,8 @@ public sealed class StartTripleTestValidator : AbstractValidator<StartTripleTest
 {
     public StartTripleTestValidator()
     {
-        RuleFor(x => x.OriginAddress).NotEmpty().MaximumLength(500);
-        RuleFor(x => x.DestinationAddress).NotEmpty().MaximumLength(500);
+        RuleFor(x => x.OriginAddress).NotEmpty().MaximumLength(ValidationConstants.AddressMaxLength);
+        RuleFor(x => x.DestinationAddress).NotEmpty().MaximumLength(ValidationConstants.AddressMaxLength);
         RuleFor(x => x.Provider).IsInEnum();
         RuleFor(x => x.StartAt)
             .Must(t => t is null || t.Value > DateTimeOffset.UtcNow.AddSeconds(-5))
@@ -69,19 +63,19 @@ public sealed class StartTripleTestCommandHandler : IRequestHandler<StartTripleT
         string? originCoords = await provider.GeocodeAsync(cmd.OriginAddress, ct);
         if (originCoords is null)
         {
-            _logger.LogWarning("StartTripleTest: geocode failed for origin '{Origin}'", cmd.OriginAddress);
+            _logger.LogWarning("StartTripleTest: geocode failed for origin {AddressRef}", PiiRedactor.Redact(cmd.OriginAddress));
             return new StartTripleTestResult(false, "GEOCODE_FAILED_ORIGIN", null);
         }
 
         string? destCoords = await provider.GeocodeAsync(cmd.DestinationAddress, ct);
         if (destCoords is null)
         {
-            _logger.LogWarning("StartTripleTest: geocode failed for destination '{Dest}'", cmd.DestinationAddress);
+            _logger.LogWarning("StartTripleTest: geocode failed for destination {AddressRef}", PiiRedactor.Redact(cmd.DestinationAddress));
             return new StartTripleTestResult(false, "GEOCODE_FAILED_DESTINATION", null);
         }
 
         if (originCoords == destCoords)
-            return new StartTripleTestResult(false, "SAME_COORDINATES", null);
+            return new StartTripleTestResult(false, RouteErrorCodes.SameCoordinates, null);
 
         DateTimeOffset scheduledAt = cmd.StartAt ?? DateTimeOffset.UtcNow;
 
@@ -126,8 +120,8 @@ public sealed class StartTripleTestCommandHandler : IRequestHandler<StartTripleT
         _scheduler.Schedule(() => shotJob.Execute(sessionId, 2), startDelay + TimeSpan.FromSeconds(40));
 
         _logger.LogInformation(
-            "StartTripleTest: session {SessionId} scheduled at {ScheduledAt} for {Origin} → {Dest}",
-            session.Id, scheduledAt, cmd.OriginAddress, cmd.DestinationAddress);
+            "StartTripleTest: session {SessionId} scheduled at {ScheduledAt} for {OriginRef} → {DestRef}",
+            session.Id, scheduledAt, PiiRedactor.Redact(cmd.OriginAddress), PiiRedactor.Redact(cmd.DestinationAddress));
 
         return new StartTripleTestResult(true, null, session.Id);
     }

@@ -31,8 +31,7 @@ public sealed class DeleteWindowCommandHandler : IRequestHandler<DeleteWindowCom
             return false;
 
         // Verify ownership via the route (avoids null navigation property in in-memory context)
-        bool isOwned = _db.Routes.Any(r => r.Id == window.RouteId && r.UserId == cmd.UserId);
-        if (!isOwned)
+        if (!_db.OwnsRoute(window.RouteId, cmd.UserId))
             return false;
 
         window.IsActive = false;

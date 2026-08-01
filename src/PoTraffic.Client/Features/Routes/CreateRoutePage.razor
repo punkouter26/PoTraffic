@@ -170,10 +170,10 @@
 
                 _error = errorCode switch
                 {
-                    "MAPS_KEY_MISSING" => "Maps integration is not configured on the server.",
-                    "ADDRESS_NOT_FOUND" => "We couldn't find that address. Please check and try again.",
-                    "GEOCODE_FAILED"   => "We couldn't find that address. Please check and try again.",
-                    "SAME_COORDINATES" => "Origin and destination resolve to the same location. Please use different addresses.",
+                    RouteErrorCodes.MapsKeyMissing => "Maps integration is not configured on the server.",
+                    RouteErrorCodes.AddressNotFound => "We couldn't find that address. Please check and try again.",
+                    RouteErrorCodes.GeocodeFailed => "We couldn't find that address. Please check and try again.",
+                    RouteErrorCodes.SameCoordinates => "Origin and destination resolve to the same location. Please use different addresses.",
                     _ when (int)createResp.StatusCode >= 500 => "Something went wrong on our end. Please try again in a moment.",
                     _                  => "Failed to create route. Please verify your addresses."
                 };

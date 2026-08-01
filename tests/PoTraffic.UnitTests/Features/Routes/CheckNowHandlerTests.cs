@@ -8,6 +8,7 @@ using PoTraffic.API.Infrastructure.Storage;
 
 using PoTraffic.API.Infrastructure.Providers;
 using PoTraffic.Shared.Enums;
+using PoTraffic.UnitTests.Helpers;
 
 
 namespace PoTraffic.UnitTests.Features.Routes;
@@ -19,23 +20,13 @@ namespace PoTraffic.UnitTests.Features.Routes;
 /// </summary>
 public sealed class CheckNowHandlerTests
 {
-    private static TableStorageContext CreateDb()
-    {
-        return new TableStorageContext();
-    }
 
-    private static ITrafficProviderFactory BuildProviderFactory(ITrafficProvider provider)
-    {
-        var factory = Substitute.For<ITrafficProviderFactory>();
-        factory.GetProvider(Arg.Any<RouteProvider>()).Returns(provider);
-        return factory;
-    }
 
     [Fact]
     public async Task CheckNow_WhenProviderSucceeds_ReturnsTravelData_NoPollRecordInserted()
     {
         // Arrange
-        TableStorageContext db = CreateDb();
+        TableStorageContext db = TestDoubles.CreateDb();
 
         RouteId routeId = RouteId.New();
         UserId userId = UserId.New();
@@ -59,7 +50,7 @@ public sealed class CheckNowHandlerTests
             .GetTravelTimeAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(new TravelResult(600, 10_000, "{}"));
 
-        var handler = new CheckNowCommandHandler(db, BuildProviderFactory(mockProvider),
+        var handler = new CheckNowCommandHandler(db, TestDoubles.ProviderFactory(mockProvider),
             NullLogger<CheckNowCommandHandler>.Instance);
 
         // Act
@@ -80,10 +71,10 @@ public sealed class CheckNowHandlerTests
     public async Task CheckNow_WhenRouteNotFound_ReturnsNotFoundError()
     {
         // Arrange
-        TableStorageContext db = CreateDb();
+        TableStorageContext db = TestDoubles.CreateDb();
 
         ITrafficProvider mockProvider = Substitute.For<ITrafficProvider>();
-        var handler = new CheckNowCommandHandler(db, BuildProviderFactory(mockProvider),
+        var handler = new CheckNowCommandHandler(db, TestDoubles.ProviderFactory(mockProvider),
             NullLogger<CheckNowCommandHandler>.Instance);
 
         // Act — route does not exist
@@ -99,7 +90,7 @@ public sealed class CheckNowHandlerTests
     public async Task CheckNow_WhenProviderReturnsNull_ReturnsProviderError()
     {
         // Arrange
-        TableStorageContext db = CreateDb();
+        TableStorageContext db = TestDoubles.CreateDb();
 
         RouteId routeId = RouteId.New();
         UserId userId = UserId.New();
@@ -123,7 +114,7 @@ public sealed class CheckNowHandlerTests
             .GetTravelTimeAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns((TravelResult?)null);
 
-        var handler = new CheckNowCommandHandler(db, BuildProviderFactory(mockProvider),
+        var handler = new CheckNowCommandHandler(db, TestDoubles.ProviderFactory(mockProvider),
             NullLogger<CheckNowCommandHandler>.Instance);
 
         // Act
@@ -138,7 +129,7 @@ public sealed class CheckNowHandlerTests
     public async Task CheckNow_WhenRouteBelongsToDifferentUser_ReturnsNotFoundError()
     {
         // Arrange
-        TableStorageContext db = CreateDb();
+        TableStorageContext db = TestDoubles.CreateDb();
 
         RouteId routeId = RouteId.New();
         UserId realOwner = UserId.New();
@@ -158,7 +149,7 @@ public sealed class CheckNowHandlerTests
         await db.SaveChangesAsync();
 
         ITrafficProvider mockProvider = Substitute.For<ITrafficProvider>();
-        var handler = new CheckNowCommandHandler(db, BuildProviderFactory(mockProvider),
+        var handler = new CheckNowCommandHandler(db, TestDoubles.ProviderFactory(mockProvider),
             NullLogger<CheckNowCommandHandler>.Instance);
 
         // Act — different user ID supplied

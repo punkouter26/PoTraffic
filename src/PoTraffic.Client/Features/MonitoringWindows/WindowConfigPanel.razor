@@ -6,15 +6,10 @@
 @implements IDisposable
 
 <RadzenFieldset Text="Monitoring Schedule" class="rz-mb-3">
-    @if (_loadingWindows)
-    {
-        <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" class="rz-mb-2" />
-    }
-    else if (!string.IsNullOrEmpty(_loadError))
-    {
-        <RadzenAlert AlertStyle="AlertStyle.Danger" ShowIcon="true" class="rz-mb-2">@_loadError</RadzenAlert>
-    }
-    else if (_activeWindow is not null && !_editing)
+    @* Loading + load-failure presentation comes from the shared scaffold every other
+       data surface uses (Health, AdminUsage, Diag), so this panel can't drift from them. *@
+    <LoadingErrorCard IsLoading="_loadingWindows" Error="@(string.IsNullOrEmpty(_loadError) ? null : _loadError)">
+    @if (_activeWindow is not null && !_editing)
     {
         @* Read-only view with Edit Schedule button — hides the delete-to-replace mechanic *@
         <div class="rz-display-flex rz-align-items-center rz-gap-4 rz-mb-2">
@@ -111,6 +106,7 @@
             }
         </div>
     }
+    </LoadingErrorCard>
 </RadzenFieldset>
 
 @code {

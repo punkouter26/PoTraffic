@@ -1,14 +1,15 @@
 using Microsoft.AspNetCore.Mvc;
 using PoTraffic.API.Features.Auth;
+using PoTraffic.API.Infrastructure.Providers;
 using PoTraffic.API.Infrastructure.Storage;
 using PoTraffic.Shared.DTOs.Auth;
+using PoTraffic.Shared.Enums;
 
 namespace PoTraffic.API.Infrastructure.Testing;
 
 public static class TestingEndpoints
 {
     private sealed record DevLoginRequest(string Email, string Role);
-    private sealed record SeedRequest(string Scenario);
     private sealed record SeedAdminResponse(string Email);
     private sealed record SeedRouteRequest(string UserEmail, string OriginAddress, string DestinationAddress, int Provider);
     private sealed record SeedRouteResponse(RouteId RouteId, string OriginAddress, string DestinationAddress);
@@ -28,9 +29,6 @@ public static class TestingEndpoints
 
         // POST /e2e/dev-login — establishes a BFF cookie session for any email/role
         group.MapPost("/dev-login", DevLogin).AllowAnonymous();
-
-        // POST /e2e/seed — runs a named seeding scenario
-        group.MapPost("/seed", Seed).AllowAnonymous();
 
         // POST /e2e/seed-admin — ensures a known admin user exists
         group.MapPost("/seed-admin", SeedAdmin).AllowAnonymous();
@@ -68,18 +66,6 @@ public static class TestingEndpoints
         return Results.Ok(new AuthMeResponse(user.Id, user.Email, user.Role, user.AuthProvider));
     }
 
-    private static IResult Seed(
-        [FromBody] SeedRequest request,
-        ILogger<LogCategory> logger)
-    {
-        logger.LogInformation("[E2E] Seed scenario requested: {Scenario}", request.Scenario);
-
-        // Scenario runners will be registered here as the E2E suite grows.
-        // For now, unknown scenarios are accepted silently so tests can run
-        // before all seed scenarios are implemented.
-        return Results.NoContent();
-    }
-
     /// <summary>
     /// Ensures a known Administrator user exists in the database.
     /// Idempotent — safe to call multiple times.
@@ -113,12 +99,17 @@ public static class TestingEndpoints
     }
 
     /// <summary>
-    /// Creates a Route row directly in the database for a given user email.
-    /// Bypasses geocoding — intended for E2E tests where provider stubs return null.
+    /// Creates a Route row directly in the database for a given user email, skipping the
+    /// create-route command's validation and scheduling. Coordinates come from the registered
+    /// <see cref="ITrafficProvider"/> — under Testing that is <see cref="MockTrafficProvider"/>,
+    /// which geocodes deterministically from the address. Hardcoding coordinates here would
+    /// give seeded routes a different (and identical) location from ones created through the
+    /// real API path, so the two flows would no longer exercise the same data.
     /// </summary>
     private static async Task<IResult> SeedRoute(
         [FromBody] SeedRouteRequest request,
         TableStorageContext db,
+        ITrafficProviderFactory providerFactory,
         ILogger<LogCategory> logger,
         CancellationToken ct)
     {
@@ -140,14 +131,20 @@ public static class TestingEndpoints
             return Results.Ok(new SeedRouteResponse(existing.Id, existing.OriginAddress, existing.DestinationAddress));
         }
 
+        ITrafficProvider provider = providerFactory.GetProvider((RouteProvider)request.Provider);
+        string? originCoordinates = await provider.GeocodeAsync(request.OriginAddress, ct);
+        string? destinationCoordinates = await provider.GeocodeAsync(request.DestinationAddress, ct);
+        if (originCoordinates is null || destinationCoordinates is null)
+            return Results.UnprocessableEntity(new { error = RouteErrorCodes.AddressNotFound });
+
         var route = new EntityRoute
         {
             Id = RouteId.New(),
             UserId = user.Id,
             OriginAddress = request.OriginAddress,
-            OriginCoordinates = "37.4220,-122.0841",  // fake coords — E2E only
+            OriginCoordinates = originCoordinates,
             DestinationAddress = request.DestinationAddress,
-            DestinationCoordinates = "37.3318,-122.0312",  // fake coords — E2E only
+            DestinationCoordinates = destinationCoordinates,
             Provider = request.Provider,
             MonitoringStatus = 0,
             CreatedAt = DateTimeOffset.UtcNow

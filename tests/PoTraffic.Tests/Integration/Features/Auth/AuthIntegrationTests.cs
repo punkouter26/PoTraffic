@@ -46,7 +46,10 @@ public sealed class AuthIntegrationTests : BaseIntegrationTest
         meAfterLogout.StatusCode.Should().Be(HttpStatusCode.OK);
         AuthMeResponse? meAnon = await meAfterLogout.Content.ReadFromJsonAsync<AuthMeResponse>();
         meAnon.Should().NotBeNull();
-        meAnon!.UserId.Should().Be(Guid.Empty,
+        // UserId.Empty, not Guid.Empty — UserId is a distinct type, so comparing it against a
+        // raw Guid fails even when the value is right (Should().Be takes object, so the
+        // mismatch is invisible at compile time).
+        meAnon!.UserId.Should().Be(UserId.Empty,
             "the session cookie must be invalidated by logout (anonymous sentinel)");
     }
 

@@ -19,6 +19,13 @@ namespace PoTraffic.Tests;
 /// Base class for all integration tests.
 /// Spins up a <see cref="WebApplicationFactory{Program}"/> with the Testing environment.
 /// Azurite is owned by Testcontainers so tests never depend on a manually started emulator.
+///
+/// <para>
+/// Because <see cref="InitializeAsync"/> starts that container, every test method on a
+/// subclass must be marked <c>[SkipUnlessAzuriteAvailable]</c> rather than <c>[Fact]</c> —
+/// a plain <c>[Fact]</c> hard-fails with <c>DockerUnavailableException</c> on a machine
+/// without Docker instead of skipping alongside the rest of the suite.
+/// </para>
 /// </summary>
 public abstract class BaseIntegrationTest : IAsyncLifetime
 {
@@ -172,6 +179,5 @@ internal sealed class NoOpJobScheduler : IJobScheduler
     public string Schedule(Expression<Func<Task>> job, TimeSpan delay) => "noop-schedule";
     public void Cancel(string jobId) { }
     public int CancelPendingPollJobsForRoute(RouteId routeId) => 0;
-    public void ScheduleRecurring(string jobId, Func<Task> job, string cronExpression) { }
-    public void CancelRecurring(string jobId) { }
+    public void ScheduleRecurring(string jobId, Func<Task> job, TimeOnly dailyAtUtc) { }
 }

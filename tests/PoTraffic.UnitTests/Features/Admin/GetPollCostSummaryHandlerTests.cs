@@ -4,6 +4,7 @@ using PoTraffic.API.Features.Admin;
 using PoTraffic.API.Infrastructure.Storage;
 
 using PoTraffic.Shared.DTOs.Admin;
+using PoTraffic.UnitTests.Helpers;
 
 
 namespace PoTraffic.UnitTests.Features.Admin;
@@ -14,16 +15,12 @@ namespace PoTraffic.UnitTests.Features.Admin;
 /// </summary>
 public sealed class GetPollCostSummaryHandlerTests
 {
-    private static TableStorageContext CreateDb()
-    {
-        return new TableStorageContext();
-    }
 
     [Fact]
     public async Task GetPollCostSummary_ComputesCorrectCost_ForGoogleMaps()
     {
         // Arrange
-        TableStorageContext db = CreateDb();
+        TableStorageContext db = TestDoubles.CreateDb();
 
         UserId userId = UserId.New();
         RouteId routeId = RouteId.New();
@@ -66,7 +63,7 @@ public sealed class GetPollCostSummaryHandlerTests
     [Fact]
     public async Task GetPollCostSummary_WhenNoPollsToday_ReturnsSummaryWithZeroCost()
     {
-        TableStorageContext db = CreateDb();
+        TableStorageContext db = TestDoubles.CreateDb();
 
         var handler = new GetPollCostSummaryHandler(db, NullLogger<GetPollCostSummaryHandler>.Instance);
 

@@ -144,5 +144,7 @@ public sealed class TripleTestIntegrationTests : BaseIntegrationTest
             "/e2e/dev-login", new { Email = "commuter@test.invalid", Role = "Commuter" });
         resp.EnsureSuccessStatusCode();
     }
-    private sealed record StartResponse(SessionId SessionId);
+    // TripleTestSessionId, not SessionId — the endpoint returns a triple-test session id, and
+    // comparing it against a differently-typed id can never succeed no matter what the API returns.
+    private sealed record StartResponse(TripleTestSessionId SessionId);
 }

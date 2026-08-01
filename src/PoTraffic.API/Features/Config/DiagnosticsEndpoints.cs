@@ -74,11 +74,21 @@ public static class DiagnosticsEndpoints
     private static string Mask(string? value)
         => string.IsNullOrEmpty(value) ? "(empty)" : $"(set, {value.Length} chars)";
 
-    private static async Task<IResult> HandleKeyVaultDiag(
+    /// <summary>
+    /// Reports whether a vault-sourced secret actually resolved, without echoing its value.
+    ///
+    /// <para>
+    /// Resolution is checked against <see cref="IConfiguration"/>, which is where
+    /// <c>AddAzureKeyVault</c> + <c>PrefixKeyVaultSecretManager</c> deposit vault secrets —
+    /// so this answers the question the endpoint exists for ("did the managed identity pull
+    /// this secret?") using the same source the <c>keyvault</c> health check reads. The
+    /// previous indirection through a <c>KeyVaultSecretProbe</c> interface had exactly one
+    /// implementation, which always returned null, making this branch permanently dead.
+    /// </para>
+    /// </summary>
+    private static IResult HandleKeyVaultDiag(
         [FromServices] IConfiguration configuration,
-        [FromServices] KeyVaultSecretProbe probe,
-        [FromQuery] string? secret = null,
-        CancellationToken ct = default)
+        [FromQuery] string? secret = null)
     {
         // Always return a tiny shape — never echo raw secret values.
         var payload = new Dictionary<string, object?>
@@ -90,21 +100,12 @@ public static class DiagnosticsEndpoints
 
         if (!string.IsNullOrWhiteSpace(secret))
         {
-            try
-            {
-                string? value = await probe.TryGetAsync(secret, ct);
-                payload["requestedSecret"] = secret;
-                payload["found"] = value is not null;
-                payload["length"] = value?.Length ?? 0;
-                // Intentionally DO NOT echo the raw value.
-                payload["maskedPreview"] = value is null
-                    ? null
-                    : string.Concat(value.AsSpan(0, Math.Min(2, value.Length)), new string('*', Math.Max(0, value.Length - 2)));
-            }
-            catch (Exception ex)
-            {
-                payload["error"] = ex.GetType().Name;
-            }
+            string? value = configuration[secret];
+            payload["requestedSecret"] = secret;
+            payload["found"] = !string.IsNullOrEmpty(value);
+            // Length bucket only — Mask() is the same rule /diag/config applies, so no
+            // characters of a secret can escape through either surface.
+            payload["masked"] = Mask(value);
         }
 
         return Results.Ok(payload);
@@ -120,19 +121,3 @@ public static class DiagnosticsEndpoints
 
 /// <summary>One flattened configuration entry, with its value already masked if sensitive.</summary>
 internal sealed record DiagConfigEntry(string Path, string Value, bool IsSensitive);
-
-/// <summary>
-/// Thin wrapper that tries to fetch a secret from Key Vault using the
-/// shared managed identity. Returns <c>null</c> on any failure (the
-/// /diag endpoint never throws — it always reports diagnostics).
-/// </summary>
-public interface KeyVaultSecretProbe
-{
-    Task<string?> TryGetAsync(string secretName, CancellationToken ct);
-}
-
-internal sealed class KeyVaultSecretProbeNoOp : KeyVaultSecretProbe
-{
-    public Task<string?> TryGetAsync(string secretName, CancellationToken ct) =>
-        Task.FromResult<string?>(null);
-}

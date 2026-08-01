@@ -1,6 +1,7 @@
 using PoTraffic.Shared.DTOs.Admin;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using PoTraffic.API.Features.Config;
 using PoTraffic.API.Infrastructure.Storage;
 
 namespace PoTraffic.API.Infrastructure;
@@ -16,8 +17,7 @@ internal static class HealthCheckExtensions
     internal static IServiceCollection AddPoTrafficHealthChecks(
         this IServiceCollection services, IHostEnvironment env, IConfiguration config)
     {
-        bool usingMockProviders = env.IsEnvironment("Testing")
-            || string.Equals(config["Features:UseMockProviders"], "true", StringComparison.OrdinalIgnoreCase);
+        bool usingMockProviders = FeatureFlags.Resolve(config, env).UseMockProviders;
 
         services.AddHealthChecks()
             .AddCheck("keyvault", () =>

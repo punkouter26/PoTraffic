@@ -30,9 +30,7 @@ public sealed class GetBaselineQueryHandler
         // For small-to-medium route histories (the common case), the in-process
         // LINQ query is fine; very large histories can move to a precomputed
         // Table Storage aggregate in a follow-up optimisation.
-        bool owned = _db.Routes
-            .Any(r => r.Id == query.RouteId && r.UserId == query.UserId);
-        if (!owned)
+        if (!_db.OwnsRoute(query.RouteId, query.UserId))
             return Task.FromResult(new BaselineResponse(query.RouteId, query.DayOfWeek, 0, [], true));
 
         List<PollRecord> allPolls = _db.Polls

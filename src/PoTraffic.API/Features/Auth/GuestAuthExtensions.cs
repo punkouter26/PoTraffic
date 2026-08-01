@@ -16,19 +16,8 @@ namespace PoTraffic.API.Features.Auth;
 /// </summary>
 public static class GuestAuthExtensions
 {
-    /// <summary>
-    /// Email domain suffix shared by all GUEST accounts.
-    /// Clients check <c>email.StartsWith("guest") &amp;&amp; email.EndsWith("@potraffic.dev")</c>
-    /// to detect GUEST sessions and display "GUEST{n} LOGGED IN" in the nav bar.
-    /// </summary>
-    public const string GuestEmailDomain = "@potraffic.dev";
-    public const string GuestEmailPrefix = "guest";
-
-    /// <summary>
-    /// Number of random digits appended to the GUEST prefix.
-    /// 8 digits = 100,000,000 unique GUEST identities (Rule 13).
-    /// </summary>
-    public const int GuestSuffixLength = 8;
+    // The GUEST address shape lives in PoTraffic.Shared.Constants.GuestAccountConstants —
+    // the client detects GUEST sessions from the same values and cannot reference this project.
 
     public static IEndpointRouteBuilder MapGuestEndpoints(this IEndpointRouteBuilder app, IWebHostEnvironment environment)
     {
@@ -80,18 +69,13 @@ public sealed class GuestLoginCommandHandler(
     {
         // Each GUEST session gets a brand-new unique account so parallel runs never collide.
         // Suffix is 8 random digits (00000000–99999999), giving 100M distinct GUEST identities.
-        int min = (int)Math.Pow(10, GuestAuthExtensions.GuestSuffixLength - 1);
-        int max = (int)Math.Pow(10, GuestAuthExtensions.GuestSuffixLength);
-        int suffix = Random.Shared.Next(min, max);
-        string guestEmail = $"{GuestAuthExtensions.GuestEmailPrefix}{suffix}{GuestAuthExtensions.GuestEmailDomain}";
+        int min = (int)Math.Pow(10, GuestAccountConstants.SuffixLength - 1);
+        int max = (int)Math.Pow(10, GuestAccountConstants.SuffixLength);
+        string guestEmail = GuestAccountConstants.EmailFor(Random.Shared.Next(min, max));
 
         // Ensure no accidental collision — retry once if needed
-        bool exists = db.Users.Any(u => u.Email == guestEmail);
-        if (exists)
-        {
-            suffix = Random.Shared.Next(min, max);
-            guestEmail = $"{GuestAuthExtensions.GuestEmailPrefix}{suffix}{GuestAuthExtensions.GuestEmailDomain}";
-        }
+        if (db.Users.Any(u => u.Email == guestEmail))
+            guestEmail = GuestAccountConstants.EmailFor(Random.Shared.Next(min, max));
 
         User guestUser = new()
         {

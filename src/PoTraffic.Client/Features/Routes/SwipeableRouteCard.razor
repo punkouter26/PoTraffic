@@ -19,7 +19,8 @@
         <span>Delete</span>
     </div>
 
-    <RouteCard Route="Route"
+    <RouteCard @ref="_routeCard"
+               Route="Route"
                OptimalDeparture="OptimalDeparture"
                RecentPolls="RecentPolls"
                OnDeleted="OnDeleted"
@@ -34,6 +35,7 @@
     [Parameter] public EventCallback OnRefresh { get; set; }
 
     private ElementReference _cardElement;
+    private RouteCard? _routeCard;
     private DotNetObjectReference<SwipeableRouteCard>? _selfRef;
     private IAsyncDisposable? _gestureCleanup;
     private bool _pendingDelete;
@@ -60,7 +62,10 @@
         {
             case "left":
                 await Pt.PlayAsync("click");
-                await RefreshAsync();
+                // Swipe-left is the Check Now button by another name — delegate to the card's
+                // own implementation instead of a second, drifting copy of the same request.
+                if (_routeCard is not null)
+                    await _routeCard.CheckNowAsync();
                 break;
             case "right":
                 await Pt.PlayAsync("delete");
@@ -71,28 +76,6 @@
                 await ShowLongPressMenuAsync();
                 break;
         }
-    }
-
-    private async Task RefreshAsync()
-    {
-        // Trigger a check-now via the existing route
-        try
-        {
-            var resp = await Http.PostAsync($"/api/routes/{Route.Id}/check-now", null);
-            if (resp.IsSuccessStatusCode)
-            {
-                var data = await resp.Content.ReadFromJsonAsync(AppJsonContext.Default.CheckNowResponse);
-                NotificationService.Notify(new NotificationMessage
-                {
-                    Severity = NotificationSeverity.Info,
-                    Summary = "Current travel time",
-                    Detail = data is not null ? $"{data.DurationSeconds / 60} min" : "Live travel time retrieved",
-                    Duration = 4000
-                });
-                await OnRefresh.InvokeAsync();
-            }
-        }
-        catch { /* swallow */ }
     }
 
     private async Task TryDeleteWithUndoAsync()
