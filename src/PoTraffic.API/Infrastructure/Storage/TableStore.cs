@@ -155,14 +155,22 @@ public sealed class AzureTableStore(TableServiceClient tableService) : ITableSto
 
         Response<IReadOnlyList<Response>> response = await client.SubmitTransactionAsync(actions, ct);
 
+        // Sub-responses come back positionally, one per submitted action. If that ever fails to
+        // hold, pairing by index would staple another row's ETag onto this one — which the next
+        // save would spend as a conditional guard, silently turning optimistic concurrency into
+        // a blind overwrite. So the pairing is used only when the counts prove it, and ETag.All
+        // ("unknown — write unconditionally") stands in otherwise.
+        IReadOnlyList<Response> subResponses = response.Value;
+        bool pairwise = subResponses.Count == chunk.Length;
+
         List<TableWriteResult> results = [];
         for (int i = 0; i < chunk.Length; i++)
         {
             if (chunk[i].Kind != TableOpKind.Upsert)
                 continue;
-            results.Add(new TableWriteResult(
-                key.Table, key.PartitionKey, chunk[i].RowKey,
-                response.Value[i].Headers.ETag?.ToString() ?? ETag.All.ToString()));
+            string etag = (pairwise ? subResponses[i].Headers.ETag?.ToString() : null)
+                ?? ETag.All.ToString();
+            results.Add(new TableWriteResult(key.Table, key.PartitionKey, chunk[i].RowKey, etag));
         }
         return results;
     }
