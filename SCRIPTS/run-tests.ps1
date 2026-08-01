@@ -70,7 +70,7 @@ function Stop-PortProcesses {
     foreach ($p in $pids) {
         try {
             $proc = Get-Process -Id $p -ErrorAction SilentlyContinue
-            if ($proc -and ($proc.ProcessName -in @('dotnet', 'PoTraffic.Api'))) {
+            if ($proc -and ($proc.ProcessName -in @('dotnet', 'PoTraffic.API'))) {
                 Write-Host "  Stopping stale $($proc.ProcessName) PID $p on port $Port" -ForegroundColor Yellow
                 Stop-Process -Id $p -Force -ErrorAction SilentlyContinue
             }
@@ -83,7 +83,7 @@ function Warmup-App {
     Write-Host "  Warming up app at $Url ..." -ForegroundColor Yellow
     for ($i = 1; $i -le $MaxRetries; $i++) {
         try {
-            $r = Invoke-WebRequest -Uri "$Url/health" -TimeoutSec 5 -UseBasicParsing -ErrorAction Stop
+            $r = Invoke-WebRequest -Uri "$Url/health/json" -TimeoutSec 5 -UseBasicParsing -ErrorAction Stop
             if ($r.StatusCode -lt 500) {
                 Write-Host "  App is ready (attempt $i)." -ForegroundColor Green
                 return $true
@@ -123,7 +123,7 @@ function Start-TestingHost {
     $stderr = Join-Path $hostLogDir 'stderr.log'
     Write-Host "  Starting Testing host at $Url ..." -ForegroundColor Yellow
     return Start-Process -FilePath 'dotnet' `
-        -ArgumentList @('run', '--project', (Join-Path $root 'src/PoTraffic.Api/PoTraffic.Api.csproj'), '--launch-profile', 'Testing', '--no-build') `
+        -ArgumentList @('run', '--project', (Join-Path $root 'src/PoTraffic.API/PoTraffic.API.csproj'), '--launch-profile', 'Testing', '--no-build') `
         -WorkingDirectory $root `
         -RedirectStandardOutput $stdout `
         -RedirectStandardError $stderr `
@@ -272,12 +272,12 @@ function Render-HtmlReport {
         '1|Tiered test execution (100/50/25/25)|Implemented|tests/PoTraffic.UnitTests/*, tests/PoTraffic.Tests/*'
         '2|Simplified CI/CD YAML|Implemented|.github/workflows/deploy.yml'
         '3|Lifecycle-managed Testcontainers Azurite|Implemented|tests/PoTraffic.Tests/Integration/Infrastructure/AzuriteTestContainer.cs'
-        '4|Mock AI boundaries via DelegatingHandler|Implemented|src/PoTraffic.Api/Infrastructure/Security/MockExternalAuthDelegatingHandler.cs'
+        '4|Mock AI boundaries via DelegatingHandler|Implemented|src/PoTraffic.API/Infrastructure/Security/MockExternalAuthDelegatingHandler.cs'
         '5|Mobile + desktop Playwright viewports|Implemented|tests/PoTraffic.Tests.E2E/Ui/Viewports.cs, ViewportsTheory.cs'
         '6|Po naming + Managed Identity + PoShared|Implemented|infra/main.bicep'
         '7|ARG governance script|Implemented|SCRIPTS/arg-governance.ps1'
-        '8|App Insights adaptive sampling + storage lifecycle|Implemented|src/PoTraffic.Api/Infrastructure/Observability/*, infra/main.bicep'
-        '9|Post-deploy smoke (Playwright + /health + /diag)|Implemented|SCRIPTS/post-deploy-smoke.ps1, src/PoTraffic.Api/Features/Diagnostics/*'
+        '8|App Insights adaptive sampling + storage lifecycle|Implemented|src/PoTraffic.API/Infrastructure/Observability/*, infra/main.bicep'
+        '9|Post-deploy smoke (Playwright + /health + /diag)|Implemented|SCRIPTS/post-deploy-smoke.ps1, src/PoTraffic.API/Features/Diagnostics/*'
         '10|Test-run HTML report|Implemented|SCRIPTS/run-tests.ps1'
     )
     foreach ($row in $ideas) {

@@ -12,7 +12,7 @@ public sealed record WeekdayMeanDto(
 /// days that have at least one sample; both null until any polls exist.
 /// </summary>
 public sealed record WeekdayComparisonDto(
-    Guid RouteId,
+    RouteId RouteId,
     IReadOnlyList<WeekdayMeanDto> Days,
     string? BestDay,
     string? WorstDay);

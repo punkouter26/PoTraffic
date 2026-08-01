@@ -1,7 +1,7 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
-using PoTraffic.Api.Features.Admin;
-using PoTraffic.Api.Infrastructure.Storage;
+using PoTraffic.API.Features.Admin;
+using PoTraffic.API.Infrastructure.Storage;
 
 using PoTraffic.Shared.DTOs.Admin;
 
@@ -25,8 +25,8 @@ public sealed class GetGlobalVolatilityHandlerTests
         // Arrange
         TableStorageContext db = CreateDb();
 
-        Guid userId = Guid.NewGuid();
-        Guid routeId = Guid.NewGuid();
+        UserId userId = UserId.New();
+        RouteId routeId = RouteId.New();
 
         db.Add(new User { Id = userId, Email = "test@test.com", Locale = "en-IE", CreatedAt = DateTimeOffset.UtcNow });
         db.Add(new EntityRoute
@@ -47,9 +47,9 @@ public sealed class GetGlobalVolatilityHandlerTests
 
         db.AddRange(new PollRecord[]
         {
-            new PollRecord { Id = Guid.NewGuid(), RouteId = routeId, PolledAt = monday0800, TravelDurationSeconds = 300, DistanceMetres = 5000 },
-            new PollRecord { Id = Guid.NewGuid(), RouteId = routeId, PolledAt = monday0800.AddDays(-7), TravelDurationSeconds = 320, DistanceMetres = 5000 },
-            new PollRecord { Id = Guid.NewGuid(), RouteId = routeId, PolledAt = monday0805, TravelDurationSeconds = 360, DistanceMetres = 5000 }
+            new PollRecord { Id = PollRecordId.New(), RouteId = routeId, PolledAt = monday0800, TravelDurationSeconds = 300, DistanceMetres = 5000 },
+            new PollRecord { Id = PollRecordId.New(), RouteId = routeId, PolledAt = monday0800.AddDays(-7), TravelDurationSeconds = 320, DistanceMetres = 5000 },
+            new PollRecord { Id = PollRecordId.New(), RouteId = routeId, PolledAt = monday0805, TravelDurationSeconds = 360, DistanceMetres = 5000 }
         });
         await db.SaveChangesAsync();
 

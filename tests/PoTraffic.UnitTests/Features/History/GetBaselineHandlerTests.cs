@@ -1,7 +1,7 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
-using PoTraffic.Api.Features.History;
-using PoTraffic.Api.Infrastructure.Storage;
+using PoTraffic.API.Features.History;
+using PoTraffic.API.Infrastructure.Storage;
 
 using PoTraffic.Shared.DTOs.History;
 using PoTraffic.Shared.Constants;
@@ -33,12 +33,12 @@ public sealed class GetBaselineHandlerTests
         // Arrange
         TableStorageContext db = CreateDb();
 
-        Guid routeId = Guid.NewGuid();
+        RouteId routeId = RouteId.New();
         var handler = new GetBaselineQueryHandler(db, NullLogger<GetBaselineQueryHandler>.Instance);
 
         // Act
         var result = await handler.Handle(
-            new GetBaselineQuery(routeId, Guid.Empty, "Monday"),
+            new GetBaselineQuery(routeId, UserId.Empty, "Monday"),
             CancellationToken.None);
 
         // Assert — no sessions → baseline response has empty slot list
@@ -53,13 +53,13 @@ public sealed class GetBaselineHandlerTests
     {
         // Arrange
         TableStorageContext db = CreateDb();
-        Guid routeId = Guid.NewGuid();
+        RouteId routeId = RouteId.New();
 
         var handler = new GetBaselineQueryHandler(db, NullLogger<GetBaselineQueryHandler>.Instance);
 
         // Act
         var result = await handler.Handle(
-            new GetBaselineQuery(routeId, Guid.Empty, "Tuesday"),
+            new GetBaselineQuery(routeId, UserId.Empty, "Tuesday"),
             CancellationToken.None);
 
         // Assert

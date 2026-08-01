@@ -28,7 +28,7 @@ src/
   PoTraffic.Domain/          # Pure domain entities and value objects
   PoTraffic.Application/     # Interfaces, contracts, validators
   PoTraffic.Infrastructure/  # Azure, Table Storage, external providers
-  PoTraffic.Api/             # ASP.NET Core host and vertical slices
+  PoTraffic.API/             # ASP.NET Core host and vertical slices
   PoTraffic.Client/          # Blazor WASM front-end
   PoTraffic.Shared/          # DTOs shared by API and client
 tests/

@@ -13,7 +13,7 @@
     font-size: 0.8rem;
     font-weight: 600;
     text-decoration: none;
-    color: var(--pt-fg-on-brand, #fff);
+    color: var(--pt-fg-on-brand, var(--pt-fg-on-brand));
     background: var(--pt-glass-bg-strong, rgba(255, 255, 255, 0.18));
     border: 1px solid var(--pt-glass-border, rgba(255, 255, 255, 0.3));
     transition: transform var(--pt-dur-fast, 120ms) var(--pt-ease-out, ease-out);
@@ -67,6 +67,9 @@
 
 .pt-weekday-bar {
     height: 100%;
+    /* --pt-weekday-pct (0-100) is supplied per-bar by the component; the rule that
+       turns it into a width lives here rather than in the markup (Rule 4). */
+    width: calc(var(--pt-weekday-pct, 0) * 1%);
     border-radius: inherit;
     /* GPU-friendly: animate transform, not width, on first paint (§6.10) */
     transform-origin: left center;

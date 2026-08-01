@@ -17,7 +17,7 @@
       "command": "dotnet",
       "args": [
         "build",
-        "${workspaceFolder}/src/PoTraffic.Api/PoTraffic.Api.csproj",
+        "${workspaceFolder}/src/PoTraffic.API/PoTraffic.API.csproj",
         "-c",
         "Debug",
         "/property:GenerateFullPaths=true",

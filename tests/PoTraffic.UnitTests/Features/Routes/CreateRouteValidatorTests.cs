@@ -1,8 +1,8 @@
 using FluentAssertions;
 using FluentValidation.TestHelper;
 using NSubstitute;
-using PoTraffic.Api.Features.Routes;
-using PoTraffic.Api.Infrastructure.Providers;
+using PoTraffic.API.Features.Routes;
+using PoTraffic.API.Infrastructure.Providers;
 using PoTraffic.Shared.Constants;
 using PoTraffic.Shared.Enums;
 
@@ -20,7 +20,7 @@ public sealed class CreateRouteValidatorTests
     public void Validator_WhenOriginIsEmpty_ShouldHaveValidationError()
     {
         var command = new CreateRouteCommand(
-            UserId: Guid.NewGuid(),
+            UserId: UserId.New(),
             OriginAddress: "",
             DestinationAddress: "10 Downing Street, London",
             Provider: RouteProvider.GoogleMaps);
@@ -34,7 +34,7 @@ public sealed class CreateRouteValidatorTests
     public void Validator_WhenDestinationIsEmpty_ShouldHaveValidationError()
     {
         var command = new CreateRouteCommand(
-            UserId: Guid.NewGuid(),
+            UserId: UserId.New(),
             OriginAddress: "1 Infinite Loop, Cupertino",
             DestinationAddress: "",
             Provider: RouteProvider.GoogleMaps);
@@ -48,7 +48,7 @@ public sealed class CreateRouteValidatorTests
     public void Validator_WhenBothAddressesEmpty_ShouldHaveValidationErrors()
     {
         var command = new CreateRouteCommand(
-            UserId: Guid.NewGuid(),
+            UserId: UserId.New(),
             OriginAddress: "",
             DestinationAddress: "",
             Provider: RouteProvider.GoogleMaps);
@@ -64,7 +64,7 @@ public sealed class CreateRouteValidatorTests
     {
         string longAddress = new('A', ValidationConstants.AddressMaxLength + 1);
         var command = new CreateRouteCommand(
-            UserId: Guid.NewGuid(),
+            UserId: UserId.New(),
             OriginAddress: longAddress,
             DestinationAddress: "Valid Destination",
             Provider: RouteProvider.GoogleMaps);
@@ -79,7 +79,7 @@ public sealed class CreateRouteValidatorTests
     {
         string longAddress = new('B', ValidationConstants.AddressMaxLength + 1);
         var command = new CreateRouteCommand(
-            UserId: Guid.NewGuid(),
+            UserId: UserId.New(),
             OriginAddress: "Valid Origin",
             DestinationAddress: longAddress,
             Provider: RouteProvider.GoogleMaps);
@@ -93,7 +93,7 @@ public sealed class CreateRouteValidatorTests
     public void Validator_WhenProviderIsInvalidEnum_ShouldHaveValidationError()
     {
         var command = new CreateRouteCommand(
-            UserId: Guid.NewGuid(),
+            UserId: UserId.New(),
             OriginAddress: "Valid Origin",
             DestinationAddress: "Valid Destination",
             Provider: (RouteProvider)99); // invalid enum value
@@ -109,7 +109,7 @@ public sealed class CreateRouteValidatorTests
     public void Validator_WhenCommandIsValid_ShouldNotHaveValidationErrors(RouteProvider provider)
     {
         var command = new CreateRouteCommand(
-            UserId: Guid.NewGuid(),
+            UserId: UserId.New(),
             OriginAddress: "Baker Street, London",
             DestinationAddress: "Waterloo Station, London",
             Provider: provider);
@@ -130,7 +130,7 @@ public sealed class CreateRouteValidatorTests
         // Same text strings are syntactically valid; the SAME_COORDINATES check happens
         // after geocoding in CreateRouteCommandHandler (FR-014).
         var command = new CreateRouteCommand(
-            UserId: Guid.NewGuid(),
+            UserId: UserId.New(),
             OriginAddress: "Buckingham Palace",
             DestinationAddress: "Buckingham Palace",
             Provider: RouteProvider.TomTom);
@@ -145,7 +145,7 @@ public sealed class CreateRouteValidatorTests
     public void Validator_WhenStartTimeIsInvalidFormat_ShouldHaveValidationError()
     {
         var command = new CreateRouteCommand(
-            UserId: Guid.NewGuid(),
+            UserId: UserId.New(),
             OriginAddress: "Baker Street, London",
             DestinationAddress: "Waterloo Station, London",
             Provider: RouteProvider.GoogleMaps,
@@ -160,7 +160,7 @@ public sealed class CreateRouteValidatorTests
     public void Validator_WhenEndTimeIsBeforeStartTime_ShouldHaveValidationError()
     {
         var command = new CreateRouteCommand(
-            UserId: Guid.NewGuid(),
+            UserId: UserId.New(),
             OriginAddress: "Baker Street, London",
             DestinationAddress: "Waterloo Station, London",
             Provider: RouteProvider.GoogleMaps,
@@ -176,7 +176,7 @@ public sealed class CreateRouteValidatorTests
     public void Validator_WhenDaysOfWeekMaskIsZero_ShouldHaveValidationError()
     {
         var command = new CreateRouteCommand(
-            UserId: Guid.NewGuid(),
+            UserId: UserId.New(),
             OriginAddress: "Baker Street, London",
             DestinationAddress: "Waterloo Station, London",
             Provider: RouteProvider.GoogleMaps,
@@ -191,7 +191,7 @@ public sealed class CreateRouteValidatorTests
     public void Validator_WhenScheduleIsValid_ShouldNotHaveValidationErrors()
     {
         var command = new CreateRouteCommand(
-            UserId: Guid.NewGuid(),
+            UserId: UserId.New(),
             OriginAddress: "Baker Street, London",
             DestinationAddress: "Waterloo Station, London",
             Provider: RouteProvider.GoogleMaps,

@@ -1,13 +1,14 @@
 // filepath: tests/PoTraffic.UnitTests/GlobalUsings.cs
 // Strict Unit-tier guards. Throws at runtime if any forbidden API is touched.
-global using EntityRoute = PoTraffic.Api.Features.Routes.Entities.Route;
+global using EntityRoute = PoTraffic.API.Features.Routes.Route;
 
 // Mirror the API's GlobalUsings so test code can reference entity types without per-file usings.
-global using PoTraffic.Api.Features.Admin.Entities;
-global using PoTraffic.Api.Features.Auth.Entities;
-global using PoTraffic.Api.Features.Routes.Entities;
-global using PoTraffic.Api.Features.MonitoringWindows.Entities;
-global using PoTraffic.Api.Features.Config.Entities;
+global using PoTraffic.API.Features.Admin;
+global using PoTraffic.API.Features.Auth;
+global using PoTraffic.API.Features.Routes;
+global using PoTraffic.API.Features.MonitoringWindows;
+global using PoTraffic.API.Features.Config;
+global using PoTraffic.Shared.Ids;
 
 namespace PoTraffic.UnitTests;
 

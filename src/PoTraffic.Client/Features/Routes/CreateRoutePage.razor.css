@@ -23,7 +23,7 @@
     padding: 0 14px;
     border: 1px solid var(--pt-border-subtle, #d1d5db);
     border-radius: 999px;
-    background: var(--pt-bg-surface, #fff);
+    background: var(--pt-bg-surface, var(--pt-bg-surface));
     color: var(--pt-fg-secondary, #4b5563);
     font-size: 0.875rem;
     font-weight: 600;
@@ -33,13 +33,13 @@
 }
 
 .pt-day-toggle:hover {
-    border-color: var(--pt-color-brand-500, #2563eb);
+    border-color: var(--pt-color-brand-500, var(--pt-color-brand-600));
 }
 
 .pt-day-toggle.is-selected {
-    background: var(--pt-color-brand-500, #2563eb);
-    border-color: var(--pt-color-brand-500, #2563eb);
-    color: var(--pt-fg-on-brand, #fff);
+    background: var(--pt-color-brand-500, var(--pt-color-brand-600));
+    border-color: var(--pt-color-brand-500, var(--pt-color-brand-600));
+    color: var(--pt-fg-on-brand, var(--pt-fg-on-brand));
 }
 
 /* Keep the checkbox accessible to screen readers / keyboard, but drive the
@@ -53,7 +53,7 @@
 }
 
 .pt-day-toggle:focus-within {
-    outline: 2px solid var(--pt-color-brand-500, #2563eb);
+    outline: 2px solid var(--pt-color-brand-500, var(--pt-color-brand-600));
     outline-offset: 2px;
 }
 

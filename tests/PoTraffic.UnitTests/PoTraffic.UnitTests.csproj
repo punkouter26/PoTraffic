@@ -25,7 +25,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\PoTraffic.Shared\PoTraffic.Shared.csproj" />
-    <ProjectReference Include="..\..\src\PoTraffic.Api\PoTraffic.Api.csproj" />
+    <ProjectReference Include="..\..\src\PoTraffic.API\PoTraffic.API.csproj" />
   </ItemGroup>
 
   <ItemGroup>

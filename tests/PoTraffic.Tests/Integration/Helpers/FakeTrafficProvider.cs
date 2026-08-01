@@ -1,4 +1,4 @@
-using PoTraffic.Api.Infrastructure.Providers;
+using PoTraffic.API.Infrastructure.Providers;
 
 namespace PoTraffic.Tests.Helpers;
 

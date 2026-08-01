@@ -1,7 +1,7 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
-using PoTraffic.Api.Features.Admin;
-using PoTraffic.Api.Infrastructure.Storage;
+using PoTraffic.API.Features.Admin;
+using PoTraffic.API.Infrastructure.Storage;
 
 using PoTraffic.Shared.DTOs.Admin;
 
@@ -25,8 +25,8 @@ public sealed class GetPollCostSummaryHandlerTests
         // Arrange
         TableStorageContext db = CreateDb();
 
-        Guid userId = Guid.NewGuid();
-        Guid routeId = Guid.NewGuid();
+        UserId userId = UserId.New();
+        RouteId routeId = RouteId.New();
         DateTimeOffset todayStart = DateTimeOffset.UtcNow.Date;
 
         // Need a User and Route for the navigation to work
@@ -45,8 +45,8 @@ public sealed class GetPollCostSummaryHandlerTests
         // Manually seed cost config (EnsureCreated may not run HasData in InMemory)
         db.AddRange(new PollRecord[]
         {
-            new PollRecord { Id = Guid.NewGuid(), RouteId = routeId, PolledAt = todayStart.AddHours(8), TravelDurationSeconds = 300, DistanceMetres = 5000 },
-            new PollRecord { Id = Guid.NewGuid(), RouteId = routeId, PolledAt = todayStart.AddHours(9), TravelDurationSeconds = 310, DistanceMetres = 5000 }
+            new PollRecord { Id = PollRecordId.New(), RouteId = routeId, PolledAt = todayStart.AddHours(8), TravelDurationSeconds = 300, DistanceMetres = 5000 },
+            new PollRecord { Id = PollRecordId.New(), RouteId = routeId, PolledAt = todayStart.AddHours(9), TravelDurationSeconds = 310, DistanceMetres = 5000 }
         });
         db.SeedDefaultConfigurationsIfMissing();
         await db.SaveChangesAsync();

@@ -52,7 +52,7 @@ az login
 azd up
 ```
 
-`azure.yaml` maps `src/PoTraffic.Api` to an Azure App Service host. The API
+`azure.yaml` maps `src/PoTraffic.API` to an Azure App Service host. The API
 serves the WASM client directly; do not configure CORS.
 
 ## Observability
@@ -61,5 +61,5 @@ serves the WASM client directly; do not configure CORS.
 - OpenTelemetry records ASP.NET Core inbound requests and outbound HTTP calls.
 - Azure Monitor export is enabled when an App Insights connection string is
   resolved from configuration or Key Vault.
-- `/health` returns JSON for uptime checks.
+- `/health/json` returns JSON for uptime checks; `/health` is the Blazor status page.
 - `/diag` is a hidden diagnostic page with masked configuration values.

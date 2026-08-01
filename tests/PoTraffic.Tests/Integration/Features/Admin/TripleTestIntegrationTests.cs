@@ -144,5 +144,5 @@ public sealed class TripleTestIntegrationTests : BaseIntegrationTest
             "/e2e/dev-login", new { Email = "commuter@test.invalid", Role = "Commuter" });
         resp.EnsureSuccessStatusCode();
     }
-    private sealed record StartResponse(Guid SessionId);
+    private sealed record StartResponse(SessionId SessionId);
 }

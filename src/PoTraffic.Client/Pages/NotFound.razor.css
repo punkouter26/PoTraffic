@@ -18,7 +18,7 @@
 .pt-notfound-title {
     font-size: var(--pt-text-2xl, 1.5rem);
     font-weight: 700;
-    color: var(--pt-fg-primary, #0f172a);
+    color: var(--pt-fg-primary, var(--pt-fg-primary));
     margin: 0;
 }
 

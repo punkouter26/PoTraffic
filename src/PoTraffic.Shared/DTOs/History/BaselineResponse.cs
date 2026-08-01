@@ -7,7 +7,7 @@ namespace PoTraffic.Shared.DTOs.History;
 /// still shows a usable baseline instead of a blank chart).
 /// </summary>
 public sealed record BaselineResponse(
-    Guid RouteId,
+    RouteId RouteId,
     string DayOfWeek,
     int SessionCount,
     IReadOnlyList<BaselineSlotDto> Slots,

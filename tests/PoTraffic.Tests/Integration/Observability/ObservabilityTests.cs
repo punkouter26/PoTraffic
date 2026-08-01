@@ -18,7 +18,7 @@ public sealed class ObservabilityTests : BaseIntegrationTest
     /// and that a trace is produced for a real HTTP request to the health endpoint.
     ///
     /// Given  the API is running with OTel instrumentation
-    /// When   GET /health is called
+    /// When   GET /health/json is called
     /// Then   the response is 200 OK (pipeline did not crash)
     /// And    an Activity is present in the current execution context (OTel is sampling)
     ///
@@ -45,7 +45,7 @@ public sealed class ObservabilityTests : BaseIntegrationTest
         HttpClient client = CreateClient();
 
         // Act
-        HttpResponseMessage response = await client.GetAsync("/health");
+        HttpResponseMessage response = await client.GetAsync("/health/json");
 
         // Assert — pipeline is alive
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -65,7 +65,7 @@ public sealed class ObservabilityTests : BaseIntegrationTest
         HttpClient client = CreateClient();
 
         // Act
-        HttpResponseMessage response = await client.GetAsync("/health");
+        HttpResponseMessage response = await client.GetAsync("/health/json");
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);

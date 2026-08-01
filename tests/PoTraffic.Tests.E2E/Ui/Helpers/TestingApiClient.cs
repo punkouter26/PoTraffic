@@ -47,7 +47,7 @@ public sealed class TestingApiClient
     }
 
     /// <summary>Seeds a route for the given user and returns (RouteId, OriginCoords, DestCoords).</summary>
-    public async Task<(Guid RouteId, string OriginCoords, string DestCoords)> SeedRouteAsync(
+    public async Task<(RouteId RouteId, string OriginCoords, string DestCoords)> SeedRouteAsync(
         string email,
         string originAddress,
         string destinationAddress,
@@ -59,7 +59,7 @@ public sealed class TestingApiClient
             ct);
         response.EnsureSuccessStatusCode();
         SeedRouteResponse? body = await response.Content.ReadFromJsonAsync<SeedRouteResponse>(cancellationToken: ct);
-        if (body is null || body.RouteId == Guid.Empty)
+        if (body is null || body.RouteId.IsEmpty)
             throw new InvalidOperationException("seed-route endpoint did not return a RouteId.");
         return (body.RouteId, body.OriginCoords, body.DestCoords);
     }
@@ -81,7 +81,7 @@ public sealed class TestingApiClient
         [property: JsonPropertyName("destination")] string Destination);
 
     private sealed record SeedRouteResponse(
-        [property: JsonPropertyName("routeId")] Guid RouteId,
+        [property: JsonPropertyName("routeId")] RouteId RouteId,
         [property: JsonPropertyName("originCoords")] string OriginCoords,
         [property: JsonPropertyName("destCoords")] string DestCoords);
 }

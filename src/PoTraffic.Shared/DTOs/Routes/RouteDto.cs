@@ -3,7 +3,7 @@ using PoTraffic.Shared.Enums;
 namespace PoTraffic.Shared.DTOs.Routes;
 
 public sealed record RouteDto(
-    Guid Id,
+    RouteId Id,
     string OriginAddress,
     string OriginCoordinates,
     string DestinationAddress,
@@ -13,10 +13,10 @@ public sealed record RouteDto(
     string? JobChainId,
     DateTimeOffset CreatedAt,
     IReadOnlyList<MonitoringWindowDto> Windows,
-    Guid? ReturnRouteId = null);
+    RouteId? ReturnRouteId = null);
 
 public sealed record MonitoringWindowDto(
-    Guid Id,
+    WindowId Id,
     string StartTime,
     string EndTime,
     IReadOnlyList<string> DaysOfWeek,

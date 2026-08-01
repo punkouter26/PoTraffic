@@ -2,8 +2,8 @@
 using System;
 using System.Reflection;
 using FluentAssertions;
-using PoTraffic.Api.Features.MonitoringWindows.Entities;
-using PoTraffic.Api.Features.Routes;
+using PoTraffic.API.Features.MonitoringWindows;
+using PoTraffic.API.Features.Routes;
 using Xunit;
 
 namespace PoTraffic.UnitTests.Features.Routes;
@@ -50,8 +50,8 @@ public sealed class PollRouteJobWindowBoundaryTests
     {
         var window = new MonitoringWindow
         {
-            Id = Guid.NewGuid(),
-            RouteId = Guid.NewGuid(),
+            Id = WindowId.New(),
+            RouteId = RouteId.New(),
             DaysOfWeekMask = AllDays,
             StartTime = TimeOnly.Parse(start),
             EndTime = TimeOnly.Parse(end),
@@ -68,8 +68,8 @@ public sealed class PollRouteJobWindowBoundaryTests
     {
         var window = new MonitoringWindow
         {
-            Id = Guid.NewGuid(),
-            RouteId = Guid.NewGuid(),
+            Id = WindowId.New(),
+            RouteId = RouteId.New(),
             DaysOfWeekMask = Wed | Thu,                 // only Wed + Thu
             StartTime = new TimeOnly(0, 0),
             EndTime = new TimeOnly(23, 59),
@@ -94,8 +94,8 @@ public sealed class PollRouteJobWindowBoundaryTests
         // outside the window.)
         var window = new MonitoringWindow
         {
-            Id = Guid.NewGuid(),
-            RouteId = Guid.NewGuid(),
+            Id = WindowId.New(),
+            RouteId = RouteId.New(),
             DaysOfWeekMask = AllDays,
             StartTime = new TimeOnly(8, 0),
             EndTime = new TimeOnly(10, 0),
@@ -119,8 +119,8 @@ public sealed class PollRouteJobWindowBoundaryTests
         // The very next open slot should be Monday 08:00 UTC.
         var window = new MonitoringWindow
         {
-            Id = Guid.NewGuid(),
-            RouteId = Guid.NewGuid(),
+            Id = WindowId.New(),
+            RouteId = RouteId.New(),
             DaysOfWeekMask = Weekdays,
             StartTime = new TimeOnly(8, 0),
             EndTime = new TimeOnly(10, 0),
@@ -141,8 +141,8 @@ public sealed class PollRouteJobWindowBoundaryTests
     {
         var window = new MonitoringWindow
         {
-            Id = Guid.NewGuid(),
-            RouteId = Guid.NewGuid(),
+            Id = WindowId.New(),
+            RouteId = RouteId.New(),
             DaysOfWeekMask = 0, // no days
             StartTime = new TimeOnly(8, 0),
             EndTime = new TimeOnly(10, 0),

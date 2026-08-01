@@ -29,7 +29,7 @@ public sealed class SkipUnlessE2EReadyAttribute : FactAttribute
         {
             string baseUrl = Environment.GetEnvironmentVariable("E2E_BASE_URL") ?? DefaultBaseUrl;
             if (!IsAppReachable(baseUrl))
-                return $"PoTraffic.Api not reachable at {baseUrl} (set E2E_BASE_URL to override; otherwise the live API must be running).";
+                return $"PoTraffic.API not reachable at {baseUrl} (set E2E_BASE_URL to override; otherwise the live API must be running).";
             if (!IsPlaywrightInstalled())
                 return "Playwright Chromium binaries are not installed (run 'playwright install chromium').";
             return null;
@@ -42,7 +42,7 @@ public sealed class SkipUnlessE2EReadyAttribute : FactAttribute
         {
             using var handler = new HttpClientHandler();
             using var client = new HttpClient(handler) { Timeout = ProbeTimeout };
-            using var response = client.GetAsync(new Uri(new Uri(baseUrl), "/health"), HttpCompletionOption.ResponseHeadersRead)
+            using var response = client.GetAsync(new Uri(new Uri(baseUrl), "/health/json"), HttpCompletionOption.ResponseHeadersRead)
                                        .GetAwaiter().GetResult();
             return response.IsSuccessStatusCode;
         }

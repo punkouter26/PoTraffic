@@ -1,8 +1,8 @@
 namespace PoTraffic.Shared.DTOs.Alerts;
 
 public sealed record AlertDto(
-    Guid Id,
-    Guid RouteId,
+    AlertId Id,
+    RouteId RouteId,
     string Kind,
     string Message,
     int TravelSeconds,

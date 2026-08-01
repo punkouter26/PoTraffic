@@ -10,7 +10,7 @@ namespace PoTraffic.Tests.E2E.Api;
 
 /// <summary>
 /// Creates cookie-authenticated <see cref="HttpClient"/> instances against the
-/// live PoTraffic.Api running in the Testing environment (default base URL
+/// live PoTraffic.API running in the Testing environment (default base URL
 /// <c>http://localhost:5150</c>, override with <c>E2E_BASE_URL</c>).
 ///
 /// Mirrors the BFF cookie behaviour the Blazor WASM client uses in-browser —
@@ -24,7 +24,7 @@ public static class ApiSessionFactory
     /// <summary>
     /// Resolves the live base URL. Honours <c>E2E_BASE_URL</c> first, then probes
     /// the standard Testing (5150) and Development (5000) ports — first one
-    /// that answers /health wins. Probes fresh on every call so a dev that
+    /// that answers /health/json wins. Probes fresh on every call so a dev that
     /// boots the API after test discovery still hits it.
     /// </summary>
     public static string BaseUrl
@@ -44,7 +44,7 @@ public static class ApiSessionFactory
             try
             {
                 using var probe = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
-                using var resp = probe.GetAsync(new Uri(new Uri(candidate), "/health"))
+                using var resp = probe.GetAsync(new Uri(new Uri(candidate), "/health/json"))
                                       .GetAwaiter().GetResult();
                 if (resp.IsSuccessStatusCode) return candidate;
             }

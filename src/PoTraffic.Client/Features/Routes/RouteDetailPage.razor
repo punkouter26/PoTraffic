@@ -41,7 +41,7 @@ else
     @if (_route is not null)
     {
         <div class="pt-returntrip-bar rz-mb-4">
-            @if (_route.ReturnRouteId is Guid rid)
+            @if (_route.ReturnRouteId is RouteId rid)
             {
                 <span class="pt-returntrip-label">🔁 Return trip linked</span>
                 <RadzenButton Text="View return trip" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small"
@@ -128,8 +128,10 @@ else
                     <div class="pt-weekday-track">
                         @if (d.SampleCount > 0)
                         {
+                            @* The only thing crossing the markup boundary is the datum
+                               itself; .pt-weekday-bar owns the width rule (Rule 4). *@
                             <div class="pt-weekday-bar @WeekdayBarClass(d)"
-                                 style="width:@(WeekdayBarPercent(d).ToString("F0"))%"></div>
+                                 style="--pt-weekday-pct:@(WeekdayBarPercent(d).ToString("F0"))"></div>
                         }
                     </div>
                     <div class="pt-weekday-value">

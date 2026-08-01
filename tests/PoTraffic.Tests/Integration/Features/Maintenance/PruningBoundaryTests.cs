@@ -1,7 +1,7 @@
-using PoTraffic.Api.Infrastructure.Dispatch;
+using PoTraffic.API.Infrastructure.Dispatch;
 using Microsoft.Extensions.DependencyInjection;
-using PoTraffic.Api.Features.Maintenance;
-using PoTraffic.Api.Infrastructure.Storage;
+using PoTraffic.API.Features.Maintenance;
+using PoTraffic.API.Infrastructure.Storage;
 
 using PoTraffic.Tests.Helpers;
 using Xunit;
@@ -50,7 +50,7 @@ public sealed class PruningBoundaryTests : BaseIntegrationTest
 
         User user = new()
         {
-            Id = Guid.NewGuid(),
+            Id = UserId.New(),
             Email = "prune-boundary@test.invalid",
             Locale = "en-IE",
             CreatedAt = now.AddDays(-100)
@@ -59,7 +59,7 @@ public sealed class PruningBoundaryTests : BaseIntegrationTest
 
         EntityRoute route = new()
         {
-            Id = Guid.NewGuid(),
+            Id = RouteId.New(),
             UserId = user.Id,
             OriginAddress = "Origin",
             DestinationAddress = "Destination",
@@ -71,7 +71,7 @@ public sealed class PruningBoundaryTests : BaseIntegrationTest
 
         MonitoringSession session = new()
         {
-            Id = Guid.NewGuid(),
+            Id = SessionId.New(),
             RouteId = route.Id,
             SessionDate = DateOnly.FromDateTime(now.AddDays(-91)),
             IsHolidayExcluded = false
@@ -81,7 +81,7 @@ public sealed class PruningBoundaryTests : BaseIntegrationTest
         // Record 1: 91 days old — BEYOND cutoff, MUST be pruned
         PollRecord beyond = new()
         {
-            Id = Guid.NewGuid(),
+            Id = PollRecordId.New(),
             RouteId = route.Id,
             SessionId = session.Id,
             PolledAt = new DateTimeOffset(now.AddDays(-91)),
@@ -97,7 +97,7 @@ public sealed class PruningBoundaryTests : BaseIntegrationTest
         // which may be seconds after 'now'. The buffer prevents a timing race.
         PollRecord atBoundary = new()
         {
-            Id = Guid.NewGuid(),
+            Id = PollRecordId.New(),
             RouteId = route.Id,
             SessionId = session.Id,
             PolledAt = new DateTimeOffset(now.AddDays(-90).AddMinutes(5)),
@@ -111,7 +111,7 @@ public sealed class PruningBoundaryTests : BaseIntegrationTest
         // Record 3: 89 days old — WITHIN window, MUST be preserved
         PollRecord recent = new()
         {
-            Id = Guid.NewGuid(),
+            Id = PollRecordId.New(),
             RouteId = route.Id,
             SessionId = session.Id,
             PolledAt = new DateTimeOffset(now.AddDays(-89)),

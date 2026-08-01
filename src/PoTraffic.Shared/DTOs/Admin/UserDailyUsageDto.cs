@@ -3,7 +3,7 @@ using PoTraffic.Shared.Enums;
 namespace PoTraffic.Shared.DTOs.Admin;
 
 public sealed record UserDailyUsageDto(
-    Guid UserId,
+    UserId UserId,
     string Email,
     string Locale,
     DateTimeOffset CreatedAt,

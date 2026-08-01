@@ -2,10 +2,10 @@ using FluentAssertions;
 using System.Linq.Expressions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
-using PoTraffic.Api.Features.Admin;
-using PoTraffic.Api.Infrastructure.Storage;
-using PoTraffic.Api.Infrastructure.Providers;
-using PoTraffic.Api.Infrastructure.Scheduling;
+using PoTraffic.API.Features.Admin;
+using PoTraffic.API.Infrastructure.Storage;
+using PoTraffic.API.Infrastructure.Providers;
+using PoTraffic.API.Infrastructure.Scheduling;
 using PoTraffic.Shared.Enums;
 
 namespace PoTraffic.UnitTests.Features.Admin;
@@ -161,7 +161,7 @@ public sealed class TripleTestHandlerTests
         // Arrange
         TableStorageContext db = CreateDb();
 
-        Guid sessionId = Guid.NewGuid();
+        TripleTestSessionId sessionId = TripleTestSessionId.New();
         var session = new TripleTestSession
         {
             Id = sessionId,
@@ -176,9 +176,9 @@ public sealed class TripleTestHandlerTests
 
         // Shot 0: 600s, Shot 1: 500s (WINNER), Shot 2: 700s
         DateTimeOffset now = DateTimeOffset.UtcNow;
-        session.Shots.Add(new TripleTestShot { Id = Guid.NewGuid(), SessionId = sessionId, ShotIndex = 0, OffsetSeconds = 0, FiredAt = now, IsSuccess = true, DurationSeconds = 600, DistanceMetres = 10000 });
-        session.Shots.Add(new TripleTestShot { Id = Guid.NewGuid(), SessionId = sessionId, ShotIndex = 1, OffsetSeconds = 20, FiredAt = now.AddSeconds(20), IsSuccess = true, DurationSeconds = 500, DistanceMetres = 10000 });
-        session.Shots.Add(new TripleTestShot { Id = Guid.NewGuid(), SessionId = sessionId, ShotIndex = 2, OffsetSeconds = 40, FiredAt = now.AddSeconds(40), IsSuccess = true, DurationSeconds = 700, DistanceMetres = 10000 });
+        session.Shots.Add(new TripleTestShot { Id = TripleTestShotId.New(), SessionId = sessionId, ShotIndex = 0, OffsetSeconds = 0, FiredAt = now, IsSuccess = true, DurationSeconds = 600, DistanceMetres = 10000 });
+        session.Shots.Add(new TripleTestShot { Id = TripleTestShotId.New(), SessionId = sessionId, ShotIndex = 1, OffsetSeconds = 20, FiredAt = now.AddSeconds(20), IsSuccess = true, DurationSeconds = 500, DistanceMetres = 10000 });
+        session.Shots.Add(new TripleTestShot { Id = TripleTestShotId.New(), SessionId = sessionId, ShotIndex = 2, OffsetSeconds = 40, FiredAt = now.AddSeconds(40), IsSuccess = true, DurationSeconds = 700, DistanceMetres = 10000 });
         db.Add(session);
         foreach (var shot in session.Shots) db.Add(shot);
         await db.SaveChangesAsync();
@@ -201,7 +201,7 @@ public sealed class TripleTestHandlerTests
         // Arrange
         TableStorageContext db = CreateDb();
 
-        Guid sessionId = Guid.NewGuid();
+        TripleTestSessionId sessionId = TripleTestSessionId.New();
         var session = new TripleTestSession
         {
             Id = sessionId,
@@ -215,9 +215,9 @@ public sealed class TripleTestHandlerTests
         };
 
         DateTimeOffset now = DateTimeOffset.UtcNow;
-        session.Shots.Add(new TripleTestShot { Id = Guid.NewGuid(), SessionId = sessionId, ShotIndex = 0, OffsetSeconds = 0, FiredAt = now, IsSuccess = true,  DurationSeconds = 800, DistanceMetres = 10000 });
-        session.Shots.Add(new TripleTestShot { Id = Guid.NewGuid(), SessionId = sessionId, ShotIndex = 1, OffsetSeconds = 20, FiredAt = now.AddSeconds(20), IsSuccess = false, DurationSeconds = null, DistanceMetres = null, ErrorCode = "PROVIDER_ERROR" });
-        session.Shots.Add(new TripleTestShot { Id = Guid.NewGuid(), SessionId = sessionId, ShotIndex = 2, OffsetSeconds = 40, FiredAt = now.AddSeconds(40), IsSuccess = true,  DurationSeconds = 600, DistanceMetres = 10000 });
+        session.Shots.Add(new TripleTestShot { Id = TripleTestShotId.New(), SessionId = sessionId, ShotIndex = 0, OffsetSeconds = 0, FiredAt = now, IsSuccess = true,  DurationSeconds = 800, DistanceMetres = 10000 });
+        session.Shots.Add(new TripleTestShot { Id = TripleTestShotId.New(), SessionId = sessionId, ShotIndex = 1, OffsetSeconds = 20, FiredAt = now.AddSeconds(20), IsSuccess = false, DurationSeconds = null, DistanceMetres = null, ErrorCode = "PROVIDER_ERROR" });
+        session.Shots.Add(new TripleTestShot { Id = TripleTestShotId.New(), SessionId = sessionId, ShotIndex = 2, OffsetSeconds = 40, FiredAt = now.AddSeconds(40), IsSuccess = true,  DurationSeconds = 600, DistanceMetres = 10000 });
         db.Add(session);
         foreach (var shot in session.Shots) db.Add(shot);
         await db.SaveChangesAsync();
@@ -239,7 +239,7 @@ public sealed class TripleTestHandlerTests
         // Arrange
         TableStorageContext db = CreateDb();
 
-        Guid sessionId = Guid.NewGuid();
+        TripleTestSessionId sessionId = TripleTestSessionId.New();
         var session = new TripleTestSession
         {
             Id = sessionId,
@@ -252,9 +252,9 @@ public sealed class TripleTestHandlerTests
             CreatedAt = DateTimeOffset.UtcNow
         };
 
-        session.Shots.Add(new TripleTestShot { Id = Guid.NewGuid(), SessionId = sessionId, ShotIndex = 0, OffsetSeconds = 0, FiredAt = DateTimeOffset.UtcNow, IsSuccess = false, ErrorCode = "PROVIDER_ERROR" });
-        session.Shots.Add(new TripleTestShot { Id = Guid.NewGuid(), SessionId = sessionId, ShotIndex = 1, OffsetSeconds = 20, FiredAt = DateTimeOffset.UtcNow, IsSuccess = false, ErrorCode = "PROVIDER_ERROR" });
-        session.Shots.Add(new TripleTestShot { Id = Guid.NewGuid(), SessionId = sessionId, ShotIndex = 2, OffsetSeconds = 40, FiredAt = DateTimeOffset.UtcNow, IsSuccess = false, ErrorCode = "PROVIDER_ERROR" });
+        session.Shots.Add(new TripleTestShot { Id = TripleTestShotId.New(), SessionId = sessionId, ShotIndex = 0, OffsetSeconds = 0, FiredAt = DateTimeOffset.UtcNow, IsSuccess = false, ErrorCode = "PROVIDER_ERROR" });
+        session.Shots.Add(new TripleTestShot { Id = TripleTestShotId.New(), SessionId = sessionId, ShotIndex = 1, OffsetSeconds = 20, FiredAt = DateTimeOffset.UtcNow, IsSuccess = false, ErrorCode = "PROVIDER_ERROR" });
+        session.Shots.Add(new TripleTestShot { Id = TripleTestShotId.New(), SessionId = sessionId, ShotIndex = 2, OffsetSeconds = 40, FiredAt = DateTimeOffset.UtcNow, IsSuccess = false, ErrorCode = "PROVIDER_ERROR" });
         db.Add(session);
         foreach (var shot in session.Shots) db.Add(shot);
         await db.SaveChangesAsync();
@@ -278,7 +278,7 @@ public sealed class TripleTestHandlerTests
         var handler = new GetTripleTestSessionQueryHandler(db);
 
         // Act
-        var dto = await handler.Handle(new GetTripleTestSessionQuery(Guid.NewGuid()), CancellationToken.None);
+        var dto = await handler.Handle(new GetTripleTestSessionQuery(TripleTestSessionId.New()), CancellationToken.None);
 
         // Assert
         dto.Should().BeNull();
@@ -290,7 +290,7 @@ public sealed class TripleTestHandlerTests
         // Arrange — only 1 of 3 shots complete
         TableStorageContext db = CreateDb();
 
-        Guid sessionId = Guid.NewGuid();
+        TripleTestSessionId sessionId = TripleTestSessionId.New();
         var session = new TripleTestSession
         {
             Id = sessionId,
@@ -303,9 +303,9 @@ public sealed class TripleTestHandlerTests
             CreatedAt = DateTimeOffset.UtcNow
         };
 
-        session.Shots.Add(new TripleTestShot { Id = Guid.NewGuid(), SessionId = sessionId, ShotIndex = 0, OffsetSeconds = 0, FiredAt = DateTimeOffset.UtcNow, IsSuccess = true, DurationSeconds = 400, DistanceMetres = 8000 });
-        session.Shots.Add(new TripleTestShot { Id = Guid.NewGuid(), SessionId = sessionId, ShotIndex = 1, OffsetSeconds = 20 });
-        session.Shots.Add(new TripleTestShot { Id = Guid.NewGuid(), SessionId = sessionId, ShotIndex = 2, OffsetSeconds = 40 });
+        session.Shots.Add(new TripleTestShot { Id = TripleTestShotId.New(), SessionId = sessionId, ShotIndex = 0, OffsetSeconds = 0, FiredAt = DateTimeOffset.UtcNow, IsSuccess = true, DurationSeconds = 400, DistanceMetres = 8000 });
+        session.Shots.Add(new TripleTestShot { Id = TripleTestShotId.New(), SessionId = sessionId, ShotIndex = 1, OffsetSeconds = 20 });
+        session.Shots.Add(new TripleTestShot { Id = TripleTestShotId.New(), SessionId = sessionId, ShotIndex = 2, OffsetSeconds = 40 });
         db.Add(session);
         foreach (var shot in session.Shots) db.Add(shot);
         await db.SaveChangesAsync();

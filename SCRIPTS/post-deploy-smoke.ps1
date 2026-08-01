@@ -4,10 +4,10 @@
     CI/CD rule #9 — Post-deployment smoke validation.
 
 .DESCRIPTION
-    Runs three browser-style smoke checks against a freshly-deployed PoTraffic.Api
+    Runs three browser-style smoke checks against a freshly-deployed PoTraffic.API
     instance. Exits non-zero if any check fails — the deploy job marks red.
 
-    1. /health → expect 200 + "Healthy" / "Degraded" JSON body
+    1. /health/json → expect 200 + "Healthy" / "Degraded" JSON body
     2. GET /   → render-tree check (the Blazor index.html serves and references the
                  new dotnet.{hash}.js file; the served hash matches a freshly-built one)
     3. GET /diag/keyvault?secret={name} → masked secret retrieval (admin cookie required
@@ -59,20 +59,20 @@ function Run-Check {
 Write-Host "=== Post-deploy smoke validation ===" -ForegroundColor Magenta
 Write-Host "Target: $BaseUrl`n"
 
-# ── Check 1: /health ─────────────────────────────────────────────────────────
+# ── Check 1: /health/json ─────────────────────────────────────────────────────────
 try {
-    $resp = Invoke-WebRequest -Uri "$BaseUrl/health" -UseBasicParsing -SkipCertificateCheck -TimeoutSec 30
+    $resp = Invoke-WebRequest -Uri "$BaseUrl/health/json" -UseBasicParsing -SkipCertificateCheck -TimeoutSec 30
     if ($resp.StatusCode -eq 200) {
         $body = ($resp.Content | ConvertFrom-Json -ErrorAction SilentlyContinue)
         $status = $body.status ?? '(no status field)'
-        Run-Check 'health' 'Pass' "HTTP 200 status=$status"
+        Run-Check 'health/json' 'Pass' "HTTP 200 status=$status"
     }
     else {
-        Run-Check 'health' 'Fail' "HTTP $($resp.StatusCode) (expected 200)"
+        Run-Check 'health/json' 'Fail' "HTTP $($resp.StatusCode) (expected 200)"
     }
 }
 catch {
-    Run-Check 'health' 'Fail' $_.Exception.Message
+    Run-Check 'health/json' 'Fail' $_.Exception.Message
 }
 
 # ── Check 1b: /health/ready (waits up to 60s for hydration to finish) ────────

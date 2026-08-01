@@ -2,12 +2,12 @@ using System.Linq.Expressions;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
-using PoTraffic.Api.Features.MonitoringWindows.Entities;
-using PoTraffic.Api.Features.Routes;
-using PoTraffic.Api.Features.Routes.Entities;
-using PoTraffic.Api.Infrastructure.Dispatch;
-using PoTraffic.Api.Infrastructure.Scheduling;
-using PoTraffic.Api.Infrastructure.Storage;
+using PoTraffic.API.Features.MonitoringWindows;
+using PoTraffic.API.Features.Routes;
+using PoTraffic.API.Features.Routes;
+using PoTraffic.API.Infrastructure.Dispatch;
+using PoTraffic.API.Infrastructure.Scheduling;
+using PoTraffic.API.Infrastructure.Storage;
 using PoTraffic.Shared.Constants;
 using PoTraffic.Shared.Enums;
 
@@ -32,7 +32,7 @@ public sealed class PollRouteJobTests
             return $"job-{ScheduledDelays.Count}";
         }
         public void Cancel(string jobId) { }
-        public int CancelPendingPollJobsForRoute(Guid routeId) => 0;
+        public int CancelPendingPollJobsForRoute(RouteId routeId) => 0;
         public void ScheduleRecurring(string jobId, Func<Task> job, string cronExpression) { }
         public void CancelRecurring(string jobId) { }
     }
@@ -63,10 +63,10 @@ public sealed class PollRouteJobTests
         return (job, scheduler, sender, db);
     }
 
-    private static EntityRoute NewRoute(Guid id, MonitoringStatus status) => new()
+    private static EntityRoute NewRoute(RouteId id, MonitoringStatus status) => new()
     {
         Id = id,
-        UserId = Guid.NewGuid(),
+        UserId = UserId.New(),
         OriginAddress = "A",
         OriginCoordinates = "0,0",
         DestinationAddress = "B",
@@ -74,9 +74,9 @@ public sealed class PollRouteJobTests
         MonitoringStatus = (int)status
     };
 
-    private static MonitoringWindow Window(Guid routeId, TimeOnly start, TimeOnly end, byte mask = AllDays) => new()
+    private static MonitoringWindow Window(RouteId routeId, TimeOnly start, TimeOnly end, byte mask = AllDays) => new()
     {
-        Id = Guid.NewGuid(),
+        Id = WindowId.New(),
         RouteId = routeId,
         StartTime = start,
         EndTime = end,
@@ -85,14 +85,14 @@ public sealed class PollRouteJobTests
     };
 
     /// <summary>An always-open window so "now"-dependent tests are deterministic.</summary>
-    private static MonitoringWindow AlwaysOpenWindow(Guid routeId) =>
+    private static MonitoringWindow AlwaysOpenWindow(RouteId routeId) =>
         Window(routeId, new TimeOnly(0, 0), new TimeOnly(23, 59, 59));
 
     [Fact]
     public async Task InsideWindow_Polls_SchedulesNextInterval_AndAutoCreatesSession()
     {
         (PollRouteJob job, RecordingScheduler scheduler, RecordingSender sender, TableStorageContext db) = Build();
-        Guid routeId = Guid.NewGuid();
+        RouteId routeId = RouteId.New();
         db.Add(NewRoute(routeId, MonitoringStatus.Active));
         db.Add(AlwaysOpenWindow(routeId));
 
@@ -110,7 +110,7 @@ public sealed class PollRouteJobTests
     public async Task OutsideWindow_DoesNotPoll_SleepsUntilNextWindowStart()
     {
         (PollRouteJob job, RecordingScheduler scheduler, RecordingSender sender, TableStorageContext db) = Build();
-        Guid routeId = Guid.NewGuid();
+        RouteId routeId = RouteId.New();
         db.Add(NewRoute(routeId, MonitoringStatus.Active));
 
         // A one-minute window that is never "now": start = now + 2h (wrapping within the day is fine —
@@ -132,7 +132,7 @@ public sealed class PollRouteJobTests
     public async Task NoActiveWindow_StopsChain_AndClearsJobChainId()
     {
         (PollRouteJob job, RecordingScheduler scheduler, RecordingSender sender, TableStorageContext db) = Build();
-        Guid routeId = Guid.NewGuid();
+        RouteId routeId = RouteId.New();
         EntityRoute route = NewRoute(routeId, MonitoringStatus.Active);
         route.JobChainId = "stale";
         db.Add(route);
@@ -148,7 +148,7 @@ public sealed class PollRouteJobTests
     public async Task DeletedRoute_StopsChain()
     {
         (PollRouteJob job, RecordingScheduler scheduler, RecordingSender sender, TableStorageContext db) = Build();
-        Guid routeId = Guid.NewGuid();
+        RouteId routeId = RouteId.New();
         db.Add(NewRoute(routeId, MonitoringStatus.Deleted));
         db.Add(AlwaysOpenWindow(routeId));
 
@@ -163,7 +163,7 @@ public sealed class PollRouteJobTests
     {
         (PollRouteJob job, RecordingScheduler scheduler, _, _) = Build();
 
-        await job.Execute(Guid.NewGuid());
+        await job.Execute(RouteId.New());
 
         scheduler.ScheduledDelays.Should().BeEmpty("a hard-deleted route must not keep polling");
     }
@@ -172,7 +172,7 @@ public sealed class PollRouteJobTests
     public async Task QuotaExhausted_DoesNotPoll_SleepsUntilNextWindowStart()
     {
         (PollRouteJob job, RecordingScheduler scheduler, RecordingSender sender, TableStorageContext db) = Build();
-        Guid routeId = Guid.NewGuid();
+        RouteId routeId = RouteId.New();
         EntityRoute route = NewRoute(routeId, MonitoringStatus.Active);
         db.Add(route);
         db.Add(AlwaysOpenWindow(routeId));
@@ -180,7 +180,7 @@ public sealed class PollRouteJobTests
         DateOnly today = DateOnly.FromDateTime(DateTime.UtcNow.Date);
         for (int i = 0; i < QuotaConstants.DefaultDailyQuota; i++)
         {
-            Guid otherRouteId = Guid.NewGuid();
+            RouteId otherRouteId = RouteId.New();
             db.Add(new EntityRoute
             {
                 Id = otherRouteId,
@@ -190,7 +190,7 @@ public sealed class PollRouteJobTests
                 DestinationAddress = "B",
                 DestinationCoordinates = "1,1"
             });
-            db.Add(new MonitoringSession { Id = Guid.NewGuid(), RouteId = otherRouteId, SessionDate = today, State = (int)SessionState.Completed });
+            db.Add(new MonitoringSession { Id = SessionId.New(), RouteId = otherRouteId, SessionDate = today, State = (int)SessionState.Completed });
         }
 
         await job.Execute(routeId);
@@ -203,7 +203,7 @@ public sealed class PollRouteJobTests
     public void NextWindowStart_SkipsDisabledDays()
     {
         // Monday-only window at 08:00 UTC; from a Tuesday the next start is the following Monday.
-        var window = Window(Guid.NewGuid(), new TimeOnly(8, 0), new TimeOnly(9, 0), mask: 0b0000001);
+        var window = Window(RouteId.New(), new TimeOnly(8, 0), new TimeOnly(9, 0), mask: 0b0000001);
         DateTimeOffset tuesday = new(2026, 7, 7, 12, 0, 0, TimeSpan.Zero); // Tuesday
 
         DateTimeOffset? next = PollRouteJob.NextWindowStart(window, tuesday);
@@ -214,7 +214,7 @@ public sealed class PollRouteJobTests
     [Fact]
     public void NextWindowStart_NoDaysEnabled_ReturnsNull()
     {
-        var window = Window(Guid.NewGuid(), new TimeOnly(8, 0), new TimeOnly(9, 0), mask: 0);
+        var window = Window(RouteId.New(), new TimeOnly(8, 0), new TimeOnly(9, 0), mask: 0);
         PollRouteJob.NextWindowStart(window, DateTimeOffset.UtcNow).Should().BeNull();
     }
 
@@ -222,7 +222,7 @@ public sealed class PollRouteJobTests
     public void IsWithinWindow_RespectsDayMaskAndTimeRange()
     {
         // Mon–Fri 07:00–09:00 (mask 0x1F, bit0=Monday)
-        var window = Window(Guid.NewGuid(), new TimeOnly(7, 0), new TimeOnly(9, 0), mask: 0x1F);
+        var window = Window(RouteId.New(), new TimeOnly(7, 0), new TimeOnly(9, 0), mask: 0x1F);
 
         PollRouteJob.IsWithinWindow(window, new DateTimeOffset(2026, 7, 6, 8, 0, 0, TimeSpan.Zero))
             .Should().BeTrue("Monday 08:00 is inside Mon–Fri 07:00–09:00");

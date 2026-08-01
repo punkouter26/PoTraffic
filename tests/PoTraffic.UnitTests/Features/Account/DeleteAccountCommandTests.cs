@@ -1,6 +1,6 @@
 using FluentAssertions;
-using PoTraffic.Api.Features.Account;
-using PoTraffic.Api.Infrastructure.Storage;
+using PoTraffic.API.Features.Account;
+using PoTraffic.API.Infrastructure.Storage;
 
 
 
@@ -23,8 +23,8 @@ public sealed class DeleteAccountCommandTests
         // Arrange
         TableStorageContext db = CreateDb();
 
-        Guid userId = Guid.NewGuid();
-        Guid routeId = Guid.NewGuid();
+        UserId userId = UserId.New();
+        RouteId routeId = RouteId.New();
 
         db.Add(new User { Id = userId, Email = "del@test.com", Locale = "en-IE", CreatedAt = DateTimeOffset.UtcNow });
         db.Add(new EntityRoute
@@ -55,7 +55,7 @@ public sealed class DeleteAccountCommandTests
 
         var handler = new DeleteAccountCommandHandler(db);
 
-        bool result = await handler.Handle(new DeleteAccountCommand(Guid.NewGuid()), CancellationToken.None);
+        bool result = await handler.Handle(new DeleteAccountCommand(UserId.New()), CancellationToken.None);
 
         result.Should().BeFalse("non-existent user returns false");
     }

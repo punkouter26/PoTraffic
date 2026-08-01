@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
-using PoTraffic.Api.Features.Alerts;
-using PoTraffic.Api.Infrastructure.Storage;
+using PoTraffic.API.Features.Alerts;
+using PoTraffic.API.Infrastructure.Storage;
 
 namespace PoTraffic.UnitTests.Helpers;
 

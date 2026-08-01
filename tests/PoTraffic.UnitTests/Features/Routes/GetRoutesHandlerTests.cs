@@ -1,7 +1,7 @@
 using FluentAssertions;
-using PoTraffic.Api.Features.Routes;
-using PoTraffic.Api.Features.Routes.Entities;
-using PoTraffic.Api.Infrastructure.Storage;
+using PoTraffic.API.Features.Routes;
+using PoTraffic.API.Features.Routes;
+using PoTraffic.API.Infrastructure.Storage;
 
 using PoTraffic.Shared.Enums;
 
@@ -25,14 +25,14 @@ public sealed class GetRoutesHandlerTests
         // Arrange
         TableStorageContext db = CreateDb();
 
-        Guid userId = Guid.NewGuid();
-        Guid otherId = Guid.NewGuid();
+        UserId userId = UserId.New();
+        UserId otherId = UserId.New();
 
         db.AddRange(new EntityRoute[]
         {
             new EntityRoute
             {
-                Id = Guid.NewGuid(),
+                Id = RouteId.New(),
                 UserId = userId,
                 OriginAddress = "A",
                 DestinationAddress = "B",
@@ -42,7 +42,7 @@ public sealed class GetRoutesHandlerTests
             },
             new EntityRoute
             {
-                Id = Guid.NewGuid(),
+                Id = RouteId.New(),
                 UserId = otherId,
                 OriginAddress = "C",
                 DestinationAddress = "D",
@@ -70,13 +70,13 @@ public sealed class GetRoutesHandlerTests
         // Arrange
         TableStorageContext db = CreateDb();
 
-        Guid userId = Guid.NewGuid();
+        UserId userId = UserId.New();
 
         db.AddRange(new EntityRoute[]
         {
             new EntityRoute
             {
-                Id = Guid.NewGuid(),
+                Id = RouteId.New(),
                 UserId = userId,
                 OriginAddress = "A",
                 DestinationAddress = "B",
@@ -86,7 +86,7 @@ public sealed class GetRoutesHandlerTests
             },
             new EntityRoute
             {
-                Id = Guid.NewGuid(),
+                Id = RouteId.New(),
                 UserId = userId,
                 OriginAddress = "C",
                 DestinationAddress = "D",
@@ -116,7 +116,7 @@ public sealed class GetRoutesHandlerTests
         var handler = new GetRoutesQueryHandler(db);
 
         // Act
-        var result = await handler.Handle(new GetRoutesQuery(Guid.NewGuid(), 1, 20), CancellationToken.None);
+        var result = await handler.Handle(new GetRoutesQuery(UserId.New(), 1, 20), CancellationToken.None);
 
         // Assert
         result.Items.Should().BeEmpty();
@@ -129,13 +129,13 @@ public sealed class GetRoutesHandlerTests
         // Arrange
         TableStorageContext db = CreateDb();
 
-        Guid userId = Guid.NewGuid();
+        UserId userId = UserId.New();
 
         for (int i = 0; i < 5; i++)
         {
             db.Add(new EntityRoute
             {
-                Id = Guid.NewGuid(),
+                Id = RouteId.New(),
                 UserId = userId,
                 OriginAddress = $"Origin{i}",
                 DestinationAddress = $"Dest{i}",

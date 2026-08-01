@@ -1,6 +1,6 @@
 using Azure.Data.Tables;
 using FluentAssertions;
-using PoTraffic.Api.Infrastructure.Storage;
+using PoTraffic.API.Infrastructure.Storage;
 using PoTraffic.Tests.Helpers;
 using PoTraffic.Tests.Infrastructure;
 
@@ -24,9 +24,9 @@ public sealed class PersistenceRoundTripTests
     {
         ITableStore store = await CreateStoreAsync();
 
-        Guid userId = Guid.NewGuid();
-        Guid routeId = Guid.NewGuid();
-        Guid pollId = Guid.NewGuid();
+        UserId userId = UserId.New();
+        RouteId routeId = RouteId.New();
+        PollRecordId pollId = PollRecordId.New();
         string email = $"roundtrip-{userId:N}@potraffic.dev";
 
         // ── Process 1 — create, mutate in place, delete ──────────────────────
@@ -73,22 +73,22 @@ public sealed class PersistenceRoundTripTests
     {
         ITableStore store = await CreateStoreAsync();
 
-        Guid routeId = Guid.NewGuid();
+        RouteId routeId = RouteId.New();
         var ctx1 = new TableStorageContext(store);
         await ctx1.HydrateAsync();
 
         var route = new EntityRoute
         {
             Id = routeId,
-            UserId = Guid.NewGuid(),
+            UserId = UserId.New(),
             OriginAddress = "A",
             OriginCoordinates = "0,0",
             DestinationAddress = "B",
             DestinationCoordinates = "1,1"
         };
-        route.Windows.Add(new PoTraffic.Api.Features.MonitoringWindows.Entities.MonitoringWindow
+        route.Windows.Add(new PoTraffic.API.Features.MonitoringWindows.MonitoringWindow
         {
-            Id = Guid.NewGuid(),
+            Id = WindowId.New(),
             RouteId = routeId,
             StartTime = new TimeOnly(8, 0),
             EndTime = new TimeOnly(10, 0),

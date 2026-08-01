@@ -2,7 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
-using PoTraffic.Api.Infrastructure.Storage;
+using PoTraffic.API.Infrastructure.Storage;
 using PoTraffic.Tests.Helpers;
 using PoTraffic.Shared.DTOs.Auth;
 
@@ -27,7 +27,7 @@ public sealed class DeleteAccountIntegrationTests : BaseIntegrationTest
 
         AuthMeResponse? auth = await registerResponse.Content.ReadFromJsonAsync<AuthMeResponse>();
         auth.Should().NotBeNull();
-        Guid userId = auth!.UserId;
+        UserId userId = auth!.UserId;
 
         // Act — delete the authenticated user's account
         HttpResponseMessage deleteResponse = await client.DeleteAsync("/api/account");

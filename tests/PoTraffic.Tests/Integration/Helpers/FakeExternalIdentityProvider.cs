@@ -1,4 +1,4 @@
-using PoTraffic.Api.Features.Auth;
+using PoTraffic.API.Features.Auth;
 
 namespace PoTraffic.Tests.Helpers;
 

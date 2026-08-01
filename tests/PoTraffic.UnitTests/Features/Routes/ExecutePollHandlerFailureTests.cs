@@ -3,10 +3,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
-using PoTraffic.Api.Features.Routes;
-using PoTraffic.Api.Infrastructure.Storage;
+using PoTraffic.API.Features.Routes;
+using PoTraffic.API.Infrastructure.Storage;
 
-using PoTraffic.Api.Infrastructure.Providers;
+using PoTraffic.API.Infrastructure.Providers;
 using PoTraffic.Shared.Enums;
 
 namespace PoTraffic.UnitTests.Features.Routes;
@@ -31,16 +31,16 @@ public sealed class ExecutePollHandlerFailureTests
         return factory;
     }
 
-    private static async Task<(TableStorageContext Db, Guid RouteId, Guid SessionId)> SeedAsync()
+    private static async Task<(TableStorageContext Db, RouteId RouteId, SessionId SessionId)> SeedAsync()
     {
         TableStorageContext db = CreateDb();
-        Guid routeId = Guid.NewGuid();
-        Guid sessionId = Guid.NewGuid();
+        RouteId routeId = RouteId.New();
+        SessionId sessionId = SessionId.New();
 
         db.Add(new Route
         {
             Id = routeId,
-            UserId = Guid.NewGuid(),
+            UserId = UserId.New(),
             OriginAddress = "A",
             OriginCoordinates = "1.0,1.0",
             DestinationAddress = "B",
@@ -67,7 +67,7 @@ public sealed class ExecutePollHandlerFailureTests
     public async Task WhenProviderThrowsHttpRequestException_ReturnsFalse_NoPollRecordInserted()
     {
         // Arrange
-        (TableStorageContext db, Guid routeId, Guid sessionId) = await SeedAsync();
+        (TableStorageContext db, RouteId routeId, SessionId sessionId) = await SeedAsync();
 
         ITrafficProvider mockProvider = Substitute.For<ITrafficProvider>();
         mockProvider
@@ -92,7 +92,7 @@ public sealed class ExecutePollHandlerFailureTests
     public async Task WhenProviderThrowsHttpRequestException_PollCountUnchanged()
     {
         // Arrange
-        (TableStorageContext db, Guid routeId, Guid sessionId) = await SeedAsync();
+        (TableStorageContext db, RouteId routeId, SessionId sessionId) = await SeedAsync();
 
         ITrafficProvider mockProvider = Substitute.For<ITrafficProvider>();
         mockProvider
@@ -116,7 +116,7 @@ public sealed class ExecutePollHandlerFailureTests
     public async Task WhenProviderThrowsHttpRequestException_WarningIsLogged()
     {
         // Arrange
-        (TableStorageContext db, Guid routeId, _) = await SeedAsync();
+        (TableStorageContext db, RouteId routeId, _) = await SeedAsync();
 
         ITrafficProvider mockProvider = Substitute.For<ITrafficProvider>();
         mockProvider
@@ -143,7 +143,7 @@ public sealed class ExecutePollHandlerFailureTests
     public async Task WhenProviderThrowsHttpRequestException_NoExceptionPropagates()
     {
         // Arrange
-        (TableStorageContext db, Guid routeId, _) = await SeedAsync();
+        (TableStorageContext db, RouteId routeId, _) = await SeedAsync();
 
         ITrafficProvider mockProvider = Substitute.For<ITrafficProvider>();
         mockProvider

@@ -32,7 +32,7 @@ logs/
 # ASP.NET DataProtection key ring — NEVER commit (encrypts auth cookies/OAuth state).
 # Persist to Blob/Key Vault in Azure; keep local keys out of source control.
 keys/
-src/PoTraffic.Api/keys/
+src/PoTraffic.API/keys/
 
 # Test results
 TestResults/

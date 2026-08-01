@@ -4,14 +4,14 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using PoTraffic.Api.Features.Auth;
-using PoTraffic.Api.Infrastructure.Providers;
-using PoTraffic.Api.Infrastructure.Scheduling;
-using PoTraffic.Api.Infrastructure.Security;
+using PoTraffic.API.Features.Auth;
+using PoTraffic.API.Infrastructure.Providers;
+using PoTraffic.API.Infrastructure.Scheduling;
+using PoTraffic.API.Infrastructure.Security;
 using PoTraffic.Tests.Helpers;
 using PoTraffic.Tests.Infrastructure;
 using PoTraffic.Shared.Enums;
-using PoTraffic.Api.Infrastructure.Storage;
+using PoTraffic.API.Infrastructure.Storage;
 
 namespace PoTraffic.Tests;
 
@@ -171,7 +171,7 @@ internal sealed class NoOpJobScheduler : IJobScheduler
     public string Enqueue(Expression<Func<Task>> job) => "noop-enqueue";
     public string Schedule(Expression<Func<Task>> job, TimeSpan delay) => "noop-schedule";
     public void Cancel(string jobId) { }
-    public int CancelPendingPollJobsForRoute(Guid routeId) => 0;
+    public int CancelPendingPollJobsForRoute(RouteId routeId) => 0;
     public void ScheduleRecurring(string jobId, Func<Task> job, string cronExpression) { }
     public void CancelRecurring(string jobId) { }
 }

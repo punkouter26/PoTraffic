@@ -59,5 +59,5 @@ for ($i = 1; $i -le $maxRetries; $i++) {
 
 # 4. Launch API (Development profile, HTTPS)
 Write-Host "`nLaunching PoTraffic API on https://localhost:5001 ..." -ForegroundColor Green
-Set-Location (Join-Path $PSScriptRoot '..' 'src' 'PoTraffic.Api')
+Set-Location (Join-Path $PSScriptRoot '..' 'src' 'PoTraffic.API')
 dotnet run --launch-profile https

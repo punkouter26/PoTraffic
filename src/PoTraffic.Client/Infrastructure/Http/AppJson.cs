@@ -17,7 +17,7 @@ public sealed record CheckNowResponse(int DurationSeconds, int DistanceMetres);
 public sealed record SeedDataRequest(int RouteCount, int DaysOfHistory);
 public sealed record SeedResult(int UsersCreated, int RoutesCreated, int PollsCreated);
 public sealed record ClearResult(int UsersDeleted, int RoutesDeleted, int PollsDeleted);
-public sealed record StopSessionRequest(Guid SessionId);
+public sealed record StopSessionRequest(SessionId SessionId);
 public sealed record SaveWindowRequest(string StartTime, string EndTime, byte DaysOfWeekMask);
 internal sealed record ClientLogBatch(List<ClientLogEntry> Entries);
 

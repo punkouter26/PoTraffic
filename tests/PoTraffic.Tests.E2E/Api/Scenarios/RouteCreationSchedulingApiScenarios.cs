@@ -80,7 +80,7 @@ public sealed class RouteCreationSchedulingApiScenarios
         await ApiSkipUnlessReadyAttribute.ThrowUnlessReadyAsync();
 
         using HttpClient client = ApiSessionFactory.CreateAnonymous();
-        HttpResponseMessage response = await client.GetAsync("/health");
+        HttpResponseMessage response = await client.GetAsync("/health/json");
         response.EnsureSuccessStatusCode();
 
         string json = await response.Content.ReadAsStringAsync();
@@ -109,7 +109,7 @@ public sealed class RouteCreationSchedulingApiScenarios
         return route!;
     }
 
-    private static async Task<MonitoringWindowDto> CreateWindowAsync(HttpClient client, Guid routeId)
+    private static async Task<MonitoringWindowDto> CreateWindowAsync(HttpClient client, RouteId routeId)
     {
         // If a window already exists for this route (e.g. from a prior run
         // sharing the same GUEST account), reuse it rather than failing on the
@@ -139,7 +139,7 @@ public sealed class RouteCreationSchedulingApiScenarios
         return window!;
     }
 
-    private static async Task StartMonitoringAsync(HttpClient client, Guid routeId, Guid windowId)
+    private static async Task StartMonitoringAsync(HttpClient client, RouteId routeId, WindowId windowId)
     {
         HttpResponseMessage response = await client.PostAsync(
             $"/api/routes/{routeId}/windows/{windowId}/start", content: null);
@@ -148,7 +148,7 @@ public sealed class RouteCreationSchedulingApiScenarios
     }
 
     private static async Task<SessionDto?> PollUntilFirstPollAsync(
-        HttpClient client, Guid routeId, TimeSpan timeout)
+        HttpClient client, RouteId routeId, TimeSpan timeout)
     {
         DateTime deadline = DateTime.UtcNow + timeout;
         SessionDto? lastSeen = null;

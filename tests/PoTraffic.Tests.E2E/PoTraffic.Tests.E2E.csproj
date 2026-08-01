@@ -9,14 +9,14 @@
       End-to-end tests split into Api/ (HTTP-only scenarios) and Ui/
       (Playwright-driven browser scenarios). Both share the same
       configuration (BaseAddress, login factories) and run against a
-      live PoTraffic.Api instance under the Testing environment.
+      live PoTraffic.API instance under the Testing environment.
     -->
     <NoWarn>$(NoWarn);xUnit1031</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\PoTraffic.Shared\PoTraffic.Shared.csproj" />
-    <ProjectReference Include="..\..\src\PoTraffic.Api\PoTraffic.Api.csproj" />
+    <ProjectReference Include="..\..\src\PoTraffic.API\PoTraffic.API.csproj" />
   </ItemGroup>
 
   <ItemGroup>

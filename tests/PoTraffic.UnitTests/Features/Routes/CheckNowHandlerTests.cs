@@ -2,11 +2,11 @@ using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
-using PoTraffic.Api.Features.Routes;
-using PoTraffic.Api.Features.Routes.Entities;
-using PoTraffic.Api.Infrastructure.Storage;
+using PoTraffic.API.Features.Routes;
+using PoTraffic.API.Features.Routes;
+using PoTraffic.API.Infrastructure.Storage;
 
-using PoTraffic.Api.Infrastructure.Providers;
+using PoTraffic.API.Infrastructure.Providers;
 using PoTraffic.Shared.Enums;
 
 
@@ -37,8 +37,8 @@ public sealed class CheckNowHandlerTests
         // Arrange
         TableStorageContext db = CreateDb();
 
-        Guid routeId = Guid.NewGuid();
-        Guid userId = Guid.NewGuid();
+        RouteId routeId = RouteId.New();
+        UserId userId = UserId.New();
 
         db.Add(new EntityRoute
         {
@@ -88,7 +88,7 @@ public sealed class CheckNowHandlerTests
 
         // Act — route does not exist
         CheckNowResult result = await handler.Handle(
-            new CheckNowCommand(Guid.NewGuid(), Guid.NewGuid()), CancellationToken.None);
+            new CheckNowCommand(RouteId.New(), UserId.New()), CancellationToken.None);
 
         // Assert
         result.IsSuccess.Should().BeFalse();
@@ -101,8 +101,8 @@ public sealed class CheckNowHandlerTests
         // Arrange
         TableStorageContext db = CreateDb();
 
-        Guid routeId = Guid.NewGuid();
-        Guid userId = Guid.NewGuid();
+        RouteId routeId = RouteId.New();
+        UserId userId = UserId.New();
 
         db.Add(new EntityRoute
         {
@@ -140,8 +140,8 @@ public sealed class CheckNowHandlerTests
         // Arrange
         TableStorageContext db = CreateDb();
 
-        Guid routeId = Guid.NewGuid();
-        Guid realOwner = Guid.NewGuid();
+        RouteId routeId = RouteId.New();
+        UserId realOwner = UserId.New();
 
         db.Add(new EntityRoute
         {
@@ -163,7 +163,7 @@ public sealed class CheckNowHandlerTests
 
         // Act — different user ID supplied
         CheckNowResult result = await handler.Handle(
-            new CheckNowCommand(routeId, Guid.NewGuid()), CancellationToken.None);
+            new CheckNowCommand(routeId, UserId.New()), CancellationToken.None);
 
         // Assert — cross-user check must behave identically to not-found (no info leak)
         result.IsSuccess.Should().BeFalse();

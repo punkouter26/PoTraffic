@@ -1,9 +1,9 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
-using PoTraffic.Api.Features.MonitoringWindows;
-using PoTraffic.Api.Infrastructure.Storage;
-using PoTraffic.Api.Infrastructure.Scheduling;
+using PoTraffic.API.Features.MonitoringWindows;
+using PoTraffic.API.Infrastructure.Storage;
+using PoTraffic.API.Infrastructure.Scheduling;
 
 using PoTraffic.Shared.Enums;
 
@@ -20,13 +20,13 @@ public sealed class WindowLifecycleTests
         return new TableStorageContext();
     }
 
-    private static async Task<(TableStorageContext Db, Guid SessionId, Guid RouteId, Guid UserId)> SeedActiveSessionAsync(
+    private static async Task<(TableStorageContext Db, SessionId SessionId, RouteId RouteId, UserId UserId)> SeedActiveSessionAsync(
         string? jobChainId = "job-abc-123")
     {
         TableStorageContext db = CreateDb();
-        Guid userId = Guid.NewGuid();
-        Guid routeId = Guid.NewGuid();
-        Guid sessionId = Guid.NewGuid();
+        UserId userId = UserId.New();
+        RouteId routeId = RouteId.New();
+        SessionId sessionId = SessionId.New();
 
         var user = new User
         {
@@ -69,7 +69,7 @@ public sealed class WindowLifecycleTests
     public async Task StopWindow_TransitionsSessionToCompleted()
     {
         // Arrange
-        (TableStorageContext db, Guid sessionId, _, Guid userId) =
+        (TableStorageContext db, SessionId sessionId, _, UserId userId) =
             await SeedActiveSessionAsync("job-1");
 
         IJobScheduler scheduler = Substitute.For<IJobScheduler>();
@@ -92,7 +92,7 @@ public sealed class WindowLifecycleTests
     {
         // Arrange
         const string jobId = "job-42";
-        (TableStorageContext db, Guid sessionId, _, Guid userId) =
+        (TableStorageContext db, SessionId sessionId, _, UserId userId) =
             await SeedActiveSessionAsync(jobId);
 
         IJobScheduler scheduler = Substitute.For<IJobScheduler>();
@@ -112,7 +112,7 @@ public sealed class WindowLifecycleTests
     {
         // Arrange
         const string jobId = "job-99";
-        (TableStorageContext db, Guid sessionId, Guid routeId, Guid userId) =
+        (TableStorageContext db, SessionId sessionId, RouteId routeId, UserId userId) =
             await SeedActiveSessionAsync(jobId);
 
         IJobScheduler scheduler = Substitute.For<IJobScheduler>();
@@ -139,7 +139,7 @@ public sealed class WindowLifecycleTests
 
         // Act
         bool result = await handler.Handle(
-            new StopWindowCommand(Guid.NewGuid(), Guid.NewGuid()), CancellationToken.None);
+            new StopWindowCommand(SessionId.New(), UserId.New()), CancellationToken.None);
 
         // Assert
         result.Should().BeFalse();
@@ -150,7 +150,7 @@ public sealed class WindowLifecycleTests
     public async Task StopWindow_WhenNoJobId_DoesNotCallCancel()
     {
         // Arrange — route has no JobChainId
-        (TableStorageContext db, Guid sessionId, _, Guid userId) =
+        (TableStorageContext db, SessionId sessionId, _, UserId userId) =
             await SeedActiveSessionAsync(jobChainId: null);
 
         IJobScheduler scheduler = Substitute.For<IJobScheduler>();

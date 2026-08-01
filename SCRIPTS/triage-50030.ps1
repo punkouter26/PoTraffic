@@ -1,7 +1,7 @@
 # filepath: SCRIPTS/triage-50030.ps1
 <#
 .SYNOPSIS
-    Diagnose a 500.30 (ANCM host startup failure) on PoTraffic.Api.
+    Diagnose a 500.30 (ANCM host startup failure) on PoTraffic.API.
 
 .DESCRIPTION
     Captures the four telemetry channels you need to determine *why* the host
@@ -139,7 +139,7 @@ Step "4. Live probe" {
     if (-not $fqdn) { Write-Host "  ⚠ Could not resolve hostname." -ForegroundColor Yellow; return }
 
     $base = "https://$fqdn"
-    foreach ($path in @('/health', '/health/ready', '/')) {
+    foreach ($path in @('/health/json', '/health/ready', '/health', '/')) {
         try {
             $resp = Invoke-WebRequest -Uri "$base$path" -UseBasicParsing -SkipCertificateCheck -TimeoutSec 30
             $body = $resp.Content.Substring(0, [Math]::Min(120, $resp.Content.Length))

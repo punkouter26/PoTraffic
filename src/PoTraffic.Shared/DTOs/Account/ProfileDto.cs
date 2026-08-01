@@ -1,7 +1,7 @@
 namespace PoTraffic.Shared.DTOs.Account;
 
 public sealed record ProfileDto(
-    Guid UserId,
+    UserId UserId,
     string Email,
     string Locale,
     DateTimeOffset CreatedAt,

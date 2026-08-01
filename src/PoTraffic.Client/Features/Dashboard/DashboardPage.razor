@@ -110,8 +110,8 @@ else
 
 @code {
     private List<RouteDto> _routes = [];
-    private Dictionary<Guid, OptimalDepartureDto> _optimalDepartures = [];
-    private Dictionary<Guid, List<PollRecordDto>> _recentPolls = [];
+    private Dictionary<RouteId, OptimalDepartureDto> _optimalDepartures = [];
+    private Dictionary<RouteId, List<PollRecordDto>> _recentPolls = [];
     private int _quotaConsumed;
     private int _pollsToday;
     private decimal _estimatedCostToday;

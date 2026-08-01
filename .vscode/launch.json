@@ -8,9 +8,9 @@
       "type": "coreclr",
       "request": "launch",
       "preLaunchTask": "build",
-      "program": "${workspaceFolder}/src/PoTraffic.Api/bin/Debug/net10.0/PoTraffic.Api.dll",
+      "program": "${workspaceFolder}/src/PoTraffic.API/bin/Debug/net10.0/PoTraffic.API.dll",
       "args": [],
-      "cwd": "${workspaceFolder}/src/PoTraffic.Api",
+      "cwd": "${workspaceFolder}/src/PoTraffic.API",
       "stopAtEntry": false,
       "console": "integratedTerminal",
       "env": {

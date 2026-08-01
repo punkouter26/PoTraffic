@@ -36,19 +36,50 @@
     --pt-color-danger:  #f43f5e;
     --pt-color-info:    #6366f1;
 
+    /* Which of the two schemes the browser should paint form controls,
+       scrollbars and the canvas in. Flipped by the dark block below. */
+    color-scheme: light;
+
     /* Semantic surface tokens */
     --pt-bg-page:    var(--pt-color-neutral-50);
     --pt-bg-surface: var(--pt-color-neutral-0);
     --pt-bg-elev-1:  var(--pt-color-neutral-0);
     --pt-bg-elev-2:  var(--pt-color-neutral-50);
+    --pt-bg-sunken:  var(--pt-color-neutral-100);
 
+    /* Foreground ramp — primary → faint. Every text colour in the app resolves
+       through one of these, so flipping the theme is a single-block change and
+       no component can hard-code a shade that survives into dark mode. */
     --pt-fg-primary:   var(--pt-color-neutral-900);
+    --pt-fg-strong:    var(--pt-color-neutral-800);
+    --pt-fg-body:      var(--pt-color-neutral-700);
     --pt-fg-secondary: var(--pt-color-neutral-600);
+    --pt-fg-muted:     var(--pt-color-neutral-500);
     --pt-fg-tertiary:  var(--pt-color-neutral-400);
+    --pt-fg-faint:     var(--pt-color-neutral-300);
     --pt-fg-on-brand:  var(--pt-color-neutral-0);
 
     --pt-border-subtle: var(--pt-color-neutral-200);
     --pt-border-strong: var(--pt-color-neutral-300);
+
+    /* Semantic success surface — the "monitoring active" cards. Needs its own
+       tokens because a success tint cannot be derived from the neutral ramp. */
+    --pt-success-bg-from:   #ecfdf5;
+    --pt-success-bg-to:     #d1fae5;
+    --pt-success-border:    #6ee7b7;
+    --pt-success-fg:        #065f46;
+    --pt-success-fg-strong: #064e3b;
+
+    /* Subtle tint surfaces (chips, sparkline wells) — an alpha wash over the page
+       rather than a fixed grey, so they read correctly on either theme. */
+    --pt-bg-tint:        rgba(15, 23, 42, 0.07);
+    --pt-bg-tint-strong: rgba(15, 23, 42, 0.12);
+
+    /* Semantic danger surface (destructive menu items). */
+    --pt-danger-bg: #fef2f2;
+
+    /* Shadow/scrim base colour as raw channels, so alpha can vary per use. */
+    --pt-shadow-rgb: 15, 23, 42;
 
     /* ── Surface radius (8px scale, used everywhere) ──────────────────── */
     --pt-radius-xs:  4px;
@@ -90,10 +121,10 @@
 
     /* ── Elevation ────────────────────────────────────────────────────── */
     --pt-elev-0: none;
-    --pt-elev-1: 0 1px 2px rgba(15, 23, 42, 0.06);
-    --pt-elev-2: 0 2px 8px rgba(15, 23, 42, 0.08);
-    --pt-elev-3: 0 8px 24px rgba(15, 23, 42, 0.12);
-    --pt-elev-4: 0 20px 48px rgba(15, 23, 42, 0.18);
+    --pt-elev-1: 0 1px 2px rgba(var(--pt-shadow-rgb), 0.06);
+    --pt-elev-2: 0 2px 8px rgba(var(--pt-shadow-rgb), 0.08);
+    --pt-elev-3: 0 8px 24px rgba(var(--pt-shadow-rgb), 0.12);
+    --pt-elev-4: 0 20px 48px rgba(var(--pt-shadow-rgb), 0.18);
 
     /* ── Motion ───────────────────────────────────────────────────────── */
     --pt-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -134,6 +165,84 @@
     --rz-border-color:       var(--pt-border-subtle);
     --rz-disabled-opacity:   0.5;
     --rz-corner-radius:      var(--pt-radius-md);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Dark theme (Rule 4 — system-aware Light/Dark, applied dynamically)
+
+   `data-theme` is stamped onto <html> by the resolver in index.html before the
+   first paint: it follows the OS preference and re-resolves live when the OS
+   flips, unless the user has pinned a choice. Because that resolver always sets
+   the attribute, only the raw palette is redefined here — the semantic tokens
+   above are the only thing any component reads, so nothing else needs to know
+   which theme is active.
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root[data-theme="dark"] {
+    color-scheme: dark;
+
+    /* Surfaces: page sits darkest, cards lift toward the viewer. */
+    --pt-bg-page:    #0b1220;
+    --pt-bg-surface: #131c2e;
+    --pt-bg-elev-1:  #131c2e;
+    --pt-bg-elev-2:  #1b2740;
+    --pt-bg-sunken:  #070d18;
+
+    /* Foreground ramp mirrored around the middle of the neutral scale. */
+    --pt-fg-primary:   var(--pt-color-neutral-50);
+    --pt-fg-strong:    var(--pt-color-neutral-100);
+    --pt-fg-body:      var(--pt-color-neutral-200);
+    --pt-fg-secondary: var(--pt-color-neutral-300);
+    --pt-fg-muted:     var(--pt-color-neutral-400);
+    --pt-fg-tertiary:  var(--pt-color-neutral-400);
+    --pt-fg-faint:     var(--pt-color-neutral-600);
+    --pt-fg-on-brand:  var(--pt-color-neutral-0);
+
+    --pt-border-subtle: #26334d;
+    --pt-border-strong: var(--pt-color-neutral-600);
+
+    /* Tints wash with light instead of dark once the page is dark. */
+    --pt-bg-tint:        rgba(255, 255, 255, 0.07);
+    --pt-bg-tint-strong: rgba(255, 255, 255, 0.14);
+    --pt-danger-bg:      #2a1215;
+
+    /* Success surface inverts: deep green fill, light green text. */
+    --pt-success-bg-from:   #052e23;
+    --pt-success-bg-to:     #064e3b;
+    --pt-success-border:    #047857;
+    --pt-success-fg:        #6ee7b7;
+    --pt-success-fg-strong: #a7f3d0;
+
+    /* Pure black shadows — a slate-tinted shadow is invisible on a slate page. */
+    --pt-shadow-rgb: 0, 0, 0;
+    --pt-elev-1: 0 1px 2px rgba(var(--pt-shadow-rgb), 0.4);
+    --pt-elev-2: 0 2px 8px rgba(var(--pt-shadow-rgb), 0.45);
+    --pt-elev-3: 0 8px 24px rgba(var(--pt-shadow-rgb), 0.5);
+    --pt-elev-4: 0 20px 48px rgba(var(--pt-shadow-rgb), 0.6);
+
+    /* Glass panes tint from the surface colour rather than from white. */
+    --pt-glass-bg:        rgba(19, 28, 46, 0.72);
+    --pt-glass-bg-strong: rgba(19, 28, 46, 0.9);
+    --pt-glass-border:    rgba(148, 163, 184, 0.18);
+
+    /* Radzen re-map. Brand lightens one step so it clears AA on a dark surface. */
+    --rz-primary:         var(--pt-color-brand-400);
+    --rz-primary-light:   var(--pt-color-brand-300);
+    --rz-primary-lighter: var(--pt-color-brand-800);
+    --rz-primary-dark:    var(--pt-color-brand-500);
+    --rz-primary-darker:  var(--pt-color-brand-600);
+    --rz-base-100:        var(--pt-bg-surface);
+    --rz-base-200:        var(--pt-bg-elev-2);
+    --rz-base-300:        var(--pt-color-neutral-700);
+    --rz-base-400:        var(--pt-color-neutral-600);
+    --rz-base-500:        var(--pt-color-neutral-500);
+}
+
+/* No-JS / pre-resolver fallback: at minimum let the browser paint its own
+   chrome in dark so the page never flashes an all-white canvas. */
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) {
+        color-scheme: dark;
+    }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

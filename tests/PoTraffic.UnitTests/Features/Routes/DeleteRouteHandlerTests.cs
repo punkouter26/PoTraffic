@@ -1,10 +1,10 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
-using PoTraffic.Api.Features.Routes;
-using PoTraffic.Api.Features.Routes.Entities;
-using PoTraffic.Api.Infrastructure.Storage;
-using PoTraffic.Api.Infrastructure.Scheduling;
+using PoTraffic.API.Features.Routes;
+using PoTraffic.API.Features.Routes;
+using PoTraffic.API.Infrastructure.Storage;
+using PoTraffic.API.Infrastructure.Scheduling;
 
 using PoTraffic.Shared.Enums;
 
@@ -28,8 +28,8 @@ public sealed class DeleteRouteHandlerTests
         // Arrange
         TableStorageContext db = CreateDb();
 
-        Guid routeId = Guid.NewGuid();
-        Guid userId = Guid.NewGuid();
+        RouteId routeId = RouteId.New();
+        UserId userId = UserId.New();
 
         db.Add(new EntityRoute
         {
@@ -63,8 +63,8 @@ public sealed class DeleteRouteHandlerTests
         // Arrange
         TableStorageContext db = CreateDb();
 
-        Guid routeId = Guid.NewGuid();
-        Guid userId = Guid.NewGuid();
+        RouteId routeId = RouteId.New();
+        UserId userId = UserId.New();
         const string jobId = "job-42";
 
         db.Add(new EntityRoute
@@ -101,7 +101,7 @@ public sealed class DeleteRouteHandlerTests
 
         // Act — no routes in DB
         bool result = await handler.Handle(
-            new DeleteRouteCommand(Guid.NewGuid(), Guid.NewGuid()), CancellationToken.None);
+            new DeleteRouteCommand(RouteId.New(), UserId.New()), CancellationToken.None);
 
         // Assert
         result.Should().BeFalse("attempting to delete a non-existent route must return false");
@@ -113,8 +113,8 @@ public sealed class DeleteRouteHandlerTests
         // Arrange
         TableStorageContext db = CreateDb();
 
-        Guid routeId = Guid.NewGuid();
-        Guid realOwner = Guid.NewGuid();
+        RouteId routeId = RouteId.New();
+        UserId realOwner = UserId.New();
 
         db.Add(new EntityRoute
         {
@@ -133,7 +133,7 @@ public sealed class DeleteRouteHandlerTests
 
         // Act — different user ID
         bool result = await handler.Handle(
-            new DeleteRouteCommand(routeId, Guid.NewGuid()), CancellationToken.None);
+            new DeleteRouteCommand(routeId, UserId.New()), CancellationToken.None);
 
         // Assert — ownership check must block unauthorised deletion
         result.Should().BeFalse("a user must not be able to delete another user's route");

@@ -2,10 +2,10 @@ using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
-using PoTraffic.Api.Features.Routes;
-using PoTraffic.Api.Infrastructure.Storage;
+using PoTraffic.API.Features.Routes;
+using PoTraffic.API.Infrastructure.Storage;
 
-using PoTraffic.Api.Infrastructure.Providers;
+using PoTraffic.API.Infrastructure.Providers;
 using PoTraffic.Shared.Enums;
 
 namespace PoTraffic.UnitTests.Features.Routes;
@@ -30,13 +30,13 @@ public sealed class ExecutePollHandlerTests
         // Arrange
         TableStorageContext db = CreateDb();
 
-        Guid routeId = Guid.NewGuid();
-        Guid sessionId = Guid.NewGuid();
+        RouteId routeId = RouteId.New();
+        SessionId sessionId = SessionId.New();
 
         db.Add(new Route
         {
             Id = routeId,
-            UserId = Guid.NewGuid(),
+            UserId = UserId.New(),
             OriginAddress = "A",
             OriginCoordinates = "1.0,1.0",
             DestinationAddress = "B",

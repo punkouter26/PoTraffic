@@ -4,8 +4,27 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
     <title>PoTraffic</title>
     <base href="/" />
+    <script>
+        // Theme resolver (Rule 4 — system-aware Light/Dark, applied dynamically).
+        // Runs in <head>, before first paint, so the page never flashes the wrong
+        // theme. Follows the OS preference and re-resolves live when the OS flips;
+        // a value pinned in localStorage under 'pt-theme' wins over the OS.
+        (function () {
+            var pinned = null;
+            try { pinned = localStorage.getItem('pt-theme'); } catch (e) { /* private mode */ }
+
+            var media = window.matchMedia('(prefers-color-scheme: dark)');
+            function resolve() {
+                document.documentElement.setAttribute(
+                    'data-theme', pinned || (media.matches ? 'dark' : 'light'));
+            }
+            resolve();
+            media.addEventListener('change', function () { if (!pinned) resolve(); });
+        })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />

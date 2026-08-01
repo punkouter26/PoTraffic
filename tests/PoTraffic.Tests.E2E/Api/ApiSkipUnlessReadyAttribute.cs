@@ -8,7 +8,7 @@ using Xunit;
 namespace PoTraffic.Tests.E2E.Api;
 
 /// <summary>
-/// xunit <see cref="FactAttribute"/> that auto-skips when the live PoTraffic.Api
+/// xunit <see cref="FactAttribute"/> that auto-skips when the live PoTraffic.API
 /// (any environment) is not reachable. Lets CI pass on machines without a
 /// running instance while still letting a local dev drive the suite.
 ///
@@ -22,10 +22,10 @@ public sealed class ApiSkipUnlessReadyAttribute : FactAttribute
         [ApiSessionFactory.DefaultBaseUrl, ApiSessionFactory.DevelopmentBaseUrl];
 
     public override string? Skip => GetReachableBaseUrl() is null
-        ? $"PoTraffic.Api /health unreachable on {string.Join(", ", CandidatePorts)}"
+        ? $"PoTraffic.API /health/json unreachable on {string.Join(", ", CandidatePorts)}"
         : null;
 
-    /// <summary>Returns the first base URL whose /health responds 200, or null.</summary>
+    /// <summary>Returns the first base URL whose /health/json responds 200, or null.</summary>
     public static string? GetReachableBaseUrl()
     {
         foreach (string candidate in CandidatePorts)
@@ -33,7 +33,7 @@ public sealed class ApiSkipUnlessReadyAttribute : FactAttribute
             try
             {
                 using var probe = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
-                using var resp = probe.GetAsync(new Uri(new Uri(candidate), "/health"))
+                using var resp = probe.GetAsync(new Uri(new Uri(candidate), "/health/json"))
                                       .GetAwaiter().GetResult();
                 if (resp.IsSuccessStatusCode) return candidate;
             }
@@ -58,7 +58,7 @@ public sealed class ApiSkipUnlessReadyAttribute : FactAttribute
             try
             {
                 using var probe = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
-                using var resp = await probe.GetAsync(new Uri(new Uri(candidate), "/health"));
+                using var resp = await probe.GetAsync(new Uri(new Uri(candidate), "/health/json"));
                 if (resp.IsSuccessStatusCode)
                 {
                     baseUrl = candidate;
@@ -73,6 +73,6 @@ public sealed class ApiSkipUnlessReadyAttribute : FactAttribute
 
         if (baseUrl is null)
             throw new InvalidOperationException(
-                $"PoTraffic.Api /health unreachable on {string.Join(", ", CandidatePorts)}: {lastError?.Message ?? "no response"}");
+                $"PoTraffic.API /health/json unreachable on {string.Join(", ", CandidatePorts)}: {lastError?.Message ?? "no response"}");
     }
 }

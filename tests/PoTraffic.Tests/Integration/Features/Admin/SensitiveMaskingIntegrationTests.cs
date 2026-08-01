@@ -3,7 +3,7 @@ using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
-using PoTraffic.Api.Infrastructure.Storage;
+using PoTraffic.API.Infrastructure.Storage;
 
 using PoTraffic.Tests.Helpers;
 using PoTraffic.Shared.DTOs.Admin;

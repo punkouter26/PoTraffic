@@ -3,6 +3,6 @@ metadata:
   template: potraffic-appservice
 services:
   web:
-    project: ./src/PoTraffic.Api
+    project: ./src/PoTraffic.API
     language: dotnet
     host: appservice

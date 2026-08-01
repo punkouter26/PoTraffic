@@ -3,8 +3,8 @@ using PoTraffic.Shared.Enums;
 namespace PoTraffic.Shared.DTOs.History;
 
 public sealed record PollRecordDto(
-    Guid Id,
-    Guid? SessionId,
+    PollRecordId Id,
+    SessionId? SessionId,
     DateTimeOffset PolledAt,
     int TravelDurationSeconds,
     int DistanceMetres,

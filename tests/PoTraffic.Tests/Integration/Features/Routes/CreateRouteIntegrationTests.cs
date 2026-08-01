@@ -2,7 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
-using PoTraffic.Api.Infrastructure.Storage;
+using PoTraffic.API.Infrastructure.Storage;
 using PoTraffic.Tests.Helpers;
 using PoTraffic.Shared.DTOs.Auth;
 using PoTraffic.Shared.DTOs.Routes;
@@ -48,7 +48,7 @@ public sealed class CreateRouteIntegrationTests : BaseIntegrationTest
         response.StatusCode.Should().Be(HttpStatusCode.Created);
         RouteDto? body = await response.Content.ReadFromJsonAsync<RouteDto>();
         body.Should().NotBeNull();
-        body!.Id.Should().NotBeEmpty();
+        body!.Id.IsEmpty.Should().BeFalse();
         body.Windows.Should().HaveCount(1, "initial monitoring window must be created inline");
         body.Windows[0].StartTime.Should().Be("08:00");
         body.Windows[0].EndTime.Should().Be("10:00");
@@ -85,7 +85,7 @@ public sealed class CreateRouteIntegrationTests : BaseIntegrationTest
         // Delete it so we can verify a fresh window can be added via POST /windows.
         if (route!.Windows is { Count: > 0 })
         {
-            Guid existingWindowId = route.Windows[0].Id;
+            WindowId existingWindowId = route.Windows[0].Id;
             HttpResponseMessage deleteResp = await client.DeleteAsync(
                 $"/api/routes/{route.Id}/windows/{existingWindowId}");
             deleteResp.StatusCode.Should().Be(HttpStatusCode.NoContent,

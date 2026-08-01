@@ -1,7 +1,7 @@
-using PoTraffic.Api.Infrastructure.Dispatch;
+using PoTraffic.API.Infrastructure.Dispatch;
 using Microsoft.Extensions.DependencyInjection;
-using PoTraffic.Api.Features.Maintenance;
-using PoTraffic.Api.Infrastructure.Storage;
+using PoTraffic.API.Features.Maintenance;
+using PoTraffic.API.Infrastructure.Storage;
 
 using PoTraffic.Tests.Helpers;
 
@@ -29,7 +29,7 @@ public sealed class PruningIntegrationTests : BaseIntegrationTest
         // Seed user + route
         User user = new()
         {
-            Id = Guid.NewGuid(),
+            Id = UserId.New(),
             Email = "prune-test@test.invalid",
             Locale = "en-IE",
             CreatedAt = now.AddDays(-100)
@@ -38,7 +38,7 @@ public sealed class PruningIntegrationTests : BaseIntegrationTest
 
         EntityRoute route = new()
         {
-            Id = Guid.NewGuid(),
+            Id = RouteId.New(),
             UserId = user.Id,
             OriginAddress = "Origin",
             DestinationAddress = "Destination",
@@ -50,7 +50,7 @@ public sealed class PruningIntegrationTests : BaseIntegrationTest
 
         MonitoringSession session = new()
         {
-            Id = Guid.NewGuid(),
+            Id = SessionId.New(),
             RouteId = route.Id,
             SessionDate = DateOnly.FromDateTime(now.AddDays(-91)),
             IsHolidayExcluded = false
@@ -60,7 +60,7 @@ public sealed class PruningIntegrationTests : BaseIntegrationTest
         // 5 old records (91 days ago — should be pruned)
         List<PollRecord> oldRecords = Enumerable.Range(0, 5).Select(i => new PollRecord
         {
-            Id = Guid.NewGuid(),
+            Id = PollRecordId.New(),
             RouteId = route.Id,
             SessionId = session.Id,
             PolledAt = new DateTimeOffset(now.AddDays(-91).AddMinutes(i * 5)),
@@ -74,7 +74,7 @@ public sealed class PruningIntegrationTests : BaseIntegrationTest
         // 3 recent records (89 days ago — should be preserved)
         List<PollRecord> recentRecords = Enumerable.Range(0, 3).Select(i => new PollRecord
         {
-            Id = Guid.NewGuid(),
+            Id = PollRecordId.New(),
             RouteId = route.Id,
             SessionId = session.Id,
             PolledAt = new DateTimeOffset(now.AddDays(-89).AddMinutes(i * 5)),

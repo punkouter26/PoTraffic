@@ -57,7 +57,7 @@ Key Vault secret names are mapped to config keys by `--`:
 
 ## 4) Local development
 
-If not using Key Vault in local dev, set in `src/PoTraffic.Api/appsettings.Development.json` or user-secrets:
+If not using Key Vault in local dev, set in `src/PoTraffic.API/appsettings.Development.json` or user-secrets:
 - `ExternalAuth:Google:Enabled`
 - `ExternalAuth:Google:ClientId`
 - `ExternalAuth:Google:ClientSecret`

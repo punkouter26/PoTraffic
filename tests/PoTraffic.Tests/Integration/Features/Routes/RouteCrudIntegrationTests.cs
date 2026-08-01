@@ -40,7 +40,7 @@ public sealed class RouteCrudIntegrationTests : BaseIntegrationTest
         createResp.StatusCode.Should().Be(HttpStatusCode.Created, "route creation must return 201");
         RouteDto? created = await createResp.Content.ReadFromJsonAsync<RouteDto>();
         created.Should().NotBeNull();
-        created!.Id.Should().NotBeEmpty();
+        created!.Id.IsEmpty.Should().BeFalse();
 
         // Act 3 — GET routes (should have 1)
         HttpResponseMessage getOneResp = await client.GetAsync("/api/routes?page=1&pageSize=10");

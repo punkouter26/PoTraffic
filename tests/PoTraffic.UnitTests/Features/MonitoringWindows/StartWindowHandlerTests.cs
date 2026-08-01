@@ -2,9 +2,9 @@ using FluentAssertions;
 using System.Linq.Expressions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
-using PoTraffic.Api.Features.MonitoringWindows;
-using PoTraffic.Api.Infrastructure.Storage;
-using PoTraffic.Api.Infrastructure.Scheduling;
+using PoTraffic.API.Features.MonitoringWindows;
+using PoTraffic.API.Infrastructure.Storage;
+using PoTraffic.API.Infrastructure.Scheduling;
 
 using PoTraffic.Shared.Constants;
 using PoTraffic.Shared.Enums;
@@ -22,13 +22,13 @@ public sealed class StartWindowHandlerTests
         return new TableStorageContext();
     }
 
-    private static async Task<(TableStorageContext Db, Guid UserId, Guid WindowId)> SeedWithSessionsAsync(
+    private static async Task<(TableStorageContext Db, UserId UserId, WindowId WindowId)> SeedWithSessionsAsync(
         int sessionCount)
     {
         TableStorageContext db = CreateDb();
-        Guid userId = Guid.NewGuid();
-        Guid routeId = Guid.NewGuid();
-        Guid windowId = Guid.NewGuid();
+        UserId userId = UserId.New();
+        RouteId routeId = RouteId.New();
+        WindowId windowId = WindowId.New();
 
         var user = new User
         {
@@ -70,7 +70,7 @@ public sealed class StartWindowHandlerTests
 
         for (int i = 0; i < sessionCount; i++)
         {
-            Guid otherRouteId = Guid.NewGuid();
+            RouteId otherRouteId = RouteId.New();
             var otherRoute = new Route
             {
                 Id = otherRouteId,
@@ -87,7 +87,7 @@ public sealed class StartWindowHandlerTests
             db.Add(otherRoute);
             db.Add(new MonitoringSession
             {
-                Id = Guid.NewGuid(),
+                Id = SessionId.New(),
                 RouteId = otherRouteId,
                 Route = otherRoute,
                 SessionDate = today,
@@ -103,7 +103,7 @@ public sealed class StartWindowHandlerTests
     public async Task StartWindow_WhenQuotaExhausted_ReturnsQuotaExceededError()
     {
         // Arrange — seed exactly DefaultDailyQuota sessions for today
-        (TableStorageContext db, Guid userId, Guid windowId) =
+        (TableStorageContext db, UserId userId, WindowId windowId) =
             await SeedWithSessionsAsync(QuotaConstants.DefaultDailyQuota);
 
         IJobScheduler scheduler = Substitute.For<IJobScheduler>();
@@ -120,7 +120,7 @@ public sealed class StartWindowHandlerTests
 
         // Verify that no new MonitoringSession was created
         int newSessionCount = db.MonitoringSessions
-            .Count(s => s.RouteId != Guid.Empty);
+            .Count(s => !s.RouteId.IsEmpty);
         newSessionCount.Should().Be(QuotaConstants.DefaultDailyQuota,
             "no additional session should be created when quota is exceeded (FR-003)");
     }
@@ -129,7 +129,7 @@ public sealed class StartWindowHandlerTests
     public async Task StartWindow_WhenQuotaNotExhausted_CreatesSessionAndEnqueuesJob()
     {
         // Arrange — seed DefaultDailyQuota - 1 sessions (one slot remaining)
-        (TableStorageContext db, Guid userId, Guid windowId) =
+        (TableStorageContext db, UserId userId, WindowId windowId) =
             await SeedWithSessionsAsync(QuotaConstants.DefaultDailyQuota - 1);
 
         IJobScheduler scheduler = Substitute.For<IJobScheduler>();
@@ -159,7 +159,7 @@ public sealed class StartWindowHandlerTests
 
         // Act
         StartWindowResult result = await handler.Handle(
-            new StartWindowCommand(Guid.NewGuid(), Guid.NewGuid()), CancellationToken.None);
+            new StartWindowCommand(WindowId.New(), UserId.New()), CancellationToken.None);
 
         // Assert
         result.IsSuccess.Should().BeFalse();
@@ -171,10 +171,10 @@ public sealed class StartWindowHandlerTests
     {
         // Arrange — create route+window, manually seed a session for it today
         TableStorageContext db = CreateDb();
-        Guid userId = Guid.NewGuid();
-        Guid routeId = Guid.NewGuid();
-        Guid windowId = Guid.NewGuid();
-        Guid existingSessionId = Guid.NewGuid();
+        UserId userId = UserId.New();
+        RouteId routeId = RouteId.New();
+        WindowId windowId = WindowId.New();
+        SessionId existingSessionId = SessionId.New();
 
         var user = new User
         {

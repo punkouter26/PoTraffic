@@ -24,7 +24,7 @@ public sealed class CookieAuthenticationStateProvider(HttpClient http) : Authent
             AuthMeResponse? me = await response.Content.ReadFromJsonAsync(AppJsonContext.Default.AuthMeResponse);
             // /api/auth/me now returns 200 with an empty UserId for anonymous callers
             // (avoids a console 401 on first paint), so treat the sentinel as signed-out.
-            if (me is null || me.UserId == Guid.Empty)
+            if (me is null || me.UserId.IsEmpty)
                 return Anonymous();
 
             ClaimsIdentity identity = new(

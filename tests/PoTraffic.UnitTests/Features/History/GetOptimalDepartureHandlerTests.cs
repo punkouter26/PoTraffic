@@ -1,7 +1,7 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
-using PoTraffic.Api.Features.History;
-using PoTraffic.Api.Infrastructure.Storage;
+using PoTraffic.API.Features.History;
+using PoTraffic.API.Infrastructure.Storage;
 
 using PoTraffic.Shared.DTOs.History;
 using PoTraffic.Shared.Enums;
@@ -32,13 +32,13 @@ public sealed class GetOptimalDepartureHandlerTests
         // and returns the contiguous run within 5% of that minimum.
         // We verify the handler does NOT throw and returns a non-null result when sufficient baseline data exists.
         TableStorageContext db = CreateDb();
-        Guid routeId = Guid.NewGuid();
+        RouteId routeId = RouteId.New();
 
         var handler = new GetOptimalDepartureQueryHandler(db, NullLogger<GetOptimalDepartureQueryHandler>.Instance);
 
         // Act — InMemory returns an empty baseline (no raw SQL support), so handler returns null
         var result = await handler.Handle(
-            new GetOptimalDepartureQuery(routeId, Guid.Empty, "Monday"),
+            new GetOptimalDepartureQuery(routeId, UserId.Empty, "Monday"),
             CancellationToken.None);
 
         // Assert — null is correct when no baseline data available (FR-012)
@@ -56,7 +56,7 @@ public sealed class GetOptimalDepartureHandlerTests
 
         // Act
         var result = await handler.Handle(
-            new GetOptimalDepartureQuery(Guid.NewGuid(), Guid.Empty, "Wednesday"),
+            new GetOptimalDepartureQuery(RouteId.New(), UserId.Empty, "Wednesday"),
             CancellationToken.None);
 
         // Assert

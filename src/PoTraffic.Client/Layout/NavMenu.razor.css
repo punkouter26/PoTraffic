@@ -212,7 +212,7 @@
 }
 
 .pt-dropdown-item.danger:hover {
-    background: #fee2e2;
+    background: var(--pt-danger-bg);
 }
 
 .pt-dropdown-divider {

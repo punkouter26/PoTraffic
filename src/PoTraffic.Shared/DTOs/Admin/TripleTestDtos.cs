@@ -18,7 +18,7 @@ public sealed record TripleTestShotDto(
     string? ErrorCode);
 
 public sealed record TripleTestSessionDto(
-    Guid SessionId,
+    TripleTestSessionId SessionId,
     string OriginAddress,
     string DestinationAddress,
     RouteProvider Provider,

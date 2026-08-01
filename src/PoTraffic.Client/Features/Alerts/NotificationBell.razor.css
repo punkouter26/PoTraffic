@@ -27,8 +27,8 @@
     height: 1rem;
     padding: 0 0.2rem;
     border-radius: 999px;
-    background: var(--pt-color-danger, #f43f5e);
-    color: #fff;
+    background: var(--pt-color-danger, var(--pt-color-danger));
+    color: var(--pt-fg-on-brand);
     font-size: 0.6rem;
     font-weight: 700;
     line-height: 1rem;
@@ -81,7 +81,7 @@
 }
 
 .pt-bell-error {
-    color: var(--pt-color-danger, #f43f5e);
+    color: var(--pt-color-danger, var(--pt-color-danger));
     font-size: 0.75rem;
     padding: 0 0.5rem 0.4rem;
 }

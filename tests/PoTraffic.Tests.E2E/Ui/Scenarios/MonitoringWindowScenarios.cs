@@ -35,7 +35,7 @@ public sealed class MonitoringWindowScenarios : PlaywrightTestBase
         string email = await api.SeedAdminAsync();
         Assert.NotNull(await api.DevLoginAsync(email, role: "Administrator"));
 
-        (Guid routeId, _, _) = await api.SeedRouteAsync(email, OriginAddress, DestinationAddress);
+        (RouteId routeId, _, _) = await api.SeedRouteAsync(email, OriginAddress, DestinationAddress);
 
         var consoleErrors = new List<string>();
         Page.Console += (_, msg) =>
@@ -145,7 +145,7 @@ public sealed class MonitoringWindowScenarios : PlaywrightTestBase
         string email = await api.SeedAdminAsync();
         Assert.NotNull(await api.DevLoginAsync(email, role: "Administrator"));
 
-        (Guid routeId, _, _) = await api.SeedRouteAsync(email, OriginAddress, DestinationAddress);
+        (RouteId routeId, _, _) = await api.SeedRouteAsync(email, OriginAddress, DestinationAddress);
 
         var consoleErrors = new List<string>();
         Page.Console += (_, msg) =>

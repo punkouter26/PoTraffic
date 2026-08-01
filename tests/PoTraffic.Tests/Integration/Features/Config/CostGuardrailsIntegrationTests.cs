@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using PoTraffic.Api.Infrastructure.Providers;
+using PoTraffic.API.Infrastructure.Providers;
 using PoTraffic.Shared.Enums;
 
 namespace PoTraffic.Tests.Features.Config;

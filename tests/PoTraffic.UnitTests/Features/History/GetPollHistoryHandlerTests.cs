@@ -1,7 +1,7 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
-using PoTraffic.Api.Features.History;
-using PoTraffic.Api.Infrastructure.Storage;
+using PoTraffic.API.Features.History;
+using PoTraffic.API.Infrastructure.Storage;
 
 using PoTraffic.Shared.Enums;
 
@@ -18,13 +18,13 @@ public sealed class GetPollHistoryHandlerTests
         return new TableStorageContext();
     }
 
-    private static async Task<(TableStorageContext Db, Guid UserId, Guid RouteId, Guid OtherRouteId)> SeedAsync(
+    private static async Task<(TableStorageContext Db, UserId UserId, RouteId RouteId, RouteId OtherRouteId)> SeedAsync(
         int pollCount = 5)
     {
         TableStorageContext db = CreateDb();
-        Guid userId = Guid.NewGuid();
-        Guid routeId = Guid.NewGuid();
-        Guid otherRouteId = Guid.NewGuid();
+        UserId userId = UserId.New();
+        RouteId routeId = RouteId.New();
+        RouteId otherRouteId = RouteId.New();
 
         var route = new Route
         {
@@ -43,7 +43,7 @@ public sealed class GetPollHistoryHandlerTests
         var otherRoute = new Route
         {
             Id = otherRouteId,
-            UserId = Guid.NewGuid(),
+            UserId = UserId.New(),
             OriginAddress = "C",
             OriginCoordinates = "3.0,3.0",
             DestinationAddress = "D",
@@ -59,7 +59,7 @@ public sealed class GetPollHistoryHandlerTests
         {
             db.Add(new PollRecord
             {
-                Id = Guid.NewGuid(),
+                Id = PollRecordId.New(),
                 RouteId = routeId,
                 Route = route,
                 PolledAt = polledAt.AddMinutes(i * 5),
@@ -71,7 +71,7 @@ public sealed class GetPollHistoryHandlerTests
         // Seed poll records for ANOTHER route — should NOT appear in results
         db.Add(new PollRecord
         {
-            Id = Guid.NewGuid(),
+            Id = PollRecordId.New(),
             RouteId = otherRouteId,
             Route = otherRoute,
             PolledAt = DateTimeOffset.UtcNow,
@@ -87,7 +87,7 @@ public sealed class GetPollHistoryHandlerTests
     public async Task GetPollHistory_ReturnsOnlyRecordsForRequestedRoute()
     {
         // Arrange
-        (TableStorageContext db, Guid userId, Guid routeId, _) = await SeedAsync(pollCount: 5);
+        (TableStorageContext db, UserId userId, RouteId routeId, _) = await SeedAsync(pollCount: 5);
         var handler = new GetPollHistoryQueryHandler(db);
 
         // Act
@@ -104,7 +104,7 @@ public sealed class GetPollHistoryHandlerTests
     public async Task GetPollHistory_PaginatesCorrectly()
     {
         // Arrange
-        (TableStorageContext db, Guid userId, Guid routeId, _) = await SeedAsync(pollCount: 10);
+        (TableStorageContext db, UserId userId, RouteId routeId, _) = await SeedAsync(pollCount: 10);
         var handler = new GetPollHistoryQueryHandler(db);
 
         // Act — page 1 of 3 records each
@@ -135,7 +135,7 @@ public sealed class GetPollHistoryHandlerTests
 
         // Act
         var result = await handler.Handle(
-            new GetPollHistoryQuery(Guid.NewGuid(), Guid.NewGuid(), Page: 1, PageSize: 20),
+            new GetPollHistoryQuery(RouteId.New(), UserId.New(), Page: 1, PageSize: 20),
             CancellationToken.None);
 
         // Assert
