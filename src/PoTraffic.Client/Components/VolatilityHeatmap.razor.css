@@ -89,16 +89,22 @@ td.pt-heat {
     line-height: 1.75rem;
 }
 
-/* Congestion ramp — mean travel time relative to the route's median sample. */
+/* Congestion ramp — mean travel time relative to the route's median sample.
+
+   These were literal rgba()s of --pt-color-success / -warning / -danger, so the
+   grid was the one surface in the app that did NOT follow a palette change: the
+   sparkline, the trend line and the badges would move to a new danger hue and
+   the heatmap would stay rose. Mixed from the tokens now, at the same alphas.
+   in oklab keeps the mid-ramp from going muddy the way sRGB interpolation does. */
 .pt-heat-empty { background: var(--pt-bg-tint); }
-.pt-heat-l0 { background: rgba(16, 185, 129, 0.20); }
-.pt-heat-l1 { background: rgba(16, 185, 129, 0.42); }
-.pt-heat-l2 { background: rgba(245, 158, 11, 0.48); }
-.pt-heat-l3 { background: rgba(244, 63, 94, 0.45); }
-.pt-heat-l4 { background: rgba(244, 63, 94, 0.80); }
+.pt-heat-l0 { background: color-mix(in oklab, var(--pt-color-success) 20%, transparent); }
+.pt-heat-l1 { background: color-mix(in oklab, var(--pt-color-success) 42%, transparent); }
+.pt-heat-l2 { background: color-mix(in oklab, var(--pt-color-warning) 48%, transparent); }
+.pt-heat-l3 { background: color-mix(in oklab, var(--pt-color-danger)  45%, transparent); }
+.pt-heat-l4 { background: color-mix(in oklab, var(--pt-color-danger)  80%, transparent); }
 
 /* At full saturation the primary foreground loses contrast in the light theme. */
-.pt-heat-l4 .pt-heat-value { color: #ffffff; }
+.pt-heat-l4 .pt-heat-value { color: var(--pt-fg-on-brand); }
 
 /* Wide spread — the hour is unpredictable, not merely slow. */
 .pt-heat-volatile::after {
@@ -147,8 +153,7 @@ td.pt-heat {
 }
 
 .pt-heatmap-empty-icon {
-    font-size: var(--pt-text-2xl);
-    opacity: 0.7;
+    color: var(--pt-fg-faint);
 }
 
 .pt-visually-hidden {

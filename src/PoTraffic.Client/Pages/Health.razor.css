@@ -7,26 +7,8 @@
     padding: var(--pt-space-6, 1.5rem) var(--pt-space-4, 1rem);
 }
 
-.pt-health-head {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--pt-space-3, 0.75rem);
-    align-items: flex-start;
-    justify-content: space-between;
-    margin-bottom: var(--pt-space-5, 1.25rem);
-}
-
-.pt-health-head h1 {
-    margin: 0;
-    font-size: var(--pt-text-2xl, 1.5rem);
-    line-height: var(--pt-leading-tight, 1.2);
-    color: var(--pt-fg-primary);
-}
-
-.pt-health-sub {
-    margin: 0.25rem 0 0;
-    color: var(--pt-fg-secondary);
-}
+/* The page's own header rules (.pt-health-head / h1 / .pt-health-sub) are gone —
+   the shared <PageHeader> renders that block for every page now. */
 
 /* ── Status colour mapping ───────────────────────────────────────────────── */
 
@@ -73,8 +55,8 @@
 
 .pt-health-meta {
     display: block;
-    margin-top: 0.15rem;
-    font-size: var(--pt-text-sm, 0.875rem);
+    margin-top: var(--pt-space-1);
+    font-size: var(--pt-text-sm);
     color: var(--pt-fg-secondary);
 }
 
@@ -82,10 +64,18 @@
 
 .pt-health-list {
     display: grid;
-    gap: var(--pt-space-2, 0.5rem);
+    gap: var(--pt-space-2);
     padding: 0;
     margin: 0;
     list-style: none;
+
+    /* The rows reflow against the list's own width, not the window's. This page
+       is anonymous and is the one people open on a phone while something is
+       broken, but it is also embedded in the 1180px content column on a desktop —
+       and a viewport query cannot tell those apart if the list is ever placed in
+       a narrower slot. */
+    container-type: inline-size;
+    container-name: pt-health-list;
 }
 
 .pt-health-item {
@@ -137,7 +127,10 @@
     color: var(--pt-fg-tertiary);
 }
 
-@media (max-width: 640px) {
+/* Below this the name, the status and the timing cannot share a row without the
+   name truncating — and the name is the only one of the three that says which
+   dependency you are looking at. */
+@container pt-health-list (width < 30rem) {
     .pt-health-duration {
         display: none;
     }

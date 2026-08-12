@@ -11,6 +11,26 @@ html, body {
 h1, h2, h3, h4, .pt-balance { text-wrap: balance; }
 p, .pt-pretty { text-wrap: pretty; }
 
+/* Trim the font's built-in leading above the cap height and below the baseline,
+   so a heading's visual gap to what follows equals the margin you actually
+   wrote. Without it every heading carries a few invisible pixels of half-leading
+   and the 8px spacing grid never quite lands. Unsupported browsers ignore it. */
+@supports (text-box: trim-both cap alphabetic) {
+    h1, h2, h3, h4, .pt-page-title, .pt-departure-hero, .pt-answer-headline {
+        text-box: trim-both cap alphabetic;
+    }
+}
+
+/* Numbers that change in place — countdowns, durations, costs — must not
+   reflow their neighbours as digits swap width. */
+.pt-tabular, time, output { font-variant-numeric: tabular-nums; }
+
+/* Inputs that grow with their content instead of scrolling a fixed box.
+   Scoped to the app's own controls: Radzen sizes its own inputs. */
+@supports (field-sizing: content) {
+    textarea:not(.rz-textarea) { field-sizing: content; }
+}
+
 h1:focus {
     outline: none;
 }
@@ -40,6 +60,15 @@ a, .btn-link {
        they cannot drift apart again. */
     padding: var(--pt-space-5) var(--pt-space-4)
              calc(var(--pt-space-8) + var(--pt-bottom-nav-safe));
+    width: 100%;
+    margin-inline: auto;
+
+    /* Every page's root query container. Components inside reflow against the
+       content column — which is capped at 1180px and centred — rather than
+       against the window, so a page rendered in a narrower shell later still
+       lays out correctly. */
+    container-type: inline-size;
+    container-name: pt-content;
 }
 
 @media (min-width: 640px) {
@@ -144,25 +173,257 @@ code {
     text-align: end;
 }
 
-/* Legacy token aliases — kept for any third-party component that still references them.
-   New code should consume `--pt-*` directly from pt-tokens.css. */
-:root {
-    --pt-brand-primary: var(--pt-color-brand-600);
-    --pt-brand-surface: var(--pt-bg-page);
-    --pt-brand-sidebar: var(--pt-color-neutral-900);
-    --pt-accent-indigo: var(--pt-color-info);
-    --pt-accent-emerald: var(--pt-color-success);
-    --pt-accent-amber: var(--pt-color-warning);
-    --pt-accent-rose: var(--pt-color-danger);
-    --pt-card-radius: var(--pt-radius-lg);
-}
-
 /* ═══════════════════════════════════════════════════════════════
    Small shared pieces. Keyframes are NOT redeclared here — they live
    in pt-motion.css, which is the single home for them.
+
+   A block of `--pt-brand-*` / `--pt-accent-*` aliases used to sit here for
+   "any third-party component that still references them". Nothing did, in this
+   project or in Radzen, so they were a second vocabulary for colours that
+   already have names.
 ═══════════════════════════════════════════════════════════════ */
+/* The disclosure chevron. Both the `.open` class (PollHistoryTable's own bool)
+   and the native `[open]` on <details> (route detail) drive the same rotation,
+   and both live here rather than in a scoped sheet: the chevron is a <PtIcon>,
+   so a scoped rule would compile its last compound to `.pt-collapsible-icon[b-…]`
+   and never match the child component's span. */
 .pt-collapsible-icon { display: inline-block; transition: transform var(--pt-dur-base) var(--pt-ease); }
-.pt-collapsible-icon.open { transform: rotate(90deg); }
+.pt-collapsible-icon.open,
+details[open] > summary .pt-collapsible-icon { transform: rotate(90deg); }
+
+/* ═══════════════════════════════════════════════════════════════
+   Icons. One system: Material Symbols, loaded once in index.html and used
+   through <PtIcon>. Emoji were the third icon system in the app (after this
+   font and Radzen's own) and the only one that ignores `color`, ships a
+   different drawing per operating system, and cannot be sized off the type
+   scale. `font-size` is the optical-size axis here, so the two stay in step.
+═══════════════════════════════════════════════════════════════ */
+.pt-icon {
+    font-family: 'Material Symbols Outlined';
+    font-weight: normal;
+    font-style: normal;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    display: inline-block;
+    white-space: nowrap;
+    word-wrap: normal;
+    direction: ltr;
+    -webkit-font-feature-settings: 'liga';
+    -webkit-font-smoothing: antialiased;
+    font-variation-settings: 'opsz' 24, 'wght' 400, 'GRAD' 0, 'FILL' var(--pt-icon-fill, 0);
+    font-size: var(--pt-icon-size, 1.25em);
+    flex-shrink: 0;
+    /* The glyph box is taller than the mark; without this an icon next to text
+       pushes the line box and misaligns every label it sits beside. */
+    vertical-align: -0.15em;
+}
+
+.pt-icon-filled { --pt-icon-fill: 1; }
+.pt-icon-sm { --pt-icon-size: 1em; }
+.pt-icon-lg { --pt-icon-size: 1.75em; }
+.pt-icon-xl { --pt-icon-size: 2.5em; }
+
+/* Per-context icon tints.
+
+   These have to be global. <PtIcon> is a component, so its span never receives
+   the `b-…` scope attribute of the page that placed it, and Blazor scopes a
+   rule by rewriting its LAST compound selector — `.auth-feature .pt-icon` in a
+   scoped sheet becomes `.auth-feature .pt-icon[b-…]` and matches nothing. Any
+   rule whose final selector names an element another component renders belongs
+   here, not in a .razor.css. */
+
+/* Sign-in panel feature list: icons take the panel's accent so the list reads
+   as four marked items rather than four oddly-starting sentences. */
+.auth-feature .pt-icon {
+    color: var(--pt-color-brand-300);
+    --pt-icon-size: 1.5rem;
+}
+
+/* User-menu items: the icon is subordinate to its label, except on the
+   destructive item where it should carry the same red as the words. */
+.pt-dropdown-item .pt-icon { color: var(--pt-fg-tertiary); }
+.pt-dropdown-item.danger .pt-icon { color: currentColor; }
+
+/* ═══════════════════════════════════════════════════════════════
+   Spacing utilities.
+
+   These exist because Radzen's rz-mb-4 / rz-mt-3 / rz-p-6 are FIXED rem
+   values. The app's density control works by scaling --pt-density, which every
+   --pt-space-* step multiplies through — so a page laid out with rz-* utilities
+   kept desktop spacing at "Compact" while the components beside it tightened.
+   Half the app responded to the setting and half ignored it, which read as
+   inconsistent alignment rather than as a density choice.
+
+   Same names, same scale positions, density-aware values.
+═══════════════════════════════════════════════════════════════ */
+.pt-mt-1 { margin-top: var(--pt-space-1); }
+.pt-mt-2 { margin-top: var(--pt-space-2); }
+.pt-mt-3 { margin-top: var(--pt-space-3); }
+.pt-mt-4 { margin-top: var(--pt-space-4); }
+.pt-mt-6 { margin-top: var(--pt-space-6); }
+
+.pt-mb-0 { margin-bottom: 0; }
+.pt-mb-1 { margin-bottom: var(--pt-space-1); }
+.pt-mb-2 { margin-bottom: var(--pt-space-2); }
+.pt-mb-3 { margin-bottom: var(--pt-space-3); }
+.pt-mb-4 { margin-bottom: var(--pt-space-4); }
+.pt-mb-6 { margin-bottom: var(--pt-space-6); }
+
+.pt-p-2 { padding: var(--pt-space-2); }
+.pt-p-3 { padding: var(--pt-space-3); }
+.pt-p-4 { padding: var(--pt-space-4); }
+.pt-p-5 { padding: var(--pt-space-5); }
+.pt-p-6 { padding: var(--pt-space-6); }
+
+.pt-w-100 { width: 100%; }
+
+.pt-flex { display: flex; }
+.pt-items-center { align-items: center; }
+.pt-wrap { flex-wrap: wrap; }
+.pt-gap-2 { gap: var(--pt-space-2); }
+.pt-gap-3 { gap: var(--pt-space-3); }
+.pt-gap-4 { gap: var(--pt-space-4); }
+.pt-mr-3 { margin-right: var(--pt-space-3); }
+
+/* Vertical rhythm for a stack of sections — one rule instead of a margin class
+   on every child, and it cannot leave a trailing margin at the end of a card. */
+.pt-stack > * + * { margin-top: var(--pt-space-4); }
+.pt-stack-lg > * + * { margin-top: var(--pt-space-6); }
+
+/* ═══════════════════════════════════════════════════════════════
+   Navigation links — top bar and bottom bar.
+
+   These are global rather than scoped, and they have to be. Both bars render
+   their links with <NavLink>, which is a COMPONENT: Blazor's CSS isolation
+   stamps its `b-…` scope attribute on the plain HTML written in a .razor file,
+   never on the markup a child component renders. So a `.app-nav-link` rule in
+   NavMenu.razor.css compiled to `.app-nav-link[b-mhqeozcjir]` and matched
+   nothing — the top nav had been falling through to the global `a` rule, drawn
+   as underlined brand-blue with no padding and no active state, for as long as
+   NavLink has been used there.
+
+   The colours are pinned to the fixed end of the neutral ramp because the shell
+   is a dark bar in BOTH themes. The inactive step used to be neutral-200 at 70%
+   alpha, which composites to roughly 4.2:1 on that bar — under AA for text this
+   size, on the app's primary navigation. Full-strength neutral-300 clears it at
+   about 7:1, and the active state now separates itself by fill and weight
+   rather than by being the only legible one.
+═══════════════════════════════════════════════════════════════ */
+.app-nav-link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--pt-space-2);
+    color: var(--pt-color-neutral-300);
+    padding: var(--pt-space-2) var(--pt-space-3);
+    border-radius: var(--pt-radius-sm);
+    text-decoration: none;
+    font-size: var(--pt-text-sm);
+    font-weight: var(--pt-weight-medium);
+    letter-spacing: 0.01em;
+    box-shadow: inset 0 0 0 1px transparent;
+    transition: background var(--pt-dur-fast) var(--pt-ease),
+                color var(--pt-dur-fast) var(--pt-ease),
+                box-shadow var(--pt-dur-fast) var(--pt-ease);
+    white-space: nowrap;
+}
+
+.app-nav-link:hover {
+    background: color-mix(in oklab, var(--pt-color-neutral-0) 8%, transparent);
+    color: var(--pt-color-neutral-0);
+}
+
+.app-nav-link.active {
+    background: color-mix(in oklab, var(--pt-color-brand-500) 20%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--pt-color-brand-400) 40%, transparent);
+    color: var(--pt-color-neutral-0);
+    font-weight: var(--pt-weight-semibold);
+}
+
+.app-nav-link:focus-visible {
+    outline: 2px solid var(--pt-color-brand-300);
+    outline-offset: 2px;
+}
+
+/* Bottom bar — same NavLink problem, same solution. */
+.pt-bottom-nav-link {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--pt-space-1);
+    color: var(--pt-fg-tertiary);
+    text-decoration: none;
+    font-size: var(--pt-text-xs);
+    font-weight: var(--pt-weight-medium);
+    min-width: 4rem;
+    min-height: 3rem;
+    border-radius: var(--pt-radius-md);
+    transition: color var(--pt-dur-fast) var(--pt-ease);
+    -webkit-tap-highlight-color: transparent;
+}
+
+.pt-bottom-nav-link:active { color: var(--pt-color-brand-on-surface); }
+
+/* The bar had no active state at all, so on a phone — where it IS the
+   navigation — nothing on screen said which page you were on. The icon fills as
+   well as changing colour, because colour alone is not a state indicator. */
+.pt-bottom-nav-link.active {
+    color: var(--pt-color-brand-on-surface);
+    font-weight: var(--pt-weight-semibold);
+}
+
+.pt-bottom-nav-link.active .pt-bottom-nav-icon { --pt-icon-fill: 1; }
+
+.pt-bottom-nav-icon { --pt-icon-size: 1.5rem; }
+
+/* The FAB is a brand-filled disc at every state — it must not pick up the
+   active or pressed colour its siblings use. */
+.pt-bottom-nav-fab,
+.pt-bottom-nav-fab:active,
+.pt-bottom-nav-fab.active {
+    color: var(--pt-fg-on-brand);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Radzen select bar.
+
+   Three corrections, all of them Radzen defaults that read wrong here:
+
+   1. The bar ships `display: inline-flex`, so it sat on the same line as the
+      caption <span> above it — "System follows your device setting…" and the
+      three buttons shared a row. Block-level, and it starts its own line.
+   2. Each item is a <button> containing <i class="rz-button-icon-left"> and
+      <span class="rz-button-text"> with no margin between them, so the icon was
+      welded to the label ("computerSystem"). The button is a flex row with a
+      gap instead — which also centres the glyph against the text rather than
+      sitting it on the baseline.
+   3. The selected item's colour comes from --rz-selectbar-selected-color, now
+      mapped in pt-tokens.css; the fill is pinned here to the same brand step
+      the primary button uses so the pair is a guaranteed contrast ratio rather
+      than whatever --rz-primary resolves to per theme (brand-400 on dark would
+      have put white text at about 2.5:1).
+═══════════════════════════════════════════════════════════════ */
+.rz-selectbar {
+    display: flex;
+    flex-wrap: wrap;
+}
+
+.rz-selectbar .rz-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--pt-space-2);
+}
+
+.rz-selectbar .rz-button.rz-state-active {
+    background: var(--pt-color-brand-600);
+    color: var(--pt-fg-on-brand);
+}
+
+.rz-selectbar .rz-button.rz-state-active .rzi {
+    color: inherit;
+}
 
 /* ═══════════════════════════════════════════════
    C2: Compact Dashboard Status Bar
@@ -170,22 +431,22 @@ code {
 .pt-status-bar {
     display: flex;
     align-items: center;
-    gap: 1.25rem;
-    padding: 0.6rem 1.1rem;
+    gap: var(--pt-space-5);
+    padding: var(--pt-space-2) var(--pt-space-4);
     background: var(--pt-bg-surface);
-    border-radius: 10px;
+    border-radius: var(--pt-radius-md);
     border: 1px solid var(--pt-border-subtle);
-    box-shadow: 0 1px 3px rgba(var(--pt-shadow-rgb), 0.05);
-    margin-bottom: 1.5rem;
+    box-shadow: var(--pt-elev-1);
+    margin-bottom: var(--pt-space-6);
     flex-wrap: wrap;
 }
 
 .pt-status-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: var(--pt-radius-full);
     display: inline-block;
-    margin-right: 0.3rem;
+    margin-right: var(--pt-space-1);
     flex-shrink: 0;
 }
 
@@ -203,14 +464,18 @@ code {
 }
 
 .pt-status-item {
-    font-size: 0.82rem;
-    font-weight: 500;
+    font-size: var(--pt-text-sm);
+    font-weight: var(--pt-weight-medium);
     color: var(--pt-fg-secondary);
     display: flex;
     align-items: center;
+    gap: var(--pt-space-1);
     white-space: nowrap;
 }
 
+/* The bar's trailing-action slot. The dashboard's Add Route button used to live
+   here; it is in the page header now, where a primary action belongs and where
+   it does not disappear along with the bar whenever connectivity is fine. */
 .pt-status-bar-actions {
     margin-left: auto;
 }
@@ -218,17 +483,28 @@ code {
 /* ═══════════════════════════════════════════════
    UI-1/2/3: Route Card (C1 Dashboard)
 ═══════════════════════════════════════════════ */
+/* The card list. On a desktop the content column is capped at 1180px and every
+   card is a single short row, so a one-per-line stack left roughly half the
+   viewport empty and pushed the fourth commute below the fold for no reason.
+   auto-fit + minmax means the column count is decided by available width rather
+   than by a breakpoint: one column on a phone, two past ~46rem, and no media
+   query anywhere. */
 .pt-route-cards {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(22rem, 100%), 1fr));
+    align-items: start;
     gap: var(--pt-space-4);
+}
 
-    /* Query container for the cards inside. A card is laid out by the width of
-       the column it sits in — not the window — so the same component is correct
-       on a phone, in the dashboard's full-width list, and in any narrower slot
-       it gets dropped into later. */
+/* Each cell is its own query container, so a card is laid out by the width of
+   the COLUMN it landed in — not the window and not the list. That is what makes
+   the same component correct at one-up on a phone, at two-up on a desktop, and
+   in any narrower slot it gets dropped into later. Declared on the wrapper
+   rather than on .pt-route-cards because a container cannot query itself. */
+.pt-route-cards > * {
     container-type: inline-size;
     container-name: pt-cards;
+    min-width: 0;
 }
 
 .pt-route-card {
@@ -322,7 +598,8 @@ code {
 .pt-departure-sub {
     font-size: var(--pt-text-sm);
     color: var(--pt-fg-secondary);
-    margin-top: 0.15rem;
+    margin-top: var(--pt-space-1);
+    font-variant-numeric: tabular-nums;
 }
 
 .pt-departure-pending {
@@ -365,12 +642,13 @@ code {
 .pt-route-flag {
     margin-left: auto;
     flex-shrink: 0;
-    font-size: 0.65rem;
+    font-size: var(--pt-text-xs);
     font-weight: var(--pt-weight-bold);
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    padding: 0.1rem 0.5rem;
+    padding: var(--pt-space-1) var(--pt-space-2);
     border-radius: var(--pt-radius-full);
+    line-height: 1;
 }
 
 .pt-route-flag-demo {
@@ -388,127 +666,27 @@ code {
 .pt-ambient-amber  { --pt-ambient-color: var(--pt-color-warning); }
 .pt-ambient-slate  { --pt-ambient-color: var(--pt-fg-tertiary); }
 
-/* ═══════════════════════════════════════════════
-   UX-10: User chip in top bar
-═══════════════════════════════════════════════ */
-.pt-user-chip {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-}
-
-.pt-user-chip-btn {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    background: var(--pt-bg-tint);
-    border: 1px solid var(--pt-border-subtle);
-    border-radius: 99px;
-    padding: 0.3rem 0.75rem 0.3rem 0.5rem;
-    cursor: pointer;
-    font-size: 0.8rem;
-    font-weight: 500;
-    color: var(--pt-fg-body);
-    transition: background 0.15s;
-    font-family: inherit;
-}
-
-.pt-user-chip-btn:hover {
-    background: var(--pt-bg-tint-strong);
-}
-
-.pt-user-avatar {
-    width: 26px;
-    height: 26px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, var(--pt-color-brand-500), var(--pt-color-info));
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--pt-fg-on-brand);
-    font-size: 0.7rem;
-    font-weight: 700;
-    flex-shrink: 0;
-}
-
-.pt-user-dropdown {
-    position: absolute;
-    right: 0;
-    top: calc(100% + 8px);
-    background: var(--pt-bg-surface);
-    border: 1px solid var(--pt-border-subtle);
-    border-radius: 10px;
-    box-shadow: 0 8px 24px rgba(var(--pt-shadow-rgb), 0.12);
-    min-width: 200px;
-    z-index: 9999;
-    overflow: hidden;
-    animation: pt-slide-up 0.12s ease;
-}
-
-.pt-user-dropdown-header {
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid var(--pt-bg-sunken);
-    font-size: 0.8rem;
-    color: var(--pt-fg-muted);
-}
-
-.pt-user-dropdown-email {
-    font-weight: 600;
-    color: var(--pt-fg-primary);
-    font-size: 0.85rem;
-    word-break: break-all;
-}
-
-.pt-dropdown-item {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.65rem 1rem;
-    font-size: 0.85rem;
-    color: var(--pt-fg-body);
-    cursor: pointer;
-    background: none;
-    border: none;
-    width: 100%;
-    text-align: left;
-    font-family: inherit;
-    transition: background 0.12s;
-    text-decoration: none;
-}
-
-.pt-dropdown-item:hover {
-    background: var(--pt-bg-elev-2);
-    color: var(--pt-fg-primary);
-}
-
-.pt-dropdown-item.danger {
-    color: var(--pt-color-danger);
-}
-
-.pt-dropdown-item.danger:hover {
-    background: var(--pt-danger-bg);
-}
-
-.pt-dropdown-divider {
-    height: 1px;
-    background: var(--pt-bg-sunken);
-    margin: 0.25rem 0;
-}
+/* The user chip, its dropdown and the dropdown items used to be declared here
+   AND in NavMenu.razor.css, with different values for the same properties — a
+   26px avatar here against 1.75rem there, a 10px dropdown radius against
+   --pt-radius-lg, a --pt-bg-elev-2 hover against --pt-bg-tint. Scoped CSS
+   carries an attribute selector and therefore always won, so this copy was dead
+   weight that still read as authoritative. The chip lives with its markup now;
+   NavMenu.razor.css is the only definition. */
 
 /* ═══════════════════════════════════════════════
-   UX-9: Collapsible raw data section
+   Collapsible raw data section (PollHistoryTable, which has no scoped sheet)
 ═══════════════════════════════════════════════ */
 .pt-collapsible-header {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: var(--pt-space-2);
     cursor: pointer;
     user-select: none;
-    padding: 0.5rem 0;
+    padding: var(--pt-space-2) 0;
     color: var(--pt-fg-muted);
-    font-size: 0.85rem;
-    font-weight: 500;
+    font-size: var(--pt-text-sm);
+    font-weight: var(--pt-weight-medium);
     border: none;
     background: none;
     font-family: inherit;
@@ -518,41 +696,34 @@ code {
     color: var(--pt-fg-body);
 }
 
-.pt-collapsible-icon {
-    display: inline-block;
-    transition: transform 0.2s ease;
-}
-
-.pt-collapsible-icon.open {
-    transform: rotate(90deg);
-}
-
 /* ═══════════════════════════════════════════════
-   TASK #9: Loading skeleton variants
+   Loading skeleton variants
 ═══════════════════════════════════════════════ */
 .pt-skeleton-stack {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: var(--pt-space-4);
 }
 
+/* Mirrors .pt-route-card's geometry — a skeleton that settles into a different
+   shape than the thing it stood in for is a layout shift with extra steps. */
 .pt-skeleton-card {
     background: var(--pt-bg-surface);
-    border-radius: 14px;
+    border-radius: var(--pt-radius-lg);
     border: 1px solid var(--pt-border-subtle);
     border-left: 5px solid var(--pt-border-subtle);
-    box-shadow: 0 2px 8px rgba(var(--pt-shadow-rgb), 0.06);
-    padding: 1.1rem 1.4rem;
+    box-shadow: var(--pt-elev-2);
+    padding: var(--pt-space-4) var(--pt-space-5);
     display: flex;
     flex-direction: column;
-    gap: 0.6rem;
+    gap: var(--pt-space-2);
 }
 
 .pt-skeleton-line {
     background: linear-gradient(90deg, var(--pt-border-subtle) 25%, var(--pt-bg-sunken) 50%, var(--pt-border-subtle) 75%);
     background-size: 200% 100%;
     animation: pt-shimmer 1.4s infinite;
-    border-radius: 6px;
+    border-radius: var(--pt-radius-sm);
     height: 0.9rem;
 }
 
@@ -562,27 +733,10 @@ code {
 .pt-skeleton-line.w-40 { width: 40%; }
 .pt-skeleton-line.w-30 { width: 30%; }
 
-@media (max-width: 640px) {
-}
-/* UI-12: 24h travel-time sparkline on dashboard route cards */
-.pt-sparkline {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-top: 0.4rem;
-}
-.pt-sparkline svg {
-    width: 120px;
-    height: 28px;
-    flex-shrink: 0;
-    background: var(--pt-bg-tint);
-    border-radius: 4px;
-}
-.pt-sparkline-label {
-    font-size: 0.72rem;
-    color: var(--pt-fg-tertiary);
-    white-space: nowrap;
-}
+/* A `.pt-sparkline` / `.pt-sparkline svg` / `.pt-sparkline-label` block used to
+   sit here, pinning the chart to 120×28. No element ever carried those classes:
+   TrendSparkline renders .pt-sparkline-wrap and .pt-sparkline-svg, both styled
+   in its own scoped sheet, and -label was declared in both places. */
 
 /* ═══════════════════════════════════════════════
    #8: Chart hover tooltip.
@@ -602,9 +756,9 @@ code {
     border: 1px solid var(--pt-border-subtle);
     border-radius: var(--pt-radius-sm);
     box-shadow: var(--pt-elev-2);
-    padding: 0.4rem 0.6rem;
-    font-size: 0.75rem;
-    line-height: 1.45;
+    padding: var(--pt-space-2) var(--pt-space-3);
+    font-size: var(--pt-text-xs);
+    line-height: var(--pt-leading-normal);
     color: var(--pt-fg-body);
     white-space: nowrap;
     z-index: var(--pt-z-pop);
@@ -632,15 +786,20 @@ code {
 }
 
 .pt-stale-banner {
+    align-items: center;
     background: var(--pt-bg-tint);
     border: 1px solid var(--pt-border-subtle);
     border-left: 3px solid var(--pt-color-warning);
     border-radius: var(--pt-radius-sm);
     color: var(--pt-fg-secondary);
-    font-size: 0.8rem;
-    margin-bottom: 1rem;
-    padding: 0.5rem 0.75rem;
+    display: flex;
+    font-size: var(--pt-text-sm);
+    gap: var(--pt-space-2);
+    margin-bottom: var(--pt-space-4);
+    padding: var(--pt-space-2) var(--pt-space-3);
 }
+
+.pt-stale-banner .pt-icon { color: var(--pt-color-warning); }
 
 /* ═══════════════════════════════════════════════
    Empty states. Shared by the dashboard and the route-comparison page (#8),
@@ -661,8 +820,22 @@ code {
     border-radius: var(--pt-radius-lg);
 }
 
-.pt-empty-state-emoji {
-    font-size: var(--pt-text-3xl);
+/* Inside a card that already has its own surface and border — a chart with no
+   data, say. Half the page height and no second frame around it. */
+.pt-empty-state-inline {
+    min-height: 0;
+    padding: var(--pt-space-8) var(--pt-space-4);
+    background: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border: 0;
+}
+
+/* Was an emoji at --pt-text-3xl. Emoji ignore `color`, so the glyph stayed
+   full-saturation against a muted empty state and drew the eye away from the
+   sentence that actually says what to do next. */
+.pt-empty-state-icon {
+    color: var(--pt-fg-faint);
     margin-bottom: var(--pt-space-4);
 }
 
@@ -707,7 +880,7 @@ code {
 
 .pt-demo-banner-tag {
     color: var(--pt-color-info);
-    font-size: 0.65rem;
+    font-size: var(--pt-text-xs);
     font-weight: var(--pt-weight-bold);
     letter-spacing: 0.06em;
     white-space: nowrap;

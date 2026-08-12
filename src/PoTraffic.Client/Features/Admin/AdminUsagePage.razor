@@ -4,13 +4,13 @@
 
 <PageTitle>Admin — Usage &amp; Volatility</PageTitle>
 
-<RadzenCard class="rz-p-6 rz-mt-4">
-    <RadzenText TextStyle="TextStyle.H5" class="rz-mb-2">Admin Tools</RadzenText>
+<PageHeader Title="Admin tools" Subtitle="Per-user consumption and fleet-wide travel-time volatility." />
 
+<RadzenCard class="pt-p-6">
     <RadzenTabs>
         <Tabs>
             <RadzenTabsItem Text="Usage Insights" Icon="people">
-                <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2 rz-mt-3">Daily Usage</RadzenText>
+                <RadzenText TextStyle="TextStyle.H6" class="pt-mb-2 pt-mt-3">Daily Usage</RadzenText>
                 <LoadingErrorCard IsLoading="_loading" Error="@_error">
                     @* Compact density and column resize/reorder/picking are all built in;
                        the grid was running at defaults. AllowColumnPicking matters most on
@@ -28,7 +28,7 @@
                                     FilterMode="FilterMode.Simple"
                                     FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
                                     EmptyText="No users have signed in yet."
-                                    class="rz-mt-2">
+                                    class="pt-mt-2">
                         <Columns>
                             <RadzenDataGridColumn TItem="UserDailyUsageDto" Property="Email" Title="Email" MinWidth="12rem" />
                             <RadzenDataGridColumn TItem="UserDailyUsageDto" Property="Locale" Title="Locale" Width="7rem" />
@@ -49,26 +49,47 @@
             </RadzenTabsItem>
 
             <RadzenTabsItem Text="Global Volatility" Icon="analytics">
-                <RadzenText TextStyle="TextStyle.Caption" class="rz-mt-3 rz-mb-4">Mean travel time across all active routes — past 24 hours</RadzenText>
+                <RadzenText TextStyle="TextStyle.Caption" class="pt-mt-3 pt-mb-4">Mean travel time across all active routes — past 24 hours</RadzenText>
                 <LoadingErrorCard IsLoading="_volLoading" Error="@_volError">
                     @if (_points.Count == 0 && !_volLoading)
                     {
-                        <RadzenAlert AlertStyle="AlertStyle.Info" Text="No volatility data for the past 24 hours." />
+                        @* The same empty-state shape the trend chart and the heatmap use,
+                           rather than an info alert — a chart with no data is an empty
+                           state, not a notification. *@
+                        <div class="pt-empty-state pt-empty-state-inline">
+                            <PtIcon Name="show_chart" Size="xl" Class="pt-empty-state-icon" />
+                            <div class="pt-empty-state-title">No volatility data</div>
+                            <div class="pt-empty-state-text">
+                                Nothing was sampled across any active route in the past 24 hours.
+                            </div>
+                        </div>
                     }
                     else
                     {
+                        @* Charts elsewhere in the app plot MINUTES — the card sparkline, the
+                           trend chart and the heatmap all do. This one plotted seconds on the
+                           axis while its own tooltip converted to minutes, so the axis and the
+                           tooltip disagreed by 60×. Minutes throughout now.
+
+                           Stroke colour is pinned to the app's series-A brand rather than
+                           Radzen's default palette, which is what made this the one chart in
+                           the app that wasn't blue. *@
                         <RadzenChart class="pt-admin-chart">
-                            <RadzenLineSeries Data="_points" CategoryProperty="PolledAt"
-                                              ValueProperty="MeanDurationSeconds"
-                                              Title="Mean Duration (s)" Smooth="true">
+                            <RadzenLineSeries Data="_series" CategoryProperty="PolledAt"
+                                              ValueProperty="Minutes" TItem="VolatilityPoint"
+                                              Title="Mean travel time" Smooth="true"
+                                              Stroke="var(--pt-color-brand-500)" StrokeWidth="2">
+                                <ChildContent>
+                                    <RadzenMarkers MarkerType="MarkerType.None" />
+                                </ChildContent>
                                 <TooltipTemplate Context="p">
-                                    <div>@(Math.Round(p.MeanDurationSeconds / 60, 1)) min · @p.RouteCount route(s)</div>
+                                    <div>@p.Minutes.ToString("F1") min · @p.RouteCount route(s)</div>
                                 </TooltipTemplate>
                             </RadzenLineSeries>
                             <RadzenCategoryAxis FormatString="{0:HH:mm}" />
                             <RadzenValueAxis>
                                 <RadzenGridLines Visible="true" />
-                                <RadzenAxisTitle Text="Duration (s)" />
+                                <RadzenAxisTitle Text="Minutes" />
                             </RadzenValueAxis>
                         </RadzenChart>
                     }
@@ -88,6 +109,15 @@
     private List<RecentVolatilityPointDto> _points = [];
     private bool _volLoading = true;
     private string? _volError;
+
+    /// <summary>
+    /// The wire DTO carries seconds; every other chart in the app plots minutes. Converted
+    /// once here rather than in the series binding, so the axis and the tooltip cannot
+    /// disagree about the unit again.
+    /// </summary>
+    private sealed record VolatilityPoint(DateTime PolledAt, double Minutes, int RouteCount);
+
+    private List<VolatilityPoint> _series = [];
 
     protected override async Task OnInitializedAsync()
     {
@@ -116,6 +146,8 @@
         {
             _points = await Http.GetFromJsonAsync(
                 "/api/admin/global-volatility/recent?hours=24", AppJsonContext.Default.ListRecentVolatilityPointDto) ?? [];
+            _series = [.. _points.Select(p =>
+                new VolatilityPoint(p.PolledAt, p.MeanDurationSeconds / 60.0, p.RouteCount))];
         }
         catch (Exception ex)
         {

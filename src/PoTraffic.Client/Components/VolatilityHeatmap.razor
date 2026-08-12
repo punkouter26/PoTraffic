@@ -18,7 +18,7 @@
 @if (Heatmap is null || Heatmap.TotalSamples == 0)
 {
     <div class="pt-heatmap-empty">
-        <div class="pt-heatmap-empty-icon" aria-hidden="true">🗓️</div>
+        <PtIcon Name="calendar_month" Size="xl" Class="pt-heatmap-empty-icon" />
         <div class="pt-heatmap-empty-text">
             The weekly pattern appears once this route has sampled a few commutes.
         </div>
@@ -28,7 +28,7 @@ else
 {
     @if (_summary is not null)
     {
-        <RadzenText TextStyle="TextStyle.Body2" class="rz-mb-3 pt-heatmap-summary">@_summary</RadzenText>
+        <RadzenText TextStyle="TextStyle.Body2" class="pt-mb-3 pt-heatmap-summary">@_summary</RadzenText>
     }
 
     <div class="pt-heatmap-scroll">

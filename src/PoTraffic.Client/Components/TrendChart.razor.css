@@ -58,9 +58,8 @@
 }
 
 .pt-trend-empty-icon {
-    font-size: var(--pt-text-3xl);
+    color: var(--pt-fg-faint);
     margin-bottom: var(--pt-space-2);
-    opacity: 0.5;
 }
 
 .pt-trend-empty-title {

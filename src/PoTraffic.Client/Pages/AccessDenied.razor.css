@@ -9,9 +9,8 @@
 }
 
 .pt-access-denied-icon {
-    font-size: 3rem;
-    line-height: 1;
-    margin-bottom: 0.75rem;
+    color: var(--pt-fg-faint);
+    margin-bottom: var(--pt-space-3);
 }
 
 .pt-access-denied h1 {

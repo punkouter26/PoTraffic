@@ -11,7 +11,7 @@
     <Authorized>
         <div class="pt-bell">
             <button class="pt-bell-btn" @onclick="Toggle" aria-label="Notifications" title="Notifications">
-                🔔
+                <PtIcon Name="notifications" Filled="@(_unreadCount > 0)" />
                 @if (_unreadCount > 0)
                 {
                     <span class="pt-bell-badge">@(_unreadCount > 9 ? "9+" : _unreadCount.ToString())</span>
@@ -32,7 +32,15 @@
                     @if (!_pushEnabled)
                     {
                         <button class="pt-bell-enable" @onclick="EnablePushAsync" disabled="@_enabling">
-                            @(_enabling ? "Enabling…" : "🔔 Enable push notifications")
+                            @if (_enabling)
+                            {
+                                <text>Enabling…</text>
+                            }
+                            else
+                            {
+                                <PtIcon Name="notifications_active" Size="sm" />
+                                <text>Enable push notifications</text>
+                            }
                         </button>
                         @if (_pushError is not null)
                         {
@@ -50,7 +58,8 @@
                             @foreach (AlertDto a in _alerts)
                             {
                                 <li class="pt-bell-item @(a.IsRead ? "" : "pt-bell-unread")" @onclick="() => OpenAlertAsync(a)">
-                                    <span class="pt-bell-icon">@(a.Kind == "Reroute" ? "🔀" : "🚗")</span>
+                                    <PtIcon Name="@(a.Kind == "Reroute" ? "alt_route" : "directions_car")"
+                                            Class="pt-bell-icon" />
                                     <span class="pt-bell-text">
                                         <span class="pt-bell-msg">@a.Message</span>
                                         <span class="pt-bell-time">@a.CreatedAt.ToLocalTime().ToString("MMM d, HH:mm")</span>

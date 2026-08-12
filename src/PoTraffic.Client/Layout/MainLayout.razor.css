@@ -12,10 +12,8 @@ main {
     padding: 0;
 }
 
-.content {
-    /* Padding now lives in app.css — tokenized, mobile-safe, leaves room
-       for the fixed BottomNav on small screens. */
-    max-width: 1280px;
-    margin: 0 auto;
-    width: 100%;
-}
+/* .content is styled entirely in app.css.
+
+   This file used to set `max-width: 1280px; margin: 0 auto; width: 100%` while
+   app.css set 1180px, and scoped CSS wins on specificity — so the measure cap
+   documented in app.css was never the one in force. One owner now. */

@@ -1,19 +1,37 @@
 /* ── PoTraffic top app shell (Rule 6 — Left=Brand / Center=Actions / Right=User) ──
-   Tokens come from wwwroot/css/pt-tokens.css so the bar reskins with the theme. */
+   Tokens come from wwwroot/css/pt-tokens.css so the bar reskins with the theme.
+
+   That claim was only half true: the gradient's top stop was a literal #142137
+   and every hover, border and chip surface below was a raw rgba(255,255,255,…),
+   so the one piece of chrome on every page was the one piece that could not be
+   reskinned from the token file. The bar is intentionally dark in BOTH themes —
+   that is a brand decision, not an oversight — so the fix is a local scale
+   derived from the palette rather than a switch to the theme-dependent
+   surfaces. Change --pt-color-neutral-900 and the bar follows. */
 
 .app-shell {
+    /* Local scale: everything painted on the bar mixes from these two, so the
+       whole shell moves together. */
+    --shell-bg: var(--pt-color-neutral-900);
+    --shell-fg: var(--pt-color-neutral-0);
+    --shell-tint: color-mix(in oklab, var(--shell-fg) 8%, transparent);
+    --shell-tint-strong: color-mix(in oklab, var(--shell-fg) 14%, transparent);
+    --shell-border: color-mix(in oklab, var(--pt-color-neutral-400) 18%, transparent);
+
     display: grid;
     grid-template-columns: auto 1fr auto;
     align-items: center;
     gap: var(--pt-space-4);
-    background: linear-gradient(180deg, #142137 0%, var(--pt-color-neutral-900) 100%);
-    color: var(--pt-color-neutral-0);
+    background: linear-gradient(180deg,
+        color-mix(in oklab, var(--pt-color-brand-900) 22%, var(--shell-bg)) 0%,
+        var(--shell-bg) 100%);
+    color: var(--shell-fg);
     padding: 0 var(--pt-space-6);
     min-height: 3.75rem;
     position: sticky;
     top: 0;
     z-index: var(--pt-z-nav);
-    border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+    border-bottom: 1px solid var(--shell-border);
     box-shadow: var(--pt-elev-2);
 }
 
@@ -26,7 +44,7 @@
     font-weight: var(--pt-weight-bold);
     font-size: var(--pt-text-lg);
     letter-spacing: -0.01em;
-    color: var(--pt-color-neutral-0);
+    color: var(--shell-fg);
     text-decoration: none;
     white-space: nowrap;
     transition: opacity var(--pt-dur-fast) var(--pt-ease);
@@ -38,7 +56,7 @@
     height: 0.6rem;
     border-radius: var(--pt-radius-xs);
     background: linear-gradient(135deg, var(--pt-color-brand-400), var(--pt-color-info));
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.16);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--pt-color-brand-500) 16%, transparent);
     flex-shrink: 0;
 }
 
@@ -66,39 +84,19 @@
 
 /* ── Nav links — hover tint, filled pill on active ── */
 
-/* The app shell is a dark bar in both themes, so these colours are pinned to the
-   fixed end of the neutral ramp rather than to the theme-dependent fg tokens.
-   The !important flags are gone — Radzen's .nav-link rules are layered now. */
-.app-nav-link {
-    color: color-mix(in oklab, var(--pt-color-neutral-200) 70%, transparent);
-    padding: var(--pt-space-2) var(--pt-space-3);
-    border-radius: var(--pt-radius-sm);
-    text-decoration: none;
-    font-size: var(--pt-text-sm);
-    font-weight: var(--pt-weight-medium);
-    letter-spacing: 0.01em;
-    box-shadow: inset 0 0 0 1px transparent;
-    transition: background var(--pt-dur-fast) var(--pt-ease),
-                color var(--pt-dur-fast) var(--pt-ease),
-                box-shadow var(--pt-dur-fast) var(--pt-ease);
-    white-space: nowrap;
-}
+/* The .app-nav-link rules are NOT here — see the note in app.css.
 
-.app-nav-link:hover {
-    background: rgba(255, 255, 255, 0.06);
-    color: var(--pt-color-neutral-0);
-}
+   They cannot live in this file. Blazor's CSS isolation stamps its scope
+   attribute onto the plain HTML elements written in NavMenu.razor, but the nav
+   links are <NavLink>, a COMPONENT: the <a> it renders belongs to NavLink's own
+   markup and never receives `b-mhqeozcjir`. Every rule here targeting
+   .app-nav-link compiled to `.app-nav-link[b-mhqeozcjir]`, matched nothing, and
+   left the links falling through to the global `a { color: … }` — underlined
+   brand-blue on the dark bar, with no padding and no active state. */
 
-.app-nav-link.active {
-    background: rgba(59, 130, 246, 0.16);
-    box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.35);
-    color: var(--pt-color-neutral-0);
-}
-
-/* Accessibility: visible keyboard focus on the dark bar. */
-.app-nav-link:focus-visible,
+/* The chip IS a plain <button> in this file's markup, so it does get the scope. */
 .pt-user-chip-btn:focus-visible {
-    outline: 2px solid var(--pt-color-brand-400);
+    outline: 2px solid var(--pt-color-brand-300);
     outline-offset: 2px;
 }
 
@@ -108,9 +106,9 @@
     display: inline-flex;
     align-items: center;
     gap: var(--pt-space-2);
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    color: var(--pt-color-neutral-0);
+    background: var(--shell-tint);
+    border: 1px solid var(--shell-border);
+    color: var(--shell-fg);
     padding: var(--pt-space-1) var(--pt-space-3) var(--pt-space-1) var(--pt-space-1);
     border-radius: var(--pt-radius-full);
     cursor: pointer;
@@ -123,23 +121,23 @@
 }
 
 .pt-user-chip-btn:hover {
-    background: rgba(255, 255, 255, 0.10);
-    border-color: rgba(255, 255, 255, 0.24);
+    background: var(--shell-tint-strong);
+    border-color: color-mix(in oklab, var(--shell-fg) 24%, transparent);
 }
 
 .pt-user-avatar {
     width: 1.75rem;
     height: 1.75rem;
     border-radius: var(--pt-radius-full);
-    background: var(--pt-color-brand-600);
+    background: linear-gradient(135deg, var(--pt-color-brand-500), var(--pt-color-info));
     display: inline-flex;
     align-items: center;
     justify-content: center;
     font-weight: var(--pt-weight-bold);
-    color: var(--pt-color-neutral-0);
+    color: var(--pt-fg-on-brand);
     font-size: var(--pt-text-xs);
     flex-shrink: 0;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.30);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.30);
 }
 
 .pt-user-chip-label {
@@ -155,6 +153,9 @@
 
 /* ── Dropdown menu ── */
 
+/* Baseline: absolutely positioned inside the header, which is a stacking context
+   of its own. That is what forces the overlay gymnastics documented at the
+   bottom of this file. */
 .pt-user-dropdown {
     position: absolute;
     top: calc(100% + var(--pt-space-2));
@@ -169,6 +170,35 @@
     padding: var(--pt-space-2) 0;
     overflow: hidden;
     animation: pt-slide-down var(--pt-dur-fast) var(--pt-ease-out);
+}
+
+/* Enhanced: CSS anchor positioning tethers the menu to the chip itself rather
+   than to the header box, so it is no longer trapped by the header's stacking
+   context or clipped by its bounds. `position-try-fallbacks` is the part worth
+   having — on a narrow phone the right-aligned menu used to run off the edge of
+   the viewport, and the browser now flips it inline-start on its own instead of
+   us writing a media query that guesses where the chip is.
+
+   Everything here is inside @supports, so a browser without anchor positioning
+   keeps the absolute positioning above unchanged. */
+@supports (anchor-name: --pt-user-chip) {
+    .pt-user-chip-btn {
+        anchor-name: --pt-user-chip;
+    }
+
+    .pt-user-dropdown {
+        position: fixed;
+        top: unset;
+        right: unset;
+        position-anchor: --pt-user-chip;
+        position-area: block-end span-inline-start;
+        margin-block-start: var(--pt-space-2);
+        position-try-fallbacks: block-end span-inline-end, block-end;
+        /* min-width beats max-width in CSS, so the 16rem floor from the base rule
+           would win over a viewport cap and overflow anyway. Clamped here instead. */
+        min-inline-size: min(16rem, calc(100vw - var(--pt-space-6)));
+        max-inline-size: calc(100vw - var(--pt-space-6));
+    }
 }
 
 .pt-user-dropdown-header {
@@ -193,17 +223,29 @@
 }
 
 .pt-dropdown-item {
-    display: block;
+    display: flex;
+    align-items: center;
+    gap: var(--pt-space-3);
     width: 100%;
     text-align: left;
     background: transparent;
     border: 0;
     padding: var(--pt-space-3) var(--pt-space-4);
     font-size: var(--pt-text-sm);
+    font-family: inherit;
     color: var(--pt-fg-primary);
     text-decoration: none;
     cursor: pointer;
     transition: background var(--pt-dur-fast) var(--pt-ease);
+}
+
+/* The dropdown items' icon colours are in app.css — see the note there. A rule
+   ending on .pt-icon cannot be scoped. */
+
+/* The admin destinations only appear in this menu at the width where the centre
+   nav is gone. Above it they would be a second copy of links already in the bar. */
+@media (min-width: 641px) {
+    .pt-dropdown-mobile-only { display: none; }
 }
 
 .pt-dropdown-item:hover {
@@ -229,14 +271,20 @@
 /* ── Mock-data banner (top notice, full width) ── */
 
 .pt-mock-banner {
-    background: linear-gradient(90deg, var(--pt-color-warning) 0%, #d97706 100%);
-    color: #422006;
-    text-align: center;
+    align-items: center;
+    background: linear-gradient(90deg,
+        var(--pt-color-warning) 0%,
+        color-mix(in oklab, var(--pt-color-warning) 70%, var(--pt-color-neutral-900)) 100%);
+    /* Near-black on amber rather than the #422006 literal — the same reading at
+       any warning hue, and it clears AA against both ends of the gradient. */
+    color: color-mix(in oklab, var(--pt-color-warning) 12%, #000);
+    display: flex;
+    gap: var(--pt-space-2);
+    justify-content: center;
     padding: var(--pt-space-2) var(--pt-space-4);
     font-weight: var(--pt-weight-bold);
     font-size: var(--pt-text-xs);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    letter-spacing: 0.06em;
 }
 
 /* ── Mobile portrait (≤640px): keep grid but compress padding ── */

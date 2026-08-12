@@ -71,22 +71,22 @@
         _areaPath = $"{_linePath} L {(n - 1):R} 1 L 0 1 Z";
 
         // Color by latest sample vs mean — gives at-a-glance congestion cue.
+        //
+        // The three fills were literal rgba()s of the three stroke colours, so a
+        // change to --pt-color-danger moved the line and left the wash behind, and
+        // a 14%-alpha slate wash is nearly invisible on the dark theme's own slate
+        // surface. Both halves now derive from ONE token per state via color-mix,
+        // which also means the wash composites against whatever surface it lands on.
         double mean = _values.Average();
         double last = _values[^1];
-        if (last > mean * 1.1)
+        (_stroke, _fill) = (last > mean * 1.1, last < mean * 0.9) switch
         {
-            _stroke = "var(--pt-color-danger, #f43f5e)";
-            _fill = "rgba(244, 63, 94, 0.14)";
-        }
-        else if (last < mean * 0.9)
-        {
-            _stroke = "var(--pt-color-success, #10b981)";
-            _fill = "rgba(16, 185, 129, 0.14)";
-        }
-        else
-        {
-            _stroke = "var(--pt-fg-tertiary, #64748b)";
-            _fill = "rgba(100, 116, 139, 0.10)";
-        }
+            (true, _) => Pair("--pt-color-danger"),
+            (_, true) => Pair("--pt-color-success"),
+            _ => Pair("--pt-fg-tertiary")
+        };
+
+        static (string Stroke, string Fill) Pair(string token) =>
+            ($"var({token})", $"color-mix(in oklab, var({token}) 16%, transparent)");
     }
 }

@@ -3,12 +3,12 @@
 @inject NotificationService NotificationService
 @inject DialogService DialogService
 
-<div class="row rz-mb-6">
+<div class="row pt-mb-6">
     <div class="col-md-5">
         <RadzenCard>
-            <RadzenText TextStyle="TextStyle.H6" Text="Configuration" class="rz-mb-4" />
+            <RadzenText TextStyle="TextStyle.H6" Text="Configuration" class="pt-mb-4" />
 
-            <RadzenStack Orientation="Orientation.Vertical" Gap="1rem" class="rz-mb-6">
+            <RadzenStack Orientation="Orientation.Vertical" Gap="1rem" class="pt-mb-6">
                 <RadzenFormField Text="Routes to Create (per user)" FullWidth="true">
                     <RadzenNumeric @bind-Value="_routeCount" Min="1" Max="10" />
                 </RadzenFormField>
@@ -32,13 +32,13 @@
     {
         <div class="col-md-7">
             <RadzenCard Variant="Variant.Outlined">
-                <RadzenText TextStyle="TextStyle.H6" Text="Last Seed Results" class="rz-mb-4" />
+                <RadzenText TextStyle="TextStyle.H6" Text="Last Seed Results" class="pt-mb-4" />
                 <RadzenStack Orientation="Orientation.Vertical" Gap="1rem">
                     <RadzenText TextStyle="TextStyle.Subtitle1"><b>Users Created:</b> @_lastResult.UsersCreated</RadzenText>
                     <RadzenText TextStyle="TextStyle.Subtitle1"><b>Routes Created:</b> @_lastResult.RoutesCreated</RadzenText>
                     <RadzenText TextStyle="TextStyle.Subtitle1"><b>Poll Records Inserted:</b> @_lastResult.PollsCreated</RadzenText>
                 </RadzenStack>
-                <RadzenAlert AlertStyle="AlertStyle.Success" class="rz-mt-4" AllowClose="false" Variant="Variant.Flat" Shade="Shade.Lighter">
+                <RadzenAlert AlertStyle="AlertStyle.Success" class="pt-mt-4" AllowClose="false" Variant="Variant.Flat" Shade="Shade.Lighter">
                     The database has been updated successfully.
                 </RadzenAlert>
             </RadzenCard>
@@ -46,11 +46,11 @@
     }
 </div>
 
-<div class="row rz-mt-6">
+<div class="row pt-mt-6">
     <div class="col-md-5">
         <RadzenCard Variant="Variant.Outlined" class="pt-seed-danger-card">
-            <RadzenText TextStyle="TextStyle.H6" Text="Destructive Operations" class="rz-mb-4 pt-seed-danger-title" />
-            <RadzenText TextStyle="TextStyle.Body2" class="rz-mb-6">
+            <RadzenText TextStyle="TextStyle.H6" Text="Destructive Operations" class="pt-mb-4 pt-seed-danger-title" />
+            <RadzenText TextStyle="TextStyle.Body2" class="pt-mb-6">
                 Clear all users (except Administrators), routes, monitoring sessions, and poll records.
                 This action is irreversible.
             </RadzenText>

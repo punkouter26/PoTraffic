@@ -4,31 +4,31 @@
 
 @if (!string.IsNullOrEmpty(Error))
 {
-    <RadzenAlert AlertStyle="AlertStyle.Danger" class="rz-mb-3">@Error</RadzenAlert>
+    <RadzenAlert AlertStyle="AlertStyle.Danger" class="pt-mb-3">@Error</RadzenAlert>
 }
 
-<RadzenFormField Text="Origin Address" class="rz-w-100 rz-mb-3">
+<RadzenFormField Text="Origin Address" class="pt-w-100 pt-mb-3">
     <RadzenTextBox Value="@Origin" ValueChanged="@((v) => OriginChanged.InvokeAsync(v))"
                    Placeholder="e.g. 1 Apple Park Way, Cupertino, CA" class="pt-tt-full" />
 </RadzenFormField>
 
-<RadzenFormField Text="Destination Address" class="rz-w-100 rz-mb-3">
+<RadzenFormField Text="Destination Address" class="pt-w-100 pt-mb-3">
     <RadzenTextBox Value="@Destination" ValueChanged="@((v) => DestinationChanged.InvokeAsync(v))"
                    Placeholder="e.g. 1 Infinite Loop, Cupertino, CA" class="pt-tt-full" />
 </RadzenFormField>
 
-<RadzenFormField Text="Provider" class="rz-w-100 rz-mb-3">
+<RadzenFormField Text="Provider" class="pt-w-100 pt-mb-3">
     <RadzenDropDown Value="@Provider" ValueChanged="@((int v) => ProviderChanged.InvokeAsync(v))"
                     Data="@_providers" TextProperty="Label" ValueProperty="Value" class="pt-tt-full" />
 </RadzenFormField>
 
-<RadzenFormField Text="Start At (leave empty to start immediately)" class="rz-w-100 rz-mb-4">
+<RadzenFormField Text="Start At (leave empty to start immediately)" class="pt-w-100 pt-mb-4">
     <RadzenDatePicker Value="@StartAt" ValueChanged="@((DateTime? v) => StartAtChanged.InvokeAsync(v))"
                       ShowTime="true" DateFormat="yyyy-MM-dd HH:mm"
                       Placeholder="Now" AllowClear="true" class="pt-tt-full" />
 </RadzenFormField>
 
-<RadzenButton Text="Run Triple Test" ButtonStyle="ButtonStyle.Primary" Icon="science" class="rz-w-100"
+<RadzenButton Text="Run Triple Test" ButtonStyle="ButtonStyle.Primary" Icon="science" class="pt-w-100"
               Click="@OnSubmit" IsBusy="@IsSubmitting"
               Disabled="@(string.IsNullOrWhiteSpace(Origin) || string.IsNullOrWhiteSpace(Destination))" />
 

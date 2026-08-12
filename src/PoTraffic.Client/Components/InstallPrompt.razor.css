@@ -19,7 +19,7 @@
 
 .pt-install-icon {
     flex-shrink: 0;
-    font-size: var(--pt-text-xl);
+    color: var(--pt-color-brand-on-surface);
 }
 
 .pt-install-text {

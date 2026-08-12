@@ -5,24 +5,27 @@
         <div class="auth-brand-content">
             <div class="auth-logo">PoTraffic</div>
             <div class="auth-tagline">Real-time commute intelligence for your daily routes.</div>
-            <div class="auth-features">
-                <div class="auth-feature">
-                    <span>⚡</span>
+            @* Four emoji at four different optical weights, each rendering as a
+               different drawing per operating system and none of them taking the
+               panel's foreground colour. One icon font, tinted to the panel. *@
+            <ul class="auth-features" role="list">
+                <li class="auth-feature">
+                    <PtIcon Name="bolt" />
                     <span>5-minute polling intervals</span>
-                </div>
-                <div class="auth-feature">
-                    <span>📊</span>
+                </li>
+                <li class="auth-feature">
+                    <PtIcon Name="insights" />
                     <span>Historical baseline analysis</span>
-                </div>
-                <div class="auth-feature">
-                    <span>🛣️</span>
+                </li>
+                <li class="auth-feature">
+                    <PtIcon Name="route" />
                     <span>Multi-route monitoring</span>
-                </div>
-                <div class="auth-feature">
-                    <span>🔔</span>
+                </li>
+                <li class="auth-feature">
+                    <PtIcon Name="schedule" />
                     <span>Optimal departure time suggestions</span>
-                </div>
-            </div>
+                </li>
+            </ul>
         </div>
     </div>
     <div class="auth-form-panel">

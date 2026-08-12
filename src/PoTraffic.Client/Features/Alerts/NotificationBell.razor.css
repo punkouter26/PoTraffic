@@ -7,7 +7,11 @@
     position: relative;
     background: transparent;
     border: none;
-    font-size: 1.15rem;
+    /* The bell sits on the dark app shell, where the inherited body foreground is
+       the page's — near-black on light. It was an emoji before and carried its own
+       colour; now it needs telling. */
+    color: var(--pt-color-neutral-200);
+    --pt-icon-size: 1.35rem;
     line-height: 1;
     cursor: pointer;
     padding: 0.35rem;
@@ -59,31 +63,41 @@
     color: var(--pt-fg-primary);
 }
 
-.pt-bell-link,
-.pt-bell-enable {
+.pt-bell-link {
     background: transparent;
     border: none;
-    color: var(--pt-color-brand-500);
-    font-size: 0.8rem;
+    color: var(--pt-color-brand-on-surface);
+    font-size: var(--pt-text-sm);
     cursor: pointer;
-    padding: 0.25rem 0.4rem;
+    padding: var(--pt-space-1) var(--pt-space-2);
 }
 
+/* Was declared twice — once alongside .pt-bell-link (transparent, no border,
+   inline padding) and again immediately below with the opposite of nearly every
+   one of those properties. Only the second ever applied. */
 .pt-bell-enable {
-    display: block;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--pt-space-2);
     width: 100%;
     text-align: center;
-    padding: 0.5rem;
-    margin-bottom: 0.4rem;
+    cursor: pointer;
+    color: var(--pt-color-brand-on-surface);
+    background: transparent;
+    font-size: var(--pt-text-sm);
+    font-family: inherit;
+    padding: var(--pt-space-2);
+    margin-bottom: var(--pt-space-1);
     border: 1px solid var(--pt-border-subtle);
-    border-radius: var(--pt-radius-sm, 8px);
-    font-weight: 600;
+    border-radius: var(--pt-radius-sm);
+    font-weight: var(--pt-weight-semibold);
 }
 
 .pt-bell-error {
-    color: var(--pt-color-danger, var(--pt-color-danger));
-    font-size: 0.75rem;
-    padding: 0 0.5rem 0.4rem;
+    color: var(--pt-color-danger);
+    font-size: var(--pt-text-xs);
+    padding: 0 var(--pt-space-2) var(--pt-space-1);
 }
 
 .pt-bell-empty {

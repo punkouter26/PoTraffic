@@ -214,6 +214,30 @@
     --rz-dialog-background-color: var(--pt-bg-surface);
     --rz-text-title-color:        var(--pt-fg-primary);
 
+    /* Radzen's select bar keeps its selected-item colour in its OWN variable, not
+       in the primary ramp — and its default is #ff6d41, a burnt orange that
+       appears nowhere else in this palette. Left unmapped it painted the chosen
+       Theme and Density labels orange on a pale-blue fill. */
+    --rz-selectbar-selected-color: var(--pt-fg-on-brand);
+
+    /* The four semantic colours. Only the PRIMARY ramp was mapped above, so every
+       Radzen alert, badge and status button — the danger alert on Settings, the
+       Healthy/Unhealthy badges on Diagnostics, the quota progress bar — was drawn
+       from Radzen's stock palette while the app's own components used --pt-color-*.
+       Two greens, two reds and two ambers were in play at once. */
+    --rz-success: var(--pt-color-success);
+    --rz-danger:  var(--pt-color-danger);
+    --rz-warning: var(--pt-color-warning);
+    --rz-info:    var(--pt-color-info);
+
+    /* Chart series. The admin line chart is the app's only RadzenChart; pinning the
+       first two series keeps it in step with pt-chart.js, which draws series A in
+       brand and series B in warning-amber. */
+    --rz-series-1: var(--pt-color-brand-500);
+    --rz-series-2: var(--pt-color-warning);
+    --rz-series-3: var(--pt-color-info);
+    --rz-series-4: var(--pt-color-success);
+
     --rz-base-100:           var(--pt-bg-surface);
     --rz-base-200:           var(--pt-bg-elev-2);
     --rz-base-300:           light-dark(var(--pt-color-neutral-100), var(--pt-color-neutral-700));

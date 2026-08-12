@@ -28,10 +28,37 @@
 .pt-anim-up   { animation: pt-slide-up  var(--pt-dur-base) var(--pt-ease) both; }
 .pt-anim-down { animation: pt-slide-down var(--pt-dur-base) var(--pt-ease) both; }
 
-/* Stagger entrance — children accept style="--pt-i:N". */
+/* Stagger entrance.
+
+   This read `animation-delay: calc(var(--pt-i, 0) * 50ms)` and was documented as
+   "children accept style='--pt-i:N'". No child anywhere in the app ever set it,
+   so every delay fell back to 0 and the stagger has always been a plain
+   simultaneous fade — a feature that has never once run.
+
+   `sibling-index()` supplies the ordinal the inline style was standing in for,
+   with no markup involvement at all. Where it is unsupported the calc is
+   invalid, the declaration is dropped, and the delay is 0 — exactly the
+   behaviour that shipped for the whole life of the rule, so there is nothing to
+   fall back to.
+
+   Capped at the 8th child: a delay that keeps growing down a long list means the
+   last card fades in a second and a half after the first, which stops reading as
+   choreography and starts reading as slowness. */
 .pt-stagger > * {
     animation: pt-slide-up var(--pt-dur-base) var(--pt-ease) both;
-    animation-delay: calc(var(--pt-i, 0) * 50ms);
+}
+
+@supports (animation-delay: calc(sibling-index() * 1ms)) {
+    .pt-stagger > * {
+        animation-delay: calc(min(sibling-index(), 8) * 40ms);
+    }
+}
+
+/* A staggered list must not delay content for someone who asked for less
+   motion — the reduced-motion block below zeroes durations, and a leftover
+   delay would leave items blank for the length of the stagger. */
+@media (prefers-reduced-motion: reduce) {
+    .pt-stagger > * { animation-delay: 0s !important; }
 }
 
 /* Default page entrance. */
@@ -117,6 +144,20 @@ article.content { animation: pt-slide-up var(--pt-dur-base) var(--pt-ease); }
     animation-duration: var(--pt-dur-slow);
     animation-timing-function: var(--pt-ease);
 }
+
+/* A card-morphs-into-the-page transition was considered for dashboard → route
+   detail and deliberately NOT shipped. Both halves of it are unavailable here:
+   `@view-transition { navigation: auto }` fires on cross-DOCUMENT navigation
+   only, and this is a Blazor WebAssembly SPA where the URL changes without one;
+   the same-document API needs `document.startViewTransition(cb)` where `cb`
+   resolves after the new DOM is in place, and Blazor exposes no hook for "the
+   re-render has landed". Worse, the detail page loads async — the frame right
+   after navigation shows a progress line, not the answer — so the snapshot
+   would capture the loading state and the morph would tween into nothing.
+
+   The theme/density transition below stays because that one IS a state change
+   the app fully owns: an attribute write on <html>, synchronous, no render to
+   wait for. */
 
 @media (prefers-reduced-motion: reduce) {
     ::view-transition-old(root),

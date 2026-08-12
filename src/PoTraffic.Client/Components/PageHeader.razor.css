@@ -1,0 +1,88 @@
+/* Page header — the single title treatment for every route.
+
+   Laid out as a grid rather than flex so the back link, the title block and the
+   action slot each hold a column and the title never shifts horizontally
+   between a page that has a back link and one that doesn't... except that it
+   should: `auto 1fr auto` collapses the empty columns to zero width, which is
+   exactly right here. */
+
+.pt-page-header {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: var(--pt-space-3);
+    margin-bottom: var(--pt-space-5);
+    container-type: inline-size;
+    container-name: pt-page-header;
+}
+
+.pt-page-header-text {
+    min-width: 0;
+}
+
+.pt-page-title {
+    font-size: var(--pt-text-2xl);
+    font-weight: var(--pt-weight-bold);
+    letter-spacing: -0.02em;
+    line-height: var(--pt-leading-tight);
+    color: var(--pt-fg-primary);
+    margin: 0;
+    text-wrap: balance;
+}
+
+.pt-page-subtitle {
+    font-size: var(--pt-text-sm);
+    color: var(--pt-fg-secondary);
+    margin: var(--pt-space-1) 0 0;
+    text-wrap: pretty;
+}
+
+/* ── Back affordance ───────────────────────────────────────────────────── */
+
+.pt-page-back {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--pt-space-1);
+    padding: var(--pt-space-2);
+    margin-inline-start: calc(var(--pt-space-2) * -1);
+    border-radius: var(--pt-radius-md);
+    color: var(--pt-fg-secondary);
+    text-decoration: none;
+    font-size: var(--pt-text-sm);
+    font-weight: var(--pt-weight-medium);
+    transition: background var(--pt-dur-fast) var(--pt-ease),
+                color var(--pt-dur-fast) var(--pt-ease);
+}
+
+@media (hover: hover) {
+    .pt-page-back:hover {
+        background: var(--pt-bg-tint);
+        color: var(--pt-fg-primary);
+    }
+}
+
+.pt-page-header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--pt-space-2);
+    justify-self: end;
+}
+
+/* Narrow header: the back label is redundant next to an arrow that points at
+   the only place it could go, and the actions drop to their own row rather
+   than squeezing the title to a two-character column. */
+@container pt-page-header (width < 30rem) {
+    .pt-page-back-label { display: none; }
+
+    .pt-page-header {
+        grid-template-columns: auto 1fr;
+    }
+
+    .pt-page-header-actions {
+        grid-column: 1 / -1;
+        justify-self: stretch;
+    }
+
+    .pt-page-title { font-size: var(--pt-text-xl); }
+}

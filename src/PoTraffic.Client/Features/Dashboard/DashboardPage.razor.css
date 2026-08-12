@@ -3,38 +3,32 @@
 /* .pt-empty-state* moved to app.css — the compare page (#8) renders the same block,
    and scoped styles here would only reach the dashboard's copy of it. */
 
-/* Glass surface for the status bar — sits over the mesh background */
+/* Glass surface for the status bar — sits over the mesh background.
+   Padding and radius are app.css's (they scale with --pt-density); restating
+   them here only re-froze them at this file's higher specificity. */
 .pt-status-bar {
     background: var(--pt-glass-bg-strong);
     backdrop-filter: blur(var(--pt-glass-blur)) saturate(var(--pt-glass-saturate));
     -webkit-backdrop-filter: blur(var(--pt-glass-blur)) saturate(var(--pt-glass-saturate));
-    border: 1px solid var(--pt-glass-border);
-    box-shadow: var(--pt-elev-1);
-    border-radius: var(--pt-radius-lg);
-    padding: var(--pt-space-3) var(--pt-space-5);
+    border-color: var(--pt-glass-border);
 }
 
-/* Route card — translucent surface so the mesh shows through subtly */
-.pt-route-cards {
-    display: flex;
-    flex-direction: column;
-    gap: var(--pt-space-4);
-}
+/* The LAYOUT of .pt-route-cards is not here.
+
+   It used to be: this file carried `display: flex; flex-direction: column`, and
+   because scoped CSS compiles to `.pt-route-cards[b-scd66klctr]` it beat the
+   app.css rule on specificity every time. So the two-column grid added to
+   app.css was computed as `display: flex` and never appeared, and the same trap
+   had been sitting here for as long as both copies existed. app.css owns the
+   grid; this file owns only what is specific to the dashboard's mesh
+   background — the translucent surface. */
 
 .pt-route-card {
+    /* Glass instead of the flat --pt-bg-surface app.css gives the card, so the
+       mesh shows through. Geometry, elevation, transition and the ambient left
+       border all come from app.css and are deliberately NOT restated. */
     background: var(--pt-glass-bg-strong);
     backdrop-filter: blur(var(--pt-glass-blur)) saturate(var(--pt-glass-saturate));
     -webkit-backdrop-filter: blur(var(--pt-glass-blur)) saturate(var(--pt-glass-saturate));
-    border: 1px solid var(--pt-glass-border);
-    border-left: 5px solid var(--pt-ambient-color, var(--pt-color-brand-500));
-    box-shadow: var(--pt-elev-2);
-    border-radius: var(--pt-radius-lg);
-    transition: box-shadow var(--pt-dur-fast) var(--pt-ease),
-                transform var(--pt-dur-fast) var(--pt-ease);
-    overflow: hidden;
-}
-
-.pt-route-card:hover {
-    box-shadow: var(--pt-elev-3);
-    transform: translateY(-1px);
+    border-color: var(--pt-glass-border);
 }

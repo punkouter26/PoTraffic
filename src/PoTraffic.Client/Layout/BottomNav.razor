@@ -5,24 +5,27 @@
 @* Bottom navigation — only visible on mobile portrait (≤640px). Provides
    thumb-reach to the three most common destinations so the user doesn't
    have to scroll back to the top nav. The desktop top nav still owns
-   branding + user chip per the L/C/R spatial contract. *@
-<nav class="pt-bottom-nav" aria-label="Quick actions">
-    <a class="pt-bottom-nav-link" href="dashboard" aria-label="Dashboard">
-        <span class="pt-bottom-nav-icon" aria-hidden="true">⌂</span>
-        <span class="pt-bottom-nav-label">Dashboard</span>
-    </a>
-    <a class="pt-bottom-nav-link pt-bottom-nav-fab" href="routes/create" aria-label="Add route">
-        <span class="pt-bottom-nav-fab-inner" aria-hidden="true">+</span>
-    </a>
-    <a class="pt-bottom-nav-link" href="account/settings" aria-label="Account">
-        <span class="material-symbols-outlined pt-bottom-nav-icon" aria-hidden="true">person</span>
-        <span class="pt-bottom-nav-label">Account</span>
-    </a>
-</nav>
+   branding + user chip per the L/C/R spatial contract.
 
-@code {
-    protected override void OnInitialized()
-    {
-        // No-op — BottomNav is presentation-only; state lives in the top nav.
-    }
-}
+   The three links used to draw their icons three different ways: a "⌂" house
+   character, a "+" plus sign and one Material Symbols glyph. So the bar mixed
+   two typefaces and two optical weights across three items sitting 60px apart.
+   All three are Material Symbols now.
+
+   NavLink rather than <a>: the bar had no active state at all, so the primary
+   navigation on a phone never showed you where you were. *@
+<nav class="pt-bottom-nav" aria-label="Quick actions">
+    <NavLink class="pt-bottom-nav-link" href="dashboard" Match="NavLinkMatch.All">
+        <PtIcon Name="dashboard" Class="pt-bottom-nav-icon" />
+        <span class="pt-bottom-nav-label">Commutes</span>
+    </NavLink>
+    <a class="pt-bottom-nav-link pt-bottom-nav-fab" href="routes/create" aria-label="Add route">
+        <span class="pt-bottom-nav-fab-inner">
+            <PtIcon Name="add" />
+        </span>
+    </a>
+    <NavLink class="pt-bottom-nav-link" href="account/settings">
+        <PtIcon Name="account_circle" Class="pt-bottom-nav-icon" />
+        <span class="pt-bottom-nav-label">Account</span>
+    </NavLink>
+</nav>

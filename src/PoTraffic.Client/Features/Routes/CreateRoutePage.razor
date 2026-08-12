@@ -5,15 +5,15 @@
 @inject HttpClient Http
 @inject NavigationManager Nav
 
-<RadzenCard class="pt-create-route-card">
-    <RadzenText TextStyle="TextStyle.H5" class="rz-mb-2">Create Monitoring Route</RadzenText>
-    <RadzenText TextStyle="TextStyle.Body2" class="rz-mb-4">
-        One step setup: create route, define monitoring window, and start 5-minute polling.
-    </RadzenText>
+<div class="pt-create-route-card">
+<PageHeader Title="New route"
+            Subtitle="One step: the trip, when to watch it, and polling starts."
+            BackHref="/dashboard" BackLabel="Commutes" />
 
+<RadzenCard>
     @if (!string.IsNullOrEmpty(_error))
     {
-        <RadzenAlert AlertStyle="AlertStyle.Danger" AllowClose="false" class="rz-mb-3 pt-enter">@_error</RadzenAlert>
+        <RadzenAlert AlertStyle="AlertStyle.Danger" AllowClose="false" class="pt-mb-3 pt-enter">@_error</RadzenAlert>
     }
 
     @* RadzenTemplateForm gives the form real submit semantics — Enter submits, the
@@ -22,7 +22,7 @@
        IRadzenFormComponent, so those keep hand-rolled field-level errors instead
        of pretending a Radzen validator can bind to them. *@
     <RadzenTemplateForm TItem="CreateRouteForm" Data="@_form" Submit="@SaveAsync">
-        <RadzenFormField Text="Origin Address" class="rz-w-100 rz-mb-1">
+        <RadzenFormField Text="Origin Address" class="pt-w-100 pt-mb-1">
             <AddressAutocomplete @bind-Value="_origin" Placeholder="Start typing an address…" />
         </RadzenFormField>
         @if (_originError is not null)
@@ -34,7 +34,7 @@
             <small class="pt-field-hint">Enter a full street address or place name (e.g. "1600 Amphitheatre Pkwy, Mountain View").</small>
         }
 
-        <RadzenFormField Text="Destination Address" class="rz-w-100 rz-mb-1">
+        <RadzenFormField Text="Destination Address" class="pt-w-100 pt-mb-1">
             <AddressAutocomplete @bind-Value="_destination" Placeholder="Start typing an address…" />
         </RadzenFormField>
         @if (_destinationError is not null)
@@ -45,10 +45,10 @@
         {
             <small class="pt-field-hint">We verify both addresses when you save; unrecognized addresses are rejected.</small>
         }
-        <div class="rz-mb-3"></div>
+        <div class="pt-mb-3"></div>
 
-        <RadzenFieldset Text="Monitoring Schedule" class="rz-mb-4">
-            <div class="pt-schedule-times rz-mb-3">
+        <RadzenFieldset Text="Monitoring Schedule" class="pt-mb-4">
+            <div class="pt-schedule-times pt-mb-3">
                 <RadzenFormField Text="Start Time">
                     <ChildContent>
                         <RadzenDatePicker Name="StartTime" @bind-Value="_startTime"
@@ -73,29 +73,36 @@
                 </RadzenFormField>
             </div>
 
-            <RadzenText TextStyle="TextStyle.Caption" class="rz-mb-2">Probe on these days:</RadzenText>
-            <div class="pt-day-toggles" role="group" aria-label="Probe on these days">
-                @foreach ((string label, byte bit) in _days)
-                {
-                    <label class="pt-day-toggle @(IsDaySelected(bit) ? "is-selected" : null)">
-                        <input type="checkbox" checked="@IsDaySelected(bit)"
-                               @onchange="@(() => ToggleDay(bit))" />
-                        <span>@label</span>
-                    </label>
-                }
-            </div>
+            <RadzenText TextStyle="TextStyle.Caption" class="pt-mb-2">Probe on these days:</RadzenText>
+            @* Seven hand-built toggle pills, each a <label> wrapping a visually-hidden
+               checkbox with its own :focus-within ring — a multi-select segmented
+               control, reimplemented. RadzenSelectBar with Multiple="true" IS that
+               control, and it keeps the day bitmask out of the markup: the bar binds
+               to the selected bits and the mask is folded from them on submit. *@
+            <RadzenSelectBar @bind-Value="_selectedDays" TValue="IEnumerable<byte>"
+                             Multiple="true" Size="ButtonSize.Medium"
+                             class="pt-day-toggles" aria-label="Probe on these days">
+                <Items>
+                    @foreach ((string label, byte bit) in _days)
+                    {
+                        <RadzenSelectBarItem Value="@bit" Text="@label" />
+                    }
+                </Items>
+            </RadzenSelectBar>
             @if (_daysError is not null)
             {
                 <div class="pt-field-error" role="alert">@_daysError</div>
             }
         </RadzenFieldset>
 
-        <RadzenButton ButtonType="ButtonType.Submit" Text="Save & Start Monitoring"
-                      ButtonStyle="ButtonStyle.Primary" class="rz-w-100" IsBusy="_loading" />
+        <RadzenButton ButtonType="ButtonType.Submit" Text="Save & start monitoring"
+                      Icon="play_arrow" ButtonStyle="ButtonStyle.Primary"
+                      class="pt-w-100" IsBusy="_loading" />
         <RadzenButton ButtonType="ButtonType.Button" Text="Cancel" ButtonStyle="ButtonStyle.Light"
-                      class="rz-w-100 rz-mt-2" Click="@Cancel" />
+                      class="pt-w-100 pt-mt-2" Click="@Cancel" />
     </RadzenTemplateForm>
 </RadzenCard>
+</div>
 
 @code {
     /// <summary>
@@ -154,10 +161,14 @@
         ("Thu", 0x08), ("Fri", 0x10), ("Sat", 0x20), ("Sun", 0x40)
     ];
 
-    private byte _mask = 0x1F; // Monday-Friday default
+    /// <summary>
+    /// What the select bar binds to: the day bits currently on. Monday–Friday by
+    /// default, matching the 0x1F mask this replaced.
+    /// </summary>
+    private IEnumerable<byte> _selectedDays = [0x01, 0x02, 0x04, 0x08, 0x10];
 
-    private void ToggleDay(byte bit) => _mask ^= bit;
-    private bool IsDaySelected(byte bit) => (_mask & bit) != 0;
+    /// <summary>The wire format — the selected bits folded back into one byte.</summary>
+    private byte DayMask => _selectedDays.Aggregate((byte)0, (acc, bit) => (byte)(acc | bit));
 
     private async Task SaveAsync()
     {
@@ -175,7 +186,7 @@
         if (string.IsNullOrWhiteSpace(_destination))
             _destinationError = "Enter a destination address.";
 
-        if (_mask == 0)
+        if (DayMask == 0)
             _daysError = "Select at least one day to probe.";
 
         if (_originError is not null || _destinationError is not null || _daysError is not null)
@@ -195,7 +206,7 @@
                 (RouteProvider)_provider,
                 ToUtcHHmm(_startTime!.Value),
                 ToUtcHHmm(_endTime!.Value),
-                _mask), AppJsonContext.Default.CreateRouteRequest);
+                DayMask), AppJsonContext.Default.CreateRouteRequest);
 
             if (!createResp.IsSuccessStatusCode)
             {

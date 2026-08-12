@@ -11,7 +11,7 @@
 @if (Pending.Current is { } deletion)
 {
     <div class="pt-undo-bar" role="status" aria-live="polite">
-        <span class="pt-undo-icon" aria-hidden="true">🗑️</span>
+        <PtIcon Name="delete" Class="pt-undo-icon" />
         <span class="pt-undo-text">
             Deleted <strong>@deletion.Label</strong>
         </span>

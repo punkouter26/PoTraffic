@@ -29,11 +29,16 @@
 }
 else
 {
+    @* The page is reached by tapping a card, and had no way back but the browser's
+       own control — which a PWA in standalone display mode does not render. *@
+    <PageHeader Title="@_pageTitle" BackHref="/dashboard" BackLabel="Commutes" />
+
     @if (IsOffline || IsStale)
     {
         <div class="pt-stale-banner pt-enter" role="status">
-            @(IsOffline ? "⚠︎ Offline — showing the last data received." :
-                          "⚠︎ Can't reach the server — retrying.")
+            <PtIcon Name="@(IsOffline ? "wifi_off" : "cloud_off")" Size="sm" />
+            @(IsOffline ? "Offline — showing the last data received." :
+                          "Can't reach the server — retrying.")
         </div>
     }
 
@@ -44,7 +49,7 @@ else
            learning this route", which reads as a fact about the commute when it is
            really a failed request. An empty answer is worse than no answer. *@
         <div class="pt-empty-state">
-            <div class="pt-empty-state-emoji" aria-hidden="true">📡</div>
+            <PtIcon Name="cloud_off" Size="xl" Class="pt-empty-state-icon" />
             <div class="pt-empty-state-title">Couldn't load this route</div>
             <div class="pt-empty-state-text">
                 @* Deliberately not "the server didn't respond": the same branch covers a
@@ -62,7 +67,7 @@ else
 
     @if (_route.IsDemo)
     {
-        <div class="pt-demo-banner rz-mb-4 pt-enter" role="note">
+        <div class="pt-demo-banner pt-mb-4 pt-enter" role="note">
             <span class="pt-demo-banner-tag">SAMPLE DATA</span>
             <span class="pt-demo-banner-text">
                 Every number below was generated. Add your own route to collect real samples.
@@ -78,7 +83,7 @@ else
     <section class="pt-answer" aria-label="Departure recommendation">
         <div class="pt-answer-route">
             <span class="pt-answer-from">@_originStreet</span>
-            <span class="pt-answer-arrow" aria-hidden="true">→</span>
+            <PtIcon Name="arrow_right_alt" Size="sm" Class="pt-answer-arrow" />
             <span class="pt-answer-to">@_destStreet</span>
         </div>
 
@@ -120,21 +125,29 @@ else
        Today's samples against the baseline, and the week at a glance. The
        departure scrubber and the weekday bar chart were removed: all three
        read the same baseline, and the grid says what both of them said. *@
-    <RadzenCard class="rz-mb-4">
+    <RadzenCard class="pt-mb-4">
         <div class="pt-evidence-head">
-            <RadzenText TextStyle="TextStyle.H6" class="rz-mb-0">Today</RadzenText>
+            <RadzenText TextStyle="TextStyle.H6" class="pt-mb-0">Today</RadzenText>
             @if (_comparableRoutes.Count > 0)
             {
                 @* Comparison folded in from the standalone /compare page: it is a
-                   second line on this chart, not a destination of its own. *@
-                <select class="pt-compare-select" value="@_compareRouteId"
-                        @onchange="OnCompareChanged" aria-label="Compare with another route">
-                    <option value="">Compare with…</option>
-                    @foreach (RouteDto other in _comparableRoutes)
-                    {
-                        <option value="@other.Id">@RouteLabel(other)</option>
-                    }
-                </select>
+                   second line on this chart, not a destination of its own.
+
+                   A bare <select> here was the only native form control left in the
+                   app — a different height, border and focus ring from every Radzen
+                   input beside it, and on a phone it opened the OS picker wheel while
+                   the identical control in Settings opened a styled list. AllowClear
+                   also gives back the "stop comparing" path that the placeholder
+                   <option value=""> was standing in for. *@
+                <RadzenDropDown Data="@_compareOptions" TValue="string"
+                                Value="@_compareRouteId"
+                                Change="@OnCompareChanged"
+                                ValueProperty="Id" TextProperty="Label"
+                                AllowClear="true" AllowFiltering="true"
+                                FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                Placeholder="Compare with…"
+                                class="pt-compare-select"
+                                aria-label="Compare with another route" />
             }
         </div>
 
@@ -177,13 +190,15 @@ else
                     }
                 </span>
                 <button type="button" class="pt-trend-selection-clear"
-                        aria-label="Clear selection" @onclick="() => _selectedPoll = null">✕</button>
+                        aria-label="Clear selection" @onclick="() => _selectedPoll = null">
+                    <PtIcon Name="close" Size="sm" />
+                </button>
             </div>
         }
     </RadzenCard>
 
-    <RadzenCard class="rz-mb-4">
-        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-1">Your week, hour by hour</RadzenText>
+    <RadzenCard class="pt-mb-4">
+        <RadzenText TextStyle="TextStyle.H6" class="pt-mb-1">Your week, hour by hour</RadzenText>
         <VolatilityHeatmap Heatmap="_heatmap" />
     </RadzenCard>
 
@@ -192,14 +207,14 @@ else
        behind one disclosure instead of three cards. *@
     <details class="pt-details">
         <summary class="pt-details-summary">
-            <span class="pt-collapsible-icon" aria-hidden="true">▸</span>
+            <PtIcon Name="chevron_right" Class="pt-collapsible-icon" />
             Settings &amp; raw data
         </summary>
 
         <div class="pt-details-body">
             @if (!_route.IsDemo)
             {
-                <div class="pt-returntrip-bar rz-mb-4">
+                <div class="pt-returntrip-bar pt-mb-4">
                     @if (_route.ReturnRouteId is RouteId rid)
                     {
                         <span class="pt-returntrip-label">Return trip linked</span>
@@ -217,7 +232,7 @@ else
                 <WindowConfigPanel RouteId="RouteId" OnSaved="OnWindowSaved" />
             }
 
-            <PollHistoryTable Polls="_todayPolls" />
+            <PollHistoryTable Polls="_pollsNewestFirst" />
         </div>
     </details>
 
@@ -227,7 +242,13 @@ else
 @code {
     [Parameter] public Guid RouteId { get; set; }
 
+    /// <summary>
+    /// Oldest first. Every chart series is built by position from this list, so its order
+    /// IS the x-axis; the raw table gets <see cref="_pollsNewestFirst"/> instead, which is
+    /// how a log wants to read.
+    /// </summary>
     private List<PollRecordDto> _todayPolls = [];
+    private List<PollRecordDto> _pollsNewestFirst = [];
     private double[] _trendPoints = [];
     private double[] _trendBaseline = [];
     private double[] _trendUpperBand = [];
@@ -257,6 +278,18 @@ else
     private string _compareRouteId = string.Empty;
     private string? _compareLabel;
     private string? _compareVerdict;
+
+    /// <summary>
+    /// What the picker binds to. RadzenDropDown reads a value and a text member off each
+    /// item, and RouteDto exposes neither a string id nor a display label — projecting
+    /// once here beats a Template that would re-run per item per render.
+    /// </summary>
+    private sealed record CompareOption(string Id, string Label);
+
+    private List<CompareOption> _compareOptions = [];
+
+    /// <summary>Heading for the page. Falls back until the route lands.</summary>
+    private string _pageTitle = "Route";
 
     /// <summary>
     /// The heatmap aggregates the route's entire history, so a single new sample can
@@ -358,9 +391,10 @@ else
     /// /compare page: the question is "is the other way faster than this one", which
     /// belongs on the chart already showing this one.
     /// </summary>
-    private async Task OnCompareChanged(ChangeEventArgs e)
+    private async Task OnCompareChanged(object? value)
     {
-        _compareRouteId = e.Value?.ToString() ?? string.Empty;
+        // AllowClear hands back null rather than "" — both mean "stop comparing".
+        _compareRouteId = value?.ToString() ?? string.Empty;
         _comparePoints = [];
         _compareLabel = null;
         _compareVerdict = null;
@@ -470,8 +504,7 @@ else
             Http.GetFromJsonAsync($"/api/routes/{RouteId}/poll-history?page=1&pageSize=300&sinceUtc={sinceUtc}", AppJsonContext.Default.PagedResultPollRecordDto);
         Task<BaselineResponse?> baselineTask =
             Http.GetFromJsonAsync($"/api/routes/{RouteId}/baseline?dayOfWeek={dayOfWeek}", AppJsonContext.Default.BaselineResponse);
-        Task<OptimalDepartureDto?> optimalTask =
-            Http.GetFromJsonAsync($"/api/routes/{RouteId}/optimal-departure?dayOfWeek={dayOfWeek}", AppJsonContext.Default.OptimalDepartureDto);
+        Task<OptimalDepartureDto?> optimalTask = GetOptimalDepartureAsync(dayOfWeek);
 
         // The weekly grid rides along with the fan-out, but only when the copy in hand
         // has aged out — see HeatmapMaxAge.
@@ -496,6 +529,7 @@ else
             _originStreet = _route.OriginAddress.Split(',')[0].Trim();
             _destStreet = _route.DestinationAddress.Split(',')[0].Trim();
             _thisLabel = _originStreet;
+            _pageTitle = $"{_originStreet} → {_destStreet}";
         }
 
         // Today's active monitoring session — carries the server-computed poll schedule.
@@ -506,8 +540,13 @@ else
         PagedResult<PollRecordDto>? historyResult = await historyTask;
         if (historyResult is not null)
         {
-            _todayPolls = [.. historyResult.Items];
-            LatestPoll = _todayPolls.MaxBy(p => p.PolledAtDateTime);
+            // Newest-first off the wire, which is right for the raw table and wrong for
+            // everything plotted: the trend line drew today in reverse, so its x-axis ran
+            // 08:45 → 08:00 → 18:30. Sorted once here rather than at each of the four
+            // projections below, all of which are positional.
+            _todayPolls = [.. historyResult.Items.OrderBy(p => p.PolledAtDateTime)];
+            _pollsNewestFirst = [.. Enumerable.Reverse(_todayPolls)];
+            LatestPoll = _todayPolls.Count > 0 ? _todayPolls[^1] : null;
             _trendPoints = [.. _todayPolls.Select(p => p.TravelDurationSeconds / 60.0)];
             _trendRerouted = [.. _todayPolls.Select(p => p.IsRerouted)];
             _trendLabels = [.. _todayPolls.Select(p => p.PolledAtDateTime.ToString("HH:mm"))];
@@ -537,7 +576,46 @@ else
 
         PagedResult<RouteDto>? routes = await routesTask;
         if (routes is not null)
+        {
             _comparableRoutes = [.. routes.Items.Where(r => r.Id.Value != RouteId)];
+            _compareOptions = [.. _comparableRoutes.Select(
+                r => new CompareOption(r.Id.Value.ToString(), RouteLabel(r)))];
+        }
+    }
+
+    /// <summary>
+    /// Reads the departure recommendation, treating "there isn't one yet" as a value
+    /// rather than an error.
+    ///
+    /// The endpoint answers 204 No Content until a route has enough history to
+    /// recommend anything — the normal state of every route for its first few days.
+    /// GetFromJsonAsync counts 204 as success and then throws parsing the empty body,
+    /// and because this page deliberately lets load failures propagate (so a genuinely
+    /// down endpoint produces backoff and the stale banner), that exception took the
+    /// whole page down: a brand-new route showed "Couldn't load this route — the route
+    /// may also have been deleted" from the moment it was created. The page already
+    /// has the right words for this state a few lines below ("Still learning this
+    /// route"); it simply never got to render them.
+    ///
+    /// The dashboard calls the same endpoint inside a try/catch, which is why the
+    /// cards were unaffected and the bug only appeared one tap deeper.
+    /// </summary>
+    private async Task<OptimalDepartureDto?> GetOptimalDepartureAsync(string dayOfWeek)
+    {
+        HttpResponseMessage response = await Http.GetAsync(
+            $"/api/routes/{RouteId}/optimal-departure?dayOfWeek={dayOfWeek}");
+
+        if (response.StatusCode == System.Net.HttpStatusCode.NoContent)
+            return null;
+
+        // Anything else that isn't success SHOULD still propagate — that is the
+        // signal PollingComponentBase turns into backoff.
+        response.EnsureSuccessStatusCode();
+
+        if (response.Content.Headers.ContentLength is 0)
+            return null;
+
+        return await response.Content.ReadFromJsonAsync(AppJsonContext.Default.OptimalDepartureDto);
     }
 
     /// <summary>

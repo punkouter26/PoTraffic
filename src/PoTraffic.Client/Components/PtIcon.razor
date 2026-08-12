@@ -1,0 +1,52 @@
+@* ──────────────────────────────────────────────────────────────────────
+   One icon component, one icon font.
+
+   The app was running three icon systems at once: emoji literals in the
+   markup, Radzen's icon font via `Icon="..."` on its own components, and the
+   Material Symbols font — which index.html loads on every page but which
+   exactly one element used. Emoji were the worst of the three: they ignore
+   `color`, so a status glyph could not be tinted to match the state it
+   reported; they render as a different drawing per operating system; and they
+   cannot be sized off the type scale.
+
+   Material Symbols wins because it is already downloaded (Radzen's own icons
+   ARE Material Symbols, so `Icon="refresh"` on a RadzenButton and
+   <PtIcon Name="refresh" /> draw the same glyph from the same file).
+
+   Sizing is relative — `1.25em` of whatever the icon sits next to — so an icon
+   in a heading and an icon in a caption are each correct without being told.
+   ────────────────────────────────────────────────────────────────────── *@
+
+<span class="pt-icon @SizeClass @(Filled ? "pt-icon-filled" : null) @Class"
+      aria-hidden="@(Label is null ? "true" : null)"
+      role="@(Label is null ? null : "img")"
+      aria-label="@Label"
+      translate="no">@Name</span>
+
+@code {
+    /// <summary>Material Symbols ligature name, e.g. "refresh", "wifi_off", "science".</summary>
+    [Parameter, EditorRequired] public string Name { get; set; } = default!;
+
+    /// <summary>
+    /// Accessible name. Leave null — the default — for decorative icons that sit beside
+    /// a text label; the icon is then hidden from assistive tech rather than read out as
+    /// a duplicate of the word next to it.
+    /// </summary>
+    [Parameter] public string? Label { get; set; }
+
+    /// <summary>Optical size. "sm" | "md" (default) | "lg" | "xl".</summary>
+    [Parameter] public string Size { get; set; } = "md";
+
+    /// <summary>Solid rather than outlined — reserve for selected/active states.</summary>
+    [Parameter] public bool Filled { get; set; }
+
+    [Parameter] public string? Class { get; set; }
+
+    private string? SizeClass => Size switch
+    {
+        "sm" => "pt-icon-sm",
+        "lg" => "pt-icon-lg",
+        "xl" => "pt-icon-xl",
+        _ => null
+    };
+}

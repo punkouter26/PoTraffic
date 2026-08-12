@@ -1,66 +1,23 @@
 /* ── CreateRoutePage — scoped styles (replaces inline style="" attributes) ── */
 
 .pt-create-route-card {
-    max-width: 560px;
-    margin: 48px auto 0;
+    max-width: 35rem;
+    margin-inline: auto;
 }
 
-/* Day-of-week selector — spaced, touch-friendly toggle pills.
-   Replaces bare native checkboxes that butted together with no gap and were
-   below the 44px minimum tap target on mobile. */
+/* Day-of-week selector. This used to be ~50 lines styling seven hand-built
+   <label> pills, each with a visually-hidden checkbox inside, plus their own
+   hover, selected and :focus-within rules — all of which RadzenSelectBar
+   already provides. What is left is the wrap: seven items in one nowrap flex
+   row overflow a phone. */
 .pt-day-toggles {
-    display: flex;
     flex-wrap: wrap;
-    gap: 8px;
-}
-
-.pt-day-toggle {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 48px;
-    min-height: 44px;
-    padding: 0 14px;
-    border: 1px solid var(--pt-border-subtle, #d1d5db);
-    border-radius: 999px;
-    background: var(--pt-bg-surface, var(--pt-bg-surface));
-    color: var(--pt-fg-secondary, #4b5563);
-    font-size: 0.875rem;
-    font-weight: 600;
-    cursor: pointer;
-    user-select: none;
-    transition: background-color .15s ease, border-color .15s ease, color .15s ease;
-}
-
-.pt-day-toggle:hover {
-    border-color: var(--pt-color-brand-500, var(--pt-color-brand-600));
-}
-
-.pt-day-toggle.is-selected {
-    background: var(--pt-color-brand-500, var(--pt-color-brand-600));
-    border-color: var(--pt-color-brand-500, var(--pt-color-brand-600));
-    color: var(--pt-fg-on-brand, var(--pt-fg-on-brand));
-}
-
-/* Keep the checkbox accessible to screen readers / keyboard, but drive the
-   visual state from the pill itself. */
-.pt-day-toggle input {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    opacity: 0;
-    pointer-events: none;
-}
-
-.pt-day-toggle:focus-within {
-    outline: 2px solid var(--pt-color-brand-500, var(--pt-color-brand-600));
-    outline-offset: 2px;
 }
 
 /* Muted helper hint shown under the address fields. */
 .pt-field-hint {
     display: block;
-    margin: -2px 0 10px;
+    margin: 0 0 var(--pt-space-3);
     color: var(--pt-fg-tertiary);
     font-size: var(--pt-text-xs);
 }
@@ -69,7 +26,7 @@
    doesn't jump when a field goes invalid. */
 .pt-field-error {
     display: block;
-    margin: -2px 0 10px;
+    margin: 0 0 var(--pt-space-3);
     color: var(--pt-color-danger);
     font-size: var(--pt-text-xs);
     font-weight: var(--pt-weight-medium);

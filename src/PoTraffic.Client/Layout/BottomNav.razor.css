@@ -29,45 +29,27 @@
     }
 }
 
-.pt-bottom-nav-link {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 2px;
-    color: var(--pt-fg-secondary);
-    text-decoration: none;
-    font-size: 0.7rem;
-    font-weight: var(--pt-weight-medium);
-    min-width: 64px;
-    min-height: 48px;
-    transition: color var(--pt-dur-fast) var(--pt-ease);
-    -webkit-tap-highlight-color: transparent;
-}
+/* .pt-bottom-nav-link and .pt-bottom-nav-icon live in app.css, not here: the two
+   outer links are <NavLink> components, whose rendered <a> never receives this
+   file's scope attribute. See the note above those rules in app.css. */
 
-.pt-bottom-nav-link:active { color: var(--pt-color-brand-on-surface); }
-
-.pt-bottom-nav-icon {
-    font-size: 1.25rem;
-    line-height: 1;
-}
-
-/* FAB-style center button */
+/* FAB-style center button. This one IS a plain <a> in BottomNav.razor, so it
+   keeps its styles here. */
 .pt-bottom-nav-fab {
     position: relative;
-    margin-top: -28px;
+    margin-top: -1.75rem;
 }
 
 .pt-bottom-nav-fab-inner {
-    width: 52px;
-    height: 52px;
-    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 3.25rem;
+    height: 3.25rem;
+    border-radius: var(--pt-radius-full);
     background: linear-gradient(135deg, var(--pt-color-brand-500), var(--pt-color-brand-700));
     color: var(--pt-fg-on-brand);
-    font-size: 1.6rem;
-    line-height: 52px;
-    text-align: center;
-    font-weight: var(--pt-weight-bold);
+    --pt-icon-size: 1.75rem;
     box-shadow: 0 6px 20px color-mix(in oklab, var(--pt-color-brand-600) 40%, transparent);
     transition: transform var(--pt-dur-fast) var(--pt-ease),
                 box-shadow var(--pt-dur-fast) var(--pt-ease);
@@ -76,9 +58,4 @@
 .pt-bottom-nav-fab:active .pt-bottom-nav-fab-inner {
     transform: scale(0.95);
     box-shadow: 0 3px 10px color-mix(in oklab, var(--pt-color-brand-600) 50%, transparent);
-}
-
-.pt-bottom-nav-link:active .pt-bottom-nav-fab-inner {
-    /* override color on FAB — it always uses brand */
-    color: var(--pt-fg-on-brand);
 }

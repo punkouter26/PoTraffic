@@ -10,13 +10,15 @@
 @if (_canInstall && !_dismissed)
 {
     <div class="pt-install" role="complementary">
-        <span class="pt-install-icon" aria-hidden="true">📲</span>
+        <PtIcon Name="install_mobile" Size="lg" Class="pt-install-icon" />
         <span class="pt-install-text">
             <strong>Install PoTraffic</strong>
             <span class="pt-install-sub">Opens instantly and works offline on the platform.</span>
         </span>
         <button type="button" class="pt-install-cta" @onclick="InstallAsync">Install</button>
-        <button type="button" class="pt-install-dismiss" aria-label="Dismiss" @onclick="Dismiss">✕</button>
+        <button type="button" class="pt-install-dismiss" aria-label="Dismiss" @onclick="Dismiss">
+            <PtIcon Name="close" Size="sm" />
+        </button>
     </div>
 }
 

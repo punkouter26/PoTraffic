@@ -1,0 +1,56 @@
+@* ──────────────────────────────────────────────────────────────────────
+   One page header for every page.
+
+   Before this, four different things claimed the top of a page: Health had a
+   real <h1>, Admin / Diagnostics / Login / Settings each opened with a
+   `RadzenText TextStyle="H5"` nested inside a card, and Dashboard and Route
+   Detail had no heading element at all. So the app announced itself at a
+   different size on every route, and — the part that actually breaks things —
+   two of its most-used pages exposed no <h1>, leaving a screen reader's
+   heading list empty and "skip to heading" with nowhere to go.
+
+   The back link is part of the header rather than each page's problem: Route
+   Detail is reachable from a card tap and had no way back but the browser's
+   own button, which a PWA in standalone display mode does not show.
+   ────────────────────────────────────────────────────────────────────── *@
+
+<header class="pt-page-header">
+    @if (BackHref is not null)
+    {
+        <a class="pt-page-back pt-tap" href="@BackHref" aria-label="@(BackLabel ?? "Back")">
+            <PtIcon Name="arrow_back" />
+            @if (BackLabel is not null)
+            {
+                <span class="pt-page-back-label">@BackLabel</span>
+            }
+        </a>
+    }
+
+    <div class="pt-page-header-text">
+        <h1 class="pt-page-title">@Title</h1>
+        @if (Subtitle is not null)
+        {
+            <p class="pt-page-subtitle">@Subtitle</p>
+        }
+    </div>
+
+    @if (Actions is not null)
+    {
+        <div class="pt-page-header-actions">@Actions</div>
+    }
+</header>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = default!;
+
+    [Parameter] public string? Subtitle { get; set; }
+
+    /// <summary>When set, renders a back affordance to this route ahead of the title.</summary>
+    [Parameter] public string? BackHref { get; set; }
+
+    /// <summary>Visible text beside the back arrow. Null renders the arrow alone.</summary>
+    [Parameter] public string? BackLabel { get; set; }
+
+    /// <summary>Trailing controls — buttons, pickers — right-aligned on the header row.</summary>
+    [Parameter] public RenderFragment? Actions { get; set; }
+}

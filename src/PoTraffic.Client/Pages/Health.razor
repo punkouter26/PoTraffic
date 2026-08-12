@@ -8,16 +8,16 @@
 <PageTitle>Health &amp; Connections</PageTitle>
 
 <div class="pt-health">
-    <header class="pt-health-head">
-        <div>
-            <h1>Health &amp; Connections</h1>
-            <p class="pt-health-sub">
-                Live status of every dependency this deployment talks to.
-            </p>
-        </div>
-        <RadzenButton Text="Refresh" Icon="refresh" ButtonStyle="ButtonStyle.Light"
-                      Disabled="_loading" Click="LoadAsync" />
-    </header>
+    @* Was a bespoke .pt-health-head with its own <h1> and subtitle rules — the
+       only page in the app that got the treatment right, and still the only one
+       styling it locally. Same markup, one shared component. *@
+    <PageHeader Title="Health &amp; connections"
+                Subtitle="Live status of every dependency this deployment talks to.">
+        <Actions>
+            <RadzenButton Text="Refresh" Icon="refresh" ButtonStyle="ButtonStyle.Light"
+                          Disabled="_loading" Click="LoadAsync" />
+        </Actions>
+    </PageHeader>
 
     @if (!_loading && _error is null)
     {

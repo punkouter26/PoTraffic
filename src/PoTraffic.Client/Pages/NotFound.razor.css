@@ -10,9 +10,9 @@
     gap: 0.5rem;
 }
 
-.pt-notfound-emoji {
-    font-size: 3rem;
-    margin-bottom: 0.5rem;
+.pt-notfound-icon {
+    color: var(--pt-fg-faint);
+    margin-bottom: var(--pt-space-2);
 }
 
 .pt-notfound-title {

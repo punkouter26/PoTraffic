@@ -21,56 +21,17 @@
 }
 
 /* ── Appearance pickers ─────────────────────────────────────────────────────
-   A segmented radiogroup rather than a dropdown: three options, all worth
-   showing, and the choice is instant — a select would hide two thirds of the
-   answer behind a click. */
-.pt-choice-row {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
-    gap: var(--pt-space-2);
+   The theme and density pickers were two hand-built segmented controls
+   (.pt-choice-row / .pt-choice, ~50 lines each with their own hover, selected
+   and aria-checked handling). They are RadzenSelectBars now; the shared
+   corrections to Radzen's bar live in app.css, and all that is left here is
+   capping the width so three items don't stretch across a desktop card. */
+.pt-settings-section .rz-selectbar {
     max-width: 32rem;
 }
 
-.pt-choice {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: var(--pt-space-1);
-    padding: var(--pt-space-3) var(--pt-space-2);
-    background: var(--pt-bg-surface);
-    border: 1px solid var(--pt-border-subtle);
-    border-radius: var(--pt-radius-md);
-    color: var(--pt-fg-secondary);
-    font-size: var(--pt-text-sm);
-    font-weight: var(--pt-weight-medium);
-    cursor: pointer;
-    transition: background var(--pt-dur-fast) var(--pt-ease),
-                border-color var(--pt-dur-fast) var(--pt-ease),
-                color var(--pt-dur-fast) var(--pt-ease);
-}
-
-@media (hover: hover) {
-    .pt-choice:hover {
-        border-color: var(--pt-border-strong);
-        background: var(--pt-bg-tint);
-    }
-}
-
-/* Selection reads off aria-checked, so the accessible state and the visible
-   state cannot disagree — there is only one of them. */
-.pt-choice[aria-checked="true"] {
-    border-color: var(--pt-color-brand-on-surface);
-    background: color-mix(in oklab, var(--pt-color-brand-500) 12%, var(--pt-bg-surface));
-    color: var(--pt-fg-primary);
-    box-shadow: inset 0 0 0 1px var(--pt-color-brand-on-surface);
-}
-
-.pt-choice-icon {
-    font-size: var(--pt-text-xl);
-    line-height: 1;
-}
-
-.pt-choice-label {
-    white-space: nowrap;
+/* The caption above each bar explains what the control does; it is a Radzen
+   <span> and needs to be a block or it shares the bar's line. */
+.pt-settings-section .rz-text-caption {
+    display: block;
 }

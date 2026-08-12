@@ -9,16 +9,17 @@
 
 <PageTitle>Account Settings</PageTitle>
 
-<RadzenCard class="rz-p-6 rz-mt-4">
-    <RadzenText TextStyle="TextStyle.H5" class="rz-mb-4">Account Settings</RadzenText>
+<PageHeader Title="Account settings"
+            Subtitle="Profile, appearance, and what this account is costing." />
 
+<RadzenCard class="pt-p-6">
     @* Four tabs held about six controls between them, which cost a click and hid
        two thirds of the page to save no scrolling. They are sections now. *@
     <section class="pt-settings-section">
-        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">Profile</RadzenText>
+        <RadzenText TextStyle="TextStyle.H6" class="pt-mb-2">Profile</RadzenText>
                 @if (_loading)
                 {
-                    <div class="pt-skeleton-stack rz-mt-4">
+                    <div class="pt-skeleton-stack pt-mt-4">
                         <div class="pt-skeleton-line lg w-40"></div>
                         <div class="pt-skeleton-line w-70"></div>
                         <div class="pt-skeleton-line lg w-40"></div>
@@ -32,7 +33,7 @@
                        locale rule is enforced before the request goes out and failures
                        land on the field instead of arriving as a server round-trip. *@
                     <RadzenTemplateForm TItem="ProfileForm" Data="@_form" Submit="@SaveProfileAsync">
-                        <RadzenStack Gap="1rem" class="rz-mt-4">
+                        <RadzenStack Gap="1rem" class="pt-mt-4">
                             <RadzenFormField Text="Email">
                                 <ChildContent>
                                     <RadzenTextBox Value="@_profile.Email" ReadOnly="true" aria-label="Email address" />
@@ -79,44 +80,42 @@
     </section>
 
     <section class="pt-settings-section">
-        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">Appearance</RadzenText>
-                <RadzenStack Gap="1.5rem" class="rz-mt-4">
+        <RadzenText TextStyle="TextStyle.H6" class="pt-mb-2">Appearance</RadzenText>
+                <RadzenStack Gap="1.5rem" class="pt-mt-4">
+                    @* Both pickers were hand-rolled <button role="radio"> grids with their
+                       own aria-checked plumbing and their own emoji glyphs — a segmented
+                       control reimplemented twice, next to a RadzenDropDown that already
+                       proves the app uses Radzen form controls. RadzenSelectBar IS this
+                       control: it owns the roving-tabindex keyboard model, the selected
+                       state and the theming, and it takes Material icon names. *@
                     <div>
-                        <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-mb-1">Theme</RadzenText>
-                        <RadzenText TextStyle="TextStyle.Caption" class="rz-mb-2 pt-settings-meta">
+                        <RadzenText TextStyle="TextStyle.Subtitle2" class="pt-mb-1">Theme</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Caption" class="pt-mb-2 pt-settings-meta">
                             System follows your device setting and switches with it.
                         </RadzenText>
-                        <div class="pt-choice-row" role="radiogroup" aria-label="Theme">
-                            @foreach ((string Value, string Label, string Icon) option in ThemeOptions)
-                            {
-                                string value = option.Value;
-                                <button type="button" role="radio" class="pt-choice pt-tap"
-                                        aria-checked="@(_theme == value)"
-                                        @onclick="@(() => SetThemeAsync(value))">
-                                    <span class="pt-choice-icon" aria-hidden="true">@option.Icon</span>
-                                    <span class="pt-choice-label">@option.Label</span>
-                                </button>
-                            }
-                        </div>
+                        <RadzenSelectBar TValue="string" Value="@_theme" Change="@OnThemeChanged"
+                                         Size="ButtonSize.Medium" aria-label="Theme">
+                            <Items>
+                                <RadzenSelectBarItem Value="@("system")" Text="System" Icon="computer" />
+                                <RadzenSelectBarItem Value="@("light")" Text="Light" Icon="light_mode" />
+                                <RadzenSelectBarItem Value="@("dark")" Text="Dark" Icon="dark_mode" />
+                            </Items>
+                        </RadzenSelectBar>
                     </div>
 
                     <div>
-                        <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-mb-1">Density</RadzenText>
-                        <RadzenText TextStyle="TextStyle.Caption" class="rz-mb-2 pt-settings-meta">
+                        <RadzenText TextStyle="TextStyle.Subtitle2" class="pt-mb-1">Density</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Caption" class="pt-mb-2 pt-settings-meta">
                             Scales spacing across the whole app. Compact fits more on screen.
                         </RadzenText>
-                        <div class="pt-choice-row" role="radiogroup" aria-label="Density">
-                            @foreach ((string Value, string Label, string Icon) option in DensityOptions)
-                            {
-                                string value = option.Value;
-                                <button type="button" role="radio" class="pt-choice pt-tap"
-                                        aria-checked="@(_density == value)"
-                                        @onclick="@(() => SetDensityAsync(value))">
-                                    <span class="pt-choice-icon" aria-hidden="true">@option.Icon</span>
-                                    <span class="pt-choice-label">@option.Label</span>
-                                </button>
-                            }
-                        </div>
+                        <RadzenSelectBar TValue="string" Value="@_density" Change="@OnDensityChanged"
+                                         Size="ButtonSize.Medium" aria-label="Density">
+                            <Items>
+                                <RadzenSelectBarItem Value="@("compact")" Text="Compact" Icon="density_small" />
+                                <RadzenSelectBarItem Value="@("normal")" Text="Normal" Icon="density_medium" />
+                                <RadzenSelectBarItem Value="@("comfortable")" Text="Comfortable" Icon="density_large" />
+                            </Items>
+                        </RadzenSelectBar>
                     </div>
 
                     @* Neither of these is ours to set — the OS owns them. Reporting them
@@ -144,10 +143,10 @@
     </section>
 
     <section class="pt-settings-section">
-        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">Monitoring limits &amp; cost</RadzenText>
+        <RadzenText TextStyle="TextStyle.H6" class="pt-mb-2">Monitoring limits &amp; cost</RadzenText>
                 @if (_loading)
                 {
-                    <div class="pt-skeleton-stack rz-mt-4">
+                    <div class="pt-skeleton-stack pt-mt-4">
                         <div class="pt-skeleton-line w-50"></div>
                         <div class="pt-skeleton-line lg w-70"></div>
                         <div class="pt-skeleton-line w-40"></div>
@@ -159,7 +158,7 @@
                        running spend figure and a reset time sat between the user and
                        the departure times they came for. This is where someone goes
                        when they actually want to know. *@
-                    <RadzenStack Gap="1rem" class="rz-mt-4">
+                    <RadzenStack Gap="1rem" class="pt-mt-4">
                         <RadzenText>
                             Used today: @_quota.UsedToday of @_quota.DailyLimit monitoring sessions
                         </RadzenText>
@@ -181,8 +180,8 @@
     </section>
 
     <section class="pt-settings-section pt-settings-danger">
-        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">Delete account</RadzenText>
-                <RadzenStack Gap="1rem" class="rz-mt-4">
+        <RadzenText TextStyle="TextStyle.H6" class="pt-mb-2">Delete account</RadzenText>
+                <RadzenStack Gap="1rem" class="pt-mt-4">
                     <RadzenAlert AlertStyle="AlertStyle.Danger" AllowClose="false"
                                  Text="Deleting your account is permanent and cannot be undone. All your routes, history, and data will be removed (GDPR Art. 17)." />
                     <div>
@@ -199,20 +198,6 @@
     {
         public string Locale { get; set; } = string.Empty;
     }
-
-    private static readonly (string Value, string Label, string Icon)[] ThemeOptions =
-    [
-        ("system", "System", "🖥️"),
-        ("light", "Light", "☀️"),
-        ("dark", "Dark", "🌙")
-    ];
-
-    private static readonly (string Value, string Label, string Icon)[] DensityOptions =
-    [
-        ("compact", "Compact", "▤"),
-        ("normal", "Normal", "▦"),
-        ("comfortable", "Comfortable", "▢")
-    ];
 
     // Whitelist matches the server-side validator.
     private static readonly List<string> ValidLocales = ["en-IE", "en-GB", "en-US", "de-DE", "fr-FR"];
@@ -276,18 +261,29 @@
         }
     }
 
-    private async Task SetThemeAsync(string value)
+    /// <summary>
+    /// RadzenSelectBar's Change hands back the item's Value boxed as object. A null can
+    /// only mean a deselect, which this bar does not offer — guard anyway rather than
+    /// stamping "" onto &lt;html data-theme&gt; and losing the theme entirely.
+    /// </summary>
+    private async Task OnThemeChanged(object? value)
     {
-        _theme = value;
+        if (value?.ToString() is not { Length: > 0 } theme)
+            return;
+
+        _theme = theme;
         if (_appearance is not null)
-            await _appearance.InvokeVoidAsync("setTheme", value);
+            await _appearance.InvokeVoidAsync("setTheme", theme);
     }
 
-    private async Task SetDensityAsync(string value)
+    private async Task OnDensityChanged(object? value)
     {
-        _density = value;
+        if (value?.ToString() is not { Length: > 0 } density)
+            return;
+
+        _density = density;
         if (_appearance is not null)
-            await _appearance.InvokeVoidAsync("setDensity", value);
+            await _appearance.InvokeVoidAsync("setDensity", density);
     }
 
     private async Task SaveProfileAsync()

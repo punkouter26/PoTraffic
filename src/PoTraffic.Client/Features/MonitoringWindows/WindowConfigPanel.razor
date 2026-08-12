@@ -5,16 +5,16 @@
 @inject HttpClient Http
 @implements IDisposable
 
-<RadzenFieldset Text="Monitoring Schedule" class="rz-mb-3">
+<RadzenFieldset Text="Monitoring Schedule" class="pt-mb-3">
     @* Loading + load-failure presentation comes from the shared scaffold every other
        data surface uses (Health, AdminUsage, Diag), so this panel can't drift from them. *@
     <LoadingErrorCard IsLoading="_loadingWindows" Error="@(string.IsNullOrEmpty(_loadError) ? null : _loadError)">
     @if (_activeWindow is not null && !_editing)
     {
         @* Read-only view with Edit Schedule button — hides the delete-to-replace mechanic *@
-        <div class="rz-display-flex rz-align-items-center rz-gap-4 rz-mb-2">
+        <div class="pt-flex pt-items-center pt-gap-4 pt-mb-2">
             <div>
-                <RadzenText TextStyle="TextStyle.Caption" class="rz-mb-0">Schedule</RadzenText>
+                <RadzenText TextStyle="TextStyle.Caption" class="pt-mb-0">Schedule</RadzenText>
                 <RadzenText>@string.Join(", ", _activeWindow.DaysOfWeek) · @_activeWindow.StartTime – @_activeWindow.EndTime</RadzenText>
             </div>
             <RadzenButton Text="Edit Schedule" Icon="edit" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small"
@@ -23,7 +23,7 @@
 
         @if (_activeSession is not null)
         {
-            <RadzenAlert AlertStyle="AlertStyle.Success" ShowIcon="true" class="rz-mb-2">
+            <RadzenAlert AlertStyle="AlertStyle.Success" ShowIcon="true" class="pt-mb-2">
                 Monitoring active — @_activeSession.PollCount poll(s) recorded today.
                 @if (_activeSession.LastPollAt.HasValue)
                 {
@@ -31,23 +31,23 @@
                 }
                 @if (!TodayIsScheduled)
                 {
-                    <div class="rz-mt-1">Today (@DateTime.UtcNow.DayOfWeek) is outside this schedule — polling resumes on the next scheduled day.</div>
+                    <div class="pt-mt-1">Today (@DateTime.UtcNow.DayOfWeek) is outside this schedule — polling resumes on the next scheduled day.</div>
                 }
             </RadzenAlert>
         }
         else
         {
-            <RadzenAlert AlertStyle="AlertStyle.Info" ShowIcon="true" class="rz-mb-2">
+            <RadzenAlert AlertStyle="AlertStyle.Info" ShowIcon="true" class="pt-mb-2">
                 No active session for today. Click <strong>Start Monitoring</strong> to begin.
             </RadzenAlert>
         }
 
         @if (!string.IsNullOrEmpty(_error))
         {
-            <RadzenAlert AlertStyle="AlertStyle.Danger" class="rz-mb-2">@_error</RadzenAlert>
+            <RadzenAlert AlertStyle="AlertStyle.Danger" class="pt-mb-2">@_error</RadzenAlert>
         }
 
-        <div class="rz-display-flex rz-gap-2">
+        <div class="pt-flex pt-gap-2">
             @if (_activeSession is not null)
             {
                 <RadzenButton Text="Stop Monitoring" ButtonStyle="ButtonStyle.Warning" Icon="stop"
@@ -65,13 +65,13 @@
         @* Create / Edit form — _editing=true means updating an existing window *@
         @if (_editing)
         {
-            <RadzenAlert AlertStyle="AlertStyle.Warning" ShowIcon="true" class="rz-mb-3">
+            <RadzenAlert AlertStyle="AlertStyle.Warning" ShowIcon="true" class="pt-mb-3">
                 Saving a new schedule replaces the current one. Today's session will be restarted.
             </RadzenAlert>
         }
 
-        <RadzenText TextStyle="TextStyle.Caption" class="rz-mb-2">Days of week:</RadzenText>
-        <div class="rz-display-flex rz-wrap rz-gap-3 rz-mb-3">
+        <RadzenText TextStyle="TextStyle.Caption" class="pt-mb-2">Days of week:</RadzenText>
+        <div class="pt-flex pt-wrap pt-gap-3 pt-mb-3">
             @foreach ((string name, byte bit) in _days)
             {
                 <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.3rem">
@@ -82,8 +82,8 @@
             }
         </div>
 
-        <div class="rz-display-flex rz-gap-4 rz-mb-3">
-            <RadzenFormField Text="Start Time" class="rz-mr-3">
+        <div class="pt-flex pt-gap-4 pt-mb-3">
+            <RadzenFormField Text="Start Time" class="pt-mr-3">
                 <RadzenDatePicker @bind-Value="_startTime" ShowTime="true" DateFormat="HH:mm" />
             </RadzenFormField>
             <RadzenFormField Text="End Time">
@@ -93,10 +93,10 @@
 
         @if (!string.IsNullOrEmpty(_error))
         {
-            <RadzenAlert AlertStyle="AlertStyle.Danger" class="rz-mb-2">@_error</RadzenAlert>
+            <RadzenAlert AlertStyle="AlertStyle.Danger" class="pt-mb-2">@_error</RadzenAlert>
         }
 
-        <div class="rz-display-flex rz-gap-2">
+        <div class="pt-flex pt-gap-2">
             <RadzenButton Text="@(_editing ? "Save Changes" : "Save Schedule")" ButtonStyle="ButtonStyle.Primary"
                           Click="@SaveWindowAsync" IsBusy="_saving" />
             @if (_editing)

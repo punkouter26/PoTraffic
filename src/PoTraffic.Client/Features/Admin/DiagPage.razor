@@ -4,20 +4,21 @@
 
 <PageTitle>Diagnostics &amp; Tools</PageTitle>
 
-<RadzenCard class="rz-p-6 rz-mt-4">
-    <RadzenText TextStyle="TextStyle.H5" class="rz-mb-2">Diagnostics &amp; Tools</RadzenText>
+<PageHeader Title="Diagnostics &amp; tools"
+            Subtitle="Dependency health, system configuration, and the test harnesses." />
 
+<RadzenCard class="pt-p-6">
     <RadzenTabs>
         <Tabs>
             <RadzenTabsItem Text="Connection Health" Icon="health_and_safety">
-                <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-mt-3 rz-mb-2 pt-diag-subtitle">
+                <RadzenText TextStyle="TextStyle.Subtitle2" class="pt-mt-3 pt-mb-2 pt-diag-subtitle">
                     Live ping results for all external dependencies.
                 </RadzenText>
                 <LoadingErrorCard IsLoading="_healthLoading" Error="@_healthError">
                     <RadzenDataGrid Data="_health" TItem="ConnectionHealthDto" AllowSorting="true"
                                     Density="Density.Compact" AllowColumnResize="true"
                                     EmptyText="No dependency results returned."
-                                    class="rz-mt-2">
+                                    class="pt-mt-2">
                         <Columns>
                             <RadzenDataGridColumn TItem="ConnectionHealthDto" Property="Name" Title="Dependency" Width="11rem" />
                             <RadzenDataGridColumn TItem="ConnectionHealthDto" Title="Status" Width="8rem" Sortable="false">
@@ -34,7 +35,7 @@
             </RadzenTabsItem>
 
             <RadzenTabsItem Text="System Config" Icon="settings">
-                <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-mt-3 rz-mb-4 pt-diag-subtitle">
+                <RadzenText TextStyle="TextStyle.Subtitle2" class="pt-mt-3 pt-mb-4 pt-diag-subtitle">
                     Sensitive values are masked. Values can be updated by administrators.
                 </RadzenText>
                 <LoadingErrorCard IsLoading="_loading" Error="@_error">
@@ -44,7 +45,7 @@
                                     Density="Density.Compact" AllowColumnResize="true"
                                     AllowColumnPicking="true"
                                     EmptyText="No configuration entries."
-                                    class="rz-mt-2">
+                                    class="pt-mt-2">
                         <Columns>
                             <RadzenDataGridColumn TItem="SystemConfigDto" Property="Key" Title="Key" Width="14rem" />
                             <RadzenDataGridColumn TItem="SystemConfigDto" Property="Value" Title="Value" Width="13rem">
@@ -78,13 +79,13 @@
             </RadzenTabsItem>
 
             <RadzenTabsItem Text="Seed Data" Icon="database">
-                <div class="rz-mt-3">
+                <div class="pt-mt-3">
                     <SeedDataPanel />
                 </div>
             </RadzenTabsItem>
 
             <RadzenTabsItem Text="Triple Test" Icon="science">
-                <div class="rz-mt-3 pt-diag-triple-test">
+                <div class="pt-mt-3 pt-diag-triple-test">
                     <TripleTestPanel />
                 </div>
             </RadzenTabsItem>

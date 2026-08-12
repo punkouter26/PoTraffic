@@ -17,49 +17,45 @@
 
 <MeshBackground />
 
+@* The page now leads with a heading like every other route. It carries the
+   Add Route action, which used to hang off the right of the status bar — a
+   primary action parked inside a connectivity indicator that hides itself
+   whenever there is nothing to report. *@
+<PageHeader Title="Your commutes"
+            Subtitle="@_subtitle">
+    <Actions>
+        @if (ShowSkeletons || VisibleRoutes.Count > 0)
+        {
+            <RadzenButton Text="Add route" Icon="add" ButtonStyle="ButtonStyle.Primary"
+                          Size="ButtonSize.Small"
+                          Click="@(() => Nav.NavigateTo("/routes/create"))" />
+        }
+    </Actions>
+</PageHeader>
+
 @* The bar used to report five things: active-route count, connectivity, a quota
    ring, today's provider spend and the reset time. Four of those are operator
    telemetry — they say nothing about when to leave — and they now live in
    Settings, where someone looking for them will look. What remains is the one
    fact that changes how much to trust the numbers below: whether they're live.
 
-   The bar renders at all only when there is something to say. *@
-@if (IsOffline || IsStale || VisibleRoutes.Count > 0)
+   It renders only when the news is bad. A permanent green "Live" chip on a
+   healthy app is a row of pixels that never changes and therefore never gets
+   read; the heading's subtitle carries that state instead. *@
+@if (IsOffline || IsStale)
 {
-    <div class="pt-status-bar">
-        @if (IsOffline)
-        {
-            <span class="pt-status-item pt-status-offline">
-                ⚠︎ Offline — showing the last data received
-            </span>
-        }
-        else if (IsStale)
-        {
-            <span class="pt-status-item pt-status-offline">
-                ⚠︎ Can't reach the server — retrying
-            </span>
-        }
-        else
-        {
-            <span class="pt-status-item">
-                <span class="pt-status-dot pt-status-dot-green"></span>
-                Live
-            </span>
-        }
-
-        @if (ShowSkeletons || VisibleRoutes.Count > 0)
-        {
-            <div class="pt-status-bar-actions">
-                <RadzenButton Text="+ Add Route" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Small"
-                              Click="@(() => Nav.NavigateTo("/routes/create"))" />
-            </div>
-        }
+    <div class="pt-status-bar" role="status">
+        <span class="pt-status-item pt-status-offline">
+            <PtIcon Name="@(IsOffline ? "wifi_off" : "cloud_off")" Size="sm" />
+            @(IsOffline ? "Offline — showing the last data received"
+                        : "Can't reach the server — retrying")
+        </span>
     </div>
 }
 
 @if (_quotaConsumed >= QuotaConstants.DefaultDailyQuota - 2)
 {
-    <RadzenAlert AlertStyle="AlertStyle.Warning" ShowIcon="true" class="rz-mb-3 pt-enter">
+    <RadzenAlert AlertStyle="AlertStyle.Warning" ShowIcon="true" class="pt-mb-3 pt-enter">
         Daily monitoring limit almost reached — sampling will pause once it's hit.
     </RadzenAlert>
 }
@@ -85,7 +81,7 @@ else if (VisibleRoutes.Count == 0 && !_hydrated)
     @* Nothing loaded and nothing cached — this is a failure, not an empty account.
        Showing "No routes yet" here would tell a user their routes had vanished. *@
     <div class="pt-empty-state">
-        <div class="pt-empty-state-emoji" aria-hidden="true">📡</div>
+        <PtIcon Name="cloud_off" Size="xl" Class="pt-empty-state-icon" />
         <div class="pt-empty-state-title">Couldn't load your routes</div>
         <div class="pt-empty-state-text">
             @(IsOffline ? "You're offline. We'll refresh as soon as you're back."
@@ -98,7 +94,7 @@ else if (VisibleRoutes.Count == 0 && !_hydrated)
 else if (VisibleRoutes.Count == 0)
 {
     <div class="pt-empty-state">
-        <div class="pt-empty-state-emoji" aria-hidden="true">🛣️</div>
+        <PtIcon Name="route" Size="xl" Class="pt-empty-state-icon" />
         <div class="pt-empty-state-title">No routes yet</div>
         <div class="pt-empty-state-text">Add your first commute route to start monitoring traffic patterns.</div>
         <RadzenButton Text="Add Your First Route" ButtonStyle="ButtonStyle.Primary" Icon="add"
@@ -118,19 +114,27 @@ else if (VisibleRoutes.Count == 0)
 }
 else
 {
-    @* One card per route, and the card is the answer. Virtualize keeps only the
-       visible ones in the DOM. ItemSize tracks the card's real height, which
-       dropped when the card lost its badge row and button row. *@
+    @* One card per route, and the card is the answer.
+
+       This was a <Virtualize>, which is incompatible with the two-column grid
+       the container now becomes on a wide screen: Virtualize works by rendering
+       spacer <div>s above and below the visible window, and in a grid those
+       spacers are grid ITEMS — they would each claim a cell and shred the
+       layout. Rendering the list outright is fine here because the dashboard
+       fetches at most 100 routes (pageSize=100) and a card is a handful of
+       spans; the ItemSize="120" hint it relied on had already drifted from the
+       card's real height twice. *@
     <div class="pt-route-cards pt-stagger" role="list">
-        <Virtualize Items="VisibleRoutes" Context="route" ItemSize="120" OverscanCount="2">
-            <div role="listitem">
+        @foreach (RouteDto route in VisibleRoutes)
+        {
+            <div role="listitem" @key="route.Id">
                 <SwipeableRouteCard Route="route"
                            OptimalDeparture="@(_optimalDepartures.GetValueOrDefault(route.Id))"
                            RecentPolls="@(_recentPolls.GetValueOrDefault(route.Id, []))"
                            OnDeleted="@RefreshAsync"
                            OnRefresh="@RefreshAsync" />
             </div>
-        </Virtualize>
+        }
     </div>
 }
 
@@ -157,8 +161,24 @@ else
     /// </summary>
     private List<RouteDto> VisibleRoutes { get; set; } = [];
 
-    private void RecomputeVisible() =>
+    /// <summary>
+    /// The header's supporting line. Carries the connectivity state that the permanent
+    /// green "Live" chip used to occupy a whole bar to report — a healthy app says so
+    /// once, quietly, next to the title.
+    /// </summary>
+    private string? _subtitle;
+
+    private void RecomputeVisible()
+    {
         VisibleRoutes = [.. _routes.Where(r => !Pending.IsPending(r.Id))];
+
+        // Null, not empty — PageHeader renders the subtitle element only when there
+        // is one, and an empty <p> still occupies a line.
+        int active = VisibleRoutes.Count(r => r.MonitoringStatus == MonitoringStatus.Active);
+        _subtitle = VisibleRoutes.Count == 0
+            ? null
+            : $"{active} of {VisibleRoutes.Count} monitoring · updated {DateTime.Now:HH:mm}";
+    }
 
     /// <summary>
     /// Skeletons only when there is genuinely nothing to show. A cached snapshot or a

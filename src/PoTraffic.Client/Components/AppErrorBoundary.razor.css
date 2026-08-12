@@ -27,7 +27,7 @@
 }
 
 .error-icon {
-    font-size: var(--pt-text-3xl);
+    color: var(--pt-color-danger);
     margin-bottom: var(--pt-space-4);
 }
 

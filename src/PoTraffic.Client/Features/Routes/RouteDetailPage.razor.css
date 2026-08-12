@@ -17,6 +17,19 @@
     padding: var(--pt-space-5) var(--pt-space-6);
     margin-bottom: var(--pt-space-4);
     box-shadow: var(--pt-elev-1);
+
+    container-type: inline-size;
+    container-name: pt-answer;
+}
+
+/* Narrow column: --pt-text-3xl at "Leave by 10:45 AM" wraps to three lines in a
+   phone's width, and a headline that wraps three times stops reading as one
+   answer. Keyed off the block's own width so it is also correct if the answer
+   is ever placed in a sidebar. */
+@container pt-answer (width < 22rem) {
+    .pt-answer-headline { font-size: var(--pt-text-2xl); }
+    .pt-answer-pending { font-size: var(--pt-text-xl); }
+    .pt-answer-duration { font-size: var(--pt-text-base); }
 }
 
 .pt-answer-route {
@@ -104,15 +117,13 @@
 }
 
 /* Comparison, folded in from what used to be its own page with its own pickers.
-   One select, on the chart it modifies. */
+   One picker, on the chart it modifies. This styled a bare <select> before; the
+   control is a RadzenDropDown now, so the surface, border and focus ring come
+   from the Radzen theme (which pt-tokens.css already maps to the brand) and all
+   that is left to say is how wide it may get. */
 .pt-compare-select {
-    background: var(--pt-bg-surface);
-    border: 1px solid var(--pt-border-subtle);
-    border-radius: var(--pt-radius-sm);
-    color: var(--pt-fg-body);
-    font-size: var(--pt-text-xs);
-    padding: 0.3rem 0.5rem;
-    max-width: 14rem;
+    max-width: 16rem;
+    min-width: 11rem;
 }
 
 .pt-compare-legend {
@@ -178,7 +189,35 @@
 .pt-details-summary::-webkit-details-marker { display: none; }
 .pt-details-summary::marker { content: ""; }
 
-.pt-details[open] .pt-collapsible-icon { transform: rotate(90deg); }
+/* The open-state chevron rotation is in app.css, not here — the icon is a
+   <PtIcon>, and a scoped rule's last compound selector gets the b-… attribute
+   that a child component's markup never carries. */
+
+/* The disclosure snapped open, dumping a schedule editor and a 300-row table
+   into the page in one frame with no indication of where they came from.
+   `interpolate-size: allow-keywords` is what makes height:auto animatable, and
+   `content-visibility` in the transition list is what keeps the content in the
+   accessibility tree at the end of the open transition and out of it when
+   closed. Both are progressively enhanced: without support the block simply
+   does not apply and the disclosure snaps exactly as it does today. */
+@supports (interpolate-size: allow-keywords) and (transition-behavior: allow-discrete) {
+    @media (prefers-reduced-motion: no-preference) {
+        .pt-details {
+            interpolate-size: allow-keywords;
+        }
+
+        .pt-details::details-content {
+            block-size: 0;
+            overflow: clip;
+            transition: block-size var(--pt-dur-base) var(--pt-ease),
+                        content-visibility var(--pt-dur-base) allow-discrete;
+        }
+
+        .pt-details[open]::details-content {
+            block-size: auto;
+        }
+    }
+}
 
 .pt-details-summary:hover { color: var(--pt-fg-primary); }
 
@@ -247,12 +286,15 @@
 }
 
 .pt-trend-selection-clear {
+    align-items: center;
     background: none;
     border: none;
+    border-radius: var(--pt-radius-sm);
     color: var(--pt-fg-tertiary);
     cursor: pointer;
-    font-size: var(--pt-text-sm);
-    padding: 0.1rem 0.35rem;
+    display: inline-flex;
+    justify-content: center;
+    padding: var(--pt-space-1);
 }
 
 .pt-trend-selection-clear:hover {

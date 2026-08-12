@@ -14,14 +14,20 @@
     <nav class="app-shell-actions" aria-label="Primary">
         @if (_isAuthenticated)
         {
-            <NavLink class="app-nav-link" href="dashboard" Match="NavLinkMatch.All">Dashboard</NavLink>
+            <NavLink class="app-nav-link" href="dashboard" Match="NavLinkMatch.All">
+                <PtIcon Name="dashboard" Size="sm" />Dashboard
+            </NavLink>
             @* The admin area used to carry its own button bar to switch between these
                two pages — a fourth navigation mechanism for two destinations. They
                are links in the one nav bar the app already has. *@
             @if (_isAdmin)
             {
-                <NavLink class="app-nav-link" href="admin">Admin</NavLink>
-                <NavLink class="app-nav-link" href="diag">Diagnostics</NavLink>
+                <NavLink class="app-nav-link" href="admin">
+                    <PtIcon Name="admin_panel_settings" Size="sm" />Admin
+                </NavLink>
+                <NavLink class="app-nav-link" href="diag">
+                    <PtIcon Name="health_and_safety" Size="sm" />Diagnostics
+                </NavLink>
             }
         }
         else if (_authResolved)
@@ -47,7 +53,7 @@
                         <text>@_displayLabel</text>
                     }
                 </span>
-                <span class="pt-user-caret" aria-hidden="true">▾</span>
+                <PtIcon Name="expand_more" Size="sm" Class="pt-user-caret" />
             </button>
             @if (_menuOpen)
             {
@@ -56,9 +62,31 @@
                         <div class="pt-user-dropdown-label">Signed in as</div>
                         <div class="pt-user-dropdown-email">@_displayLabel</div>
                     </div>
-                    <a class="pt-dropdown-item" href="/account/settings" role="menuitem">Account Settings</a>
+                    <a class="pt-dropdown-item" href="/account/settings" role="menuitem">
+                        <PtIcon Name="settings" Size="sm" />Account settings
+                    </a>
+
+                    @* Below 640px the centre nav is hidden — the brand and the user chip
+                       already claim the bar — and the bottom nav carries only Dashboard,
+                       Add and Account. That left an administrator on a phone with no path
+                       to /admin or /diag at all. The menu is the one piece of chrome that
+                       survives every width, so the admin destinations live here too and
+                       are marked mobile-only so they don't duplicate the bar on desktop. *@
+                    @if (_isAdmin)
+                    {
+                        <div class="pt-dropdown-divider pt-dropdown-mobile-only" role="separator"></div>
+                        <a class="pt-dropdown-item pt-dropdown-mobile-only" href="/admin" role="menuitem">
+                            <PtIcon Name="admin_panel_settings" Size="sm" />Admin
+                        </a>
+                        <a class="pt-dropdown-item pt-dropdown-mobile-only" href="/diag" role="menuitem">
+                            <PtIcon Name="health_and_safety" Size="sm" />Diagnostics
+                        </a>
+                    }
+
                     <div class="pt-dropdown-divider" role="separator"></div>
-                    <button class="pt-dropdown-item danger" @onclick="LogoutAsync" type="button" role="menuitem">Sign Out</button>
+                    <button class="pt-dropdown-item danger" @onclick="LogoutAsync" type="button" role="menuitem">
+                        <PtIcon Name="logout" Size="sm" />Sign out
+                    </button>
                 </div>
             }
         }
@@ -69,12 +97,18 @@
 @if (_useMockProviders)
 {
     <div class="pt-mock-banner" role="status" aria-live="polite">
-        USING MOCK DATA — API responses are deterministic; do not use for production routing.
+        <PtIcon Name="science" Size="sm" />
+        Using mock data — API responses are deterministic; do not use for production routing.
     </div>
 }
 
 @if (_menuOpen)
 {
+    @* Catches the click that closes the menu. This is deliberately NOT the native
+       popover light-dismiss: the dropdown is rendered by Blazor inside the header,
+       which is its own stacking context, so hoisting it to the top layer would take
+       it out of the flow its positioning depends on. See the z-index note in
+       NavMenu.razor.css — this element must stay below the header. *@
     <div class="pt-overlay" @onclick="CloseUserMenu"></div>
 }
 

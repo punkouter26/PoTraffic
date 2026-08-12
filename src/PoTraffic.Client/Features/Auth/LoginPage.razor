@@ -9,22 +9,23 @@
 @inject NavigationManager Nav
 @inject AuthenticationStateProvider AuthStateProvider
 
-<RadzenCard class="rz-p-6">
-    <RadzenText TextStyle="TextStyle.H5" class="rz-mb-2">Sign In</RadzenText>
-    <RadzenText TextStyle="TextStyle.Body2" class="rz-mb-4 pt-fg-tertiary">
-        @(_guestEnabled
-            ? "Sign in with your Microsoft account, or continue as a guest (local development)."
-            : "Sign in with your Microsoft account to continue.")
-    </RadzenText>
+<RadzenCard class="pt-p-6">
+    @* An <h1>, not a RadzenText H5. This is the app's landing page for anyone
+       signed out and it exposed no heading element at all — a screen reader's
+       heading list was empty on the one page every new user sees first. *@
+    <PageHeader Title="Sign in"
+                Subtitle="@(_guestEnabled
+                    ? "Use your Microsoft account, or continue as a guest (local development)."
+                    : "Use your Microsoft account to continue.")" />
 
     @if (!string.IsNullOrEmpty(_error))
     {
-        <RadzenAlert AlertStyle="AlertStyle.Danger" class="rz-mb-3">@_error</RadzenAlert>
+        <RadzenAlert AlertStyle="AlertStyle.Danger" class="pt-mb-3">@_error</RadzenAlert>
     }
 
     @if (_providersLoaded && !_microsoftConfigured && !_guestEnabled)
     {
-        <RadzenAlert AlertStyle="AlertStyle.Warning" AllowClose="false" class="rz-mb-3">
+        <RadzenAlert AlertStyle="AlertStyle.Warning" AllowClose="false" class="pt-mb-3">
             Microsoft sign-in is not configured on this server.
         </RadzenAlert>
     }
@@ -32,7 +33,7 @@
     @if (!_providersLoaded || _microsoftConfigured || !_guestEnabled)
     {
         <RadzenButton Text="Continue with Microsoft" ButtonStyle="ButtonStyle.Primary"
-                      class="rz-w-100 auth-social-btn"
+                      class="pt-w-100 auth-social-btn"
                       Click='() => StartExternalLogin("microsoft")'
                       Disabled="@(_loading || (_providersLoaded && !_microsoftConfigured))" />
     }
@@ -41,11 +42,11 @@
     @if (_guestEnabled)
     {
         <RadzenButton Text="Continue as Guest" ButtonStyle="ButtonStyle.Secondary"
-                      class="rz-w-100 rz-mt-3 auth-social-btn"
+                      class="pt-w-100 pt-mt-3 auth-social-btn"
                       Click="@GuestLoginAsync"
                       IsBusy="@_guestLoading"
                       Disabled="@_loading" />
-        <RadzenText TextStyle="TextStyle.Caption" class="rz-mt-2 pt-fg-tertiary">
+        <RadzenText TextStyle="TextStyle.Caption" class="pt-mt-2 pt-fg-tertiary">
             Guest sessions are for local development and testing only.
         </RadzenText>
     }

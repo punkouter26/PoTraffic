@@ -1,6 +1,6 @@
 @* Progress display shown while the test is running but no session data received yet *@
 
-<div class="rz-display-flex rz-align-items-center rz-gap-3 rz-mb-3">
+<div class="pt-flex pt-items-center pt-gap-3 pt-mb-3">
     <RadzenProgressBarCircular Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Small" />
     <RadzenText>Waiting for first poll…</RadzenText>
 </div>
@@ -8,7 +8,7 @@
 @if (StartAt.HasValue)
 {
     var first = StartAt.Value;
-    <RadzenCard class="rz-p-3 rz-mb-3 pt-tt-card">
+    <RadzenCard class="pt-p-3 pt-mb-3 pt-tt-card">
         <RadzenText TextStyle="TextStyle.Caption" class="pt-tt-caption">SCHEDULED SHOTS</RadzenText>
         <div class="pt-tt-shots">
             <div>Shot 1 (+0 s) — fires at <strong>@first.ToString("HH:mm:ss")</strong> @CountdownLabel(first)</div>
@@ -31,6 +31,6 @@
     private static string CountdownLabel(DateTime target)
     {
         double secs = (target - DateTime.Now).TotalSeconds;
-        return secs <= 0 ? "✓ due" : $"(in {(int)secs}s)";
+        return secs <= 0 ? "· due" : $"(in {(int)secs}s)";
     }
 }
