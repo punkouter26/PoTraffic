@@ -136,8 +136,9 @@ public sealed class CreateDemoRouteHandlerTests
 
         await HandlerFor(db).Handle(new CreateDemoRouteCommand(UserId.New()), CancellationToken.None);
 
-        double peak = db.PollRecords.Where(p => p.PolledAt.Hour == 8).Average(p => p.TravelDurationSeconds);
-        double shoulder = db.PollRecords.Where(p => p.PolledAt.Hour == 6).Average(p => p.TravelDurationSeconds);
+        // UTC hours: 12:00 is the 08:00 Eastern peak, 10:00 the 06:00 shoulder.
+        double peak = db.PollRecords.Where(p => p.PolledAt.Hour == 12).Average(p => p.TravelDurationSeconds);
+        double shoulder = db.PollRecords.Where(p => p.PolledAt.Hour == 10).Average(p => p.TravelDurationSeconds);
 
         peak.Should().BeGreaterThan(shoulder * 1.2,
             "a flat series would render an empty-looking heatmap and a meaningless baseline");

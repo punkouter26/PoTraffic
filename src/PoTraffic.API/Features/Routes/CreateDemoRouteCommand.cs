@@ -29,17 +29,27 @@ public sealed class CreateDemoRouteCommandHandler(
     ILogger<CreateDemoRouteCommandHandler> logger)
     : IRequestHandler<CreateDemoRouteCommand, CreateRouteResult>
 {
-    private const string DemoOriginAddress = "1600 Amphitheatre Pkwy, Mountain View, CA (sample)";
-    private const string DemoOriginCoordinates = "37.4220,-122.0841";
-    private const string DemoDestinationAddress = "1 Apple Park Way, Cupertino, CA (sample)";
-    private const string DemoDestinationCoordinates = "37.3349,-122.0090";
+    // A real commute, not a placeholder pair. The coordinates are pinned rather than
+    // geocoded at runtime — that is what keeps loading a demo free — and they were
+    // resolved once through this app's own Google provider, so they are the same
+    // values a real route for these addresses would store.
+    private const string DemoOriginAddress = "4451 Telfair Blvd, Camp Springs, MD 20746";
+    private const string DemoOriginCoordinates = "38.828112,-76.909925";
+    private const string DemoDestinationAddress = "5325 Westbard Ave, Bethesda, MD 20816";
+    private const string DemoDestinationCoordinates = "38.9611502,-77.1067288";
 
     /// <summary>Fixed so every account's sample data — and every screenshot of it — is identical.</summary>
     private const int HistorySeed = 20260811;
 
     private const int HistoryDays = 14;
-    private const int FreeFlowSeconds = 1260;   // 21 min with nothing in the way
-    private const int DistanceMetres = 19_000;
+
+    /// <summary>
+    /// Measured live on this route at a quiet hour: 2,355 s over 37,921 m. Named for
+    /// what it is — a light-traffic baseline the rush-hour humps build on — rather
+    /// than claimed as true free-flow, which would need a reading nobody took.
+    /// </summary>
+    private const int QuietHourSeconds = 2_355;
+    private const int DistanceMetres = 37_921;
 
     public async Task<CreateRouteResult> Handle(CreateDemoRouteCommand cmd, CancellationToken ct)
     {
@@ -102,7 +112,12 @@ public sealed class CreateDemoRouteCommandHandler(
             if (day.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
                 continue;
 
-            foreach (int hour in (int[])[6, 7, 8, 16, 17, 18])
+            // UTC, like everything else in the polling model — but chosen so the
+            // sample reads as the commute it now depicts. These addresses are in US
+            // Eastern (UTC-4 in summer), so 10–12 UTC is the 06:00–08:00 run in and
+            // 20–22 UTC is the 16:00–18:00 run home. The previous 6–8/16–18 would
+            // have put this Maryland commute's rush hour at 2 AM local.
+            foreach (int hour in (int[])[10, 11, 12, 20, 21, 22])
             {
                 for (int minute = 0; minute < 60; minute += 15)
                 {
@@ -146,8 +161,14 @@ public sealed class CreateDemoRouteCommandHandler(
     private static double DurationSeconds(DateTimeOffset at, Random rng)
     {
         double minuteOfDay = (at.Hour * 60) + at.Minute;
-        double morning = Hump(minuteOfDay, centre: 8 * 60, width: 50) * 0.90;
-        double evening = Hump(minuteOfDay, centre: 17 * 60, width: 60) * 0.70;
+
+        // Peak multipliers are lower than they were for the old 21-minute placeholder
+        // route: on a 39-minute drive the same factors would have produced a 74-minute
+        // peak. These land around 66 min in the morning, which is the shape this
+        // corridor actually has.
+        // Centres are UTC: 12:00 is 08:00 Eastern, 21:00 is 17:00 Eastern.
+        double morning = Hump(minuteOfDay, centre: 12 * 60, width: 50) * 0.70;
+        double evening = Hump(minuteOfDay, centre: 21 * 60, width: 60) * 0.55;
 
         double dayFactor = at.DayOfWeek switch
         {
@@ -158,7 +179,7 @@ public sealed class CreateDemoRouteCommandHandler(
         };
 
         double jitter = 0.94 + (rng.NextDouble() * 0.12);
-        return FreeFlowSeconds * (1 + morning + evening) * dayFactor * jitter;
+        return QuietHourSeconds * (1 + morning + evening) * dayFactor * jitter;
     }
 
     /// <summary>Gaussian bump, 1.0 at <paramref name="centre"/> and falling away either side.</summary>
