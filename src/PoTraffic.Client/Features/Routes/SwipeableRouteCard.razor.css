@@ -47,8 +47,17 @@
     background: var(--pt-color-danger);
 }
 
-/* On desktop (≥768px) the swipe hint is disabled — gestures don't fire
-   because there are no touchstart events. Visual artifact is harmless. */
-@media (min-width: 1024px) {
+/* The actions sit in the layer behind the card, revealed only as it slides.
+   z-index below the card's own — see .pt-route-card in app.css. */
+.pt-swipe-action {
+    z-index: 0;
+}
+
+/* Gestures only exist where there is a touch screen, so on a mouse the panels
+   are dead weight. This used to be the only thing keeping them off the card,
+   which left every width between the phone and desktop breakpoints — and touch
+   tablets — with "Check Now" and "Delete" painted over the departure time. The
+   stacking above is what actually fixes that; this is now just tidiness. */
+@media (hover: hover) and (pointer: fine) {
     .pt-swipe-action { display: none; }
 }

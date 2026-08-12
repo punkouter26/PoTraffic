@@ -258,7 +258,19 @@ code {
 }
 
 /* The card navigates, so it behaves like the control it is. */
-.pt-route-card { cursor: pointer; }
+.pt-route-card {
+    cursor: pointer;
+
+    /* Lifts the card above the absolutely-positioned swipe actions behind it.
+       Without a position of its own the card stays in the static painting layer,
+       which loses to any positioned sibling regardless of DOM order — so the
+       "Check Now" and "Delete" panels rendered ON TOP of the card and covered
+       the departure time. They are meant to be revealed by the card sliding
+       away, not painted over it. */
+    position: relative;
+    z-index: 1;
+    background: var(--pt-bg-surface);
+}
 .pt-route-card:focus-visible {
     outline: 2px solid var(--pt-color-brand-on-surface);
     outline-offset: 2px;
