@@ -66,12 +66,6 @@ public sealed class StartWindowCommandHandler : IRequestHandler<StartWindowComma
         if (route is null)
             return new StartWindowResult(false, RouteErrorCodes.NotFound, 0, null);
 
-        // The sample route (#10) carries synthetic history. Arming a polling chain against it
-        // would spend real provider quota and interleave measured samples with fabricated
-        // ones in the same series — the user's own route is the place to start monitoring.
-        if (route.IsDemo)
-            return new StartWindowResult(false, RouteErrorCodes.DemoRoute, 0, null);
-
         DateOnly today = DateOnly.FromDateTime(DateTimeOffset.UtcNow.Date);
 
         SemaphoreSlim gate = GateFor(route.Id);

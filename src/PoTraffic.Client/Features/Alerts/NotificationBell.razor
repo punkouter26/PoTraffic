@@ -2,7 +2,6 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @implements IAsyncDisposable
 @inject HttpClient Http
-@inject IJSRuntime JS
 @inject NavigationManager Nav
 @inject AuthenticationStateProvider AuthState
 @inject PageActivityMonitor Activity
@@ -28,25 +27,6 @@
                             <button class="pt-bell-link" @onclick="MarkAllReadAsync">Mark all read</button>
                         }
                     </div>
-
-                    @if (!_pushEnabled)
-                    {
-                        <button class="pt-bell-enable" @onclick="EnablePushAsync" disabled="@_enabling">
-                            @if (_enabling)
-                            {
-                                <text>Enabling…</text>
-                            }
-                            else
-                            {
-                                <PtIcon Name="notifications_active" Size="sm" />
-                                <text>Enable push notifications</text>
-                            }
-                        </button>
-                        @if (_pushError is not null)
-                        {
-                            <div class="pt-bell-error">@_pushError</div>
-                        }
-                    }
 
                     @if (_alerts.Count == 0)
                     {
@@ -76,13 +56,9 @@
 
 @code {
     private bool _open;
-    private bool _pushEnabled;
-    private bool _enabling;
-    private string? _pushError;
     private int _unreadCount;
     private List<AlertDto> _alerts = [];
     private System.Timers.Timer? _timer;
-    private IJSObjectReference? _push;
     private bool _authenticated;
 
     protected override async Task OnInitializedAsync()
@@ -142,57 +118,10 @@
         await RefreshAsync();
     }
 
-    private async Task<IJSObjectReference> PushModule() =>
-        _push ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/pt-push.js");
-
-    private async Task EnablePushAsync()
-    {
-        _enabling = true;
-        _pushError = null;
-        try
-        {
-            IJSObjectReference mod = await PushModule();
-            if (!await mod.InvokeAsync<bool>("isSupported"))
-            {
-                _pushError = "Push isn't supported in this browser.";
-                return;
-            }
-
-            VapidPublicKeyResponse? vapid = await Http.GetFromJsonAsync(
-                "/api/push/vapid-public-key", AppJsonContext.Default.VapidPublicKeyResponse);
-            if (vapid is null)
-                return;
-
-            string[]? sub = await mod.InvokeAsync<string[]>("subscribe", vapid.PublicKey);
-            if (sub is null || sub.Length < 3)
-            {
-                _pushError = "Notification permission was denied.";
-                return;
-            }
-
-            await Http.PostAsJsonAsync("/api/push/subscribe",
-                new PushSubscriptionRequest(sub[0], sub[1], sub[2]),
-                AppJsonContext.Default.PushSubscriptionRequest);
-            _pushEnabled = true;
-        }
-        catch
-        {
-            _pushError = "Couldn't enable push notifications.";
-        }
-        finally
-        {
-            _enabling = false;
-        }
-    }
-
     public async ValueTask DisposeAsync()
     {
         Activity.Resumed -= OnResumedAsync;
         _timer?.Stop();
         _timer?.Dispose();
-        if (_push is not null)
-        {
-            try { await _push.DisposeAsync(); } catch { }
-        }
     }
 }

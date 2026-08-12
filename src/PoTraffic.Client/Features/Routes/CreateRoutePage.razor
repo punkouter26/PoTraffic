@@ -5,6 +5,8 @@
 @inject HttpClient Http
 @inject NavigationManager Nav
 
+<PageTitle>New route — PoTraffic</PageTitle>
+
 <div class="pt-create-route-card">
 <PageHeader Title="New route"
             Subtitle="One step: the trip, when to watch it, and polling starts."
@@ -23,7 +25,7 @@
        of pretending a Radzen validator can bind to them. *@
     <RadzenTemplateForm TItem="CreateRouteForm" Data="@_form" Submit="@SaveAsync">
         <RadzenFormField Text="Origin Address" class="pt-w-100 pt-mb-1">
-            <AddressAutocomplete @bind-Value="_origin" Placeholder="Start typing an address…" />
+            <AddressAutocomplete @bind-Value="_origin" Placeholder="e.g. Home or 1600 Amphitheatre Pkwy" />
         </RadzenFormField>
         @if (_originError is not null)
         {
@@ -35,7 +37,7 @@
         }
 
         <RadzenFormField Text="Destination Address" class="pt-w-100 pt-mb-1">
-            <AddressAutocomplete @bind-Value="_destination" Placeholder="Start typing an address…" />
+            <AddressAutocomplete @bind-Value="_destination" Placeholder="e.g. Work or 1 Apple Park Way" />
         </RadzenFormField>
         @if (_destinationError is not null)
         {
@@ -52,7 +54,8 @@
                 <RadzenFormField Text="Start Time">
                     <ChildContent>
                         <RadzenDatePicker Name="StartTime" @bind-Value="_startTime"
-                                          ShowTime="true" TimeOnly="true" DateFormat="HH:mm" />
+                                          ShowTime="true" TimeOnly="true" DateFormat="HH:mm"
+                                          aria-label="Start time" />
                     </ChildContent>
                     <Helper>
                         <RadzenRequiredValidator Component="StartTime" Text="Set a start time." />
@@ -61,7 +64,8 @@
                 <RadzenFormField Text="End Time">
                     <ChildContent>
                         <RadzenDatePicker Name="EndTime" @bind-Value="_endTime"
-                                          ShowTime="true" TimeOnly="true" DateFormat="HH:mm" />
+                                          ShowTime="true" TimeOnly="true" DateFormat="HH:mm"
+                                          aria-label="End time" />
                     </ChildContent>
                     <Helper>
                         <RadzenRequiredValidator Component="EndTime" Text="Set an end time." />
@@ -248,7 +252,7 @@
             if (createdRoute is null || activeWindow is null)
             {
                 _error = "Route was created, but monitoring window could not be initialized.";
-                Nav.NavigateTo("/routes");
+                Nav.NavigateTo("/dashboard");
                 return;
             }
 
@@ -283,5 +287,5 @@
         }
     }
 
-    private void Cancel() => Nav.NavigateTo("/routes");
+    private void Cancel() => Nav.NavigateTo("/dashboard");
 }

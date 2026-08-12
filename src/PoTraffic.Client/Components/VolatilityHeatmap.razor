@@ -1,18 +1,23 @@
 @using PoTraffic.Shared.DTOs.History
 
 @* ──────────────────────────────────────────────────────────────────────
-   #5 — Day-of-week × hour congestion grid.
+   #5 — Day-of-week × half-hour congestion grid.
 
-   Colour encodes how much slower an hour runs than the route's typical
-   (median) sample; the dot marks hours whose spread is wide enough that the
-   time is unpredictable rather than merely slow. Those are different problems:
-   a reliably-40-minute hour can be planned around, a 25-to-55-minute one can't.
+   Colour encodes how much slower a half-hour slot runs than the route's
+   typical (median) sample; the dot marks slots whose spread is wide enough
+   that the time is unpredictable rather than merely slow. Those are
+   different problems: a reliably-40-minute slot can be planned around, a
+   25-to-55-minute one can't.
 
-   Only the hours that actually carry samples are drawn. A 07:00–09:00 commute
-   would otherwise render as two columns of data and twenty-two of blank.
+   Only the half-hour slots that actually carry samples are drawn. A 07:00–
+   09:00 commute would otherwise render as two columns of data and
+   twenty-two of blank per hour-of-day.
 
    Rule 4: the markup hands CSS the level class only — the ramp itself is
    owned by .pt-heat-l0…l4 in app.css.
+
+   Times are US Eastern (the user's wall clock) at 30-minute resolution,
+   so "17:30" reads as the rush hour it actually is for the driver.
    ────────────────────────────────────────────────────────────────────── *@
 
 @if (Heatmap is null || Heatmap.TotalSamples == 0)
@@ -34,14 +39,14 @@ else
     <div class="pt-heatmap-scroll">
         <table class="pt-heatmap">
             <caption class="pt-visually-hidden">
-                Mean travel time by day of week and hour, in UTC.
+                Mean travel time by day of week and half-hour, in US Eastern time.
             </caption>
             <thead>
                 <tr>
                     <th scope="col"><span class="pt-visually-hidden">Day</span></th>
-                    @foreach (int hour in _hours)
+                    @foreach (HalfHourSlot slot in _slots)
                     {
-                        <th scope="col" class="pt-heatmap-hour">@hour.ToString("D2")</th>
+                        <th scope="col" class="pt-heatmap-hour">@SlotLabel(slot)</th>
                     }
                 </tr>
             </thead>
@@ -50,13 +55,13 @@ else
                 {
                     <tr>
                         <th scope="row" class="pt-heatmap-day">@day[..3]</th>
-                        @foreach (int hour in _hours)
+                        @foreach (HalfHourSlot slot in _slots)
                         {
-                            HeatmapCellDto? cell = _byDayHour.GetValueOrDefault((day, hour));
+                            HeatmapCellDto? cell = _byKey.GetValueOrDefault((day, slot.Hour, slot.HalfHour));
                             @if (cell is null)
                             {
-                                <td class="pt-heat pt-heat-empty" title="@EmptyTooltip(day, hour)">
-                                    <span class="pt-visually-hidden">@EmptyTooltip(day, hour)</span>
+                                <td class="pt-heat pt-heat-empty" title="@EmptyTooltip(day, slot)">
+                                    <span class="pt-visually-hidden">@EmptyTooltip(day, slot)</span>
                                 </td>
                             }
                             else
@@ -86,7 +91,7 @@ else
         <span class="pt-heat pt-heat-l2 pt-heat-volatile" aria-hidden="true"></span>
         <span class="pt-heatmap-legend-label">dot = unpredictable</span>
         <span class="pt-heatmap-legend-sep">·</span>
-        <span class="pt-heatmap-legend-label">minutes, hours in UTC — only hours you travel are shown</span>
+        <span class="pt-heatmap-legend-label">minutes, half-hours in US Eastern — only times you travel are shown</span>
     </div>
 }
 
@@ -97,42 +102,55 @@ else
         ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
     /// <summary>
-    /// Coefficient of variation above which an hour is called unpredictable. Matches the
-    /// stability threshold the adaptive poller uses, so "volatile" means the same thing
-    /// on the grid as it does to the scheduler.
+    /// Coefficient of variation above which a half-hour is called unpredictable. Matches
+    /// the stability threshold the adaptive poller uses, so "volatile" means the same
+    /// thing on the grid as it does to the scheduler.
     /// </summary>
     private const double VolatileCoefficient = 0.08;
 
-    private Dictionary<(string Day, int Hour), HeatmapCellDto> _byDayHour = [];
-    private int[] _hours = [];
+    /// <summary>One 30-minute slot in the local day.</summary>
+    /// <param name="Hour">Local Eastern hour 0–23.</param>
+    /// <param name="HalfHour">0 for :00–:29, 1 for :30–:59.</param>
+    private readonly record struct HalfHourSlot(int Hour, int HalfHour)
+    {
+        public int StartMinute => HalfHour * 30;
+    }
+
+    private Dictionary<(string Day, int Hour, int HalfHour), HeatmapCellDto> _byKey = [];
+    private List<HalfHourSlot> _slots = [];
     private string? _summary;
 
     protected override void OnParametersSet()
     {
         if (Heatmap is null || Heatmap.Cells.Count == 0)
         {
-            _byDayHour = [];
-            _hours = [];
+            _byKey = [];
+            _slots = [];
             _summary = null;
             return;
         }
 
-        // Last cell wins on a duplicate (day, hour) — the server groups by exactly that
-        // pair, so a duplicate would be a server bug rather than something to render twice.
-        _byDayHour = Heatmap.Cells
-            .GroupBy(c => (c.DayOfWeek, c.Hour))
+        // Last cell wins on a duplicate key — the server groups by exactly that triple,
+        // so a duplicate would be a server bug rather than something to render twice.
+        _byKey = Heatmap.Cells
+            .GroupBy(c => (c.DayOfWeek, c.Hour, c.HalfHour))
             .ToDictionary(g => g.Key, g => g.Last());
 
-        // Only hours that actually carry a sample get a column. A commute that runs
-        // 06:00–09:00 and 16:00–19:00 spans thirteen hours but occupies six of them;
-        // rendering the range meant seven columns of blank between the two blocks.
-        _hours = [.. Heatmap.Cells.Select(c => c.Hour).Distinct().Order()];
+        // Only slots that actually carry a sample get a column. A commute that runs
+        // 07:00–09:00 and 16:00–19:00 spans 12 half-hours but occupies 12 of them;
+        // rendering a contiguous range would put six empty columns between the two blocks.
+        _slots = Heatmap.Cells
+            .Select(c => new HalfHourSlot(c.Hour, c.HalfHour))
+            .Distinct()
+            .OrderBy(static s => s.Hour)
+            .ThenBy(static s => s.HalfHour)
+            .ToList();
 
         _summary = BuildSummary(Heatmap);
     }
 
-    /// <summary>"Tuesdays at 17:00 run 62% over your typical 23 min." Null until a cell is
-    /// materially worse than the route's median — flagging a 4% bump as a hotspot is noise.</summary>
+    /// <summary>"Tuesdays at 17:30 run 62% over your typical 23 min." Null until a cell
+    /// is materially worse than the route's median — flagging a 4% bump as a hotspot is noise.</summary>
     private static string? BuildSummary(VolatilityHeatmapDto heatmap)
     {
         if (heatmap.MedianDurationSeconds <= 0)
@@ -145,9 +163,10 @@ else
         int pct = (int)Math.Round((worst.MeanDurationSeconds - heatmap.MedianDurationSeconds)
             / heatmap.MedianDurationSeconds * 100);
 
+        string when = $"{worst.DayOfWeek}s at {worst.Hour:D2}:{worst.HalfHour * 30:D2}";
         return pct < 10
-            ? $"This route holds steady all week — no hour runs more than {Math.Max(pct, 0)}% over its typical {heatmap.MedianDurationSeconds / 60:F0} min."
-            : $"{worst.DayOfWeek}s at {worst.Hour:D2}:00 are the worst hour of your week — {pct}% over the typical {heatmap.MedianDurationSeconds / 60:F0} min.";
+            ? $"This route holds steady all week — no slot runs more than {Math.Max(pct, 0)}% over its typical {heatmap.MedianDurationSeconds / 60:F0} min."
+            : $"{when} are the worst 30 minutes of your week — {pct}% over the typical {heatmap.MedianDurationSeconds / 60:F0} min.";
     }
 
     private string LevelClass(HeatmapCellDto cell)
@@ -173,8 +192,11 @@ else
         && cell.MeanDurationSeconds > 0
         && cell.StdDevDurationSeconds / cell.MeanDurationSeconds > VolatileCoefficient;
 
-    private static string EmptyTooltip(string day, int hour) =>
-        $"{day} {hour:D2}:00 — no samples";
+    private static string SlotLabel(HalfHourSlot slot) =>
+        $"{slot.Hour:D2}:{slot.StartMinute:D2}";
+
+    private static string EmptyTooltip(string day, HalfHourSlot slot) =>
+        $"{day} {SlotLabel(slot)} — no samples";
 
     private string CellTooltip(HeatmapCellDto cell)
     {
@@ -186,6 +208,6 @@ else
             ? $" · ±{cell.StdDevDurationSeconds / 60:F0} min swing"
             : string.Empty;
 
-        return $"{cell.DayOfWeek} {cell.Hour:D2}:00 — {cell.MeanDurationSeconds / 60:F0} min avg{delta}{spread} · {cell.SampleCount} sample(s)";
+        return $"{cell.DayOfWeek} {SlotLabel(new HalfHourSlot(cell.Hour, cell.HalfHour))} — {cell.MeanDurationSeconds / 60:F0} min avg{delta}{spread} · {cell.SampleCount} sample(s)";
     }
 }

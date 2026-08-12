@@ -27,7 +27,7 @@ public sealed class GetGlobalVolatilityHandler : IRequestHandler<GetGlobalVolati
     public Task<IReadOnlyList<GlobalVolatilitySlotDto>> Handle(GetGlobalVolatilityQuery query, CancellationToken ct)
     {
         // Snapshot to lists so the LINQ pipeline can run multiple times.
-        List<PollRecord> polls = _db.Polls.Where(p => !p.IsDeleted).ToList();
+        List<PollRecord> polls = _db.Polls.ToList();
         Dictionary<RouteId, EntityRoute> routesById = _db.Routes.ToDictionary(r => r.Id);
 
         return Task.FromResult(VolatilityAggregator.Aggregate(polls, routesById));

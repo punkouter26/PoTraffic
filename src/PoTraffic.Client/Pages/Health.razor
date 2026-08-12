@@ -12,7 +12,8 @@
        only page in the app that got the treatment right, and still the only one
        styling it locally. Same markup, one shared component. *@
     <PageHeader Title="Health &amp; connections"
-                Subtitle="Live status of every dependency this deployment talks to.">
+                Subtitle="Live status of every dependency this deployment talks to."
+                BackHref="/dashboard" BackLabel="Commutes">
         <Actions>
             <RadzenButton Text="Refresh" Icon="refresh" ButtonStyle="ButtonStyle.Light"
                           Disabled="_loading" Click="LoadAsync" />

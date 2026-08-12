@@ -171,7 +171,7 @@ public abstract class BaseIntegrationTest : IAsyncLifetime
 
 /// <summary>
 /// No-op IJobScheduler for integration tests. Handlers that inject IJobScheduler
-/// (e.g. StartTripleTestCommandHandler) can resolve without requiring a running Azurite instance.
+/// (e.g. job handlers) can resolve without requiring a running Azurite instance.
 /// </summary>
 internal sealed class NoOpJobScheduler : IJobScheduler
 {

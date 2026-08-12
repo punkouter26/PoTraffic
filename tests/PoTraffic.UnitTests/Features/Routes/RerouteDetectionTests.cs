@@ -60,8 +60,7 @@ public sealed class RerouteDetectionTests
                 SessionId = sessionId,
                 PolledAt = polledBase,
                 TravelDurationSeconds = 300,
-                DistanceMetres = dist,
-                RawProviderResponse = "{}"
+                DistanceMetres = dist
             });
             polledBase = polledBase.AddMinutes(5);
         }

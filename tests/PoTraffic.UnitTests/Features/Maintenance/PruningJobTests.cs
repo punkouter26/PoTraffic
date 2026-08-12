@@ -9,13 +9,13 @@ namespace PoTraffic.UnitTests.Features.Maintenance;
 
 /// <summary>
 /// Unit tests for <see cref="PruneOldPollRecordsJobHandler"/>.
-/// FR-020: soft-delete records older than 90 days; records within window untouched.
+/// FR-020: hard-delete records older than 90 days; records within window untouched.
 /// </summary>
 public sealed class PruningJobTests
 {
 
     [Fact]
-    public async Task PruneJob_MarksOldRecordsDeleted_DoesNotTouchRecentRecords()
+    public async Task PruneJob_DeletesOldRecords_LeavesRecentRecords()
     {
         // Arrange
         TableStorageContext db = TestDoubles.CreateDb();
@@ -26,9 +26,9 @@ public sealed class PruningJobTests
         // 3 old records (> 90 days)
         db.AddRange(new PollRecord[]
         {
-            new PollRecord { Id = PollRecordId.New(), RouteId = routeId, PolledAt = cutoff.AddDays(-5), TravelDurationSeconds = 300, DistanceMetres = 5000, RawProviderResponse = "data" },
-            new PollRecord { Id = PollRecordId.New(), RouteId = routeId, PolledAt = cutoff.AddDays(-30), TravelDurationSeconds = 310, DistanceMetres = 5000, RawProviderResponse = "data" },
-            new PollRecord { Id = PollRecordId.New(), RouteId = routeId, PolledAt = cutoff.AddDays(-60), TravelDurationSeconds = 320, DistanceMetres = 5000, RawProviderResponse = "data" }
+            new PollRecord { Id = PollRecordId.New(), RouteId = routeId, PolledAt = cutoff.AddDays(-5), TravelDurationSeconds = 300, DistanceMetres = 5000 },
+            new PollRecord { Id = PollRecordId.New(), RouteId = routeId, PolledAt = cutoff.AddDays(-30), TravelDurationSeconds = 310, DistanceMetres = 5000 },
+            new PollRecord { Id = PollRecordId.New(), RouteId = routeId, PolledAt = cutoff.AddDays(-60), TravelDurationSeconds = 320, DistanceMetres = 5000 }
         });
 
         // 2 recent records (< 90 days)
@@ -48,15 +48,8 @@ public sealed class PruningJobTests
         // Assert — 3 old records deleted
         deleted.Should().Be(3, "3 records are older than 90 days");
 
-        // Reload bypassing global filter
-        List<PollRecord> allRecords = db.PollRecords.ToList();
-        allRecords.Count(r => r.IsDeleted).Should().Be(3);
-        allRecords.Count(r => !r.IsDeleted).Should().Be(2);
-
-        // Raw provider response nulled out on deleted records
-        allRecords.Where(r => r.IsDeleted)
-            .Should().AllSatisfy(r => r.RawProviderResponse.Should().BeNull(
-                "RawProviderResponse must be cleared on pruned records (FR-020)"));
+        // 2 recent records still present
+        db.PollRecords.Count().Should().Be(2);
     }
 
     [Fact]

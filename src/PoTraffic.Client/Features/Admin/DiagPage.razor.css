@@ -1,4 +1,0 @@
-/* DiagPage — scoped styles replacing inline `style="..."` attributes. */
-.pt-diag-subtitle { color: var(--pt-fg-tertiary); }
-.pt-diag-sensitive { color: var(--pt-fg-tertiary); font-style: italic; }
-.pt-diag-triple-test { max-width: 800px; }

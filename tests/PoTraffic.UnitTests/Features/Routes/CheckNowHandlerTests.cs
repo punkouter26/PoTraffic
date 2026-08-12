@@ -127,44 +127,6 @@ public sealed class CheckNowHandlerTests
     }
 
     [Fact]
-    public async Task CheckNow_WhenRouteIsTheDemoRoute_RefusesWithoutCallingTheProvider()
-    {
-        // Arrange — the sample route (#10): illustrative addresses, invented history
-        TableStorageContext db = TestDoubles.CreateDb();
-
-        RouteId routeId = RouteId.New();
-        UserId userId = UserId.New();
-
-        db.Add(new EntityRoute
-        {
-            Id = routeId,
-            UserId = userId,
-            OriginAddress = "A",
-            OriginCoordinates = "1.0,1.0",
-            DestinationAddress = "B",
-            DestinationCoordinates = "2.0,2.0",
-            Provider = (int)RouteProvider.GoogleMaps,
-            MonitoringStatus = (int)MonitoringStatus.Paused,
-            IsDemo = true,
-            CreatedAt = DateTimeOffset.UtcNow
-        });
-        await db.SaveChangesAsync();
-
-        ITrafficProvider mockProvider = Substitute.For<ITrafficProvider>();
-        var handler = new CheckNowCommandHandler(db, TestDoubles.ProviderFactory(mockProvider),
-            NullLogger<CheckNowCommandHandler>.Instance);
-
-        // Act
-        CheckNowResult result = await handler.Handle(new CheckNowCommand(routeId, userId), CancellationToken.None);
-
-        // Assert — refused before the billable call, not after
-        result.IsSuccess.Should().BeFalse();
-        result.ErrorCode.Should().Be(RouteErrorCodes.DemoRoute);
-        await mockProvider.DidNotReceive().GetTravelTimeAsync(
-            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
     public async Task CheckNow_WhenRouteBelongsToDifferentUser_ReturnsNotFoundError()
     {
         // Arrange

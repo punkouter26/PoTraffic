@@ -7,13 +7,18 @@
    have to scroll back to the top nav. The desktop top nav still owns
    branding + user chip per the L/C/R spatial contract.
 
-   The three links used to draw their icons three different ways: a "⌂" house
-   character, a "+" plus sign and one Material Symbols glyph. So the bar mixed
-   two typefaces and two optical weights across three items sitting 60px apart.
-   All three are Material Symbols now.
+   Previously: three hard-coded destinations (Commutes / Add / Account), and
+   the catch-all destinations (System status, Sign out) lived behind a hidden
+   avatar menu on mobile — a long thumb-reach to the top-right corner and a
+   tap-target change to dismiss it. They live in an action sheet now,
+   reachable from the rightmost "Account" pill on the bar, which mirrors the
+   desktop user-menu's options (plus Sign out) so the two surfaces agree on
+   what "Account" means. Two taps instead of one for the common paths, three
+   for the rare ones, never any thumb-reach.
 
-   NavLink rather than <a>: the bar had no active state at all, so the primary
-   navigation on a phone never showed you where you were. *@
+   NavLink rather than <a> for the active destinations: the bar had no active
+   state at all, so the primary navigation on a phone never showed you where
+   you were. *@
 <nav class="pt-bottom-nav" aria-label="Quick actions">
     <NavLink class="pt-bottom-nav-link" href="dashboard" Match="NavLinkMatch.All">
         <PtIcon Name="dashboard" Class="pt-bottom-nav-icon" />
@@ -24,8 +29,94 @@
             <PtIcon Name="add" />
         </span>
     </a>
-    <NavLink class="pt-bottom-nav-link" href="account/settings">
+    <button class="pt-bottom-nav-link" type="button" aria-haspopup="menu"
+            aria-expanded="@_sheetOpen" aria-label="Account menu"
+            @onclick="ToggleSheet" @onclick:stopPropagation="true">
         <PtIcon Name="account_circle" Class="pt-bottom-nav-icon" />
-        <span class="pt-bottom-nav-label">Account</span>
-    </NavLink>
+        <span class="pt-bottom-nav-label">@(IsAuthenticated ? "Account" : "Menu")</span>
+    </button>
 </nav>
+
+@if (_sheetOpen && IsAuthenticated)
+{
+    @* Same role/aria pattern as the desktop user dropdown — kept here so a
+       screen reader announcing the trigger button lands on a labelled menu. *@
+    <div class="pt-bottom-sheet" role="menu" aria-label="Account menu">
+        <a class="pt-bottom-sheet-item" href="/account/settings" role="menuitem" @onclick="CloseSheet">
+            <PtIcon Name="settings" Size="sm" />Account settings
+        </a>
+        <a class="pt-bottom-sheet-item" href="/health" role="menuitem" @onclick="CloseSheet">
+            <PtIcon Name="health_and_safety" Size="sm" />System status
+        </a>
+        <div class="pt-bottom-sheet-divider" role="separator"></div>
+        <button type="button" class="pt-bottom-sheet-item pt-bottom-sheet-danger" role="menuitem" @onclick="LogoutAsync">
+            <PtIcon Name="logout" Size="sm" />Sign out
+        </button>
+    </div>
+}
+else if (_sheetOpen)
+{
+    <div class="pt-bottom-sheet" role="menu" aria-label="Menu">
+        <a class="pt-bottom-sheet-item" href="/login" role="menuitem" @onclick="CloseSheet">
+            <PtIcon Name="login" Size="sm" />Sign in
+        </a>
+        <a class="pt-bottom-sheet-item" href="/health" role="menuitem" @onclick="CloseSheet">
+            <PtIcon Name="health_and_safety" Size="sm" />System status
+        </a>
+    </div>
+}
+
+@if (_sheetOpen)
+{
+    <div class="pt-overlay" @onclick="CloseSheet" aria-hidden="true"></div>
+}
+
+@code {
+    private bool _sheetOpen;
+    private bool IsAuthenticated { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        // The same auth state may surface through the auth provider's interface
+        // AND through its concrete CookieAuthenticationStateProvider event, so
+        // we subscribe to both — duplicate handlers de-duplicate themselves on
+        // the bool assignment.
+        AuthStateProvider.AuthenticationStateChanged += OnAuthChanged;
+        if (AuthStateProvider is CookieAuthenticationStateProvider cookie)
+            cookie.AuthenticationStateChanged += OnAuthChanged;
+
+        AuthenticationState state = await AuthStateProvider.GetAuthenticationStateAsync();
+        IsAuthenticated = state.User.Identity?.IsAuthenticated == true;
+    }
+
+    private void OnAuthChanged(Task<AuthenticationState> task)
+    {
+        _ = InvokeAsync(async () =>
+        {
+            AuthenticationState state = await task;
+            IsAuthenticated = state.User.Identity?.IsAuthenticated == true;
+            _sheetOpen = false;
+            StateHasChanged();
+        });
+    }
+
+    private void ToggleSheet() => _sheetOpen = !_sheetOpen;
+    private void CloseSheet() => _sheetOpen = false;
+
+    private async Task LogoutAsync()
+    {
+        _sheetOpen = false;
+        if (AuthStateProvider is CookieAuthenticationStateProvider cookie)
+            await cookie.LogoutAsync();
+        Nav.NavigateTo("/login", forceLoad: true);
+    }
+
+    [Inject] private NavigationManager Nav { get; set; } = default!;
+
+    public void Dispose()
+    {
+        AuthStateProvider.AuthenticationStateChanged -= OnAuthChanged;
+        if (AuthStateProvider is CookieAuthenticationStateProvider cookie)
+            cookie.AuthenticationStateChanged -= OnAuthChanged;
+    }
+}

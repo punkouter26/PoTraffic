@@ -146,6 +146,5 @@ public sealed class CreateRouteCommandHandler(
         r.JobChainId,
         r.CreatedAt,
         r.Windows.Select(w => w.ToDto()).ToList(),
-        r.ReturnRouteId,
-        r.IsDemo);
+        r.ReturnRouteId);
 }

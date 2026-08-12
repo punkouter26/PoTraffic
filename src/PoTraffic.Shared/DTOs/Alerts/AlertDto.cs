@@ -9,11 +9,3 @@ public sealed record AlertDto(
     int BaselineSeconds,
     DateTimeOffset CreatedAt,
     bool IsRead);
-
-/// <summary>Browser push subscription payload sent from the client after it subscribes.</summary>
-public sealed record PushSubscriptionRequest(
-    string Endpoint,
-    string P256dh,
-    string Auth);
-
-public sealed record VapidPublicKeyResponse(string PublicKey);

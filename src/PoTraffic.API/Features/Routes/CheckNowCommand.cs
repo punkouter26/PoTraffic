@@ -31,12 +31,6 @@ public sealed class CheckNowCommandHandler(
         if (route is null)
             return new CheckNowResult(false, null, null, RouteErrorCodes.NotFound);
 
-        // The sample route's history is synthetic (#10). Polling it live would bill a real
-        // provider call to illustrate a fiction, and drop a genuine sample into a series
-        // the UI labels as demo data.
-        if (route.IsDemo)
-            return new CheckNowResult(false, null, null, RouteErrorCodes.DemoRoute);
-
         ITrafficProvider provider = providerFactory.GetProvider((RouteProvider)route.Provider);
         TravelResult? travel = await provider.GetTravelTimeAsync(
             route.OriginCoordinates!, route.DestinationCoordinates!, ct);

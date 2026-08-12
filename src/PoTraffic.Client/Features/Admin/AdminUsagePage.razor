@@ -2,20 +2,16 @@
 @attribute [Authorize(Roles = "Administrator")]
 @inject HttpClient Http
 
-<PageTitle>Admin — Usage &amp; Volatility</PageTitle>
+<PageTitle>Admin</PageTitle>
 
-<PageHeader Title="Admin tools" Subtitle="Per-user consumption and fleet-wide travel-time volatility." />
+<PageHeader Title="Admin" Subtitle="User consumption, fleet-wide volatility, dependency health, and system configuration." />
 
 <RadzenCard class="pt-p-6">
     <RadzenTabs>
         <Tabs>
             <RadzenTabsItem Text="Usage Insights" Icon="people">
-                <RadzenText TextStyle="TextStyle.H6" class="pt-mb-2 pt-mt-3">Daily Usage</RadzenText>
+                <RadzenText TextStyle="TextStyle.H3" class="pt-mb-2 pt-mt-3 pt-section-heading">Daily Usage</RadzenText>
                 <LoadingErrorCard IsLoading="_loading" Error="@_error">
-                    @* Compact density and column resize/reorder/picking are all built in;
-                       the grid was running at defaults. AllowColumnPicking matters most on
-                       a narrow screen — five columns of user data do not fit a phone, and
-                       hiding two beats scrolling the table sideways. *@
                     <RadzenDataGrid Data="_users" TItem="UserDailyUsageDto"
                                     AllowSorting="true" AllowFiltering="true"
                                     AllowPaging="true" PageSize="25"
@@ -53,9 +49,6 @@
                 <LoadingErrorCard IsLoading="_volLoading" Error="@_volError">
                     @if (_points.Count == 0 && !_volLoading)
                     {
-                        @* The same empty-state shape the trend chart and the heatmap use,
-                           rather than an info alert — a chart with no data is an empty
-                           state, not a notification. *@
                         <div class="pt-empty-state pt-empty-state-inline">
                             <PtIcon Name="show_chart" Size="xl" Class="pt-empty-state-icon" />
                             <div class="pt-empty-state-title">No volatility data</div>
@@ -66,14 +59,6 @@
                     }
                     else
                     {
-                        @* Charts elsewhere in the app plot MINUTES — the card sparkline, the
-                           trend chart and the heatmap all do. This one plotted seconds on the
-                           axis while its own tooltip converted to minutes, so the axis and the
-                           tooltip disagreed by 60×. Minutes throughout now.
-
-                           Stroke colour is pinned to the app's series-A brand rather than
-                           Radzen's default palette, which is what made this the one chart in
-                           the app that wasn't blue. *@
                         <RadzenChart class="pt-admin-chart">
                             <RadzenLineSeries Data="_series" CategoryProperty="PolledAt"
                                               ValueProperty="Minutes" TItem="VolatilityPoint"
@@ -93,6 +78,74 @@
                             </RadzenValueAxis>
                         </RadzenChart>
                     }
+                </LoadingErrorCard>
+            </RadzenTabsItem>
+
+            <RadzenTabsItem Text="Connection Health" Icon="health_and_safety">
+                <RadzenText TextStyle="TextStyle.Subtitle2" class="pt-mt-3 pt-mb-2 pt-diag-subtitle">
+                    Live ping results for all external dependencies.
+                </RadzenText>
+                <LoadingErrorCard IsLoading="_healthLoading" Error="@_healthError">
+                    <RadzenDataGrid Data="_health" TItem="ConnectionHealthDto" AllowSorting="true"
+                                    Density="Density.Compact" AllowColumnResize="true"
+                                    EmptyText="No dependency results returned."
+                                    class="pt-mt-2">
+                        <Columns>
+                            <RadzenDataGridColumn TItem="ConnectionHealthDto" Property="Name" Title="Dependency" Width="11rem" />
+                            <RadzenDataGridColumn TItem="ConnectionHealthDto" Title="Status" Width="8rem" Sortable="false">
+                                <Template Context="h">
+                                    <RadzenBadge BadgeStyle="@(h.Status == "Healthy" ? BadgeStyle.Success : BadgeStyle.Danger)"
+                                                 Text="@h.Status" />
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="ConnectionHealthDto" Property="Description" Title="Description" MinWidth="14rem" />
+                            <RadzenDataGridColumn TItem="ConnectionHealthDto" Property="DurationMs" Title="ms" Width="6rem" FormatString="{0:F0}" />
+                        </Columns>
+                    </RadzenDataGrid>
+                </LoadingErrorCard>
+            </RadzenTabsItem>
+
+            <RadzenTabsItem Text="System Config" Icon="settings">
+                <RadzenText TextStyle="TextStyle.Subtitle2" class="pt-mt-3 pt-mb-4 pt-diag-subtitle">
+                    Sensitive values are masked. Values can be updated by administrators.
+                </RadzenText>
+                <LoadingErrorCard IsLoading="_cfgLoading" Error="@_cfgError">
+                    <RadzenDataGrid Data="_configs" TItem="SystemConfigDto" AllowSorting="true"
+                                    AllowFiltering="true" FilterMode="FilterMode.Simple"
+                                    FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                    Density="Density.Compact" AllowColumnResize="true"
+                                    AllowColumnPicking="true"
+                                    EmptyText="No configuration entries."
+                                    class="pt-mt-2">
+                        <Columns>
+                            <RadzenDataGridColumn TItem="SystemConfigDto" Property="Key" Title="Key" Width="14rem" />
+                            <RadzenDataGridColumn TItem="SystemConfigDto" Property="Value" Title="Value" Width="13rem">
+                                <Template Context="c">
+                                    @if (c.IsSensitive)
+                                    {
+                                        <span class="pt-diag-sensitive">@c.Value</span>
+                                    }
+                                    else
+                                    {
+                                        @c.Value
+                                    }
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="SystemConfigDto" Property="Description" Title="Description" />
+                            <RadzenDataGridColumn TItem="SystemConfigDto" Title="Sensitive" Width="90px">
+                                <Template Context="c">
+                                    @if (c.IsSensitive)
+                                    {
+                                        <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="Yes" />
+                                    }
+                                    else
+                                    {
+                                        <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="No" />
+                                    }
+                                </Template>
+                            </RadzenDataGridColumn>
+                        </Columns>
+                    </RadzenDataGrid>
                 </LoadingErrorCard>
             </RadzenTabsItem>
         </Tabs>
@@ -119,9 +172,19 @@
 
     private List<VolatilityPoint> _series = [];
 
+    // ── Connection Health tab ────────────────────────────────────────────────
+    private List<ConnectionHealthDto> _health = [];
+    private bool _healthLoading = true;
+    private string? _healthError;
+
+    // ── System Config tab ─────────────────────────────────────────────────────
+    private List<SystemConfigDto> _configs = [];
+    private bool _cfgLoading = true;
+    private string? _cfgError;
+
     protected override async Task OnInitializedAsync()
     {
-        await Task.WhenAll(LoadUsageAsync(), LoadVolatilityAsync());
+        await Task.WhenAll(LoadUsageAsync(), LoadVolatilityAsync(), LoadHealthAsync(), LoadConfigAsync());
     }
 
     private async Task LoadUsageAsync()
@@ -156,6 +219,38 @@
         finally
         {
             _volLoading = false;
+        }
+    }
+
+    private async Task LoadHealthAsync()
+    {
+        try
+        {
+            _health = await Http.GetFromJsonAsync("/api/admin/connection-health", AppJsonContext.Default.ListConnectionHealthDto) ?? [];
+        }
+        catch (Exception ex)
+        {
+            _healthError = $"Failed to load connection health: {ex.Message}";
+        }
+        finally
+        {
+            _healthLoading = false;
+        }
+    }
+
+    private async Task LoadConfigAsync()
+    {
+        try
+        {
+            _configs = await Http.GetFromJsonAsync("/api/admin/configuration", AppJsonContext.Default.ListSystemConfigDto) ?? [];
+        }
+        catch (Exception ex)
+        {
+            _cfgError = $"Failed to load configuration: {ex.Message}";
+        }
+        finally
+        {
+            _cfgLoading = false;
         }
     }
 }

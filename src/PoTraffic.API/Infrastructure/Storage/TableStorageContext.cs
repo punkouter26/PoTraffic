@@ -47,11 +47,8 @@ public sealed class TableStorageContext
         // Polls partition by route for efficient per-route reads and pruning.
         [typeof(PollRecord)] = new("PollRecords", e => ((PollRecord)e).RouteId.ToString(), e => ((PollRecord)e).Id.ToString(), c => c._polls),
         [typeof(SystemConfiguration)] = new("SystemConfigurations", _ => "main", e => ((SystemConfiguration)e).Key, c => c._configs),
-        [typeof(TripleTestSession)] = new("TripleTestSessions", _ => "main", e => ((TripleTestSession)e).Id.ToString(), c => c._tripleTestSessions),
-        [typeof(TripleTestShot)] = new("TripleTestShots", _ => "main", e => ((TripleTestShot)e).Id.ToString(), c => c._tripleTestShots),
-        // Alerts + push subscriptions partition by user for efficient per-user reads (#1).
+        // Alerts partition by user for efficient per-user reads.
         [typeof(Alert)] = new("Alerts", e => ((Alert)e).UserId.ToString(), e => ((Alert)e).Id.ToString(), c => c._alerts),
-        [typeof(UserPushSubscription)] = new("PushSubscriptions", e => ((UserPushSubscription)e).UserId.ToString(), e => ((UserPushSubscription)e).Id.ToString(), c => c._pushSubscriptions),
     };
 
     private static readonly JsonSerializerOptions JsonOpts = new(); // nav properties carry [JsonIgnore]
@@ -71,10 +68,7 @@ public sealed class TableStorageContext
     internal readonly List<MonitoringSession> _sessions = new();
     internal readonly List<PollRecord> _polls = new();
     internal readonly List<SystemConfiguration> _configs = new();
-    internal readonly List<TripleTestSession> _tripleTestSessions = new();
-    internal readonly List<TripleTestShot> _tripleTestShots = new();
     internal readonly List<Alert> _alerts = new();
-    internal readonly List<UserPushSubscription> _pushSubscriptions = new();
 
     private readonly object _gate = new();
     private readonly ITableStore? _store;
@@ -82,13 +76,6 @@ public sealed class TableStorageContext
     // Last-known ETag per tracked entity → drives optimistic-concurrency conditional writes (§5.5).
     private readonly Dictionary<object, string> _etags = new(ReferenceEqualityComparer.Instance);
     private readonly List<TableOp> _pendingDeletes = [];
-
-    // PollRecords are the unbounded, dominant table and carry a large RawProviderResponse
-    // blob. Re-serialising every one on every SaveChanges (to diff it) is the poll hot
-    // path's biggest cost. They are append-only after insert — the ONLY mutation of an
-    // existing PollRecord is the prune job — so we track changed ones explicitly and skip
-    // re-serialising the clean majority. Every other (small) table keeps the full diff.
-    private readonly HashSet<object> _dirtyPolls = new(ReferenceEqualityComparer.Instance);
 
     private bool _durable;
     private volatile bool _hydrated;
@@ -144,24 +131,9 @@ public sealed class TableStorageContext
         get { lock (_gate) return _configs.AsQueryable(); }
     }
 
-    public IQueryable<TripleTestSession> TripleTestSessions
-    {
-        get { lock (_gate) return _tripleTestSessions.AsQueryable(); }
-    }
-
-    public IQueryable<TripleTestShot> TripleTestShots
-    {
-        get { lock (_gate) return _tripleTestShots.AsQueryable(); }
-    }
-
     public IQueryable<Alert> Alerts
     {
         get { lock (_gate) return _alerts.AsQueryable(); }
-    }
-
-    public IQueryable<UserPushSubscription> PushSubscriptions
-    {
-        get { lock (_gate) return _pushSubscriptions.AsQueryable(); }
     }
 
     // ── Legacy aliases (post-refactor) ──────────────────────────────────────
@@ -229,8 +201,6 @@ public sealed class TableStorageContext
         lock (_gate)
         {
             GetList<T>().Add(entity);
-            if (entity is PollRecord)
-                _dirtyPolls.Add(entity);
         }
 
         // Cascade: add navigation collection children (replaces EF Core change tracking)
@@ -317,17 +287,6 @@ public sealed class TableStorageContext
         foreach (T entity in entities) Add(entity);
     }
 
-    /// <summary>
-    /// Announces a mutation to an <em>existing</em> <see cref="PollRecord"/> so the next
-    /// <see cref="SaveChangesAsync"/> persists it. Required because PollRecords use explicit
-    /// change tracking rather than the full-scan diff (see <c>_dirtyPolls</c>). Newly added
-    /// records are tracked automatically by <see cref="Add{T}"/>.
-    /// </summary>
-    public void MarkChanged(PollRecord record)
-    {
-        lock (_gate) _dirtyPolls.Add(record);
-    }
-
     public void Remove<T>(T entity) where T : class
     {
         lock (_gate) RemoveCore(entity);
@@ -348,7 +307,6 @@ public sealed class TableStorageContext
 
         _snapshots.Remove(entity);
         _etags.Remove(entity);
-        _dirtyPolls.Remove(entity);
         if (Maps.TryGetValue(typeof(T), out EntityMap? map))
             _pendingDeletes.Add(new TableOp(TableOpKind.Delete, map.Table, map.Pk(entity), map.Rk(entity), null));
     }
@@ -372,11 +330,7 @@ public sealed class TableStorageContext
         {
             foreach ((Type type, EntityMap map) in Maps)
             {
-                // PollRecord uses explicit change tracking — only serialise the ones that were
-                // added or announced via MarkChanged, not the entire (unbounded) table.
-                IEnumerable<object> candidates = type == typeof(PollRecord)
-                    ? _dirtyPolls
-                    : GetListUntyped(type).Cast<object>();
+                IEnumerable<object> candidates = GetListUntyped(type).Cast<object>();
 
                 foreach (object entity in candidates)
                 {
@@ -423,10 +377,6 @@ public sealed class TableStorageContext
             foreach ((object entity, string json) in written)
             {
                 _snapshots[entity] = json;
-                // Successfully persisted — clear its dirty flag so it isn't re-serialised
-                // next save. On failure we skip this block, so the flag survives and retries.
-                if (entity is PollRecord)
-                    _dirtyPolls.Remove(entity);
             }
             // Adopt refreshed ETags so the NEXT save issues a correctly-guarded conditional write.
             foreach (TableWriteResult r in results)
@@ -543,10 +493,6 @@ public sealed class TableStorageContext
             route.Sessions = [.. sessionsByRoute[route.Id]];
             route.PollRecords = [.. pollsByRoute[route.Id]];
         }
-
-        ILookup<TripleTestSessionId, TripleTestShot> shotsBySession = _tripleTestShots.ToLookup(s => s.SessionId);
-        foreach (TripleTestSession session in _tripleTestSessions)
-            session.Shots = [.. shotsBySession[session.Id]];
     }
 
     private IList GetListUntyped(Type type)

@@ -74,6 +74,18 @@
     min-width: 0;
 }
 
+/* On mobile the bottom-nav already covers Commutes / Add / Account —
+   rendering the same destinations again in the top bar crowds the header
+   into two collapsible icons and one avatar pill with no useful order.
+   Hide the centre row entirely below 640px; the right-hand user chip
+   remains because Sign out has no other home on phone.
+   Account settings is reached from the bottom-nav action sheet. */
+@media (max-width: 640px) {
+    .app-shell-actions {
+        display: none;
+    }
+}
+
 .app-shell-user {
     display: flex;
     align-items: center;
@@ -170,35 +182,6 @@
     padding: var(--pt-space-2) 0;
     overflow: hidden;
     animation: pt-slide-down var(--pt-dur-fast) var(--pt-ease-out);
-}
-
-/* Enhanced: CSS anchor positioning tethers the menu to the chip itself rather
-   than to the header box, so it is no longer trapped by the header's stacking
-   context or clipped by its bounds. `position-try-fallbacks` is the part worth
-   having — on a narrow phone the right-aligned menu used to run off the edge of
-   the viewport, and the browser now flips it inline-start on its own instead of
-   us writing a media query that guesses where the chip is.
-
-   Everything here is inside @supports, so a browser without anchor positioning
-   keeps the absolute positioning above unchanged. */
-@supports (anchor-name: --pt-user-chip) {
-    .pt-user-chip-btn {
-        anchor-name: --pt-user-chip;
-    }
-
-    .pt-user-dropdown {
-        position: fixed;
-        top: unset;
-        right: unset;
-        position-anchor: --pt-user-chip;
-        position-area: block-end span-inline-start;
-        margin-block-start: var(--pt-space-2);
-        position-try-fallbacks: block-end span-inline-end, block-end;
-        /* min-width beats max-width in CSS, so the 16rem floor from the base rule
-           would win over a viewport cap and overflow anyway. Clamped here instead. */
-        min-inline-size: min(16rem, calc(100vw - var(--pt-space-6)));
-        max-inline-size: calc(100vw - var(--pt-space-6));
-    }
 }
 
 .pt-user-dropdown-header {

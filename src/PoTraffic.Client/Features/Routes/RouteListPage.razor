@@ -1,8 +1,0 @@
-@* C1/UX-6: /routes merged into Dashboard. This page redirects for backwards compatibility. *@
-@page "/routes"
-@inject NavigationManager Nav
-
-@code {
-    protected override void OnInitialized() =>
-        Nav.NavigateTo("/dashboard", replace: true);
-}

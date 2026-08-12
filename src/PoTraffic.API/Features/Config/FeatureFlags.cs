@@ -12,11 +12,10 @@ namespace PoTraffic.API.Features.Config;
 /// on mocks while telling the client it was live.
 /// </para>
 /// </summary>
-public sealed record FeatureFlags(bool UseMockProviders, bool TripleTestEnabled)
+public sealed record FeatureFlags(bool UseMockProviders)
 {
     /// <summary>Evaluates the flags from configuration and the host environment.</summary>
     public static FeatureFlags Resolve(IConfiguration configuration, IHostEnvironment environment) => new(
         UseMockProviders: environment.IsEnvironment("Testing")
-            || configuration.GetValue<bool>("Features:UseMockProviders"),
-        TripleTestEnabled: configuration.GetValue<bool>("Features:TripleTestEnabled", true));
+            || configuration.GetValue<bool>("Features:UseMockProviders"));
 }

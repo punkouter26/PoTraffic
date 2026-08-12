@@ -27,7 +27,7 @@ public sealed class GetPollCostSummaryHandler : IRequestHandler<GetPollCostSumma
         DateTimeOffset dayEnd = dayStart.AddDays(1);
 
         var polls = _db.Polls
-            .Where(p => p.PolledAt >= dayStart && p.PolledAt < dayEnd && !p.IsDeleted)
+            .Where(p => p.PolledAt >= dayStart && p.PolledAt < dayEnd)
             .ToList();
         var routesById = _db.Routes.ToDictionary(r => r.Id);
 

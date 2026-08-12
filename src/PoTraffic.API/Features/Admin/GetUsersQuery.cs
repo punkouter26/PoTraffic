@@ -32,7 +32,7 @@ public sealed class GetUsersHandler : IRequestHandler<GetUsersQuery, IReadOnlyLi
 
         // Load today's poll records across all routes
         Dictionary<RouteId, List<PollRecord>> pollsByRoute = _db.PollRecords
-            .Where(p => p.PolledAt >= dayStart && p.PolledAt < dayEnd && !p.IsDeleted)
+            .Where(p => p.PolledAt >= dayStart && p.PolledAt < dayEnd)
             .GroupBy(p => p.RouteId)
             .ToDictionary(g => g.Key, g => g.ToList());
 

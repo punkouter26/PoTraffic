@@ -7,6 +7,7 @@
 @inherits PollingComponentBase
 @inject HttpClient Http
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 
 @* ──────────────────────────────────────────────────────────────────────
    Route detail — the answer, the evidence, and everything else folded away.
@@ -65,18 +66,6 @@ else
     else
     {
 
-    @if (_route.IsDemo)
-    {
-        <div class="pt-demo-banner pt-mb-4 pt-enter" role="note">
-            <span class="pt-demo-banner-tag">SAMPLE DATA</span>
-            <span class="pt-demo-banner-text">
-                Every number below was generated. Add your own route to collect real samples.
-            </span>
-            <RadzenButton Text="Add a real route" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small"
-                          Click="@(() => Nav.NavigateTo("/routes/create"))" />
-        </div>
-    }
-
     @* ── THE ANSWER ────────────────────────────────────────────────────
        Route name, when to leave, how long, how live the number is. Nothing
        else competes for this space. *@
@@ -102,9 +91,7 @@ else
             <div class="pt-answer-duration">@_pendingDetail</div>
         }
 
-        @{
-            NextSampleInfo next = NextSample;
-        }
+        @{ NextSampleInfo next = NextSample; }
         <div class="pt-answer-live">
             <span class="pt-status-dot @(next.Live ? "pt-status-dot-green" : "pt-status-dot-amber")"></span>
             @if (next.CountdownTargetUtc is { } target)
@@ -114,6 +101,18 @@ else
                                PeriodHint="@TimeSpan.FromMinutes(_activeSession?.Schedule?.PollIntervalMinutes ?? 5)"
                                DueText="moments" />
             }
+            else if (_activeSession is null)
+            {
+                @* Paused route — surface the Settings disclosure directly. The page
+                   otherwise buries the Start Monitoring button behind a chevron and
+                   two-thirds of the page; this turns the sentence into the action it
+                   describes. *@
+                <button type="button" class="pt-callout-action"
+                        @onclick="ExpandAndScrollToSettings">
+                    @next.Detail
+                    <PtIcon Name="arrow_downward" Size="sm" Class="pt-callout-action-icon" />
+                </button>
+            }
             else
             {
                 @next.Detail
@@ -122,59 +121,16 @@ else
     </section>
 
     @* ── THE EVIDENCE ──────────────────────────────────────────────────
-       Today's samples against the baseline, and the week at a glance. The
-       departure scrubber and the weekday bar chart were removed: all three
-       read the same baseline, and the grid says what both of them said. *@
+       Today's samples against the baseline, and the week at a glance. *@
     <RadzenCard class="pt-mb-4">
-        <div class="pt-evidence-head">
-            <RadzenText TextStyle="TextStyle.H6" class="pt-mb-0">Today</RadzenText>
-            @if (_comparableRoutes.Count > 0)
-            {
-                @* Comparison folded in from the standalone /compare page: it is a
-                   second line on this chart, not a destination of its own.
-
-                   A bare <select> here was the only native form control left in the
-                   app — a different height, border and focus ring from every Radzen
-                   input beside it, and on a phone it opened the OS picker wheel while
-                   the identical control in Settings opened a styled list. AllowClear
-                   also gives back the "stop comparing" path that the placeholder
-                   <option value=""> was standing in for. *@
-                <RadzenDropDown Data="@_compareOptions" TValue="string"
-                                Value="@_compareRouteId"
-                                Change="@OnCompareChanged"
-                                ValueProperty="Id" TextProperty="Label"
-                                AllowClear="true" AllowFiltering="true"
-                                FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
-                                Placeholder="Compare with…"
-                                class="pt-compare-select"
-                                aria-label="Compare with another route" />
-            }
-        </div>
-
-        @if (_compareLabel is not null)
-        {
-            <div class="pt-compare-legend">
-                <span class="pt-compare-legend-item">
-                    <span class="pt-compare-key pt-compare-key-a" aria-hidden="true"></span>@_thisLabel
-                </span>
-                <span class="pt-compare-legend-item">
-                    <span class="pt-compare-key pt-compare-key-b" aria-hidden="true"></span>@_compareLabel
-                </span>
-                @if (_compareVerdict is not null)
-                {
-                    <span class="pt-compare-verdict-inline">@_compareVerdict</span>
-                }
-            </div>
-        }
+        <RadzenText TextStyle="TextStyle.H3" class="pt-mb-0 pt-section-heading">Today</RadzenText>
 
         <TrendChart Points="@_trendPoints"
                     Baseline="@_trendBaseline"
                     UpperBand="@_trendUpperBand"
-                    ComparePoints="@_comparePoints"
                     ReroutedFlags="@_trendRerouted"
                     Labels="@_trendLabels"
                     SeriesName="@_thisLabel"
-                    CompareSeriesName="@(_compareLabel ?? "Other route")"
                     OnPointSelected="OnTrendPointSelected" />
 
         @if (_selectedPoll is { } selected)
@@ -198,42 +154,38 @@ else
     </RadzenCard>
 
     <RadzenCard class="pt-mb-4">
-        <RadzenText TextStyle="TextStyle.H6" class="pt-mb-1">Your week, hour by hour</RadzenText>
+        <RadzenText TextStyle="TextStyle.H3" class="pt-mb-1 pt-section-heading">Your week, hour by hour</RadzenText>
         <VolatilityHeatmap Heatmap="_heatmap" />
     </RadzenCard>
 
     @* ── EVERYTHING ELSE ───────────────────────────────────────────────
        Schedule, return trip and raw records. Real controls, rarely needed,
        behind one disclosure instead of three cards. *@
-    <details class="pt-details">
+    <details open="@_detailsOpen" class="pt-details" id="pt-route-details">
         <summary class="pt-details-summary">
             <PtIcon Name="chevron_right" Class="pt-collapsible-icon" />
             Settings &amp; raw data
         </summary>
 
         <div class="pt-details-body">
-            @if (!_route.IsDemo)
-            {
-                <div class="pt-returntrip-bar pt-mb-4">
-                    @if (_route.ReturnRouteId is RouteId rid)
-                    {
-                        <span class="pt-returntrip-label">Return trip linked</span>
-                        <RadzenButton Text="View return trip" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small"
-                                      Click="@(() => Nav.NavigateTo($"/routes/{rid}"))" />
-                    }
-                    else
-                    {
-                        <span class="pt-returntrip-label">Also track the trip home?</span>
-                        <RadzenButton Text="Track return trip" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small"
-                                      Click="CreateReturnTripAsync" IsBusy="_creatingReturn" />
-                    }
-                </div>
+            <div class="pt-returntrip-bar pt-mb-4">
+                @if (_route.ReturnRouteId is RouteId rid)
+                {
+                    <span class="pt-returntrip-label">Return trip linked</span>
+                    <RadzenButton Text="View return trip" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small"
+                                  Click="@(() => Nav.NavigateTo($"/routes/{rid}"))" />
+                }
+                else
+                {
+                    <span class="pt-returntrip-label">Also track the trip home?</span>
+                    <RadzenButton Text="Track return trip" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small"
+                                  Click="CreateReturnTripAsync" IsBusy="_creatingReturn" />
+                }
+            </div>
 
-                <WindowConfigPanel RouteId="RouteId" OnSaved="OnWindowSaved" />
-            }
+            <WindowConfigPanel RouteId="RouteId" OnSaved="OnWindowSaved" />
 
-            <PollHistoryTable Polls="_pollsNewestFirst" />
-        </div>
+            </div>
     </details>
 
     }
@@ -244,15 +196,12 @@ else
 
     /// <summary>
     /// Oldest first. Every chart series is built by position from this list, so its order
-    /// IS the x-axis; the raw table gets <see cref="_pollsNewestFirst"/> instead, which is
-    /// how a log wants to read.
+    /// IS the x-axis.
     /// </summary>
     private List<PollRecordDto> _todayPolls = [];
-    private List<PollRecordDto> _pollsNewestFirst = [];
     private double[] _trendPoints = [];
     private double[] _trendBaseline = [];
     private double[] _trendUpperBand = [];
-    private double[] _comparePoints = [];
     private bool[] _trendRerouted = [];
     private string[] _trendLabels = [];
     private PollRecordDto? _selectedPoll;
@@ -272,21 +221,7 @@ else
     private string _confidenceNote = string.Empty;
     private string _pendingDetail = string.Empty;
     private string _thisLabel = "This route";
-
-    // Comparison, folded in from the standalone /compare page.
-    private List<RouteDto> _comparableRoutes = [];
-    private string _compareRouteId = string.Empty;
-    private string? _compareLabel;
-    private string? _compareVerdict;
-
-    /// <summary>
-    /// What the picker binds to. RadzenDropDown reads a value and a text member off each
-    /// item, and RouteDto exposes neither a string id nor a display label — projecting
-    /// once here beats a Template that would re-run per item per render.
-    /// </summary>
-    private sealed record CompareOption(string Id, string Label);
-
-    private List<CompareOption> _compareOptions = [];
+    private bool _detailsOpen;
 
     /// <summary>Heading for the page. Falls back until the route lands.</summary>
     private string _pageTitle = "Route";
@@ -321,7 +256,11 @@ else
         get
         {
             if (_activeSession is not { State: SessionState.Active } session)
-                return new NextSampleInfo("Not monitoring — start it in Settings below", Live: false);
+                // The callout that surfaces this string on the page is itself a button
+            // that scrolls to and expands the disclosure below — see pt-callout-action.
+            // Kept as a sentence (not "Click here") because the affordance is also
+            // visible at the foot of the page.
+            return new NextSampleInfo("Not monitoring — start it in Settings below", Live: false);
 
             if (session.Schedule is not { } schedule)
                 return new NextSampleInfo("No polling days scheduled", Live: false);
@@ -386,104 +325,6 @@ else
         finally { _creatingReturn = false; }
     }
 
-    /// <summary>
-    /// Overlays another route's baseline on today's chart. Replaces the standalone
-    /// /compare page: the question is "is the other way faster than this one", which
-    /// belongs on the chart already showing this one.
-    /// </summary>
-    private async Task OnCompareChanged(object? value)
-    {
-        // AllowClear hands back null rather than "" — both mean "stop comparing".
-        _compareRouteId = value?.ToString() ?? string.Empty;
-        _comparePoints = [];
-        _compareLabel = null;
-        _compareVerdict = null;
-
-        // Guid.TryParse, not RouteId.TryParse — the page's own RouteId parameter
-        // shadows the identifier type inside this component.
-        if (!Guid.TryParse(_compareRouteId, out Guid otherId))
-            return;
-
-        RouteDto? other = _comparableRoutes.FirstOrDefault(r => r.Id.Value == otherId);
-        if (other is null)
-            return;
-
-        try
-        {
-            string dayOfWeek = DateTime.Today.DayOfWeek.ToString();
-            BaselineResponse? otherBaseline = await Http.GetFromJsonAsync(
-                $"/api/routes/{otherId}/baseline?dayOfWeek={dayOfWeek}",
-                AppJsonContext.Default.BaselineResponse);
-
-            if (otherBaseline is null || otherBaseline.Slots.Count == 0)
-                return;
-
-            _compareLabel = RouteLabel(other);
-            BuildComparison(otherBaseline);
-        }
-        catch
-        {
-            // A failed comparison just leaves the chart as it was.
-            _compareLabel = null;
-        }
-    }
-
-    /// <summary>
-    /// Projects the other route's baseline onto the same x-positions as today's samples,
-    /// by matching each sample's 15-minute slot. Slots the other route has never sampled
-    /// are left at its own mean rather than invented, and the verdict says how much of
-    /// the window actually overlapped.
-    /// </summary>
-    private void BuildComparison(BaselineResponse other)
-    {
-        Dictionary<int, double> otherSlots = other.Slots
-            .GroupBy(s => s.TimeSlotBucket)
-            .ToDictionary(g => g.Key, g => g.Last().MeanDurationSeconds);
-
-        if (otherSlots.Count == 0 || _todayPolls.Count == 0)
-            return;
-
-        double[] projected = new double[_todayPolls.Count];
-        int matched = 0;
-        double otherSum = 0, thisSum = 0;
-
-        for (int i = 0; i < _todayPolls.Count; i++)
-        {
-            DateTimeOffset at = _todayPolls[i].PolledAtDateTime;
-            int bucket = (at.Hour * 4) + (at.Minute / 15);
-
-            if (otherSlots.TryGetValue(bucket, out double seconds))
-            {
-                projected[i] = seconds / 60.0;
-                matched++;
-                otherSum += seconds / 60.0;
-                thisSum += _todayPolls[i].TravelDurationSeconds / 60.0;
-            }
-            else
-            {
-                // No sample from the other route at this time of day. Carry the previous
-                // value so the line stays continuous rather than dropping to zero.
-                projected[i] = i > 0 ? projected[i - 1] : otherSlots.Values.Average() / 60.0;
-            }
-        }
-
-        _comparePoints = projected;
-
-        if (matched == 0)
-        {
-            _compareVerdict = "no overlapping times of day yet";
-            return;
-        }
-
-        double thisMean = thisSum / matched;
-        double otherMean = otherSum / matched;
-        double gap = Math.Abs(thisMean - otherMean);
-
-        _compareVerdict = gap < 1
-            ? "within a minute of each other"
-            : $"{(thisMean < otherMean ? _thisLabel : _compareLabel)} faster by ~{gap:F0} min";
-    }
-
     protected override async Task LoadDataAsync()
     {
         // Failures propagate deliberately: PollingComponentBase turns them into backoff
@@ -514,20 +355,16 @@ else
             ? Http.GetFromJsonAsync($"/api/routes/{RouteId}/heatmap", AppJsonContext.Default.VolatilityHeatmapDto)
             : Task.FromResult(_heatmap);
 
-        // The comparison picker needs the user's other routes. Fetched once — the list
-        // barely changes and this page refreshes every 15 seconds.
-        Task<PagedResult<RouteDto>?> routesTask = _comparableRoutes.Count == 0
-            ? Http.GetFromJsonAsync("/api/routes?page=1&pageSize=100", AppJsonContext.Default.PagedResultRouteDto)
-            : Task.FromResult<PagedResult<RouteDto>?>(null);
-
-        await Task.WhenAll(routeTask, sessionsTask, historyTask, baselineTask, optimalTask,
-                           heatmapTask, routesTask);
+        await Task.WhenAll(routeTask, sessionsTask, historyTask, baselineTask, optimalTask, heatmapTask);
 
         _route = await routeTask;
         if (_route is not null)
         {
-            _originStreet = _route.OriginAddress.Split(',')[0].Trim();
-            _destStreet = _route.DestinationAddress.Split(',')[0].Trim();
+            // See RouteCard.razor — title-case at the read site so the dashboard
+            // list and this header always render the same casing for the same
+            // street, regardless of how the address was first entered.
+            _originStreet = TextFormatting.ToTitleCase(_route.OriginAddress.Split(',')[0]);
+            _destStreet = TextFormatting.ToTitleCase(_route.DestinationAddress.Split(',')[0]);
             _thisLabel = _originStreet;
             _pageTitle = $"{_originStreet} → {_destStreet}";
         }
@@ -540,12 +377,10 @@ else
         PagedResult<PollRecordDto>? historyResult = await historyTask;
         if (historyResult is not null)
         {
-            // Newest-first off the wire, which is right for the raw table and wrong for
-            // everything plotted: the trend line drew today in reverse, so its x-axis ran
-            // 08:45 → 08:00 → 18:30. Sorted once here rather than at each of the four
-            // projections below, all of which are positional.
+            // Newest-first off the wire is wrong for everything plotted: the trend line
+            // drew today in reverse, so its x-axis ran 08:45 → 08:00 → 18:30. Sorted once
+            // here rather than at each of the projections below, all of which are positional.
             _todayPolls = [.. historyResult.Items.OrderBy(p => p.PolledAtDateTime)];
-            _pollsNewestFirst = [.. Enumerable.Reverse(_todayPolls)];
             LatestPoll = _todayPolls.Count > 0 ? _todayPolls[^1] : null;
             _trendPoints = [.. _todayPolls.Select(p => p.TravelDurationSeconds / 60.0)];
             _trendRerouted = [.. _todayPolls.Select(p => p.IsRerouted)];
@@ -573,14 +408,28 @@ else
         _heatmap = await heatmapTask;
         if (refreshHeatmap)
             _heatmapFetchedAt = DateTimeOffset.UtcNow;
+    }
 
-        PagedResult<RouteDto>? routes = await routesTask;
-        if (routes is not null)
+    /// <summary>
+    /// Opens the disclosure that holds the schedule control and smooth-scrolls it into
+    /// view. Used by the "Not monitoring — start it in Settings below" callout so the
+    /// action it describes lives where the text is, not two screens down.
+    /// </summary>
+    private async Task ExpandAndScrollToSettings()
+    {
+        _detailsOpen = true;
+        StateHasChanged();
+        await Task.Yield();
+        // Re-render so the freshly-open <details> renders before we measure.
+        try
         {
-            _comparableRoutes = [.. routes.Items.Where(r => r.Id.Value != RouteId)];
-            _compareOptions = [.. _comparableRoutes.Select(
-                r => new CompareOption(r.Id.Value.ToString(), RouteLabel(r)))];
+            // Lazy-import via the dynamic-import JS API rather than maintaining
+            // a separate <script> tag in index.html — keeps the module count
+            // bounded by what the app actually uses.
+            await using IJSObjectReference module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/pt-scroll.js");
+            await module.InvokeVoidAsync("ptScrollIntoView", "pt-route-details");
         }
+        catch { /* no-op if JS not available */ }
     }
 
     /// <summary>

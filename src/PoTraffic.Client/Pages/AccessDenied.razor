@@ -1,13 +1,12 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @inject NavigationManager Nav
 
+<PageTitle>Access denied — PoTraffic</PageTitle>
+
 <div class="pt-access-denied">
     <PtIcon Name="lock" Size="xl" Class="pt-access-denied-icon" />
-    <h1>Access denied</h1>
-    <p>
-        You're signed in as <strong>@_label</strong>, but this page requires
-        elevated permissions your account doesn't have.
-    </p>
+    <PageHeader Title="Access denied"
+                Subtitle="@($"You're signed in as {_label}, but this page requires elevated permissions your account doesn't have.")" />
     <RadzenButton Text="Back to dashboard" ButtonStyle="ButtonStyle.Primary"
                   Click="@(() => Nav.NavigateTo("/dashboard"))" />
 </div>

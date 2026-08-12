@@ -45,52 +45,6 @@ public static class AlertsEndpoints
             return Results.NoContent();
         });
 
-        RouteGroupBuilder push = app.MapGroup("/api/push")
-            .RequireAuthorization("ProductionMicrosoftAuth").WithTags("Push");
-
-        push.MapGet("vapid-public-key", (VapidKeyProvider vapid) =>
-            Results.Ok(new VapidPublicKeyResponse(vapid.PublicKey)));
-
-        push.MapPost("subscribe", async (
-            HttpContext ctx, TableStorageContext db, [FromBody] PushSubscriptionRequest req) =>
-        {
-            UserId userId = ctx.User.GetUserId();
-            UserPushSubscription? existing = db.PushSubscriptions
-                .FirstOrDefault(s => s.UserId == userId && s.Endpoint == req.Endpoint);
-            if (existing is not null)
-            {
-                existing.P256dh = req.P256dh;
-                existing.Auth = req.Auth;
-            }
-            else
-            {
-                db.Add(new UserPushSubscription
-                {
-                    Id = PushSubscriptionId.New(),
-                    UserId = userId,
-                    Endpoint = req.Endpoint,
-                    P256dh = req.P256dh,
-                    Auth = req.Auth,
-                    CreatedAt = DateTimeOffset.UtcNow,
-                });
-            }
-            await db.SaveChangesAsync();
-            return Results.NoContent();
-        });
-
-        push.MapPost("unsubscribe", async (
-            HttpContext ctx, TableStorageContext db, [FromBody] PushSubscriptionRequest req) =>
-        {
-            UserId userId = ctx.User.GetUserId();
-            foreach (UserPushSubscription s in db.PushSubscriptions
-                .Where(s => s.UserId == userId && s.Endpoint == req.Endpoint).ToList())
-            {
-                db.Remove(s);
-            }
-            await db.SaveChangesAsync();
-            return Results.NoContent();
-        });
-
         return app;
     }
 }

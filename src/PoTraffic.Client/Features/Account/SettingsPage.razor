@@ -4,19 +4,19 @@
 @inject HttpClient Http
 @inject NavigationManager Nav
 @inject IJSRuntime JS
-@inject DialogService DialogService
 @inject NotificationService NotificationService
 
 <PageTitle>Account Settings</PageTitle>
 
 <PageHeader Title="Account settings"
-            Subtitle="Profile, appearance, and what this account is costing." />
+            Subtitle="Profile, appearance, and what this account is costing."
+            BackHref="/dashboard" BackLabel="Commutes" />
 
 <RadzenCard class="pt-p-6">
     @* Four tabs held about six controls between them, which cost a click and hid
        two thirds of the page to save no scrolling. They are sections now. *@
     <section class="pt-settings-section">
-        <RadzenText TextStyle="TextStyle.H6" class="pt-mb-2">Profile</RadzenText>
+        <RadzenText TextStyle="TextStyle.H3" class="pt-mb-2 pt-section-heading">Profile</RadzenText>
                 @if (_loading)
                 {
                     <div class="pt-skeleton-stack pt-mt-4">
@@ -62,6 +62,14 @@
                             <div>
                                 <RadzenButton ButtonType="ButtonType.Submit" Text="Save"
                                               ButtonStyle="ButtonStyle.Primary" IsBusy="@_saving" />
+                                @* Discard unsaved locale change. Disabled when nothing has changed
+                                   so the affordance only appears when it would actually undo
+                                   something — a Cancel that's always live teaches users it doesn't
+                                   cancel anything. *@
+                                <RadzenButton ButtonType="ButtonType.Button" Text="Cancel"
+                                              ButtonStyle="ButtonStyle.Light" class="pt-ml-2"
+                                              Disabled="@(!_formDirty)"
+                                              Click="@DiscardProfileChanges" />
                             </div>
 
                             @if (_profileSaved)
@@ -80,7 +88,7 @@
     </section>
 
     <section class="pt-settings-section">
-        <RadzenText TextStyle="TextStyle.H6" class="pt-mb-2">Appearance</RadzenText>
+        <RadzenText TextStyle="TextStyle.H3" class="pt-mb-2 pt-section-heading">Appearance</RadzenText>
                 <RadzenStack Gap="1.5rem" class="pt-mt-4">
                     @* Both pickers were hand-rolled <button role="radio"> grids with their
                        own aria-checked plumbing and their own emoji glyphs — a segmented
@@ -143,7 +151,7 @@
     </section>
 
     <section class="pt-settings-section">
-        <RadzenText TextStyle="TextStyle.H6" class="pt-mb-2">Monitoring limits &amp; cost</RadzenText>
+        <RadzenText TextStyle="TextStyle.H3" class="pt-mb-2 pt-section-heading">Monitoring limits &amp; cost</RadzenText>
                 @if (_loading)
                 {
                     <div class="pt-skeleton-stack pt-mt-4">
@@ -160,10 +168,15 @@
                        when they actually want to know. *@
                     <RadzenStack Gap="1rem" class="pt-mt-4">
                         <RadzenText>
-                            Used today: @_quota.UsedToday of @_quota.DailyLimit monitoring sessions
+                            Used today: <strong>@_quota.UsedToday of @_quota.DailyLimit</strong> monitoring sessions
+                            (@QuotaPercent.ToString("F0")%)
                         </RadzenText>
-                        <RadzenProgressBar Value="@QuotaPercent" ShowValue="true"
-                                           ProgressBarStyle="@QuotaStyle" />
+                        @* ShowValue="false" because the line above already prints the
+                           percentage — Radzen's overlay text was drawing a second "20%"
+                           on top of the bar that doubled the same number. *@
+                        <RadzenProgressBar Value="@QuotaPercent" ShowValue="false"
+                                           ProgressBarStyle="@QuotaStyle"
+                                           aria-label="Daily quota used" />
                         <RadzenText class="pt-settings-meta">
                             Resets at @_quota.ResetsAtUtc.ToString("HH:mm") UTC.
                             @if (_quota.PollsToday > 0)
@@ -180,14 +193,42 @@
     </section>
 
     <section class="pt-settings-section pt-settings-danger">
-        <RadzenText TextStyle="TextStyle.H6" class="pt-mb-2">Delete account</RadzenText>
+        <RadzenText TextStyle="TextStyle.H3" class="pt-mb-2 pt-section-heading">Delete account</RadzenText>
                 <RadzenStack Gap="1rem" class="pt-mt-4">
                     <RadzenAlert AlertStyle="AlertStyle.Danger" AllowClose="false"
                                  Text="Deleting your account is permanent and cannot be undone. All your routes, history, and data will be removed (GDPR Art. 17)." />
-                    <div>
-                        <RadzenButton Text="Delete My Account" ButtonStyle="ButtonStyle.Danger"
-                                      Click="@ConfirmDeleteAsync" IsBusy="@_deleting" />
-                    </div>
+
+                    @* Two-stage destructive: the first tap reveals a typed-confirmation
+                       input + a "Confirm delete" button. The dialog kept being closed by
+                       accident in user tests; this keeps the affordance on the page, in
+                       the same scrolling position, and lets us add the typed-confirmation
+                       guard before the second tap reaches the API. *@
+                    @if (!_confirmDeleteArmed)
+                    {
+                        <div>
+                            <RadzenButton Text="Delete My Account" ButtonStyle="ButtonStyle.Danger"
+                                          Click="@ArmDeleteConfirmation" />
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="pt-confirm-delete">
+                            <RadzenText TextStyle="TextStyle.Caption" class="pt-mb-1">
+                                Type <strong>DELETE</strong> to confirm.
+                            </RadzenText>
+                            <RadzenTextBox @bind-Value="_confirmDeletePhrase" class="pt-w-100 pt-mb-2"
+                                           Placeholder="DELETE" autocomplete="off" />
+                            <div>
+                                <RadzenButton Text="Confirm delete" ButtonStyle="ButtonStyle.Danger"
+                                              Disabled="@(_confirmDeletePhrase != "DELETE" || _deleting)"
+                                              IsBusy="@_deleting"
+                                              Click="@ConfirmDeleteAsync" />
+                                <RadzenButton Text="Keep my account" ButtonStyle="ButtonStyle.Light"
+                                              class="pt-ml-2"
+                                              Click="@DisarmDeleteConfirmation" />
+                            </div>
+                        </div>
+                    }
                 </RadzenStack>
     </section>
 </RadzenCard>
@@ -210,6 +251,17 @@
     private bool _deleting;
     private bool _profileSaved;
     private string? _profileError;
+    private string _originalLocale = string.Empty;
+    private bool _confirmDeleteArmed;
+    private string _confirmDeletePhrase = string.Empty;
+
+    /// <summary>
+    /// True when the bound locale differs from what the profile was loaded with.
+    /// Cancel is gated on this so the button only appears when it would
+    /// actually undo something — a permanently-enabled Cancel teaches users that
+    /// "Cancel" cancels nothing.
+    /// </summary>
+    private bool _formDirty => _form.Locale != _originalLocale;
 
     private string _theme = "system";
     private string _density = "normal";
@@ -234,9 +286,31 @@
             _profile = await Http.GetFromJsonAsync("/api/account/profile", AppJsonContext.Default.ProfileDto);
             _quota = await Http.GetFromJsonAsync("/api/account/quota", AppJsonContext.Default.QuotaDto);
             _form.Locale = _profile?.Locale ?? string.Empty;
+            _originalLocale = _form.Locale;
         }
         catch { /* handled by null guards */ }
         finally { _loading = false; }
+    }
+
+    /// <summary>Reverts unsaved locale edits back to the server-known value.</summary>
+    private void DiscardProfileChanges()
+    {
+        _form.Locale = _originalLocale;
+        _profileError = null;
+    }
+
+    /// <summary>Reveals the typed-confirmation guard before allowing delete.</summary>
+    private void ArmDeleteConfirmation()
+    {
+        _confirmDeleteArmed = true;
+        _confirmDeletePhrase = string.Empty;
+    }
+
+    /// <summary>Closes the typed-confirmation guard without deleting.</summary>
+    private void DisarmDeleteConfirmation()
+    {
+        _confirmDeleteArmed = false;
+        _confirmDeletePhrase = string.Empty;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -311,18 +385,14 @@
     }
 
     /// <summary>
-    /// FR-031: confirm before irreversible deletion. This previously read
-    /// `await Task.FromResult(true)` — the dialog was never shown and the button
-    /// deleted the account on the first click.
+    /// FR-031: confirm before irreversible deletion. The typed-confirmation
+    /// guard (see <see cref="ArmDeleteConfirmation"/>) sits between this and the
+    /// destructive button so the API only sees a request after the user has
+    /// both opted in twice and typed DELETE.
     /// </summary>
     private async Task ConfirmDeleteAsync()
     {
-        bool? confirmed = await DialogService.Confirm(
-            "This permanently deletes your account, every route you monitor, and all of their history. This cannot be undone.",
-            "Delete account?",
-            new ConfirmOptions { OkButtonText = "Delete my account", CancelButtonText = "Keep my account" });
-
-        if (confirmed != true)
+        if (_confirmDeletePhrase != "DELETE")
             return;
 
         _deleting = true;

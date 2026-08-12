@@ -34,7 +34,7 @@ public sealed class GetBaselineQueryHandler
             return Task.FromResult(new BaselineResponse(query.RouteId, query.DayOfWeek, 0, [], true));
 
         List<PollRecord> allPolls = _db.Polls
-            .Where(p => p.RouteId == query.RouteId && !p.IsDeleted)
+            .Where(p => p.RouteId == query.RouteId)
             .ToList();
 
         // Baseline is now day-of-week specific (#4): a Friday baseline reflects only

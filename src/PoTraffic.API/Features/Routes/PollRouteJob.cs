@@ -209,7 +209,7 @@ public sealed class PollRouteJob
     {
         DateTimeOffset since = now.AddHours(-1);
         List<int> recent = db.Polls
-            .Where(p => p.RouteId == routeId && !p.IsDeleted && p.PolledAt >= since)
+            .Where(p => p.RouteId == routeId && p.PolledAt >= since)
             .OrderByDescending(p => p.PolledAt)
             .Take(QuotaConstants.AdaptiveSampleWindow)
             .Select(p => p.TravelDurationSeconds)

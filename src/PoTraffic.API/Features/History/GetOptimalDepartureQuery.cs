@@ -34,7 +34,7 @@ public sealed class GetOptimalDepartureQueryHandler
             return Task.FromResult<OptimalDepartureDto?>(null);
 
         List<PollRecord> allPolls = _db.Polls
-            .Where(p => p.RouteId == query.RouteId && !p.IsDeleted)
+            .Where(p => p.RouteId == query.RouteId)
             .ToList();
 
         // Day-of-week specific (#4), with an all-days fallback when the requested weekday

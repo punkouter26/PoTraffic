@@ -122,8 +122,7 @@ public sealed class RerouteAccuracyTheoryTests
                 SessionId = sessionId,
                 PolledAt = polledAt,
                 TravelDurationSeconds = 300,
-                DistanceMetres = dist,
-                RawProviderResponse = "{}"
+                DistanceMetres = dist
             });
             polledAt = polledAt.AddMinutes(5);
         }
@@ -205,8 +204,7 @@ public sealed class RerouteAccuracyTheoryTests
                     SessionId = sessionId,
                     PolledAt = polledAt,
                     TravelDurationSeconds = 300,
-                    DistanceMetres = dist,
-                    RawProviderResponse = "{}"
+                    DistanceMetres = dist
                 });
                 polledAt = polledAt.AddMinutes(5);
             }

@@ -106,6 +106,38 @@
     font-variant-numeric: tabular-nums;
 }
 
+/* When the route is paused, the "Not monitoring — start it in Settings below"
+   line becomes a button. Visual language matches a ghost link: same font-size
+   and colour as the surrounding line so the page doesn't suddenly spring a
+   brand-coloured control into the answer block, but the chevron gives the
+   affordance away. */
+
+.pt-callout-action {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--pt-space-1);
+    background: transparent;
+    border: 0;
+    padding: 0;
+    font: inherit;
+    color: var(--pt-color-brand-600);
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+    text-decoration-thickness: 1px;
+    transition: color var(--pt-dur-fast) var(--pt-ease);
+}
+
+.pt-callout-action:hover,
+.pt-callout-action:focus-visible {
+    color: var(--pt-color-brand-700);
+    outline: none;
+}
+
+.pt-callout-action-icon {
+    font-size: 0.9em;
+}
+
 /* ── Evidence ───────────────────────────────────────────────────────────── */
 .pt-evidence-head {
     display: flex;

@@ -51,13 +51,8 @@
             <span class="pt-route-addr-to">@_destStreet</span>
         </span>
 
-        @* The only two states worth interrupting the answer for: this route
-           isn't collecting, or its numbers are invented. *@
-        @if (Route.IsDemo)
-        {
-            <span class="pt-route-flag pt-route-flag-demo">Sample</span>
-        }
-        else if (Route.MonitoringStatus != MonitoringStatus.Active)
+        @* Only one state worth flagging: monitoring is paused. *@
+        @if (Route.MonitoringStatus != MonitoringStatus.Active)
         {
             <span class="pt-route-flag pt-route-flag-paused">Paused</span>
         }
@@ -100,8 +95,12 @@
 
     protected override void OnParametersSet()
     {
-        _originStreet = Route.OriginAddress.Split(',')[0].Trim();
-        _destStreet = Route.DestinationAddress.Split(',')[0].Trim();
+        // Display-side title-casing: the API returns addresses verbatim, so a
+        // user-entered "4451 telfair blvd" and a Google-resolved "4451 Telfair
+        // Blvd" would otherwise sit on the same dashboard with different
+        // casings. Storage stays untouched; only the rendered string is shaped.
+        _originStreet = TextFormatting.ToTitleCase(Route.OriginAddress.Split(',')[0]);
+        _destStreet = TextFormatting.ToTitleCase(Route.DestinationAddress.Split(',')[0]);
 
         if (OptimalDeparture is { } optimal)
         {
@@ -137,18 +136,6 @@
     /// </summary>
     public async Task CheckNowAsync()
     {
-        if (Route.IsDemo)
-        {
-            NotificationService.Notify(new NotificationMessage
-            {
-                Severity = NotificationSeverity.Info,
-                Summary = "Sample route",
-                Detail = "This route's history is generated, so there's nothing live to poll.",
-                Duration = 5000
-            });
-            return;
-        }
-
         HttpResponseMessage resp = await Http.PostAsync($"/api/routes/{Route.Id}/check-now", null);
         if (resp.IsSuccessStatusCode)
         {

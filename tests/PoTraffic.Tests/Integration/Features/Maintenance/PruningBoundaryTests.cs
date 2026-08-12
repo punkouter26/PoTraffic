@@ -30,8 +30,8 @@ public sealed class PruningBoundaryTests : BaseIntegrationTest
     ///          - 90 days ago (at cutoff boundary — should be PRESERVED per exclusive less-than)
     ///          - 89 days ago (within retention window — should be preserved)
     /// When   PruneOldPollRecordsCommand is executed
-    /// Then   only the 91-day-old record is soft-deleted (IsDeleted=true, RawProviderResponse=null)
-    /// And    the 90-day and 89-day records remain with IsDeleted=false
+    /// Then   only the 91-day-old record is removed
+    /// And    the 90-day and 89-day records remain
     /// </summary>
     [SkipUnlessAzuriteAvailable]
     public async Task PruneCommand_SoftDeletesRecordsBeyond90Days_PreservesAt90DayBoundary()
@@ -87,9 +87,7 @@ public sealed class PruningBoundaryTests : BaseIntegrationTest
             PolledAt = new DateTimeOffset(now.AddDays(-91)),
             TravelDurationSeconds = 600,
             DistanceMetres = 5000,
-            IsRerouted = false,
-            RawProviderResponse = "{\"status\":\"ok\"}",
-            IsDeleted = false
+            IsRerouted = false
         };
 
         // Record 2: exactly 90 days minus a 5-minute buffer — AT boundary.
@@ -103,9 +101,7 @@ public sealed class PruningBoundaryTests : BaseIntegrationTest
             PolledAt = new DateTimeOffset(now.AddDays(-90).AddMinutes(5)),
             TravelDurationSeconds = 610,
             DistanceMetres = 5010,
-            IsRerouted = false,
-            RawProviderResponse = "{\"status\":\"ok\"}",
-            IsDeleted = false
+            IsRerouted = false
         };
 
         // Record 3: 89 days old — WITHIN window, MUST be preserved
@@ -117,9 +113,7 @@ public sealed class PruningBoundaryTests : BaseIntegrationTest
             PolledAt = new DateTimeOffset(now.AddDays(-89)),
             TravelDurationSeconds = 620,
             DistanceMetres = 5020,
-            IsRerouted = false,
-            RawProviderResponse = "{\"status\":\"ok\"}",
-            IsDeleted = false
+            IsRerouted = false
         };
 
         db.AddRange(new PollRecord[] { beyond, atBoundary, recent });
@@ -128,23 +122,17 @@ public sealed class PruningBoundaryTests : BaseIntegrationTest
         // Act
         await sender.Send(new PruneOldPollRecordsCommand());
 
-        // Assert — 91-day record must be pruned
+        // Assert — 91-day record must be hard-deleted
         PollRecord? reloadedBeyond = db.PollRecords.FirstOrDefault(r => r.Id == beyond.Id);
         PollRecord? reloadedAtBoundary = db.PollRecords.FirstOrDefault(r => r.Id == atBoundary.Id);
         PollRecord? reloadedRecent = db.PollRecords.FirstOrDefault(r => r.Id == recent.Id);
 
-        Assert.NotNull(reloadedBeyond);
-        Assert.True(reloadedBeyond!.IsDeleted, "91-day record should be soft-deleted");
-        Assert.Null(reloadedBeyond.RawProviderResponse);
+        Assert.Null(reloadedBeyond);
 
         // 90-day record must be preserved (boundary is exclusive <, not <=)
         Assert.NotNull(reloadedAtBoundary);
-        Assert.False(reloadedAtBoundary!.IsDeleted, "90-day record should NOT be pruned (exclusive boundary)");
-        Assert.NotNull(reloadedAtBoundary.RawProviderResponse);
 
         // 89-day record must be preserved
         Assert.NotNull(reloadedRecent);
-        Assert.False(reloadedRecent!.IsDeleted, "89-day record should NOT be pruned");
-        Assert.NotNull(reloadedRecent.RawProviderResponse);
     }
 }

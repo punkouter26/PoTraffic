@@ -42,7 +42,6 @@ public sealed class GetPollHistoryQueryHandler
         // counting and paging off the same IQueryable would scan — and re-sort — it twice.
         List<PollRecord> matching = [.. _db.PollRecords
             .Where(p => p.RouteId == query.RouteId
-                && !p.IsDeleted
                 && (query.SinceUtc == null || p.PolledAt >= query.SinceUtc))];
 
         int total = matching.Count;

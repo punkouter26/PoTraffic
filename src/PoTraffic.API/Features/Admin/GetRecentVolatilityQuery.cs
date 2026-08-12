@@ -8,10 +8,14 @@ using PoTraffic.Shared.Enums;
 
 namespace PoTraffic.API.Features.Admin;
 
-// FR-024: Recent volatility — last 7 days × 5-min bucket aggregation.
-public sealed record GetRecentVolatilityQuery(int Hours) : IRequest<IReadOnlyList<GlobalVolatilitySlotDto>>;
+/// <summary>
+/// Last-24h aggregated volatility for the admin chart. The wire shape is a real
+/// timestamped series (<see cref="RecentVolatilityPointDto"/>), bucketed every five
+/// minutes from now backwards. Used to drive the time-series chart on the Admin tab.
+/// </summary>
+public sealed record GetRecentVolatilityQuery(int Hours) : IRequest<IReadOnlyList<RecentVolatilityPointDto>>;
 
-public sealed class GetRecentVolatilityHandler : IRequestHandler<GetRecentVolatilityQuery, IReadOnlyList<GlobalVolatilitySlotDto>>
+public sealed class GetRecentVolatilityHandler : IRequestHandler<GetRecentVolatilityQuery, IReadOnlyList<RecentVolatilityPointDto>>
 {
     private readonly TableStorageContext _db;
     private readonly ILogger<GetRecentVolatilityHandler> _logger;
@@ -22,13 +26,32 @@ public sealed class GetRecentVolatilityHandler : IRequestHandler<GetRecentVolati
         _logger = logger;
     }
 
-    public Task<IReadOnlyList<GlobalVolatilitySlotDto>> Handle(GetRecentVolatilityQuery query, CancellationToken ct)
+    public Task<IReadOnlyList<RecentVolatilityPointDto>> Handle(GetRecentVolatilityQuery query, CancellationToken ct)
     {
-        DateTimeOffset since = DateTimeOffset.UtcNow.AddDays(-7);
+        DateTimeOffset since = DateTimeOffset.UtcNow.AddHours(-query.Hours);
 
-        List<PollRecord> polls = _db.Polls.Where(p => p.PolledAt >= since && !p.IsDeleted).ToList();
-        Dictionary<RouteId, EntityRoute> routesById = _db.Routes.ToDictionary(r => r.Id);
+        List<PollRecord> polls = _db.Polls
+            .Where(p => p.PolledAt >= since)
+            .ToList();
 
-        return Task.FromResult(VolatilityAggregator.Aggregate(polls, routesById));
+        // Bucket by UTC wall-clock minute truncated to 5 — every chart in the app plots
+        // per-bucket mean so the line is the average across all active routes.
+        var byBucket = polls
+            .GroupBy(p => new DateTime(
+                p.PolledAt.UtcDateTime.Year,
+                p.PolledAt.UtcDateTime.Month,
+                p.PolledAt.UtcDateTime.Day,
+                p.PolledAt.UtcDateTime.Hour,
+                (p.PolledAt.UtcDateTime.Minute / 5) * 5,
+                0,
+                DateTimeKind.Utc))
+            .OrderBy(g => g.Key)
+            .Select(g => new RecentVolatilityPointDto(
+                PolledAt: g.Key,
+                MeanDurationSeconds: g.Average(p => (double)p.TravelDurationSeconds),
+                RouteCount: g.Select(p => p.RouteId).Distinct().Count()))
+            .ToList();
+
+        return Task.FromResult<IReadOnlyList<RecentVolatilityPointDto>>(byBucket);
     }
 }

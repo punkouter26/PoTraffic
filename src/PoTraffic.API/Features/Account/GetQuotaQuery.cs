@@ -54,7 +54,7 @@ public sealed class GetQuotaHandler : IRequestHandler<GetQuotaQuery, QuotaDto?>
         // One pass over the poll table — a per-route Count() would rescan the whole
         // (global) poll list once per route the user owns.
         Dictionary<RouteId, int> pollsByRoute = _db.Polls
-            .Where(p => userRouteIds.Contains(p.RouteId) && !p.IsDeleted
+            .Where(p => userRouteIds.Contains(p.RouteId)
                         && DateOnly.FromDateTime(p.PolledAt.UtcDateTime) == today)
             .GroupBy(p => p.RouteId)
             .ToDictionary(g => g.Key, g => g.Count());
@@ -65,7 +65,6 @@ public sealed class GetQuotaHandler : IRequestHandler<GetQuotaQuery, QuotaDto?>
         {
             // The sample route's samples were generated, not bought (#10). Counting them
             // would report spend against an account that never called a provider.
-            if (route.IsDemo) continue;
             if (!pollsByRoute.TryGetValue(route.Id, out int polls)) continue;
             pollsToday += polls;
             costToday += polls * rates.For((RouteProvider)route.Provider);

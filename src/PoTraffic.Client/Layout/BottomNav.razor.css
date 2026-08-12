@@ -1,5 +1,9 @@
 /* Bottom navigation — mobile portrait only (≤640px).
-   Glass surface with central FAB for the primary "Add Route" action. */
+   Glass surface with central FAB for the primary "Add Route" action.
+   The third slot is a "Menu" / "Account" button that opens a bottom-sheet
+   action sheet with the catch-all destinations — matching the desktop
+   avatar-menu's options (settings, status, sign out) — so the two surfaces
+   agree on what "Account" means. */
 
 .pt-bottom-nav {
     display: none;
@@ -14,24 +18,74 @@
         left: 0;
         right: 0;
         bottom: 0;
-        /* Height comes from the token that .content also reserves space for.
-           These were two independent numbers (64 here, 56 there) and the page's
-           last rows sat underneath the nav. */
         min-height: var(--pt-bottom-nav-h);
         padding: var(--pt-space-2) var(--pt-space-3) calc(var(--pt-space-2) + env(safe-area-inset-bottom, 0px));
-        background: var(--pt-glass-bg-strong);
-        backdrop-filter: blur(var(--pt-glass-blur)) saturate(var(--pt-glass-saturate));
-        -webkit-backdrop-filter: blur(var(--pt-glass-blur)) saturate(var(--pt-glass-saturate));
+        background: var(--pt-color-surface);
         border-top: 1px solid var(--pt-border-subtle);
-        box-shadow: 0 -1px 12px rgba(var(--pt-shadow-rgb), 0.06);
         z-index: var(--pt-z-nav);
-        animation: pt-slide-up var(--pt-dur-base) var(--pt-ease);
     }
 }
 
-/* .pt-bottom-nav-link and .pt-bottom-nav-icon live in app.css, not here: the two
-   outer links are <NavLink> components, whose rendered <a> never receives this
-   file's scope attribute. See the note above those rules in app.css. */
+/* ── Bottom-sheet action menu (mobile only) ──────────────────────── */
+
+.pt-bottom-sheet {
+    position: fixed;
+    left: var(--pt-space-3);
+    right: var(--pt-space-3);
+    /* Sit above the bottom-nav, below the header. Same elevation as
+       .pt-user-dropdown on desktop so the two surfaces feel like the same
+       control opened differently. */
+    bottom: calc(var(--pt-bottom-nav-h) + var(--pt-space-2) + env(safe-area-inset-bottom, 0px));
+    background: var(--pt-color-surface);
+    border: 1px solid var(--pt-border-subtle);
+    border-radius: var(--pt-radius-lg);
+    box-shadow: var(--pt-elev-4);
+    padding: var(--pt-space-2);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    z-index: calc(var(--pt-z-nav) + 1);
+    animation: pt-bottom-sheet-up var(--pt-dur-base) var(--pt-ease);
+}
+
+@keyframes pt-bottom-sheet-up {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.pt-bottom-sheet-item {
+    display: flex;
+    align-items: center;
+    gap: var(--pt-space-3);
+    padding: var(--pt-space-3) var(--pt-space-3);
+    border: 0;
+    background: transparent;
+    border-radius: var(--pt-radius-md);
+    color: var(--pt-color-fg);
+    font-size: var(--pt-text-base);
+    font-family: inherit;
+    text-align: left;
+    text-decoration: none;
+    cursor: pointer;
+    min-height: 2.75rem;
+    transition: background var(--pt-dur-fast) var(--pt-ease);
+}
+
+.pt-bottom-sheet-item:hover,
+.pt-bottom-sheet-item:focus-visible {
+    background: var(--pt-color-surface-hover);
+    outline: none;
+}
+
+.pt-bottom-sheet-danger {
+    color: var(--pt-color-danger-fg);
+}
+
+.pt-bottom-sheet-divider {
+    height: 1px;
+    background: var(--pt-border-subtle);
+    margin: var(--pt-space-1) var(--pt-space-2);
+}
 
 /* FAB-style center button. This one IS a plain <a> in BottomNav.razor, so it
    keeps its styles here. */

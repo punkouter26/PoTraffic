@@ -13,8 +13,7 @@ public sealed record RouteDto(
     string? JobChainId,
     DateTimeOffset CreatedAt,
     IReadOnlyList<MonitoringWindowDto> Windows,
-    RouteId? ReturnRouteId = null,
-    bool IsDemo = false);
+    RouteId? ReturnRouteId = null);
 
 public sealed record MonitoringWindowDto(
     WindowId Id,

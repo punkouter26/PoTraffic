@@ -242,14 +242,17 @@
     {
         _editing = true;
         _error = "";
-        // Pre-populate form with existing window values
+        // Default to "monitor from now" — start at the current local wall-clock minute,
+        // end two hours later. The existing window is replaced wholesale on save, so
+        // there's no value in re-populating its saved times here; the user is almost
+        // always opening this panel to start a fresh window starting right now.
+        _startTime = Routes.CreateRoutePage.LocalNowToMinute();
+        _endTime = Routes.CreateRoutePage.LocalNowToMinute().AddHours(2);
+
         if (_activeWindow is not null)
         {
-            if (TimeSpan.TryParse(_activeWindow.StartTime, out var start))
-                _startTime = DateTime.Today + start;
-            if (TimeSpan.TryParse(_activeWindow.EndTime, out var end))
-                _endTime = DateTime.Today + end;
-
+            // Carry over the day mask so the user doesn't have to re-pick Mon–Fri etc.
+            // each time. Time fields stay on the now/+2h defaults.
             foreach (var (name, bit) in _days)
                 _selectedDays[name] = false;
             foreach (string day in _activeWindow.DaysOfWeek)

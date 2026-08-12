@@ -6,12 +6,20 @@ using Microsoft.Extensions.Logging;
 
 namespace PoTraffic.API.Features.Maintenance;
 
+/// <summary>
+/// Hard-deletes PollRecords older than the cutoff (default: 90 days). The previous
+/// implementation soft-deleted and nulled out <c>RawProviderResponse</c>, but the raw
+/// payload was never read back — the soft-delete flag and the column became pure
+/// storage overhead with no behavioural value. Hard-delete keeps the table small and
+/// removes the IsDeleted filter from every read query.
+/// </summary>
 public sealed record PruneOldPollRecordsCommand : IRequest<int>;
 
-// Command pattern — encapsulates nightly batch mutation as a discrete MediatR command
 public sealed class PruneOldPollRecordsCommandHandler
     : IRequestHandler<PruneOldPollRecordsCommand, int>
 {
+    private const int RetentionDays = 90;
+
     private readonly TableStorageContext _db;
     private readonly ILogger<PruneOldPollRecordsCommandHandler> _logger;
 
@@ -23,34 +31,23 @@ public sealed class PruneOldPollRecordsCommandHandler
         _logger = logger;
     }
 
-    public async Task<int> Handle(PruneOldPollRecordsCommand command, CancellationToken ct)
+    public Task<int> Handle(PruneOldPollRecordsCommand command, CancellationToken ct)
     {
-        DateTime cutoff = DateTime.UtcNow.AddDays(-90);
+        DateTime cutoff = DateTime.UtcNow.AddDays(-RetentionDays);
 
-        // IgnoreQueryFilters to bypass global soft-delete filter (FR-020)
         List<PollRecord> oldRecords = _db.PollRecords
-            .Where(p => !p.IsDeleted && p.PolledAt < cutoff)
+            .Where(p => p.PolledAt < cutoff)
             .ToList();
 
         if (oldRecords.Count == 0)
-            return 0;
+            return Task.FromResult(0);
 
-        foreach (PollRecord record in oldRecords)
-        {
-            record.IsDeleted = true;
-            record.RawProviderResponse = null;  // free storage; no longer needed post-pruning
-            // PollRecords use explicit change tracking, so a mutation to an existing one
-            // must be announced or the save would skip it.
-            _db.MarkChanged(record);
-        }
-
-        await _db.SaveChangesAsync(ct);
-
+        _db.RemoveRange(oldRecords);
         _logger.LogInformation(
-            "PruneOldPollRecordsJob: soft-deleted {Count} PollRecords older than {Cutoff}",
+            "PruneOldPollRecordsJob: hard-deleted {Count} PollRecords older than {Cutoff:o}",
             oldRecords.Count, cutoff);
 
-        return oldRecords.Count;
+        return Task.FromResult(oldRecords.Count);
     }
 }
 

@@ -17,16 +17,10 @@
             <NavLink class="app-nav-link" href="dashboard" Match="NavLinkMatch.All">
                 <PtIcon Name="dashboard" Size="sm" />Dashboard
             </NavLink>
-            @* The admin area used to carry its own button bar to switch between these
-               two pages — a fourth navigation mechanism for two destinations. They
-               are links in the one nav bar the app already has. *@
             @if (_isAdmin)
             {
                 <NavLink class="app-nav-link" href="admin">
                     <PtIcon Name="admin_panel_settings" Size="sm" />Admin
-                </NavLink>
-                <NavLink class="app-nav-link" href="diag">
-                    <PtIcon Name="health_and_safety" Size="sm" />Diagnostics
                 </NavLink>
             }
         }
@@ -66,20 +60,19 @@
                         <PtIcon Name="settings" Size="sm" />Account settings
                     </a>
 
-                    @* Below 640px the centre nav is hidden — the brand and the user chip
-                       already claim the bar — and the bottom nav carries only Dashboard,
-                       Add and Account. That left an administrator on a phone with no path
-                       to /admin or /diag at all. The menu is the one piece of chrome that
-                       survives every width, so the admin destinations live here too and
-                       are marked mobile-only so they don't duplicate the bar on desktop. *@
+                    <div class="pt-dropdown-divider" role="separator"></div>
+                    <a class="pt-dropdown-item" href="/health" role="menuitem">
+                        <PtIcon Name="health_and_safety" Size="sm" />System status
+                    </a>
+
+                    @* The menu is the one piece of chrome that survives every width, so
+                       admin destinations live here too and are marked mobile-only so
+                       they don't duplicate the top bar on desktop. *@
                     @if (_isAdmin)
                     {
                         <div class="pt-dropdown-divider pt-dropdown-mobile-only" role="separator"></div>
                         <a class="pt-dropdown-item pt-dropdown-mobile-only" href="/admin" role="menuitem">
                             <PtIcon Name="admin_panel_settings" Size="sm" />Admin
-                        </a>
-                        <a class="pt-dropdown-item pt-dropdown-mobile-only" href="/diag" role="menuitem">
-                            <PtIcon Name="health_and_safety" Size="sm" />Diagnostics
                         </a>
                     }
 

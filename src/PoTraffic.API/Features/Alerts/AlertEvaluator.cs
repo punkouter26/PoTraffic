@@ -14,10 +14,7 @@ namespace PoTraffic.API.Features.Alerts;
 /// De-duplicated per session so a congested commute produces one alert, not one per poll.
 /// Runs inside the poll's scope; push delivery failures never break polling.
 /// </summary>
-public sealed class AlertEvaluator(
-    TableStorageContext db,
-    IPushNotifier push,
-    ILogger<AlertEvaluator> logger)
+public sealed class AlertEvaluator(TableStorageContext db)
 {
     public async Task EvaluateAsync(EntityRoute route, PollRecord record, MonitoringSession session, CancellationToken ct)
     {
@@ -49,18 +46,6 @@ public sealed class AlertEvaluator(
         foreach (Alert a in raised)
             db.Add(a);
         await db.SaveChangesAsync(ct);
-
-        foreach (Alert a in raised)
-        {
-            try
-            {
-                await push.SendAsync(a.UserId, ToDto(a), ct);
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Push notify failed for alert {AlertId}", a.Id);
-            }
-        }
     }
 
     private bool TryBuildCongestionAlert(EntityRoute route, PollRecord record, MonitoringSession session, out Alert? alert)
@@ -71,7 +56,7 @@ public sealed class AlertEvaluator(
 
         // Baseline from prior sessions only (exclude this session so a spike isn't compared to itself).
         List<int> hist = db.Polls
-            .Where(p => p.RouteId == route.Id && !p.IsDeleted && p.SessionId != session.Id
+            .Where(p => p.RouteId == route.Id && p.SessionId != session.Id
                 && p.PolledAt.DayOfWeek == dow
                 && (p.PolledAt.Hour * 4) + (p.PolledAt.Minute / 15) == bucket)
             .Select(p => p.TravelDurationSeconds)

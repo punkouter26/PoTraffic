@@ -11,8 +11,6 @@ public sealed class PollRecord
     public int TravelDurationSeconds { get; set; }
     public int DistanceMetres { get; set; }
     public bool IsRerouted { get; set; }
-    public bool IsDeleted { get; set; }
-    public string? RawProviderResponse { get; set; }
 
     [JsonIgnore]
     public Route Route { get; set; } = null!;

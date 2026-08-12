@@ -892,3 +892,18 @@ details[open] > summary .pt-collapsible-icon { transform: rotate(90deg); }
     font-size: var(--pt-text-sm);
     min-width: 0;
 }
+
+/* ── Section headings inside Cards
+   Used by every section title inside a Card. Visually we keep the small,
+   weighty treatment from when these were rendered at H6; structurally we
+   re-emit them at H3 so the heading-list skips an empty H2/H4/H5 on every
+   page that uses them. The rule applies the font treatment; the level-bumping
+   has already happened in the markup. */
+.pt-section-heading {
+    font-size: var(--pt-text-md);
+    line-height: 1.3;
+    font-weight: var(--pt-weight-semibold);
+    color: var(--pt-color-fg);
+    letter-spacing: -0.005em;
+    margin-top: 0;
+}

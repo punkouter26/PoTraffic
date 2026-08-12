@@ -24,13 +24,6 @@ public sealed class Route
     /// routes when a return trip is created; null for standalone routes.</summary>
     public RouteId? ReturnRouteId { get; set; }
 
-    /// <summary>
-    /// True for the sample route seeded into an empty account (#10). Its poll history is
-    /// synthetic, so the UI labels it and the operations that would bill a real provider
-    /// call — Check Now, starting a monitoring window — refuse to run against it.
-    /// </summary>
-    public bool IsDemo { get; set; }
-
     [JsonIgnore]
     public User User { get; set; } = null!;
     [JsonIgnore]

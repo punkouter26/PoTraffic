@@ -42,17 +42,7 @@ else
     [Parameter] public IReadOnlyList<double> Baseline { get; set; } = [];
     [Parameter] public IReadOnlyList<double> UpperBand { get; set; } = [];
     [Parameter] public IReadOnlyList<bool> ReroutedFlags { get; set; } = [];
-
-    /// <summary>
-    /// Second series drawn over the first (#8), for comparing two routes. Must be indexed
-    /// the same as <see cref="Points"/> — the renderer places both on one x-scale and does
-    /// not attempt to align mismatched slots.
-    /// </summary>
-    [Parameter] public IReadOnlyList<double> ComparePoints { get; set; } = [];
-
-    /// <summary>Names for the two series, used by the hover tooltip in compare mode.</summary>
     [Parameter] public string? SeriesName { get; set; }
-    [Parameter] public string? CompareSeriesName { get; set; }
 
     /// <summary>Per-sample labels shown in the hover tooltip, e.g. "08:42".</summary>
     [Parameter] public IReadOnlyList<string> Labels { get; set; } = [];
@@ -155,10 +145,9 @@ else
                 points = Slice(Points),
                 baseline = Slice(Baseline),
                 upperBand = Slice(UpperBand),
-                compare = Slice(ComparePoints),
                 rerouted = Slice(ReroutedFlags),
                 labels = Slice(Labels),
-                names = new[] { SeriesName ?? "Route A", CompareSeriesName ?? "Route B" }
+                name = SeriesName ?? "Route"
             });
         }
         catch

@@ -102,14 +102,13 @@ public sealed class ExecutePollCommandHandler(
             SessionId = session.Id,
             PolledAt = DateTimeOffset.UtcNow,
             TravelDurationSeconds = travelResult.DurationSeconds,
-            DistanceMetres = travelResult.DistanceMetres,
-            RawProviderResponse = travelResult.RawJson
+            DistanceMetres = travelResult.DistanceMetres
         };
 
         // 6. Reroute detection. Only the single most recent prior record is needed alongside
         // the median, so this takes a linear MaxBy rather than sorting the whole session.
         List<PollRecord> priorRecords = [.. db.PollRecords
-            .Where(p => p.SessionId == session.Id && !p.IsDeleted)];
+            .Where(p => p.SessionId == session.Id)];
 
         if (priorRecords.Count >= 2)
         {

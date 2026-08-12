@@ -66,9 +66,7 @@ public sealed class PruningIntegrationTests : BaseIntegrationTest
             PolledAt = new DateTimeOffset(now.AddDays(-91).AddMinutes(i * 5)),
             TravelDurationSeconds = 600 + i,
             DistanceMetres = 5000,
-            IsRerouted = false,
-            RawProviderResponse = "{\"status\":\"ok\"}",
-            IsDeleted = false
+            IsRerouted = false
         }).ToList();
 
         // 3 recent records (89 days ago — should be preserved)
@@ -80,9 +78,7 @@ public sealed class PruningIntegrationTests : BaseIntegrationTest
             PolledAt = new DateTimeOffset(now.AddDays(-89).AddMinutes(i * 5)),
             TravelDurationSeconds = 610 + i,
             DistanceMetres = 5010,
-            IsRerouted = false,
-            RawProviderResponse = "{\"status\":\"ok\"}",
-            IsDeleted = false
+            IsRerouted = false
         }).ToList();
 
         db.AddRange(oldRecords);
@@ -92,13 +88,11 @@ public sealed class PruningIntegrationTests : BaseIntegrationTest
         // Act
         await sender.Send(new PruneOldPollRecordsCommand());
 
-        // Assert — old records should be soft-deleted
+        // Assert — old records should be hard-deleted
         foreach (PollRecord old in oldRecords)
         {
             PollRecord? reloaded = db.PollRecords.FirstOrDefault(r => r.Id == old.Id);
-            Assert.NotNull(reloaded);
-            Assert.True(reloaded!.IsDeleted, "91-day record should be soft-deleted");
-            Assert.Null(reloaded.RawProviderResponse);
+            Assert.Null(reloaded);
         }
 
         // Assert — recent records should NOT be pruned
@@ -106,8 +100,6 @@ public sealed class PruningIntegrationTests : BaseIntegrationTest
         {
             PollRecord? reloaded = db.PollRecords.FirstOrDefault(r => r.Id == recent.Id);
             Assert.NotNull(reloaded);
-            Assert.False(reloaded!.IsDeleted, "89-day record should NOT be pruned");
-            Assert.NotNull(reloaded.RawProviderResponse);
         }
     }
 }

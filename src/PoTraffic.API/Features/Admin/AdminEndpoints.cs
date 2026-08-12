@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using PoTraffic.API.Features.Admin;
 using PoTraffic.API.Infrastructure;
-using PoTraffic.API.Infrastructure.Scheduling;
 using PoTraffic.Shared.DTOs.Admin;
 using PoTraffic.Shared.Enums;
 
@@ -49,11 +48,11 @@ public static class AdminEndpoints
             CancellationToken ct,
             [FromQuery] int hours = 24) =>
         {
-            IReadOnlyList<GlobalVolatilitySlotDto> points = await sender.Send(new GetRecentVolatilityQuery(hours), ct);
+            IReadOnlyList<RecentVolatilityPointDto> points = await sender.Send(new GetRecentVolatilityQuery(hours), ct);
             return Results.Ok(points);
         })
         .WithName("GetRecentVolatility")
-        .Produces<IReadOnlyList<GlobalVolatilitySlotDto>>();
+        .Produces<IReadOnlyList<RecentVolatilityPointDto>>();
 
         grp.MapGet("/poll-cost-summary", async (ISender sender, CancellationToken ct) =>
         {
@@ -76,77 +75,8 @@ public static class AdminEndpoints
         .Produces<SystemConfigDto>()
         .Produces(StatusCodes.Status404NotFound);
 
-        // Triple Test endpoints — FR-TT: admin-only diagnostic travel-time sampler
-        grp.MapPost("/triple-test", async (
-            [FromBody] TripleTestRequest body,
-            ISender sender,
-            CancellationToken ct) =>
-        {
-            StartTripleTestResult result = await sender.Send(
-                new StartTripleTestCommand(
-                    body.OriginAddress,
-                    body.DestinationAddress,
-                    body.Provider,
-                    body.StartAt), ct);
-
-            return result.IsSuccess
-                ? Results.Accepted($"/api/admin/triple-test/{result.SessionId}", new { sessionId = result.SessionId })
-                : Results.BadRequest(new { error = result.ErrorCode });
-        })
-        .WithName("StartTripleTest")
-        .Produces(StatusCodes.Status202Accepted)
-        .Produces(StatusCodes.Status400BadRequest);
-
-        grp.MapGet("/triple-test/{sessionId:guid}", async (
-            TripleTestSessionId sessionId,
-            ISender sender,
-            CancellationToken ct) =>
-        {
-            TripleTestSessionDto? dto = await sender.Send(new GetTripleTestSessionQuery(sessionId), ct);
-            return dto is null ? Results.NotFound() : Results.Ok(dto);
-        })
-        .WithName("GetTripleTestSession")
-        .Produces<TripleTestSessionDto>()
-        .Produces(StatusCodes.Status404NotFound);
-
-        // US-ADM: POST /api/admin/seed-data — populates demo data for demo/demo flow
-        grp.MapPost("/seed-data", async (
-            [FromBody] SeedRequest request,
-            ISender sender,
-            CancellationToken ct) =>
-        {
-            SeedDatabaseResult result = await sender.Send(new SeedDatabaseCommand(request.RouteCount, request.DaysOfHistory), ct);
-            return Results.Ok(result);
-        })
-        .WithName("SeedDatabase")
-        .Produces<SeedDatabaseResult>();
-
-        // US-ADM: POST /api/admin/clear-data — purges demo/volatile data
-        grp.MapPost("/clear-data", async (
-            ISender sender,
-            CancellationToken ct) =>
-        {
-            ClearDatabaseResult result = await sender.Send(new ClearDatabaseCommand(), ct);
-            return Results.Ok(result);
-        })
-        .WithName("ClearDatabase")
-        .Produces<ClearDatabaseResult>();
-
-        // GET /api/admin/connection-health — live ping status for all external dependencies.
-        // Shares ConnectionHealthReporter with the anonymous /health/connections feed the
-        // Blazor health page reads, so the two can never report different things.
-        grp.MapGet("/connection-health", async (
-            HealthCheckService healthCheckService,
-            IConfiguration configuration,
-            CancellationToken ct) =>
-            Results.Ok(await ConnectionHealthReporter.BuildAsync(healthCheckService, configuration, ct)))
-        .WithName("GetConnectionHealth")
-        .Produces<IEnumerable<ConnectionHealthDto>>();
-
         return app;
     }
-
-    private sealed record SeedRequest(int RouteCount = 3, int DaysOfHistory = 14);
 }
 
 // Request DTO scoped to this file

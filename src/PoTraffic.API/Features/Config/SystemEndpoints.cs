@@ -14,7 +14,6 @@ public static class SystemEndpoints
         app.MapGet("/api/system/features", (FeatureFlags flags) =>
             Results.Ok(new
             {
-                tripleTestEnabled = flags.TripleTestEnabled,
                 useMockProviders = flags.UseMockProviders
             }))
             .AllowAnonymous()

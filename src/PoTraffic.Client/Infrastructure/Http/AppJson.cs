@@ -12,11 +12,8 @@ namespace PoTraffic.Client.Infrastructure.Http;
 
 // ── Client-side contracts (previously anonymous objects or page-private records) ──
 public sealed record ProvidersResponse(List<string> Providers, bool GuestEnabled);
-public sealed record FeatureFlags(bool TripleTestEnabled, bool UseMockProviders);
+public sealed record FeatureFlags(bool UseMockProviders);
 public sealed record CheckNowResponse(int DurationSeconds, int DistanceMetres);
-public sealed record SeedDataRequest(int RouteCount, int DaysOfHistory);
-public sealed record SeedResult(int UsersCreated, int RoutesCreated, int PollsCreated);
-public sealed record ClearResult(int UsersDeleted, int RoutesDeleted, int PollsDeleted);
 public sealed record StopSessionRequest(SessionId SessionId);
 public sealed record SaveWindowRequest(string StartTime, string EndTime, byte DaysOfWeekMask);
 internal sealed record ClientLogBatch(List<ClientLogEntry> Entries);
@@ -62,8 +59,6 @@ public static class ClientCacheKeys
 [JsonSerializable(typeof(List<RecentVolatilityPointDto>))]
 [JsonSerializable(typeof(List<ConnectionHealthDto>))]
 [JsonSerializable(typeof(List<SystemConfigDto>))]
-[JsonSerializable(typeof(TripleTestRequest))]
-[JsonSerializable(typeof(TripleTestSessionDto))]
 [JsonSerializable(typeof(JsonElement))]
 [JsonSerializable(typeof(ProvidersResponse))]
 [JsonSerializable(typeof(FeatureFlags))]
@@ -73,9 +68,6 @@ public static class ClientCacheKeys
 [JsonSerializable(typeof(CreateRouteRequest))]
 [JsonSerializable(typeof(List<PlaceSuggestionDto>))]
 [JsonSerializable(typeof(CheckNowResponse))]
-[JsonSerializable(typeof(SeedDataRequest))]
-[JsonSerializable(typeof(SeedResult))]
-[JsonSerializable(typeof(ClearResult))]
 [JsonSerializable(typeof(OptimalDepartureDto))]
 [JsonSerializable(typeof(List<MonitoringWindowDto>))]
 [JsonSerializable(typeof(List<SessionDto>))]
@@ -84,8 +76,6 @@ public static class ClientCacheKeys
 [JsonSerializable(typeof(VolatilityHeatmapDto))]
 [JsonSerializable(typeof(List<AlertDto>))]
 [JsonSerializable(typeof(AlertDto))]
-[JsonSerializable(typeof(PushSubscriptionRequest))]
-[JsonSerializable(typeof(VapidPublicKeyResponse))]
 [JsonSerializable(typeof(StopSessionRequest))]
 [JsonSerializable(typeof(SaveWindowRequest))]
 [JsonSerializable(typeof(ClientLogBatch))]
