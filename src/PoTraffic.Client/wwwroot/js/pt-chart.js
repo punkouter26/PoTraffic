@@ -16,42 +16,121 @@ const states = new WeakMap();
 /** Minimum horizontal drag, in CSS px, before a gesture counts as a brush not a click. */
 const BRUSH_THRESHOLD_PX = 8;
 
+/**
+ * Gutters reserved around the plot for the axes. The left one holds the minutes
+ * scale, the bottom one the 24-hour clock; the data never draws into either, so
+ * a tick label can't be overpainted by the line it labels.
+ */
+const PAD = { top: 12, right: 14, bottom: 26, left: 46 };
+
+/**
+ * Resolves a colour EXPRESSION (not a raw token name) against the live cascade.
+ *
+ * getComputedStyle().getPropertyValue("--pt-fg-muted") hands back the *specified*
+ * text — for this app's tokens that is the literal string "light-dark(...)", which
+ * canvas cannot parse. Assigning an unparseable value to ctx.strokeStyle is a
+ * silent no-op, so the axis labels inherited whatever colour was set last (the
+ * reroute-marker red) and the gridlines came out brand blue. Bouncing each
+ * expression off a throwaway element makes the browser resolve it to an rgb()
+ * triple the way it would for any real element.
+ */
 function readTheme(canvas) {
-    const cs = getComputedStyle(canvas);
-    const pick = (name, fallback) => {
-        const v = cs.getPropertyValue(name).trim();
-        return v.length ? v : fallback;
+    const host = canvas.parentElement ?? document.body;
+    const probe = document.createElement("span");
+    probe.style.cssText = "position:absolute;left:-9999px;top:0;width:0;height:0";
+    host.appendChild(probe);
+
+    const resolve = (expr, fallback) => {
+        probe.style.color = "";
+        probe.style.color = expr;
+        const v = getComputedStyle(probe).color;
+        return v && v.length ? v : fallback;
     };
-    return {
-        grid: pick("--pt-border-subtle", "#e2e8f0"),
-        muted: pick("--pt-fg-muted", "#64748b"),
-        baseline: pick("--pt-fg-tertiary", "#94a3b8"),
-        line: pick("--pt-color-brand-500", "#3b82f6"),
-        lineStrong: pick("--pt-color-brand-600", "#2563eb"),
-        danger: pick("--pt-color-danger", "#f43f5e"),
+
+    const theme = {
+        grid: resolve("var(--pt-border-subtle)", "#e2e8f0"),
+        axis: resolve("var(--pt-border-strong)", "#cbd5e1"),
+        muted: resolve("var(--pt-fg-muted)", "#64748b"),
+        baseline: resolve("var(--pt-fg-tertiary)", "#94a3b8"),
+        surface: resolve("var(--pt-bg-elev-1)", "#ffffff"),
+        line: resolve("var(--pt-color-brand-500)", "#3b82f6"),
+        lineStrong: resolve("var(--pt-color-brand-600)", "#2563eb"),
+        danger: resolve("var(--pt-color-danger)", "#f43f5e"),
         // Second series in compare mode (#8). Warning-amber rather than another blue:
         // the two lines have to be told apart at a glance, including in greyscale.
-        compare: pick("--pt-color-warning", "#f59e0b"),
+        compare: resolve("var(--pt-color-warning)", "#f59e0b"),
         band: "rgba(16, 185, 129, 0.12)",
         brush: "rgba(59, 130, 246, 0.16)"
     };
+
+    probe.remove();
+    return theme;
 }
 
-function xForIndex(i, count, w) {
-    return count <= 1 ? 0 : (i / (count - 1)) * w;
+/** The data rectangle, in CSS px, inside the axis gutters. */
+function plotOf(w, h) {
+    return {
+        x: PAD.left,
+        y: PAD.top,
+        w: Math.max(10, w - PAD.left - PAD.right),
+        h: Math.max(10, h - PAD.top - PAD.bottom)
+    };
 }
 
-function yForValue(v, min, max, h) {
+function xForIndex(i, count, plot) {
+    return plot.x + (count <= 1 ? plot.w / 2 : (i / (count - 1)) * plot.w);
+}
+
+function yForValue(v, min, max, plot) {
     const span = max - min;
-    return span <= 0 ? h / 2 : h - ((v - min) / span) * h;
+    return plot.y + (span <= 0 ? plot.h / 2 : plot.h - ((v - min) / span) * plot.h);
 }
 
-function drawSeries(ctx, values, count, min, max, w, h) {
+function drawSeries(ctx, values, count, min, max, plot) {
     for (let i = 0; i < values.length; i++) {
-        const x = xForIndex(i, count, w);
-        const y = yForValue(values[i], min, max, h);
+        const x = xForIndex(i, count, plot);
+        const y = yForValue(values[i], min, max, plot);
         if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     }
+}
+
+/**
+ * Round tick values covering [min, max] at a 1/2/5×10ⁿ step — so the minutes
+ * scale reads 40, 50, 60 rather than 41.7, 52.1, 62.5.
+ */
+function niceTicks(min, max, target) {
+    const span = max - min;
+    if (!(span > 0)) return [min];
+
+    const magnitude = Math.pow(10, Math.floor(Math.log10(span / target)));
+    const normalised = (span / target) / magnitude;
+    const step = (normalised <= 1 ? 1 : normalised <= 2 ? 2 : normalised <= 5 ? 5 : 10) * magnitude;
+
+    const ticks = [];
+    for (let v = Math.ceil(min / step) * step; v <= max + step * 1e-6; v += step) {
+        ticks.push(Math.round(v * 100) / 100);
+    }
+    return ticks;
+}
+
+/**
+ * Sample indices to label along the bottom, spaced so the 24-hour stamps never
+ * collide. Always includes the first and last sample — the span of the chart is
+ * the first thing the reader wants.
+ */
+function xTickIndices(count, plotWidth) {
+    if (count <= 1) return count === 1 ? [0] : [];
+
+    const maxTicks = Math.max(2, Math.min(8, Math.floor(plotWidth / 68)));
+    if (count <= maxTicks) return Array.from({ length: count }, (_, i) => i);
+
+    const stride = (count - 1) / (maxTicks - 1);
+    const indices = [];
+    for (let t = 0; t < maxTicks; t++) {
+        const i = Math.round(t * stride);
+        if (indices[indices.length - 1] !== i) indices.push(i);
+    }
+    return indices;
 }
 
 function draw(canvas) {
@@ -61,41 +140,84 @@ function draw(canvas) {
     const { ctx, w, h, view, theme } = st;
     const points = view.points;
     const count = points.length;
+    const plot = plotOf(w, h);
+    const { min, max } = view;
 
     ctx.clearRect(0, 0, w, h);
+    ctx.font = "11px Inter, system-ui, sans-serif";
 
-    // Horizontal gridlines
-    ctx.strokeStyle = theme.grid;
+    // ── Y axis: travel time in whole minutes ──────────────────────────────
+    // Gridlines and their labels are drawn together so a line can never appear
+    // without the number that explains it.
     ctx.lineWidth = 1;
-    for (let g = 0; g < 4; g++) {
-        const y = (h / 4) * g;
+    ctx.textAlign = "right";
+    ctx.textBaseline = "middle";
+    for (const value of niceTicks(min, max, 4)) {
+        const y = Math.round(yForValue(value, min, max, plot)) + 0.5;
+
+        ctx.strokeStyle = theme.grid;
         ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(w, y);
+        ctx.moveTo(plot.x, y);
+        ctx.lineTo(plot.x + plot.w, y);
         ctx.stroke();
+
+        ctx.fillStyle = theme.muted;
+        ctx.fillText(value.toFixed(0), plot.x - 8, y);
     }
 
-    if (count < 2) return;
+    // Unit, stated once above the scale rather than repeated on every tick.
+    ctx.fillStyle = theme.muted;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillText("min", 4, plot.y - 2);
 
-    const { min, max } = view;
+    // ── X axis: 24-hour clock ─────────────────────────────────────────────
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    for (const i of xTickIndices(count, plot.w)) {
+        const x = xForIndex(i, count, plot);
+        const label = view.labels[i];
+        if (!label) continue;
+
+        ctx.strokeStyle = theme.grid;
+        ctx.beginPath();
+        ctx.moveTo(Math.round(x) + 0.5, plot.y + plot.h);
+        ctx.lineTo(Math.round(x) + 0.5, plot.y + plot.h + 4);
+        ctx.stroke();
+
+        ctx.fillStyle = theme.muted;
+        // Clamped so the first and last stamps stay inside the canvas instead of
+        // being clipped by their own centring.
+        ctx.fillText(label, Math.min(Math.max(x, 18), w - 18), plot.y + plot.h + 7);
+    }
+
+    // Axis rules — the plot's floor and left edge.
+    ctx.strokeStyle = theme.axis;
+    ctx.beginPath();
+    ctx.moveTo(plot.x + 0.5, plot.y);
+    ctx.lineTo(plot.x + 0.5, plot.y + plot.h + 0.5);
+    ctx.lineTo(plot.x + plot.w, plot.y + plot.h + 0.5);
+    ctx.stroke();
+
+    if (count < 2) return;
 
     // Brush selection wash, painted under the data
     if (st.brush && Math.abs(st.brush.x2 - st.brush.x1) >= BRUSH_THRESHOLD_PX) {
         const x1 = Math.min(st.brush.x1, st.brush.x2);
         const x2 = Math.max(st.brush.x1, st.brush.x2);
         ctx.fillStyle = theme.brush;
-        ctx.fillRect(x1, 0, x2 - x1, h);
+        ctx.fillRect(x1, plot.y, x2 - x1, plot.h);
     }
 
     // ±1σ band between baseline and upper band
     if (view.upperBand.length >= 2 && view.baseline.length >= 2) {
         ctx.fillStyle = theme.band;
         ctx.beginPath();
-        drawSeries(ctx, view.upperBand, view.upperBand.length, min, max, w, h);
+        drawSeries(ctx, view.upperBand, view.upperBand.length, min, max, plot);
         for (let i = view.baseline.length - 1; i >= 0; i--) {
             ctx.lineTo(
-                xForIndex(i, view.baseline.length, w),
-                yForValue(view.baseline[i], min, max, h));
+                xForIndex(i, view.baseline.length, plot),
+                yForValue(view.baseline[i], min, max, plot));
         }
         ctx.closePath();
         ctx.fill();
@@ -107,7 +229,7 @@ function draw(canvas) {
         ctx.lineWidth = 1.5;
         ctx.setLineDash([4, 4]);
         ctx.beginPath();
-        drawSeries(ctx, view.baseline, view.baseline.length, min, max, w, h);
+        drawSeries(ctx, view.baseline, view.baseline.length, min, max, plot);
         ctx.stroke();
         ctx.setLineDash([]);
     }
@@ -115,8 +237,9 @@ function draw(canvas) {
     // Observed travel times
     ctx.strokeStyle = theme.line;
     ctx.lineWidth = 2;
+    ctx.lineJoin = "round";
     ctx.beginPath();
-    drawSeries(ctx, points, count, min, max, w, h);
+    drawSeries(ctx, points, count, min, max, plot);
     ctx.stroke();
 
     // Second route, in compare mode (#8). Drawn over the primary at the same x-scale —
@@ -125,7 +248,7 @@ function draw(canvas) {
         ctx.strokeStyle = theme.compare;
         ctx.lineWidth = 2;
         ctx.beginPath();
-        drawSeries(ctx, view.compare, view.compare.length, min, max, w, h);
+        drawSeries(ctx, view.compare, view.compare.length, min, max, plot);
         ctx.stroke();
     }
 
@@ -134,21 +257,21 @@ function draw(canvas) {
     for (let i = 0; i < count; i++) {
         if (!view.rerouted[i]) continue;
         ctx.beginPath();
-        ctx.arc(xForIndex(i, count, w), yForValue(points[i], min, max, h), 4, 0, Math.PI * 2);
+        ctx.arc(xForIndex(i, count, plot), yForValue(points[i], min, max, plot), 4, 0, Math.PI * 2);
         ctx.fill();
     }
 
     // Crosshair on the hovered sample
     if (st.hoverIndex !== null && st.hoverIndex >= 0 && st.hoverIndex < count) {
-        const x = xForIndex(st.hoverIndex, count, w);
-        const y = yForValue(points[st.hoverIndex], min, max, h);
+        const x = xForIndex(st.hoverIndex, count, plot);
+        const y = yForValue(points[st.hoverIndex], min, max, plot);
 
         ctx.strokeStyle = theme.lineStrong;
         ctx.globalAlpha = 0.35;
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, h);
+        ctx.moveTo(x, plot.y);
+        ctx.lineTo(x, plot.y + plot.h);
         ctx.stroke();
         ctx.globalAlpha = 1;
 
@@ -156,16 +279,12 @@ function draw(canvas) {
         ctx.beginPath();
         ctx.arc(x, y, 4.5, 0, Math.PI * 2);
         ctx.fill();
-        ctx.strokeStyle = "#fff";
+        // Ringed in the card's own colour so the dot reads as raised on either theme;
+        // a hard white ring was invisible on the light card and glaring on the dark one.
+        ctx.strokeStyle = theme.surface;
         ctx.lineWidth = 1.5;
         ctx.stroke();
     }
-
-    // Axis labels
-    ctx.fillStyle = theme.muted;
-    ctx.font = "11px Inter, system-ui";
-    ctx.fillText(`${max.toFixed(0)} min`, 4, 12);
-    ctx.fillText(`${min.toFixed(0)} min`, 4, h - 4);
 }
 
 function buildView(data) {
@@ -273,19 +392,29 @@ function updateTooltip(canvas) {
 
     // Flip the tooltip to the left of the cursor near the right edge so it
     // never runs off the card.
-    const x = xForIndex(i, view.points.length, st.w);
+    const x = xForIndex(i, view.points.length, plotOf(st.w, st.h));
     const flip = x > st.w - 130;
     tip.style.left = `${flip ? x - 12 : x + 12}px`;
     tip.style.transform = flip ? "translateX(-100%)" : "none";
 }
 
+/** Pointer position in canvas CSS px, independent of any layout scaling. */
+function localX(canvas, st, clientX) {
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width === 0) return 0;
+    return (clientX - rect.left) * (st.w / rect.width);
+}
+
 function indexAt(canvas, clientX) {
     const st = states.get(canvas);
     if (!st) return null;
-    const rect = canvas.getBoundingClientRect();
     const count = st.view.points.length;
-    if (count === 0 || rect.width === 0) return null;
-    const ratio = (clientX - rect.left) / rect.width;
+    if (count === 0) return null;
+
+    // Measured against the plot rectangle, not the whole canvas: with the axis
+    // gutters in place those differ by 60px, which is several samples of skew.
+    const plot = plotOf(st.w, st.h);
+    const ratio = (localX(canvas, st, clientX) - plot.x) / plot.w;
     return Math.max(0, Math.min(count - 1, Math.round(ratio * (count - 1))));
 }
 
@@ -349,7 +478,7 @@ export function attach(canvas, dotnetRef, method) {
         if (!st) return;
         st.hoverIndex = indexAt(canvas, e.clientX);
         if (st.dragging) {
-            st.brush = { x1: st.dragStartX, x2: e.clientX - canvas.getBoundingClientRect().left };
+            st.brush = { x1: st.dragStartX, x2: localX(canvas, st, e.clientX) };
         }
         draw(canvas);
         updateTooltip(canvas);
@@ -369,7 +498,7 @@ export function attach(canvas, dotnetRef, method) {
         const st = states.get(canvas);
         if (!st) return;
         st.dragging = true;
-        st.dragStartX = e.clientX - canvas.getBoundingClientRect().left;
+        st.dragStartX = localX(canvas, st, e.clientX);
         st.dragStartIndex = indexAt(canvas, e.clientX);
         st.brush = null;
         canvas.setPointerCapture?.(e.pointerId);
@@ -381,7 +510,7 @@ export function attach(canvas, dotnetRef, method) {
         st.dragging = false;
         canvas.releasePointerCapture?.(e.pointerId);
 
-        const endX = e.clientX - canvas.getBoundingClientRect().left;
+        const endX = localX(canvas, st, e.clientX);
         const travelled = Math.abs(endX - st.dragStartX);
         const endIndex = indexAt(canvas, e.clientX);
         st.brush = null;
