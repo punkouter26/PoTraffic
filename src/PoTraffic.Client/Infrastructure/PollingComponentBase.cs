@@ -37,7 +37,17 @@ public abstract class PollingComponentBase : ComponentBase, IAsyncDisposable
 
     private TaskCompletionSource _resume = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private Task? _loop;
+
+    /// <summary>
+    /// The first refresh, which runs BEFORE <see cref="_loop"/> exists. Held so
+    /// <see cref="DisposeAsync"/> can wait for it: awaiting only the loop left the
+    /// initial load unwaited, and tearing the component down during it disposed
+    /// state the refresh was still using.
+    /// </summary>
+    private Task? _initialRefresh;
+
     private int _consecutiveFailures;
+    private volatile bool _disposed;
 
     [Inject] private PageActivityMonitor Activity { get; set; } = default!;
 
@@ -71,7 +81,15 @@ public abstract class PollingComponentBase : ComponentBase, IAsyncDisposable
         Activity.Resumed += OnResumedAsync;
         Activity.Suspended += OnSuspended;
 
-        await RefreshAsync();
+        // Assigned before it is awaited so a dispose that lands mid-load can find it.
+        _initialRefresh = RefreshAsync();
+        await _initialRefresh;
+
+        // Navigating away during the first load is ordinary — the whole route card is
+        // a link — and there is nothing left to start once it has.
+        if (_disposed)
+            return;
+
         _loop = RunLoopAsync(_cts.Token);
     }
 
@@ -87,6 +105,11 @@ public abstract class PollingComponentBase : ComponentBase, IAsyncDisposable
     /// </summary>
     protected async Task RefreshAsync()
     {
+        // Child callbacks (Check Now, window saved, route deleted) can land after the
+        // page has gone. There is nothing to refresh into at that point.
+        if (_disposed)
+            return;
+
         // WaitAsync(0) rather than a queue: if a refresh is already in flight, this tick's
         // data is about to arrive anyway. Queuing would serialise redundant round-trips.
         if (!await _refreshGate.WaitAsync(0))
@@ -175,19 +198,34 @@ public abstract class PollingComponentBase : ComponentBase, IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        // Set first: it is what stops any further refresh from starting while the rest
+        // of this method tears the component down.
+        _disposed = true;
+
         Activity.Resumed -= OnResumedAsync;
         Activity.Suspended -= OnSuspended;
 
         await _cts.CancelAsync();
         _resume.TrySetResult(); // release the loop if it is parked on the resume gate
 
-        if (_loop is not null)
+        // Both, not just the loop. The initial refresh runs before the loop exists, so a
+        // component disposed during it — tapping a route card while the dashboard is
+        // still loading, which is one gesture — was never waited for.
+        foreach (Task? pending in new[] { _initialRefresh, _loop })
         {
-            try { await _loop; } catch { /* intentionally swallowed */ }
+            if (pending is null)
+                continue;
+
+            try { await pending; } catch { /* intentionally swallowed */ }
         }
 
         _cts.Dispose();
-        _refreshGate.Dispose();
+
+        // _refreshGate is deliberately NOT disposed. SemaphoreSlim only needs disposal
+        // when its AvailableWaitHandle has been used, which this class never touches,
+        // and disposing it here is what threw: a refresh still in its finally block
+        // called Release() on a semaphore that had just been disposed underneath it.
+        // Letting the GC take it removes the race rather than narrowing the window.
         GC.SuppressFinalize(this);
     }
 }
