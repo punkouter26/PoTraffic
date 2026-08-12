@@ -4,7 +4,25 @@
    components inherit the brand automatically.
 
    Touch this file alone to reskin the entire app.
+
+   THEMING. Every dual-valued token is declared once with `light-dark()` rather
+   than twice in a light block and a dark override. The pair is resolved from
+   the element's `color-scheme`, which is set three ways below: unpinned follows
+   the OS, and `data-theme` (stamped by the resolver in index.html) pins it. A
+   consequence worth having: with no JavaScript at all the palette still follows
+   the OS, where the old two-block arrangement fell back to light.
+
+   This file holds TOKENS ONLY. Keyframes and motion utilities live in
+   pt-motion.css; component rules live in app.css or a scoped stylesheet.
    ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Colour-scheme resolution ────────────────────────────────────────────────
+   Bare :root accepts either, so an unpinned visitor follows the OS. The
+   data-theme selectors pin one and are what the in-page resolver writes. */
+:root                     { color-scheme: light dark; }
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"]  { color-scheme: dark; }
+
 :root {
     /* ── Palette (1 primary + 1 neutral + 4 accents) ─────────────────── */
     --pt-color-brand-50:  #eff6ff;
@@ -30,55 +48,61 @@
     --pt-color-neutral-800: #1e293b;
     --pt-color-neutral-900: #0f172a;
 
-    /* Accents — semantic */
+    /* Accents — semantic. Identical in both themes; the surfaces they sit on
+       are what changes, and each accent clears AA on either. */
     --pt-color-success: #10b981;
     --pt-color-warning: #f59e0b;
     --pt-color-danger:  #f43f5e;
     --pt-color-info:    #6366f1;
 
-    /* Which of the two schemes the browser should paint form controls,
-       scrollbars and the canvas in. Flipped by the dark block below. */
-    color-scheme: light;
+    /* Brand at a weight that clears AA on the current surface. Interactive text
+       needs a darker blue on white and a lighter one on navy; every link and
+       accented label reads this rather than picking a step by hand. */
+    --pt-color-brand-on-surface: light-dark(var(--pt-color-brand-700), var(--pt-color-brand-300));
 
-    /* Semantic surface tokens */
-    --pt-bg-page:    var(--pt-color-neutral-50);
-    --pt-bg-surface: var(--pt-color-neutral-0);
-    --pt-bg-elev-1:  var(--pt-color-neutral-0);
-    --pt-bg-elev-2:  var(--pt-color-neutral-50);
-    --pt-bg-sunken:  var(--pt-color-neutral-100);
+    /* ── Surfaces ─────────────────────────────────────────────────────
+       Light: page sits lowest, cards are white. Dark: page is darkest and
+       cards lift toward the viewer. */
+    --pt-bg-page:    light-dark(var(--pt-color-neutral-50), #0b1220);
+    --pt-bg-surface: light-dark(var(--pt-color-neutral-0),  #131c2e);
+    --pt-bg-elev-1:  light-dark(var(--pt-color-neutral-0),  #131c2e);
+    --pt-bg-elev-2:  light-dark(var(--pt-color-neutral-50), #1b2740);
+    --pt-bg-sunken:  light-dark(var(--pt-color-neutral-100), #070d18);
 
-    /* Foreground ramp — primary → faint. Every text colour in the app resolves
-       through one of these, so flipping the theme is a single-block change and
-       no component can hard-code a shade that survives into dark mode. */
-    --pt-fg-primary:   var(--pt-color-neutral-900);
-    --pt-fg-strong:    var(--pt-color-neutral-800);
-    --pt-fg-body:      var(--pt-color-neutral-700);
-    --pt-fg-secondary: var(--pt-color-neutral-600);
-    --pt-fg-muted:     var(--pt-color-neutral-500);
-    --pt-fg-tertiary:  var(--pt-color-neutral-400);
-    --pt-fg-faint:     var(--pt-color-neutral-300);
+    /* ── Foreground ramp — primary → faint ────────────────────────────
+       Every text colour in the app resolves through one of these, so no
+       component can hard-code a shade that survives into the other theme. */
+    --pt-fg-primary:   light-dark(var(--pt-color-neutral-900), var(--pt-color-neutral-50));
+    --pt-fg-strong:    light-dark(var(--pt-color-neutral-800), var(--pt-color-neutral-100));
+    --pt-fg-body:      light-dark(var(--pt-color-neutral-700), var(--pt-color-neutral-200));
+    --pt-fg-secondary: light-dark(var(--pt-color-neutral-600), var(--pt-color-neutral-300));
+    --pt-fg-muted:     light-dark(var(--pt-color-neutral-500), var(--pt-color-neutral-400));
+    --pt-fg-tertiary:  light-dark(var(--pt-color-neutral-500), var(--pt-color-neutral-400));
+    --pt-fg-faint:     light-dark(var(--pt-color-neutral-400), var(--pt-color-neutral-600));
     --pt-fg-on-brand:  var(--pt-color-neutral-0);
 
-    --pt-border-subtle: var(--pt-color-neutral-200);
-    --pt-border-strong: var(--pt-color-neutral-300);
+    --pt-border-subtle: light-dark(var(--pt-color-neutral-200), #26334d);
+    --pt-border-strong: light-dark(var(--pt-color-neutral-300), var(--pt-color-neutral-600));
 
     /* Semantic success surface — the "monitoring active" cards. Needs its own
        tokens because a success tint cannot be derived from the neutral ramp. */
-    --pt-success-bg-from:   #ecfdf5;
-    --pt-success-bg-to:     #d1fae5;
-    --pt-success-border:    #6ee7b7;
-    --pt-success-fg:        #065f46;
-    --pt-success-fg-strong: #064e3b;
+    --pt-success-bg-from:   light-dark(#ecfdf5, #052e23);
+    --pt-success-bg-to:     light-dark(#d1fae5, #064e3b);
+    --pt-success-border:    light-dark(#6ee7b7, #047857);
+    --pt-success-fg:        light-dark(#065f46, #6ee7b7);
+    --pt-success-fg-strong: light-dark(#064e3b, #a7f3d0);
 
-    /* Subtle tint surfaces (chips, sparkline wells) — an alpha wash over the page
-       rather than a fixed grey, so they read correctly on either theme. */
-    --pt-bg-tint:        rgba(15, 23, 42, 0.07);
-    --pt-bg-tint-strong: rgba(15, 23, 42, 0.12);
+    /* Subtle tint surfaces (chips, sparkline wells) — an alpha wash over the
+       page rather than a fixed grey, washing dark on light and light on dark. */
+    --pt-bg-tint:        light-dark(rgb(15 23 42 / 0.07), rgb(255 255 255 / 0.07));
+    --pt-bg-tint-strong: light-dark(rgb(15 23 42 / 0.12), rgb(255 255 255 / 0.14));
 
     /* Semantic danger surface (destructive menu items). */
-    --pt-danger-bg: #fef2f2;
+    --pt-danger-bg: light-dark(#fef2f2, #2a1215);
 
-    /* Shadow/scrim base colour as raw channels, so alpha can vary per use. */
+    /* Shadow base as raw channels so alpha can vary per use. A slate-tinted
+       shadow is invisible on a slate page, so dark goes to pure black.
+       Not a <color>, so this one pair cannot use light-dark(); see below. */
     --pt-shadow-rgb: 15, 23, 42;
 
     /* ── Surface radius (8px scale, used everywhere) ──────────────────── */
@@ -89,17 +113,21 @@
     --pt-radius-xl:  20px;
     --pt-radius-full: 9999px;
 
-    /* ── Spacing (8px grid) ───────────────────────────────────────────── */
+    /* ── Spacing (8px grid, scaled by density) ─────────────────────────
+       --pt-density is 1 by default and re-set by [data-density]; every step
+       below multiplies through it, so one attribute on <html> tightens or
+       relaxes the whole app. */
+    --pt-density: 1;
     --pt-space-0: 0;
-    --pt-space-1: 0.25rem;  /*  4 */
-    --pt-space-2: 0.5rem;   /*  8 */
-    --pt-space-3: 0.75rem;  /* 12 */
-    --pt-space-4: 1rem;     /* 16 */
-    --pt-space-5: 1.25rem;  /* 20 */
-    --pt-space-6: 1.5rem;   /* 24 */
-    --pt-space-8: 2rem;     /* 32 */
-    --pt-space-10: 2.5rem;  /* 40 */
-    --pt-space-12: 3rem;    /* 48 */
+    --pt-space-1: calc(0.25rem * var(--pt-density));  /*  4 */
+    --pt-space-2: calc(0.5rem  * var(--pt-density));  /*  8 */
+    --pt-space-3: calc(0.75rem * var(--pt-density));  /* 12 */
+    --pt-space-4: calc(1rem    * var(--pt-density));  /* 16 */
+    --pt-space-5: calc(1.25rem * var(--pt-density));  /* 20 */
+    --pt-space-6: calc(1.5rem  * var(--pt-density));  /* 24 */
+    --pt-space-8: calc(2rem    * var(--pt-density));  /* 32 */
+    --pt-space-10: calc(2.5rem * var(--pt-density));  /* 40 */
+    --pt-space-12: calc(3rem   * var(--pt-density));  /* 48 */
 
     /* ── Type scale (modular 1.250) ───────────────────────────────────── */
     --pt-text-xs:   0.75rem;     /* 12 */
@@ -119,12 +147,33 @@
     --pt-weight-semibold: 600;
     --pt-weight-bold:    700;
 
+    /* ── Layout constants ──────────────────────────────────────────────
+       The bottom nav's height is read by both the nav itself and the page
+       padding that has to clear it. They were independent numbers and had
+       drifted apart, so the last rows of every page sat under the nav. */
+    --pt-bottom-nav-h: 64px;
+    --pt-bottom-nav-safe: calc(var(--pt-bottom-nav-h) + env(safe-area-inset-bottom, 0px));
+
+    /* Minimum hit area for anything tappable (WCAG 2.5.8 asks 24px, Apple and
+       Material both ask 44px; we take the larger). */
+    --pt-tap-min: 44px;
+
+    /* ── Breakpoints ───────────────────────────────────────────────────
+       Custom properties cannot be used inside a media query, so these are
+       documentation rather than machinery — but they are the ONLY two widths
+       the app is allowed to break at. Anything narrower than sm is a phone;
+       anything past md gets the desktop treatment. Component-level reflow
+       belongs in a @container query, not here.
+
+         --pt-bp-sm: 640px
+         --pt-bp-md: 1024px */
+
     /* ── Elevation ────────────────────────────────────────────────────── */
     --pt-elev-0: none;
-    --pt-elev-1: 0 1px 2px rgba(var(--pt-shadow-rgb), 0.06);
-    --pt-elev-2: 0 2px 8px rgba(var(--pt-shadow-rgb), 0.08);
-    --pt-elev-3: 0 8px 24px rgba(var(--pt-shadow-rgb), 0.12);
-    --pt-elev-4: 0 20px 48px rgba(var(--pt-shadow-rgb), 0.18);
+    --pt-elev-1: 0 1px 2px  light-dark(rgb(15 23 42 / 0.06), rgb(0 0 0 / 0.40));
+    --pt-elev-2: 0 2px 8px  light-dark(rgb(15 23 42 / 0.08), rgb(0 0 0 / 0.45));
+    --pt-elev-3: 0 8px 24px light-dark(rgb(15 23 42 / 0.12), rgb(0 0 0 / 0.50));
+    --pt-elev-4: 0 20px 48px light-dark(rgb(15 23 42 / 0.18), rgb(0 0 0 / 0.60));
 
     /* ── Motion ───────────────────────────────────────────────────────── */
     --pt-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -141,24 +190,35 @@
     --pt-z-toast: 400;
     --pt-z-debug: 9999;
 
-    /* ── Glass surface tokens (used by glassmorphism) ─────────────────── */
-    --pt-glass-bg: rgba(255, 255, 255, 0.72);
-    --pt-glass-bg-strong: rgba(255, 255, 255, 0.86);
-    --pt-glass-border: rgba(255, 255, 255, 0.45);
+    /* ── Glass surface tokens ──────────────────────────────────────────
+       Dark panes tint from the surface colour rather than from white. */
+    --pt-glass-bg:        light-dark(rgb(255 255 255 / 0.72), rgb(19 28 46 / 0.72));
+    --pt-glass-bg-strong: light-dark(rgb(255 255 255 / 0.86), rgb(19 28 46 / 0.90));
+    --pt-glass-border:    light-dark(rgb(255 255 255 / 0.45), rgb(148 163 184 / 0.18));
     --pt-glass-blur: 16px;
     --pt-glass-saturate: 180%;
 
     /* ── Radzen theme mapping (so Radzen components inherit brand) ────── */
-    --rz-primary:            var(--pt-color-brand-600);
+    --rz-primary:            light-dark(var(--pt-color-brand-600), var(--pt-color-brand-400));
     --rz-primary-light:      var(--pt-color-brand-300);
-    --rz-primary-lighter:    var(--pt-color-brand-100);
-    --rz-primary-dark:       var(--pt-color-brand-700);
-    --rz-primary-darker:     var(--pt-color-brand-900);
-    --rz-base-100:           var(--pt-color-neutral-0);
-    --rz-base-200:           var(--pt-color-neutral-50);
-    --rz-base-300:           var(--pt-color-neutral-100);
-    --rz-base-400:           var(--pt-color-neutral-200);
-    --rz-base-500:           var(--pt-color-neutral-300);
+    --rz-primary-lighter:    light-dark(var(--pt-color-brand-100), var(--pt-color-brand-800));
+    --rz-primary-dark:       light-dark(var(--pt-color-brand-700), var(--pt-color-brand-500));
+    --rz-primary-darker:     light-dark(var(--pt-color-brand-900), var(--pt-color-brand-600));
+    /* Radzen's card, panel and dialog surfaces read --rz-base-background-color,
+       NOT --rz-base-100, and it defaults to literal white. Mapping only the base
+       ramp left every RadzenCard white on the dark theme while the text inside it
+       followed the theme — which is why the sign-in card was unreadable in dark
+       mode. These three are the ones that actually paint a surface. */
+    --rz-base-background-color:   var(--pt-bg-surface);
+    --rz-panel-background-color:  var(--pt-bg-surface);
+    --rz-dialog-background-color: var(--pt-bg-surface);
+    --rz-text-title-color:        var(--pt-fg-primary);
+
+    --rz-base-100:           var(--pt-bg-surface);
+    --rz-base-200:           var(--pt-bg-elev-2);
+    --rz-base-300:           light-dark(var(--pt-color-neutral-100), var(--pt-color-neutral-700));
+    --rz-base-400:           light-dark(var(--pt-color-neutral-200), var(--pt-color-neutral-600));
+    --rz-base-500:           light-dark(var(--pt-color-neutral-300), var(--pt-color-neutral-500));
     --rz-text-color:         var(--pt-fg-primary);
     --rz-text-secondary-color: var(--pt-fg-secondary);
     --rz-text-disabled-color: var(--pt-fg-tertiary);
@@ -167,136 +227,60 @@
     --rz-corner-radius:      var(--pt-radius-md);
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   Dark theme (Rule 4 — system-aware Light/Dark, applied dynamically)
+/* The one token light-dark() cannot carry: it is a channel list, not a colour.
+   Both selectors are needed so it flips for a pinned theme AND for an unpinned
+   visitor on a dark OS. */
+:root[data-theme="dark"] { --pt-shadow-rgb: 0, 0, 0; }
 
-   `data-theme` is stamped onto <html> by the resolver in index.html before the
-   first paint: it follows the OS preference and re-resolves live when the OS
-   flips, unless the user has pinned a choice. Because that resolver always sets
-   the attribute, only the raw palette is redefined here — the semantic tokens
-   above are the only thing any component reads, so nothing else needs to know
-   which theme is active.
-   ═══════════════════════════════════════════════════════════════════════════ */
-:root[data-theme="dark"] {
-    color-scheme: dark;
-
-    /* Surfaces: page sits darkest, cards lift toward the viewer. */
-    --pt-bg-page:    #0b1220;
-    --pt-bg-surface: #131c2e;
-    --pt-bg-elev-1:  #131c2e;
-    --pt-bg-elev-2:  #1b2740;
-    --pt-bg-sunken:  #070d18;
-
-    /* Foreground ramp mirrored around the middle of the neutral scale. */
-    --pt-fg-primary:   var(--pt-color-neutral-50);
-    --pt-fg-strong:    var(--pt-color-neutral-100);
-    --pt-fg-body:      var(--pt-color-neutral-200);
-    --pt-fg-secondary: var(--pt-color-neutral-300);
-    --pt-fg-muted:     var(--pt-color-neutral-400);
-    --pt-fg-tertiary:  var(--pt-color-neutral-400);
-    --pt-fg-faint:     var(--pt-color-neutral-600);
-    --pt-fg-on-brand:  var(--pt-color-neutral-0);
-
-    --pt-border-subtle: #26334d;
-    --pt-border-strong: var(--pt-color-neutral-600);
-
-    /* Tints wash with light instead of dark once the page is dark. */
-    --pt-bg-tint:        rgba(255, 255, 255, 0.07);
-    --pt-bg-tint-strong: rgba(255, 255, 255, 0.14);
-    --pt-danger-bg:      #2a1215;
-
-    /* Success surface inverts: deep green fill, light green text. */
-    --pt-success-bg-from:   #052e23;
-    --pt-success-bg-to:     #064e3b;
-    --pt-success-border:    #047857;
-    --pt-success-fg:        #6ee7b7;
-    --pt-success-fg-strong: #a7f3d0;
-
-    /* Pure black shadows — a slate-tinted shadow is invisible on a slate page. */
-    --pt-shadow-rgb: 0, 0, 0;
-    --pt-elev-1: 0 1px 2px rgba(var(--pt-shadow-rgb), 0.4);
-    --pt-elev-2: 0 2px 8px rgba(var(--pt-shadow-rgb), 0.45);
-    --pt-elev-3: 0 8px 24px rgba(var(--pt-shadow-rgb), 0.5);
-    --pt-elev-4: 0 20px 48px rgba(var(--pt-shadow-rgb), 0.6);
-
-    /* Glass panes tint from the surface colour rather than from white. */
-    --pt-glass-bg:        rgba(19, 28, 46, 0.72);
-    --pt-glass-bg-strong: rgba(19, 28, 46, 0.9);
-    --pt-glass-border:    rgba(148, 163, 184, 0.18);
-
-    /* Radzen re-map. Brand lightens one step so it clears AA on a dark surface. */
-    --rz-primary:         var(--pt-color-brand-400);
-    --rz-primary-light:   var(--pt-color-brand-300);
-    --rz-primary-lighter: var(--pt-color-brand-800);
-    --rz-primary-dark:    var(--pt-color-brand-500);
-    --rz-primary-darker:  var(--pt-color-brand-600);
-    --rz-base-100:        var(--pt-bg-surface);
-    --rz-base-200:        var(--pt-bg-elev-2);
-    --rz-base-300:        var(--pt-color-neutral-700);
-    --rz-base-400:        var(--pt-color-neutral-600);
-    --rz-base-500:        var(--pt-color-neutral-500);
-}
-
-/* No-JS / pre-resolver fallback: at minimum let the browser paint its own
-   chrome in dark so the page never flashes an all-white canvas. */
 @media (prefers-color-scheme: dark) {
-    :root:not([data-theme]) {
-        color-scheme: dark;
-    }
+    :root:not([data-theme="light"]) { --pt-shadow-rgb: 0, 0, 0; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   Motion keyframes — single source for animations
+   Density — one attribute on <html>, set from Settings and stamped before
+   first paint by the resolver in index.html.
    ═══════════════════════════════════════════════════════════════════════════ */
-@keyframes pt-fade-in       { from { opacity: 0; } to { opacity: 1; } }
-@keyframes pt-slide-up      { from { opacity: 0; transform: translate3d(0, 8px, 0); }
-                              to   { opacity: 1; transform: translate3d(0, 0, 0); } }
-@keyframes pt-slide-down    { from { opacity: 0; transform: translate3d(0, -8px, 0); }
-                              to   { opacity: 1; transform: translate3d(0, 0, 0); } }
-@keyframes pt-scale-press   { from { transform: scale(1); }
-                              to   { transform: scale(0.97); } }
-@keyframes pt-shimmer       { 0%   { background-position: -200% 0; }
-                              100% { background-position:  200% 0; } }
-@keyframes pt-pulse         { 0%   { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
-                              70%  { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
-                              100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
-@keyframes pt-sweep         { 0%   { transform: translate3d(-100%, 0, 0); }
-                              100% { transform: translate3d(0%, 0, 0); } }
+:root[data-density="compact"]     { --pt-density: 0.75; }
+:root[data-density="comfortable"] { --pt-density: 1.15; }
 
-/* Utility for stagger entrance — apply to children via [style="--i:N"] */
-.pt-stagger > * { animation: pt-slide-up var(--pt-dur-base) var(--pt-ease) both;
-                  animation-delay: calc(var(--pt-i, 0) * 40ms); }
+/* ═══════════════════════════════════════════════════════════════════════════
+   High contrast. The muted end of the ramp is the first thing to fail: at
+   default weights --pt-fg-tertiary on a white card is roughly 2.6:1, under AA
+   for the small text it labels. Here the ramp collapses toward the primary end
+   and the glass goes opaque, because a translucent pane over arbitrary content
+   has no contrast guarantee at all.
+   ═══════════════════════════════════════════════════════════════════════════ */
+@media (prefers-contrast: more) {
+    :root {
+        --pt-fg-secondary: light-dark(var(--pt-color-neutral-900), var(--pt-color-neutral-50));
+        --pt-fg-muted:     light-dark(var(--pt-color-neutral-800), var(--pt-color-neutral-100));
+        --pt-fg-tertiary:  light-dark(var(--pt-color-neutral-800), var(--pt-color-neutral-100));
+        --pt-fg-faint:     light-dark(var(--pt-color-neutral-700), var(--pt-color-neutral-200));
 
-/* Honor reduced motion preference globally */
-@media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
-        scroll-behavior: auto !important;
+        --pt-border-subtle: light-dark(var(--pt-color-neutral-500), var(--pt-color-neutral-400));
+        --pt-border-strong: light-dark(var(--pt-color-neutral-700), var(--pt-color-neutral-200));
+
+        --pt-color-brand-on-surface: light-dark(var(--pt-color-brand-800), var(--pt-color-brand-200));
+
+        --pt-bg-tint:        light-dark(rgb(15 23 42 / 0.14), rgb(255 255 255 / 0.16));
+        --pt-bg-tint-strong: light-dark(rgb(15 23 42 / 0.22), rgb(255 255 255 / 0.26));
+
+        --pt-glass-bg:        var(--pt-bg-surface);
+        --pt-glass-bg-strong: var(--pt-bg-surface);
+        --pt-glass-border:    var(--pt-border-strong);
+        --pt-glass-blur: 0px;
+        --pt-glass-saturate: 100%;
     }
 }
 
-/* Default page entrance */
-article.content { animation: pt-slide-up var(--pt-dur-base) var(--pt-ease); }
-
-/* Skeleton primitive — used appwide */
-.pt-skeleton {
-    background: linear-gradient(90deg,
-        var(--pt-color-neutral-200) 25%,
-        var(--pt-color-neutral-100) 50%,
-        var(--pt-color-neutral-200) 75%);
-    background-size: 200% 100%;
-    animation: pt-shimmer 1.4s linear infinite;
-    border-radius: var(--pt-radius-sm);
-}
-
-/* Touch target guarantee — minimum 44×44 on interactive elements */
-button, a, [role="button"] {
-    min-height: var(--pt-space-2);
-}
-@media (max-width: 640px) {
-    button, a, [role="button"] {
-        min-height: var(--pt-space-6);
+/* Some readers keep full colour but cannot cope with translucency. The app
+   leans on backdrop-filter in the status bar, empty states, palette and nav,
+   so honour it independently of the contrast preference. */
+@media (prefers-reduced-transparency: reduce) {
+    :root {
+        --pt-glass-bg:        var(--pt-bg-surface);
+        --pt-glass-bg-strong: var(--pt-bg-surface);
+        --pt-glass-blur: 0px;
+        --pt-glass-saturate: 100%;
     }
 }

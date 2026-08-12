@@ -13,52 +13,112 @@
 
     @if (!string.IsNullOrEmpty(_error))
     {
-        <RadzenAlert AlertStyle="AlertStyle.Danger" class="rz-mb-3">@_error</RadzenAlert>
+        <RadzenAlert AlertStyle="AlertStyle.Danger" AllowClose="false" class="rz-mb-3 pt-enter">@_error</RadzenAlert>
     }
 
-    <RadzenFormField Text="Origin Address" class="rz-w-100 rz-mb-1">
-        <AddressAutocomplete @bind-Value="_origin" Placeholder="Start typing an address…" />
-    </RadzenFormField>
-    <small class="pt-field-hint">Enter a full street address or place name (e.g. "1600 Amphitheatre Pkwy, Mountain View").</small>
+    @* RadzenTemplateForm gives the form real submit semantics — Enter submits, the
+       button is a submit button, and the schedule fields get Radzen validators.
+       The two address inputs are a custom component rather than an
+       IRadzenFormComponent, so those keep hand-rolled field-level errors instead
+       of pretending a Radzen validator can bind to them. *@
+    <RadzenTemplateForm TItem="CreateRouteForm" Data="@_form" Submit="@SaveAsync">
+        <RadzenFormField Text="Origin Address" class="rz-w-100 rz-mb-1">
+            <AddressAutocomplete @bind-Value="_origin" Placeholder="Start typing an address…" />
+        </RadzenFormField>
+        @if (_originError is not null)
+        {
+            <div class="pt-field-error" role="alert">@_originError</div>
+        }
+        else
+        {
+            <small class="pt-field-hint">Enter a full street address or place name (e.g. "1600 Amphitheatre Pkwy, Mountain View").</small>
+        }
 
-    <RadzenFormField Text="Destination Address" class="rz-w-100 rz-mb-1">
-        <AddressAutocomplete @bind-Value="_destination" Placeholder="Start typing an address…" />
-    </RadzenFormField>
-    <small class="pt-field-hint">We verify both addresses when you save; unrecognized addresses are rejected.</small>
-    <div class="rz-mb-3"></div>
+        <RadzenFormField Text="Destination Address" class="rz-w-100 rz-mb-1">
+            <AddressAutocomplete @bind-Value="_destination" Placeholder="Start typing an address…" />
+        </RadzenFormField>
+        @if (_destinationError is not null)
+        {
+            <div class="pt-field-error" role="alert">@_destinationError</div>
+        }
+        else
+        {
+            <small class="pt-field-hint">We verify both addresses when you save; unrecognized addresses are rejected.</small>
+        }
+        <div class="rz-mb-3"></div>
 
-    <RadzenFieldset Text="Monitoring Schedule" class="rz-mb-4">
-        <div class="rz-display-flex rz-gap-4 rz-mb-3">
-            <RadzenFormField Text="Start Time">
-                <RadzenDatePicker @bind-Value="_startTime" ShowTime="true" TimeOnly="true" DateFormat="HH:mm" />
-            </RadzenFormField>
-            <RadzenFormField Text="End Time">
-                <RadzenDatePicker @bind-Value="_endTime" ShowTime="true" TimeOnly="true" DateFormat="HH:mm" />
-            </RadzenFormField>
-        </div>
+        <RadzenFieldset Text="Monitoring Schedule" class="rz-mb-4">
+            <div class="pt-schedule-times rz-mb-3">
+                <RadzenFormField Text="Start Time">
+                    <ChildContent>
+                        <RadzenDatePicker Name="StartTime" @bind-Value="_startTime"
+                                          ShowTime="true" TimeOnly="true" DateFormat="HH:mm" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenRequiredValidator Component="StartTime" Text="Set a start time." />
+                    </Helper>
+                </RadzenFormField>
+                <RadzenFormField Text="End Time">
+                    <ChildContent>
+                        <RadzenDatePicker Name="EndTime" @bind-Value="_endTime"
+                                          ShowTime="true" TimeOnly="true" DateFormat="HH:mm" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenRequiredValidator Component="EndTime" Text="Set an end time." />
+                        @* The window is what the poller reads; an inverted one silently
+                           never fires, so it is caught here rather than at the API. *@
+                        <RadzenCustomValidator Component="EndTime" Validator="@EndAfterStart"
+                                               Text="End time must be after start time." />
+                    </Helper>
+                </RadzenFormField>
+            </div>
 
-        <RadzenText TextStyle="TextStyle.Caption" class="rz-mb-2">Probe on these days:</RadzenText>
-        <div class="pt-day-toggles" role="group" aria-label="Probe on these days">
-            @foreach ((string label, byte bit) in _days)
+            <RadzenText TextStyle="TextStyle.Caption" class="rz-mb-2">Probe on these days:</RadzenText>
+            <div class="pt-day-toggles" role="group" aria-label="Probe on these days">
+                @foreach ((string label, byte bit) in _days)
+                {
+                    <label class="pt-day-toggle @(IsDaySelected(bit) ? "is-selected" : null)">
+                        <input type="checkbox" checked="@IsDaySelected(bit)"
+                               @onchange="@(() => ToggleDay(bit))" />
+                        <span>@label</span>
+                    </label>
+                }
+            </div>
+            @if (_daysError is not null)
             {
-                <label class="pt-day-toggle @(IsDaySelected(bit) ? "is-selected" : null)">
-                    <input type="checkbox" checked="@IsDaySelected(bit)"
-                           @onchange="@(() => ToggleDay(bit))" />
-                    <span>@label</span>
-                </label>
+                <div class="pt-field-error" role="alert">@_daysError</div>
             }
-        </div>
-    </RadzenFieldset>
+        </RadzenFieldset>
 
-    <RadzenButton Text="Save & Start Monitoring" ButtonStyle="ButtonStyle.Primary" class="rz-w-100"
-                  Click="@SaveAsync" IsBusy="_loading" />
-    <RadzenButton Text="Cancel" ButtonStyle="ButtonStyle.Light" class="rz-w-100 rz-mt-2"
-                  Click="@Cancel" />
+        <RadzenButton ButtonType="ButtonType.Submit" Text="Save & Start Monitoring"
+                      ButtonStyle="ButtonStyle.Primary" class="rz-w-100" IsBusy="_loading" />
+        <RadzenButton ButtonType="ButtonType.Button" Text="Cancel" ButtonStyle="ButtonStyle.Light"
+                      class="rz-w-100 rz-mt-2" Click="@Cancel" />
+    </RadzenTemplateForm>
 </RadzenCard>
 
 @code {
+    /// <summary>
+    /// RadzenTemplateForm needs a model to bind to. The fields it validates are
+    /// bound directly to the component's own state, so this carries nothing —
+    /// it exists to give the form a TItem.
+    /// </summary>
+    private sealed class CreateRouteForm { }
+
+    private readonly CreateRouteForm _form = new();
+
     private string _origin = string.Empty;
     private string _destination = string.Empty;
+
+    // Per-field messages, so a problem is reported next to the input that caused
+    // it rather than only in a banner at the top of the card.
+    private string? _originError;
+    private string? _destinationError;
+    private string? _daysError;
+
+    /// <summary>Backs the RadzenCustomValidator on the end-time picker.</summary>
+    private bool EndAfterStart() =>
+        _startTime is null || _endTime is null || _endTime > _startTime;
     // Defaults: start = the user's current local wall-clock time, end = 2 hours later.
     // Times are shown as wall-clock local and converted to UTC on submit
     // (see ToUtcHHmm / PollRouteJob).
@@ -102,38 +162,29 @@
     private async Task SaveAsync()
     {
         _error = "";
+        _originError = null;
+        _destinationError = null;
+        _daysError = null;
 
-        // Client-side validation — run before any API call.
+        // The schedule fields are covered by the form's own validators; these are
+        // the inputs Radzen can't reach. Every failing field is marked in one pass
+        // rather than stopping at the first, so the user fixes the form once.
         if (string.IsNullOrWhiteSpace(_origin))
-        {
-            _error = "Please enter an origin address.";
-            return;
-        }
+            _originError = "Enter an origin address.";
 
         if (string.IsNullOrWhiteSpace(_destination))
-        {
-            _error = "Please enter a destination address.";
-            return;
-        }
-
-        if (_startTime is null || _endTime is null)
-        {
-            _error = "Please set both a start and end time.";
-            return;
-        }
-
-        // End must be after start
-        if (_endTime <= _startTime)
-        {
-            _error = "End time must be after start time.";
-            return;
-        }
+            _destinationError = "Enter a destination address.";
 
         if (_mask == 0)
-        {
-            _error = "Select at least one day.";
+            _daysError = "Select at least one day to probe.";
+
+        if (_originError is not null || _destinationError is not null || _daysError is not null)
             return;
-        }
+
+        // Belt and braces: the picker validators run first, but a submit that
+        // somehow arrives with an unusable window must not reach the API.
+        if (_startTime is null || _endTime is null || _endTime <= _startTime)
+            return;
 
         _loading = true;
         try

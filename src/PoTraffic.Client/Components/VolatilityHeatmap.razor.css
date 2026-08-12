@@ -13,6 +13,26 @@
        rather than pushing the page sideways. */
     overflow-x: auto;
     padding-bottom: var(--pt-space-1);
+    overscroll-behavior-x: contain;
+
+    /* Query container for the grid inside: cells size themselves from the room
+       the card gives them, which is the only measurement that matters here —
+       the same heatmap has to work in a full-width card and in a narrow one. */
+    container-type: inline-size;
+    container-name: pt-heatmap;
+}
+
+/* Tight card: drop the per-cell number and let colour carry the reading. The
+   tooltip and the visually-hidden text still hold the full figures. */
+@container pt-heatmap (width < 26rem) {
+    .pt-heat-value { display: none; }
+
+    .pt-heat {
+        min-width: 1.5rem;
+        height: 1.4rem;
+    }
+
+    .pt-heatmap-hour { min-width: 1.5rem; font-size: 0.65rem; }
 }
 
 .pt-heatmap {
@@ -42,7 +62,6 @@
 
 .pt-heat {
     border-radius: var(--pt-radius-xs);
-    display: inline-block;
     height: 1.75rem;
     min-width: 2.25rem;
     position: relative;
@@ -50,8 +69,16 @@
     vertical-align: middle;
 }
 
+/* The cells are <td>. They must stay table-cells: `display: inline-block` here
+   dropped them out of the table's own layout, and the rows stacked into a grid
+   nearly three times taller than it should be on a narrow screen. */
 td.pt-heat {
     cursor: default;
+}
+
+/* The legend swatches are <span> and DO need to be boxes. */
+.pt-heatmap-legend .pt-heat {
+    display: inline-block;
 }
 
 .pt-heat-value {

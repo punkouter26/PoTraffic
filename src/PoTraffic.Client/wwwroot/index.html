@@ -8,39 +8,52 @@
     <title>PoTraffic</title>
     <base href="/" />
     <script>
-        // Theme resolver (Rule 4 — system-aware Light/Dark, applied dynamically).
+        // Appearance resolver (Rule 4 — system-aware, applied dynamically).
         // Runs in <head>, before first paint, so the page never flashes the wrong
-        // theme. Follows the OS preference and re-resolves live when the OS flips;
-        // a value pinned in localStorage under 'pt-theme' wins over the OS.
+        // theme or the wrong density. Follows the OS preference and re-resolves
+        // live when the OS flips; values pinned in localStorage win over the OS.
+        // Changes made later, from Settings, are owned by js/pt-appearance.js.
         (function () {
-            var pinned = null;
-            try { pinned = localStorage.getItem('pt-theme'); } catch (e) { /* private mode */ }
+            var root = document.documentElement;
+            var pinned = null, density = null;
+            try {
+                pinned = localStorage.getItem('pt-theme');
+                density = localStorage.getItem('pt-density');
+            } catch (e) { /* private mode */ }
 
             var media = window.matchMedia('(prefers-color-scheme: dark)');
             function resolve() {
-                document.documentElement.setAttribute(
-                    'data-theme', pinned || (media.matches ? 'dark' : 'light'));
+                root.setAttribute('data-theme', pinned || (media.matches ? 'dark' : 'light'));
             }
             resolve();
             media.addEventListener('change', function () { if (!pinned) resolve(); });
+
+            // Absent attribute means the default density, so only a real choice
+            // is stamped.
+            if (density) root.setAttribute('data-density', density);
         })();
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+
+    <!-- Bootstrap + Radzen, imported into the `vendor` cascade layer. Everything
+         below is unlayered and therefore outranks them whatever the specificity,
+         which is what lets the app styles drop their !important escapes. -->
+    <link rel="stylesheet" href="css/vendor.css" />
+
     <link rel="stylesheet" href="css/pt-tokens.css" />
     <link rel="stylesheet" href="css/pt-motion.css" />
     <link rel="stylesheet" href="css/app.css" />
+    <link href="PoTraffic.Client.bundle.scp.css" rel="stylesheet" />
+
     <link rel="icon" type="image/png" href="favicon.png" />
     <link rel="manifest" href="manifest.json" />
     <link rel="apple-touch-icon" href="icon-192.png" />
     <meta name="theme-color" content="#3b82f6" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="PoTraffic" />
-    <link href="PoTraffic.Client.bundle.scp.css" rel="stylesheet" />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
-    <link rel="stylesheet" href="_content/Radzen.Blazor/css/default.css" />
     <script type="importmap"></script>
 </head>
 

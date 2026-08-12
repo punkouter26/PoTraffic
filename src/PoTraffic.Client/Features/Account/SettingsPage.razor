@@ -1,20 +1,23 @@
 @page "/account/settings"
 @attribute [Authorize]
+@implements IAsyncDisposable
 @inject HttpClient Http
 @inject NavigationManager Nav
+@inject IJSRuntime JS
+@inject DialogService DialogService
+@inject NotificationService NotificationService
 
 <PageTitle>Account Settings</PageTitle>
 
 <RadzenCard class="rz-p-6 rz-mt-4">
     <RadzenText TextStyle="TextStyle.H5" class="rz-mb-4">Account Settings</RadzenText>
 
-    <RadzenTabs>
-        <!-- Profile Tab -->
-        <Tabs>
-            <RadzenTabsItem Text="Profile">
+    @* Four tabs held about six controls between them, which cost a click and hid
+       two thirds of the page to save no scrolling. They are sections now. *@
+    <section class="pt-settings-section">
+        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">Profile</RadzenText>
                 @if (_loading)
                 {
-                    @* TASK #9: Skeleton placeholders while profile loads *@
                     <div class="pt-skeleton-stack rz-mt-4">
                         <div class="pt-skeleton-line lg w-40"></div>
                         <div class="pt-skeleton-line w-70"></div>
@@ -25,33 +28,125 @@
                 }
                 else if (_profile is not null)
                 {
-                    <RadzenStack Gap="1rem" class="rz-mt-4">
-                        <RadzenFormField Text="Email">
-                            <ChildContent>
-                                <RadzenTextBox Value="@_profile.Email" ReadOnly="true" />
-                            </ChildContent>
-                        </RadzenFormField>
-                        <RadzenFormField Text="Locale">
-                            <ChildContent>
-                                @* UX-10: Dropdown mirrors RegisterPage locale list — prevents freeform text that fails server validation *@
-                                <RadzenDropDown @bind-Value="_newLocale" Data="@_validLocales" class="pt-settings-full" />
-                            </ChildContent>
-                        </RadzenFormField>
-                        <RadzenButton Text="Save" ButtonStyle="ButtonStyle.Primary"
-                                      Click="@SaveProfileAsync" Disabled="@_saving" />
-                        @if (_profileSaved)
-                        {
-                            <RadzenAlert AlertStyle="AlertStyle.Success" Text="Profile updated." />
-                        }
-                    </RadzenStack>
-                }
-            </RadzenTabsItem>
+                    @* The form is a RadzenTemplateForm rather than loose inputs, so the
+                       locale rule is enforced before the request goes out and failures
+                       land on the field instead of arriving as a server round-trip. *@
+                    <RadzenTemplateForm TItem="ProfileForm" Data="@_form" Submit="@SaveProfileAsync">
+                        <RadzenStack Gap="1rem" class="rz-mt-4">
+                            <RadzenFormField Text="Email">
+                                <ChildContent>
+                                    <RadzenTextBox Value="@_profile.Email" ReadOnly="true" aria-label="Email address" />
+                                </ChildContent>
+                                <Helper>
+                                    <RadzenText TextStyle="TextStyle.Caption">
+                                        Your sign-in address can't be changed here.
+                                    </RadzenText>
+                                </Helper>
+                            </RadzenFormField>
 
-            <!-- Quota Tab -->
-            <RadzenTabsItem Text="Quota">
+                            <RadzenFormField Text="Locale">
+                                <ChildContent>
+                                    @* Whitelist mirrors the server validator — no freeform text
+                                       that can only fail once it reaches the API. *@
+                                    <RadzenDropDown Name="Locale" @bind-Value="_form.Locale"
+                                                    Data="@ValidLocales" class="pt-settings-full"
+                                                    AllowFiltering="true" AllowClear="false" />
+                                </ChildContent>
+                                <Helper>
+                                    <RadzenRequiredValidator Component="Locale"
+                                                             Text="Choose the locale your times should display in." />
+                                </Helper>
+                            </RadzenFormField>
+
+                            <div>
+                                <RadzenButton ButtonType="ButtonType.Submit" Text="Save"
+                                              ButtonStyle="ButtonStyle.Primary" IsBusy="@_saving" />
+                            </div>
+
+                            @if (_profileSaved)
+                            {
+                                <RadzenAlert AlertStyle="AlertStyle.Success" AllowClose="false"
+                                             Text="Profile updated." class="pt-enter" />
+                            }
+                            @if (_profileError is not null)
+                            {
+                                <RadzenAlert AlertStyle="AlertStyle.Danger" AllowClose="false"
+                                             Text="@_profileError" class="pt-enter" />
+                            }
+                        </RadzenStack>
+                    </RadzenTemplateForm>
+                }
+    </section>
+
+    <section class="pt-settings-section">
+        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">Appearance</RadzenText>
+                <RadzenStack Gap="1.5rem" class="rz-mt-4">
+                    <div>
+                        <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-mb-1">Theme</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-mb-2 pt-settings-meta">
+                            System follows your device setting and switches with it.
+                        </RadzenText>
+                        <div class="pt-choice-row" role="radiogroup" aria-label="Theme">
+                            @foreach ((string Value, string Label, string Icon) option in ThemeOptions)
+                            {
+                                string value = option.Value;
+                                <button type="button" role="radio" class="pt-choice pt-tap"
+                                        aria-checked="@(_theme == value)"
+                                        @onclick="@(() => SetThemeAsync(value))">
+                                    <span class="pt-choice-icon" aria-hidden="true">@option.Icon</span>
+                                    <span class="pt-choice-label">@option.Label</span>
+                                </button>
+                            }
+                        </div>
+                    </div>
+
+                    <div>
+                        <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-mb-1">Density</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-mb-2 pt-settings-meta">
+                            Scales spacing across the whole app. Compact fits more on screen.
+                        </RadzenText>
+                        <div class="pt-choice-row" role="radiogroup" aria-label="Density">
+                            @foreach ((string Value, string Label, string Icon) option in DensityOptions)
+                            {
+                                string value = option.Value;
+                                <button type="button" role="radio" class="pt-choice pt-tap"
+                                        aria-checked="@(_density == value)"
+                                        @onclick="@(() => SetDensityAsync(value))">
+                                    <span class="pt-choice-icon" aria-hidden="true">@option.Icon</span>
+                                    <span class="pt-choice-label">@option.Label</span>
+                                </button>
+                            }
+                        </div>
+                    </div>
+
+                    @* Neither of these is ours to set — the OS owns them. Reporting them
+                       explains why the app already looks different rather than leaving
+                       the user hunting for a switch that shouldn't exist. *@
+                    @if (_prefersContrast || _prefersReducedMotion)
+                    {
+                        <RadzenAlert AlertStyle="AlertStyle.Info" AllowClose="false" class="pt-enter">
+                            Following your system preferences:
+                            @if (_prefersContrast)
+                            {
+                                <text>higher contrast</text>
+                            }
+                            @if (_prefersContrast && _prefersReducedMotion)
+                            {
+                                <text> and </text>
+                            }
+                            @if (_prefersReducedMotion)
+                            {
+                                <text>reduced motion</text>
+                            }.
+                        </RadzenAlert>
+                    }
+                </RadzenStack>
+    </section>
+
+    <section class="pt-settings-section">
+        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">Monitoring limits &amp; cost</RadzenText>
                 @if (_loading)
                 {
-                    @* TASK #9: Skeleton placeholders while quota loads *@
                     <div class="pt-skeleton-stack rz-mt-4">
                         <div class="pt-skeleton-line w-50"></div>
                         <div class="pt-skeleton-line lg w-70"></div>
@@ -60,42 +155,92 @@
                 }
                 else if (_quota is not null)
                 {
+                    @* Moved here from the dashboard status bar, where a quota ring, a
+                       running spend figure and a reset time sat between the user and
+                       the departure times they came for. This is where someone goes
+                       when they actually want to know. *@
                     <RadzenStack Gap="1rem" class="rz-mt-4">
                         <RadzenText>
-                            Used today: @_quota.UsedToday / @_quota.DailyLimit sessions
+                            Used today: @_quota.UsedToday of @_quota.DailyLimit monitoring sessions
                         </RadzenText>
-                        <RadzenProgressBar Value="@((double)_quota.UsedToday / _quota.DailyLimit * 100)"
-                                           ShowValue="true" />
+                        <RadzenProgressBar Value="@QuotaPercent" ShowValue="true"
+                                           ProgressBarStyle="@QuotaStyle" />
                         <RadzenText class="pt-settings-meta">
-                            Resets at @_quota.ResetsAtUtc.ToString("HH:mm") UTC
+                            Resets at @_quota.ResetsAtUtc.ToString("HH:mm") UTC.
+                            @if (_quota.PollsToday > 0)
+                            {
+                                <text>
+                                    @_quota.PollsToday traffic look-ups so far today,
+                                    about @_quota.EstimatedCostTodayUsd.ToString("C3") —
+                                    roughly @_quota.ProjectedMonthlyCostUsd.ToString("C2") a month at this rate.
+                                </text>
+                            }
                         </RadzenText>
                     </RadzenStack>
                 }
-            </RadzenTabsItem>
+    </section>
 
-            <!-- Danger Zone Tab -->
-            <RadzenTabsItem Text="Danger Zone">
+    <section class="pt-settings-section pt-settings-danger">
+        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">Delete account</RadzenText>
                 <RadzenStack Gap="1rem" class="rz-mt-4">
-                    <RadzenAlert AlertStyle="AlertStyle.Danger"
+                    <RadzenAlert AlertStyle="AlertStyle.Danger" AllowClose="false"
                                  Text="Deleting your account is permanent and cannot be undone. All your routes, history, and data will be removed (GDPR Art. 17)." />
-                    <RadzenButton Text="Delete My Account" ButtonStyle="ButtonStyle.Danger"
-                                  Click="@ConfirmDeleteAsync" />
+                    <div>
+                        <RadzenButton Text="Delete My Account" ButtonStyle="ButtonStyle.Danger"
+                                      Click="@ConfirmDeleteAsync" IsBusy="@_deleting" />
+                    </div>
                 </RadzenStack>
-            </RadzenTabsItem>
-        </Tabs>
-    </RadzenTabs>
+    </section>
 </RadzenCard>
 
 @code {
+    /// <summary>Bound by the profile form so validation has a model to work against.</summary>
+    private sealed class ProfileForm
+    {
+        public string Locale { get; set; } = string.Empty;
+    }
+
+    private static readonly (string Value, string Label, string Icon)[] ThemeOptions =
+    [
+        ("system", "System", "🖥️"),
+        ("light", "Light", "☀️"),
+        ("dark", "Dark", "🌙")
+    ];
+
+    private static readonly (string Value, string Label, string Icon)[] DensityOptions =
+    [
+        ("compact", "Compact", "▤"),
+        ("normal", "Normal", "▦"),
+        ("comfortable", "Comfortable", "▢")
+    ];
+
+    // Whitelist matches the server-side validator.
+    private static readonly List<string> ValidLocales = ["en-IE", "en-GB", "en-US", "de-DE", "fr-FR"];
+
     private ProfileDto? _profile;
     private QuotaDto? _quota;
-    private string _newLocale = string.Empty;
+    private readonly ProfileForm _form = new();
     private bool _loading = true;
     private bool _saving;
+    private bool _deleting;
     private bool _profileSaved;
+    private string? _profileError;
 
-    // UX-10: Whitelist matches server-side validator — prevents freeform input that fails validation
-    private static readonly List<string> _validLocales = ["en-IE", "en-GB", "en-US", "de-DE", "fr-FR"];
+    private string _theme = "system";
+    private string _density = "normal";
+    private bool _prefersContrast;
+    private bool _prefersReducedMotion;
+    private IJSObjectReference? _appearance;
+
+    private double QuotaPercent =>
+        _quota is { DailyLimit: > 0 } q ? Math.Min(100, (double)q.UsedToday / q.DailyLimit * 100) : 0;
+
+    private ProgressBarStyle QuotaStyle => QuotaPercent switch
+    {
+        >= 90 => ProgressBarStyle.Danger,
+        >= 70 => ProgressBarStyle.Warning,
+        _ => ProgressBarStyle.Primary
+    };
 
     protected override async Task OnInitializedAsync()
     {
@@ -103,32 +248,130 @@
         {
             _profile = await Http.GetFromJsonAsync("/api/account/profile", AppJsonContext.Default.ProfileDto);
             _quota = await Http.GetFromJsonAsync("/api/account/quota", AppJsonContext.Default.QuotaDto);
-            _newLocale = _profile?.Locale ?? string.Empty;
+            _form.Locale = _profile?.Locale ?? string.Empty;
         }
         catch { /* handled by null guards */ }
         finally { _loading = false; }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        try
+        {
+            _appearance = await JS.InvokeAsync<IJSObjectReference>("import", "./js/pt-appearance.js");
+            AppearanceState state = await _appearance.InvokeAsync<AppearanceState>("getAppearance");
+            _theme = state.Theme;
+            _density = state.Density;
+            _prefersContrast = state.PrefersContrast;
+            _prefersReducedMotion = state.PrefersReducedMotion;
+            StateHasChanged();
+        }
+        catch
+        {
+            // No interop is a degraded settings panel, not a broken page — the
+            // controls simply show the defaults.
+        }
+    }
+
+    private async Task SetThemeAsync(string value)
+    {
+        _theme = value;
+        if (_appearance is not null)
+            await _appearance.InvokeVoidAsync("setTheme", value);
+    }
+
+    private async Task SetDensityAsync(string value)
+    {
+        _density = value;
+        if (_appearance is not null)
+            await _appearance.InvokeVoidAsync("setDensity", value);
     }
 
     private async Task SaveProfileAsync()
     {
         _saving = true;
         _profileSaved = false;
+        _profileError = null;
         try
         {
-            HttpResponseMessage resp = await Http.PutAsJsonAsync("/api/account/profile", new UpdateProfileRequest(_newLocale), AppJsonContext.Default.UpdateProfileRequest);
-            _profileSaved = resp.IsSuccessStatusCode;
+            HttpResponseMessage resp = await Http.PutAsJsonAsync(
+                "/api/account/profile",
+                new UpdateProfileRequest(_form.Locale),
+                AppJsonContext.Default.UpdateProfileRequest);
+
+            if (resp.IsSuccessStatusCode)
+                _profileSaved = true;
+            else
+                _profileError = $"Couldn't save your profile ({(int)resp.StatusCode}). Try again.";
+        }
+        catch
+        {
+            _profileError = "Couldn't reach the server. Your profile wasn't saved.";
         }
         finally { _saving = false; }
     }
 
+    /// <summary>
+    /// FR-031: confirm before irreversible deletion. This previously read
+    /// `await Task.FromResult(true)` — the dialog was never shown and the button
+    /// deleted the account on the first click.
+    /// </summary>
     private async Task ConfirmDeleteAsync()
     {
-        // FR-031: Confirm before irreversible deletion
-        bool confirmed = await Task.FromResult(true); // RadzenConfirmDialog not available here without DI — use JS confirm as fallback
-        if (confirmed)
+        bool? confirmed = await DialogService.Confirm(
+            "This permanently deletes your account, every route you monitor, and all of their history. This cannot be undone.",
+            "Delete account?",
+            new ConfirmOptions { OkButtonText = "Delete my account", CancelButtonText = "Keep my account" });
+
+        if (confirmed != true)
+            return;
+
+        _deleting = true;
+        try
         {
-            await Http.DeleteAsync("/api/account/");
-            Nav.NavigateTo("/login", forceLoad: true);
+            HttpResponseMessage resp = await Http.DeleteAsync("/api/account/");
+            if (resp.IsSuccessStatusCode)
+            {
+                Nav.NavigateTo("/login", forceLoad: true);
+                return;
+            }
+
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Account not deleted",
+                Detail = $"The server refused the request ({(int)resp.StatusCode}). Nothing was removed.",
+                Duration = 6000
+            });
+        }
+        catch
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Account not deleted",
+                Detail = "Couldn't reach the server. Nothing was removed.",
+                Duration = 6000
+            });
+        }
+        finally { _deleting = false; }
+    }
+
+    /// <summary>Shape returned by <c>getAppearance</c> in pt-appearance.js.</summary>
+    private sealed record AppearanceState(
+        string Theme,
+        string Density,
+        bool PrefersContrast,
+        bool PrefersReducedMotion);
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_appearance is not null)
+        {
+            try { await _appearance.DisposeAsync(); } catch { /* page tearing down */ }
         }
     }
 }

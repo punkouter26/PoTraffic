@@ -46,8 +46,12 @@ else if (AllDone)
     </RadzenAlert>
 }
 
+@* Seven narrow columns; Compact keeps the whole run visible without scrolling
+   the table sideways on a laptop. *@
 <RadzenDataGrid Data="@GetDisplayRows()" TItem="ShotDisplayRow"
                 AllowSorting="false" AllowFiltering="false"
+                Density="Density.Compact"
+                EmptyText="No shots recorded for this run."
                 RowRender="@HighlightWinner" class="rz-mb-4">
     <Columns>
         <RadzenDataGridColumn TItem="ShotDisplayRow" Property="Label" Title="Shot" Width="70px" />

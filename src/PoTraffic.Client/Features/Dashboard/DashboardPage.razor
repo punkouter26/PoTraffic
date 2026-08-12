@@ -17,67 +17,50 @@
 
 <MeshBackground />
 
-@* C2: Compact status bar replaces 4 KPI cards *@
-<div class="pt-status-bar">
-    @{
-        int activeCount = VisibleRoutes.Count(r => r.MonitoringStatus == MonitoringStatus.Active);
-        string dotClass = activeCount > 0 ? "pt-status-dot-green" : "pt-status-dot-amber";
-        int quotaTotal = QuotaConstants.DefaultDailyQuota;
-        double quotaPct = quotaTotal > 0 ? Math.Min(100, (double)_quotaConsumed / quotaTotal * 100) : 0;
-        string quotaColor = quotaPct >= 90 ? "#f43f5e" : quotaPct >= 70 ? "#f59e0b" : "#10b981";
-        string quotaRingStyle = $"--pt-quota-pct:{quotaPct.ToString(System.Globalization.CultureInfo.InvariantCulture)};--pt-quota-color:{quotaColor};";
-    }
-    <div class="pt-status-metrics">
-        <span class="pt-status-item">
-            <span class="pt-status-dot @dotClass"></span>
-            @activeCount of @VisibleRoutes.Count routes active
-        </span>
+@* The bar used to report five things: active-route count, connectivity, a quota
+   ring, today's provider spend and the reset time. Four of those are operator
+   telemetry — they say nothing about when to leave — and they now live in
+   Settings, where someone looking for them will look. What remains is the one
+   fact that changes how much to trust the numbers below: whether they're live.
+
+   The bar renders at all only when there is something to say. *@
+@if (IsOffline || IsStale || VisibleRoutes.Count > 0)
+{
+    <div class="pt-status-bar">
         @if (IsOffline)
         {
-            <span class="pt-status-item pt-status-offline" title="Showing the last data received">
-                ⚠︎ Offline
+            <span class="pt-status-item pt-status-offline">
+                ⚠︎ Offline — showing the last data received
             </span>
         }
         else if (IsStale)
         {
-            <span class="pt-status-item pt-status-offline" title="Couldn't reach the server — retrying with backoff">
-                ⚠︎ Reconnecting
+            <span class="pt-status-item pt-status-offline">
+                ⚠︎ Can't reach the server — retrying
             </span>
         }
-        <span class="pt-status-item">
-            <span class="pt-quota-chip">
-                <span class="pt-quota-ring" style="@quotaRingStyle" aria-hidden="true"></span>
-                <span class="pt-quota-chip-text">
-                    <span class="pt-quota-chip-value">@_quotaConsumed / @quotaTotal</span>
-                    <span class="pt-quota-chip-label">Quota</span>
-                </span>
-            </span>
-        </span>
-        @if (_pollsToday > 0)
+        else
         {
-            <span class="pt-status-item pt-status-item-muted"
-                  title="@_pollsToday poll(s) today · projected ~$@(_projectedMonthlyCost.ToString("F2"))/mo">
-                💲@(_estimatedCostToday.ToString("F3")) today
+            <span class="pt-status-item">
+                <span class="pt-status-dot pt-status-dot-green"></span>
+                Live
             </span>
         }
-        <span class="pt-status-item pt-status-item-muted">Resets midnight UTC</span>
+
+        @if (ShowSkeletons || VisibleRoutes.Count > 0)
+        {
+            <div class="pt-status-bar-actions">
+                <RadzenButton Text="+ Add Route" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Small"
+                              Click="@(() => Nav.NavigateTo("/routes/create"))" />
+            </div>
+        }
     </div>
-    @* Show the status-bar add button only when routes exist. On the empty
-       dashboard the empty-state CTA (and the mobile FAB) already provide it —
-       avoids three competing "Add Route" buttons on first load. *@
-    @if (ShowSkeletons || VisibleRoutes.Count > 0)
-    {
-        <div class="pt-status-bar-actions">
-            <RadzenButton Text="+ Add Route" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Small"
-                          Click="@(() => Nav.NavigateTo("/routes/create"))" />
-        </div>
-    }
-</div>
+}
 
 @if (_quotaConsumed >= QuotaConstants.DefaultDailyQuota - 2)
 {
-    <RadzenAlert AlertStyle="AlertStyle.Warning" ShowIcon="true" class="rz-mb-3">
-        Daily quota almost reached. Monitoring will pause once the limit is hit.
+    <RadzenAlert AlertStyle="AlertStyle.Warning" ShowIcon="true" class="rz-mb-3 pt-enter">
+        Daily monitoring limit almost reached — sampling will pause once it's hit.
     </RadzenAlert>
 }
 
@@ -135,11 +118,11 @@ else if (VisibleRoutes.Count == 0)
 }
 else
 {
-    @* C1/UI-1: Route cards replace the grid — one card per route.
-       Virtualize keeps only the visible cards in the DOM. With 10+ routes
-       the user can scroll without paying the cost of 100+ RadzenCards. *@
+    @* One card per route, and the card is the answer. Virtualize keeps only the
+       visible ones in the DOM. ItemSize tracks the card's real height, which
+       dropped when the card lost its badge row and button row. *@
     <div class="pt-route-cards pt-stagger" role="list">
-        <Virtualize Items="VisibleRoutes" Context="route" ItemSize="180" OverscanCount="2">
+        <Virtualize Items="VisibleRoutes" Context="route" ItemSize="120" OverscanCount="2">
             <div role="listitem">
                 <SwipeableRouteCard Route="route"
                            OptimalDeparture="@(_optimalDepartures.GetValueOrDefault(route.Id))"

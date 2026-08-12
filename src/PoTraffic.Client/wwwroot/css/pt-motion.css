@@ -1,31 +1,64 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   PoTraffic Motion Helpers
+   PoTraffic Motion — keyframes and motion utilities.
+
+   This file is the ONLY home for @keyframes. They previously existed in both
+   pt-tokens.css and app.css with different values (the pulse ring 6px in one
+   and 8px in the other), and since app.css loads last the file commented
+   "canonical keyframes" was the one being overridden.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/* Entrance */
-.pt-anim-fade   { animation: pt-fade-in   var(--pt-dur-base) var(--pt-ease) both; }
-.pt-anim-up     { animation: pt-slide-up  var(--pt-dur-base) var(--pt-ease) both; }
-.pt-anim-down   { animation: pt-slide-down var(--pt-dur-base) var(--pt-ease) both; }
+/* ── Keyframes ──────────────────────────────────────────────────────────── */
+@keyframes pt-fade-in     { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pt-slide-up    { from { opacity: 0; transform: translate3d(0, 8px, 0); }
+                            to   { opacity: 1; transform: translate3d(0, 0, 0); } }
+@keyframes pt-slide-down  { from { opacity: 0; transform: translate3d(0, -8px, 0); }
+                            to   { opacity: 1; transform: translate3d(0, 0, 0); } }
+@keyframes pt-scale-press { from { transform: scale(1); } to { transform: scale(0.97); } }
+@keyframes pt-shimmer     { 0%   { background-position: -200% 0; }
+                            100% { background-position:  200% 0; } }
+@keyframes pt-pulse       { 0%   { box-shadow: 0 0 0 0 rgb(16 185 129 / 0.5); }
+                            70%  { box-shadow: 0 0 0 8px rgb(16 185 129 / 0); }
+                            100% { box-shadow: 0 0 0 0 rgb(16 185 129 / 0); } }
+@keyframes pt-sweep       { 0%   { transform: translate3d(-100%, 0, 0); }
+                            100% { transform: translate3d(0%, 0, 0); } }
 
-/* Interactive press feedback (replaces scale(0.98) which clips shadows) */
+
+/* ── Entrance utilities ─────────────────────────────────────────────────── */
+.pt-anim-fade { animation: pt-fade-in   var(--pt-dur-base) var(--pt-ease) both; }
+.pt-anim-up   { animation: pt-slide-up  var(--pt-dur-base) var(--pt-ease) both; }
+.pt-anim-down { animation: pt-slide-down var(--pt-dur-base) var(--pt-ease) both; }
+
+/* Stagger entrance — children accept style="--pt-i:N". */
+.pt-stagger > * {
+    animation: pt-slide-up var(--pt-dur-base) var(--pt-ease) both;
+    animation-delay: calc(var(--pt-i, 0) * 50ms);
+}
+
+/* Default page entrance. */
+article.content { animation: pt-slide-up var(--pt-dur-base) var(--pt-ease); }
+
+/* ── Interactive press feedback ─────────────────────────────────────────── */
 .pt-press {
     transition: background-color var(--pt-dur-fast) var(--pt-ease),
                 border-color var(--pt-dur-fast) var(--pt-ease),
                 box-shadow var(--pt-dur-fast) var(--pt-ease);
-    will-change: transform;
 }
 .pt-press:active { transform: translateY(1px); }
 
 .pt-press-glow { transition: box-shadow var(--pt-dur-fast) var(--pt-ease); }
-.pt-press-glow:active { box-shadow: 0 0 0 3px var(--pt-color-brand-200); }
+.pt-press-glow:active {
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--pt-color-brand-500) 35%, transparent);
+}
 
-/* Live line indicator (replaces RadzenProgressBarIndeterminate) */
+/* ── Indeterminate progress line ────────────────────────────────────────── */
 .pt-progress-line {
     position: relative;
     overflow: hidden;
     height: 2px;
     width: 100%;
-    background: var(--pt-color-brand-100);
+    /* Was --pt-color-brand-100, a near-white track that glared on a dark page.
+       Mixing the brand into the current surface tracks the theme instead. */
+    background: color-mix(in oklab, var(--pt-color-brand-500) 22%, var(--pt-bg-surface));
     border-radius: var(--pt-radius-full);
 }
 .pt-progress-line::after {
@@ -34,35 +67,13 @@
     inset: 0;
     background: linear-gradient(90deg,
         transparent 0%,
-        var(--pt-color-brand-600) 50%,
+        var(--pt-color-brand-on-surface) 50%,
         transparent 100%);
     animation: pt-sweep 1.6s var(--pt-ease) infinite;
     will-change: transform;
 }
 
-/* Skeleton (placeholder, not animation) */
-.pt-skeleton { height: 1rem; width: 100%; }
-.pt-skeleton.rounded { border-radius: var(--pt-radius-full); }
-.pt-skeleton.lg { height: 1.5rem; }
-.pt-skeleton.xl { height: 2rem; }
-
-/* Stagger entrance — children accept style="--i:N" */
-.pt-stagger > * {
-    animation: pt-slide-up var(--pt-dur-base) var(--pt-ease) both;
-    animation-delay: calc(var(--pt-i, 0) * 50ms);
-}
-
-/* Shimmer effect on top of any element */
-.pt-shimmer { position: relative; overflow: hidden; }
-.pt-shimmer::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
-    animation: pt-sweep 1.4s linear infinite;
-}
-
-/* Live status dot */
+/* ── Live status dot ────────────────────────────────────────────────────── */
 .pt-live-dot {
     display: inline-block;
     width: 8px;
@@ -72,12 +83,91 @@
     animation: pt-pulse 2s infinite var(--pt-ease);
 }
 
-/* Reduced motion */
+/* A scroll-driven reveal (`animation-timeline: view()`) used to live here and was
+   applied to the route page's analysis cards. It is deliberately gone: a card
+   taller than the scrollport can fail to complete its `entry` range, and the
+   failure mode is content stuck at opacity 0. An app whose job is to show you a
+   number must never trade legibility for a flourish. Elements that appear
+   mid-session use .pt-enter below, which always ends visible.
+
+   ── Entry animation for elements that appear mid-session ───────────────────
+   @starting-style gives newly-inserted DOM a from-state without a JS tick or a
+   "mounted" class, which is exactly what Blazor's conditional blocks need. */
+@supports (transition-behavior: allow-discrete) {
+    @media (prefers-reduced-motion: no-preference) {
+        .pt-enter {
+            opacity: 1;
+            translate: 0 0;
+            transition: opacity var(--pt-dur-base) var(--pt-ease),
+                        translate var(--pt-dur-base) var(--pt-ease);
+        }
+        @starting-style {
+            .pt-enter { opacity: 0; translate: 0 8px; }
+        }
+    }
+}
+
+/* ── View transitions ───────────────────────────────────────────────────────
+   Applied to theme and density switches, which are the state changes the app
+   fully controls (an attribute on <html>). SPA route changes are deliberately
+   left alone: Blazor owns that DOM update, and wrapping it would mean guessing
+   when the re-render lands. */
+::view-transition-old(root),
+::view-transition-new(root) {
+    animation-duration: var(--pt-dur-slow);
+    animation-timing-function: var(--pt-ease);
+}
+
 @media (prefers-reduced-motion: reduce) {
+    ::view-transition-old(root),
+    ::view-transition-new(root) { animation: none; }
+}
+
+/* ── Reduced motion ─────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+
     .pt-progress-line::after,
     .pt-shimmer::after,
     .pt-live-dot {
         animation: none;
         opacity: 0.7;
+    }
+}
+
+/* ── Shimmer overlay ────────────────────────────────────────────────────── */
+.pt-shimmer { position: relative; overflow: hidden; }
+.pt-shimmer::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent,
+                color-mix(in oklab, var(--pt-bg-surface) 60%, transparent), transparent);
+    animation: pt-sweep 1.4s linear infinite;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Tap targets. The rule this replaces was commented "minimum 44×44" but set
+   min-height to --pt-space-2 (8px, rising to 24px under 640px), applied no
+   min-width, and hit every <a> on the page including inline prose links.
+
+   :where() keeps specificity at zero so any component can override without a
+   fight, and the selector is limited to real controls — a link inside running
+   text is excluded, since padding it to 44px would wreck the paragraph.
+
+   Gated on `pointer: coarse` because 44px is a finger measurement. Forcing it
+   on a mouse would fight the compact desktop density this app is going for,
+   and a cursor does not need the help.
+   ═══════════════════════════════════════════════════════════════════════════ */
+@media (pointer: coarse) {
+    :where(button, [role="button"], input[type="button"], input[type="submit"],
+           select, .rz-button, a.pt-tap) {
+        min-block-size: var(--pt-tap-min);
+        min-inline-size: var(--pt-tap-min);
     }
 }

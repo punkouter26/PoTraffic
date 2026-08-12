@@ -6,12 +6,17 @@ html, body {
     color: var(--pt-fg-primary);
 }
 
+/* Headings shouldn't end on a lonely word; body copy shouldn't end on a lonely
+   line. Both are one declaration each and degrade to nothing where unsupported. */
+h1, h2, h3, h4, .pt-balance { text-wrap: balance; }
+p, .pt-pretty { text-wrap: pretty; }
+
 h1:focus {
     outline: none;
 }
 
 a, .btn-link {
-    color: var(--pt-color-brand-700);
+    color: var(--pt-color-brand-on-surface);
 }
 
 .btn-primary {
@@ -20,17 +25,36 @@ a, .btn-link {
     border-color: var(--pt-color-brand-700);
 }
 
-.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem var(--pt-color-brand-400);
+/* One focus ring for everything, drawn with outline so it follows the shape and
+   never gets clipped by an ancestor's overflow. The old rule painted a white
+   inner ring, which vanished against a dark surface. */
+:focus-visible {
+    outline: 2px solid var(--pt-color-brand-on-surface);
+    outline-offset: 2px;
+    border-radius: var(--pt-radius-xs);
 }
 
 .content {
-    padding: var(--pt-space-5) var(--pt-space-4) calc(var(--pt-space-12) + 56px); /* bottom space for fixed bottom nav */
+    /* The bottom nav is fixed and only exists on narrow screens; its height and
+       the space reserved for it here both come from --pt-bottom-nav-safe, so
+       they cannot drift apart again. */
+    padding: var(--pt-space-5) var(--pt-space-4)
+             calc(var(--pt-space-8) + var(--pt-bottom-nav-safe));
+}
+
+@media (min-width: 640px) {
+    .content {
+        /* No bottom nav past the phone breakpoint — reclaim the reserve. */
+        padding-bottom: var(--pt-space-8);
+    }
 }
 
 @media (min-width: 1024px) {
     .content {
-        padding-bottom: var(--pt-space-8);
+        /* Long measure hurts readability; cap it and centre. */
+        max-width: 1180px;
+        margin-inline: auto;
+        padding-inline: var(--pt-space-6);
     }
 }
 
@@ -134,125 +158,11 @@ code {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   Micro-animations — see pt-tokens.css for canonical keyframes
+   Small shared pieces. Keyframes are NOT redeclared here — they live
+   in pt-motion.css, which is the single home for them.
 ═══════════════════════════════════════════════════════════════ */
-.pt-stat-meta {
-    font-size: var(--pt-text-xs);
-    color: var(--pt-fg-tertiary);
-    margin-top: var(--pt-space-1);
-    font-variant-numeric: tabular-nums;
-}
-.pt-poll-live {
-    animation: pt-pulse 2s var(--pt-ease) infinite;
-    display: inline-block;
-    padding: 2px 6px;
-    border-radius: var(--pt-radius-sm);
-}
-.pt-skeleton {
-    background: linear-gradient(90deg,
-        var(--pt-color-neutral-200) 25%,
-        var(--pt-color-neutral-100) 50%,
-        var(--pt-color-neutral-200) 75%);
-    background-size: 200% 100%;
-    animation: pt-shimmer 1.4s linear infinite;
-    border-radius: var(--pt-radius-sm);
-    height: 1rem;
-    width: 100%;
-}
 .pt-collapsible-icon { display: inline-block; transition: transform var(--pt-dur-base) var(--pt-ease); }
 .pt-collapsible-icon.open { transform: rotate(90deg); }
-════════════════    --pt-accent-rose: #f43f5e;
-    --pt-card-radius: 12px;
-}
-
-/* ═══════════════════════════════════════════════
-   Po3UiUx UI-5: Micro-animations
-═══════════════════════════════════════════════ */
-@keyframes pt-slide-up {
-    from { opacity: 0; transform: translateY(10px); }
-    to   { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes pt-shimmer {
-    0%   { background-position: -200% 0; }
-    100% { background-position:  200% 0; }
-}
-
-@keyframes pt-pulse {
-    0%   { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
-    70%  { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
-}
-
-/* KPI Strip — DEPRECATED, removed. The Dashboard now uses .pt-status-bar. */
-
-/* ═══════════════════════════════════════════════
-   Po3UiUx UI-3: Route Detail Stat Blocks
-═══════════════════════════════════════════════ */
-.pt-stat-strip {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 0.75rem;
-    margin-bottom: 1rem;
-}
-
-.pt-stat-block {
-    background: var(--pt-brand-surface, var(--pt-bg-elev-2));
-    border-radius: 8px;
-    padding: 0.875rem 1rem;
-    border-left: 3px solid var(--pt-stat-color, var(--pt-color-brand-500));
-}
-
-.pt-stat-block .pt-stat-value {
-    font-size: 1.15rem;
-    font-weight: 600;
-    color: var(--pt-fg-strong);
-    line-height: 1.2;
-}
-
-.pt-stat-block .pt-stat-label {
-    font-size: 0.72rem;
-    color: var(--pt-fg-tertiary);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    margin-top: 0.15rem;
-}
-
-.pt-stat-blue  { --pt-stat-color: var(--pt-color-brand-500); }
-.pt-stat-green { --pt-stat-color: var(--pt-color-success); }
-.pt-stat-amber { --pt-stat-color: var(--pt-color-warning); }
-
-/* ═══════════════════════════════════════════════
-   Po3UiUx UX-7: Breadcrumb navigation
-═══════════════════════════════════════════════ */
-.pt-breadcrumb {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-size: 0.875rem;
-    color: var(--pt-fg-tertiary);
-    margin-bottom: 1.25rem;
-}
-
-.pt-breadcrumb a {
-    color: var(--pt-fg-muted);
-    text-decoration: none;
-    transition: color 0.15s ease;
-}
-
-.pt-breadcrumb a:hover {
-    color: var(--pt-brand-primary, var(--pt-color-brand-500));
-}
-
-.pt-breadcrumb .pt-breadcrumb-sep {
-    color: var(--pt-fg-faint);
-    user-select: none;
-}
-
-.pt-breadcrumb .pt-breadcrumb-current {
-    color: var(--pt-fg-body);
-    font-weight: 500;
-}
 
 /* ═══════════════════════════════════════════════
    C2: Compact Dashboard Status Bar
@@ -283,6 +193,15 @@ code {
 .pt-status-dot-amber { background: var(--pt-color-warning); }
 .pt-status-dot-red   { background: var(--pt-color-danger); }
 
+/* Connectivity is a property of the whole bar, not of the one chip that
+   mentions it. :has() lets the container react to its own contents, so losing
+   the connection tints the entire strip instead of hiding the news in a corner
+   the eye has no reason to visit. */
+.pt-status-bar:has(.pt-status-offline) {
+    border-color: color-mix(in oklab, var(--pt-color-warning) 55%, var(--pt-border-subtle));
+    background: color-mix(in oklab, var(--pt-color-warning) 8%, var(--pt-bg-surface));
+}
+
 .pt-status-item {
     font-size: 0.82rem;
     font-weight: 500;
@@ -290,11 +209,6 @@ code {
     display: flex;
     align-items: center;
     white-space: nowrap;
-}
-
-.pt-status-sep {
-    color: var(--pt-fg-faint);
-    user-select: none;
 }
 
 .pt-status-bar-actions {
@@ -307,113 +221,159 @@ code {
 .pt-route-cards {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: var(--pt-space-4);
+
+    /* Query container for the cards inside. A card is laid out by the width of
+       the column it sits in — not the window — so the same component is correct
+       on a phone, in the dashboard's full-width list, and in any narrower slot
+       it gets dropped into later. */
+    container-type: inline-size;
+    container-name: pt-cards;
 }
 
 .pt-route-card {
     background: var(--pt-bg-surface);
-    border-radius: 14px;
+    border-radius: var(--pt-radius-lg);
     border: 1px solid var(--pt-border-subtle);
     border-left: 5px solid var(--pt-ambient-color, var(--pt-color-brand-500));
-    box-shadow: 0 2px 8px rgba(var(--pt-shadow-rgb), 0.06);
-    transition: box-shadow 0.18s ease, transform 0.12s ease;
+    box-shadow: var(--pt-elev-2);
+    transition: box-shadow var(--pt-dur-fast) var(--pt-ease),
+                transform var(--pt-dur-fast) var(--pt-ease);
     overflow: hidden;
 }
 
-.pt-route-card:hover {
-    box-shadow: 0 6px 20px rgba(var(--pt-shadow-rgb), 0.10);
-    transform: translateY(-1px);
+/* Lift only where there is a cursor to lift toward. */
+@media (hover: hover) {
+    .pt-route-card:hover {
+        box-shadow: var(--pt-elev-3);
+        transform: translateY(-1px);
+    }
 }
 
-.pt-route-card-header {
-    padding: 1.1rem 1.4rem 0.75rem 1.4rem;
+/* The sample route wears its border the way its flag reads: dashed and
+   provisional, not one of your real commutes. */
+.pt-route-card:has(.pt-route-flag-demo) {
+    border-style: dashed;
+    border-left-style: solid;
+}
+
+/* The card navigates, so it behaves like the control it is. */
+.pt-route-card { cursor: pointer; }
+.pt-route-card:focus-visible {
+    outline: 2px solid var(--pt-color-brand-on-surface);
+    outline-offset: 2px;
+}
+
+.pt-route-card-body {
+    padding: var(--pt-space-4) var(--pt-space-5) var(--pt-space-2);
     display: flex;
-    align-items: flex-start;
-    gap: 1rem;
+    align-items: center;
+    gap: var(--pt-space-4);
 }
 
-.pt-route-card-main {
-    flex: 1;
+/* The answer takes the row and the sparkline takes what's left. The sparkline's
+   own wrapper is width:100%, so without a basis here it claimed the whole row
+   and wrapped "Leave by 6:00 AM" onto four lines. */
+.pt-route-card-answer {
+    flex: 1 1 auto;
     min-width: 0;
 }
 
-/* Optimal departure hero line — the most important insight */
+.pt-route-card-body > .pt-sparkline-wrap {
+    flex: 0 1 40%;
+    max-width: 22rem;
+    margin-top: 0;
+}
+
+/* Narrow column: the sparkline drops below the answer instead of squeezing it. */
+@container pt-cards (width < 26rem) {
+    .pt-route-card-body {
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--pt-space-2);
+        padding: var(--pt-space-3) var(--pt-space-4) var(--pt-space-2);
+    }
+
+    .pt-route-card-foot { padding-inline: var(--pt-space-4); }
+    .pt-departure-hero { font-size: var(--pt-text-lg); }
+}
+
+/* The answer. Everything else on the card is subordinate to this line. */
 .pt-departure-hero {
-    font-size: 1.25rem;
-    font-weight: 700;
+    font-size: var(--pt-text-xl);
+    font-weight: var(--pt-weight-bold);
     color: var(--pt-fg-primary);
-    line-height: 1.2;
-    margin-bottom: 0.35rem;
+    line-height: var(--pt-leading-tight);
+    letter-spacing: -0.01em;
 }
 
 .pt-departure-sub {
-    font-size: 0.8rem;
-    color: var(--pt-fg-muted);
-    font-weight: 400;
+    font-size: var(--pt-text-sm);
+    color: var(--pt-fg-secondary);
+    margin-top: 0.15rem;
 }
 
 .pt-departure-pending {
-    font-size: 1rem;
-    font-weight: 500;
-    color: var(--pt-fg-tertiary);
-    font-style: italic;
-    margin-bottom: 0.35rem;
+    font-size: var(--pt-text-lg);
+    font-weight: var(--pt-weight-medium);
+    color: var(--pt-fg-secondary);
+    line-height: var(--pt-leading-tight);
+}
+
+.pt-route-card-foot {
+    padding: 0 var(--pt-space-5) var(--pt-space-3);
+    display: flex;
+    align-items: center;
+    gap: var(--pt-space-3);
 }
 
 .pt-route-addresses {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    font-size: 0.82rem;
-    color: var(--pt-fg-muted);
-    margin-top: 0.5rem;
-    flex-wrap: wrap;
+    gap: var(--pt-space-2);
+    font-size: var(--pt-text-xs);
+    color: var(--pt-fg-tertiary);
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
 }
 
-.pt-route-addr-from {
-    font-weight: 500;
-    color: var(--pt-fg-body);
+.pt-route-addr-from,
+.pt-route-addr-to {
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .pt-route-addr-arrow {
     color: var(--pt-fg-faint);
-    font-size: 1rem;
     flex-shrink: 0;
 }
 
-.pt-route-addr-to {
-    font-weight: 500;
-    color: var(--pt-fg-body);
-}
-
-.pt-route-card-meta {
-    padding: 0.55rem 1.4rem 0.9rem 1.4rem;
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    border-top: 1px solid var(--pt-bg-sunken);
-    flex-wrap: wrap;
-}
-
-.pt-route-schedule {
-    font-size: 0.76rem;
-    color: var(--pt-fg-tertiary);
-    font-weight: 500;
-}
-
-.pt-route-card-actions {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
+/* Two states, and only two, are allowed to interrupt the answer. */
+.pt-route-flag {
     margin-left: auto;
-    flex-wrap: wrap;
+    flex-shrink: 0;
+    font-size: 0.65rem;
+    font-weight: var(--pt-weight-bold);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0.1rem 0.5rem;
+    border-radius: var(--pt-radius-full);
+}
+
+.pt-route-flag-demo {
+    color: var(--pt-color-info);
+    border: 1px dashed var(--pt-color-info);
+}
+
+.pt-route-flag-paused {
+    color: var(--pt-color-warning);
+    border: 1px solid color-mix(in oklab, var(--pt-color-warning) 45%, transparent);
 }
 
 /* Ambient traffic state colors */
 .pt-ambient-green  { --pt-ambient-color: var(--pt-color-success); }
 .pt-ambient-amber  { --pt-ambient-color: var(--pt-color-warning); }
-.pt-ambient-red    { --pt-ambient-color: var(--pt-color-danger); }
-.pt-ambient-blue   { --pt-ambient-color: var(--pt-color-brand-500); }
 .pt-ambient-slate  { --pt-ambient-color: var(--pt-fg-tertiary); }
 
 /* ═══════════════════════════════════════════════
@@ -556,96 +516,6 @@ code {
 }
 
 /* ═══════════════════════════════════════════════
-   P1/UI-2: Optimal Departure Hero Banner (Route Detail)
-═══════════════════════════════════════════════ */
-.pt-departure-banner {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    background: linear-gradient(135deg, var(--pt-success-bg-from), var(--pt-success-bg-to));
-    border: 1px solid var(--pt-success-border);
-    border-radius: 12px;
-    padding: 1rem 1.4rem;
-    box-shadow: 0 2px 8px rgba(16,185,129,0.12);
-}
-
-.pt-departure-banner-icon {
-    font-size: 2rem;
-    flex-shrink: 0;
-}
-
-.pt-departure-banner-label {
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
-    color: var(--pt-success-fg);
-    margin-bottom: 0.2rem;
-}
-
-.pt-departure-banner-time {
-    font-size: 1.4rem;
-    font-weight: 700;
-    color: var(--pt-success-fg-strong);
-    line-height: 1.2;
-}
-
-/* ═══════════════════════════════════════════════
-   TASK #8: Quota chip (progress ring) in dashboard header
-═══════════════════════════════════════════════ */
-.pt-quota-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    background: var(--pt-bg-elev-2);
-    border: 1px solid var(--pt-border-subtle);
-    border-radius: 99px;
-    padding: 0.25rem 0.7rem 0.25rem 0.3rem;
-    flex-shrink: 0;
-}
-
-.pt-quota-ring {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    flex-shrink: 0;
-    /* --pt-quota-pct (0-100) and --pt-quota-color set inline */
-    background: conic-gradient(var(--pt-quota-color, var(--pt-color-brand-500)) calc(var(--pt-quota-pct, 0) * 1%), var(--pt-border-subtle) 0);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.pt-quota-ring::after {
-    content: "";
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: var(--pt-bg-surface);
-}
-
-.pt-quota-chip-text {
-    display: flex;
-    flex-direction: column;
-    line-height: 1.1;
-}
-
-.pt-quota-chip-value {
-    font-size: 0.82rem;
-    font-weight: 700;
-    color: var(--pt-fg-strong);
-    font-variant-numeric: tabular-nums;
-}
-
-.pt-quota-chip-label {
-    font-size: 0.62rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--pt-fg-tertiary);
-}
-
-/* ═══════════════════════════════════════════════
    TASK #9: Loading skeleton variants
 ═══════════════════════════════════════════════ */
 .pt-skeleton-stack {
@@ -680,39 +550,7 @@ code {
 .pt-skeleton-line.w-40 { width: 40%; }
 .pt-skeleton-line.w-30 { width: 30%; }
 
-/* ═══════════════════════════════════════════════
-   TASK #7: Mobile-safe status bar separators
-   Use flex gap + pseudo-element separators that drop on wrap.
-═══════════════════════════════════════════════ */
-.pt-status-metrics {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 0.4rem 1.25rem;
-    flex: 1;
-    min-width: 0;
-}
-
-/* Pseudo-element separator sits before each item except the first.
-   On wrap the first item of a new row hugs the left edge (gap absorbs
-   spacing) so a leading "·" reads as decoration, not an orphan. */
-.pt-status-metrics .pt-status-item + .pt-status-item::before {
-    content: "·";
-    color: var(--pt-fg-faint);
-    margin-right: 1.25rem;
-    margin-left: -1.25rem;
-}
-
-@media (max-width: 520px) {
-    .pt-status-metrics {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 0.25rem;
-    }
-    /* Stacked vertically — no separators at all */
-    .pt-status-metrics .pt-status-item + .pt-status-item::before {
-        content: none;
-    }
+@media (max-width: 640px) {
 }
 /* UI-12: 24h travel-time sparkline on dashboard route cards */
 .pt-sparkline {
@@ -842,22 +680,6 @@ code {
     font-size: var(--pt-text-xs);
     margin-top: var(--pt-space-2);
     max-width: 26rem;
-}
-
-/* ═══════════════════════════════════════════════
-   #10 — sample-route markers. Synthetic history is labelled everywhere it is
-   shown, in the one colour the app otherwise reserves for "read this".
-═══════════════════════════════════════════════ */
-.pt-demo-badge {
-    background: var(--pt-bg-tint);
-    border: 1px dashed var(--pt-color-info);
-    border-radius: var(--pt-radius-full);
-    color: var(--pt-color-info);
-    font-size: 0.65rem;
-    font-weight: var(--pt-weight-bold);
-    letter-spacing: 0.06em;
-    padding: 0.1rem 0.5rem;
-    white-space: nowrap;
 }
 
 .pt-demo-banner {

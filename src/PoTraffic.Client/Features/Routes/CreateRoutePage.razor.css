@@ -61,6 +61,24 @@
 .pt-field-hint {
     display: block;
     margin: -2px 0 10px;
-    color: var(--pt-fg-tertiary, #6b7280);
-    font-size: 0.8rem;
+    color: var(--pt-fg-tertiary);
+    font-size: var(--pt-text-xs);
+}
+
+/* Field-level validation message; replaces the hint in place so the row height
+   doesn't jump when a field goes invalid. */
+.pt-field-error {
+    display: block;
+    margin: -2px 0 10px;
+    color: var(--pt-color-danger);
+    font-size: var(--pt-text-xs);
+    font-weight: var(--pt-weight-medium);
+}
+
+/* The two time pickers sit side by side when there is room and stack when there
+   isn't. They were a fixed flex row, which overflowed the card on a phone. */
+.pt-schedule-times {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    gap: var(--pt-space-4);
 }

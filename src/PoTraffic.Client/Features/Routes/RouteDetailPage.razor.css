@@ -1,110 +1,216 @@
-/* #2 — "add to calendar" action inside the departure banner */
-.pt-departure-banner-body {
-    flex: 1 1 auto;
+/* Route detail — answer, evidence, details.
+
+   What used to be here styled a departure banner, a return-trip bar, a weekday
+   bar chart and a compare call-to-action. Three of those four blocks are gone;
+   what remains is the answer section, the inline comparison, and the disclosure
+   that holds the settings. */
+
+/* ── The answer ─────────────────────────────────────────────────────────────
+   The only thing above the fold. It gets the largest type in the app and a
+   surface of its own, because everything below it exists to support this line. */
+.pt-answer {
+    background: linear-gradient(135deg,
+        color-mix(in oklab, var(--pt-color-brand-500) 14%, var(--pt-bg-surface)),
+        var(--pt-bg-surface));
+    border: 1px solid var(--pt-border-subtle);
+    border-radius: var(--pt-radius-lg);
+    padding: var(--pt-space-5) var(--pt-space-6);
+    margin-bottom: var(--pt-space-4);
+    box-shadow: var(--pt-elev-1);
 }
 
-.pt-departure-ics {
-    flex: 0 0 auto;
-    display: inline-flex;
+.pt-answer-route {
+    display: flex;
     align-items: center;
-    gap: 0.35rem;
-    padding: 0.4rem 0.75rem;
-    border-radius: var(--pt-radius-pill, 999px);
-    font-size: 0.8rem;
-    font-weight: 600;
+    gap: var(--pt-space-2);
+    font-size: var(--pt-text-sm);
+    color: var(--pt-fg-secondary);
+    margin-bottom: var(--pt-space-2);
+    min-width: 0;
+}
+
+.pt-answer-from,
+.pt-answer-to {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pt-answer-arrow {
+    color: var(--pt-fg-faint);
+    flex-shrink: 0;
+}
+
+.pt-answer-headline {
+    font-size: var(--pt-text-3xl);
+    font-weight: var(--pt-weight-bold);
+    line-height: var(--pt-leading-tight);
+    letter-spacing: -0.02em;
+    color: var(--pt-fg-primary);
+    text-wrap: balance;
+}
+
+.pt-answer-pending {
+    font-size: var(--pt-text-2xl);
+    color: var(--pt-fg-secondary);
+}
+
+.pt-answer-duration {
+    font-size: var(--pt-text-lg);
+    color: var(--pt-fg-body);
+    margin-top: var(--pt-space-1);
+}
+
+/* How much to trust the number, in a sentence rather than a progress bar. */
+.pt-answer-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--pt-space-3);
+    margin-top: var(--pt-space-3);
+    font-size: var(--pt-text-xs);
+    color: var(--pt-fg-tertiary);
+}
+
+.pt-answer-ics {
+    color: var(--pt-color-brand-on-surface);
+    font-weight: var(--pt-weight-semibold);
     text-decoration: none;
-    color: var(--pt-fg-on-brand, var(--pt-fg-on-brand));
-    background: var(--pt-glass-bg-strong, rgba(255, 255, 255, 0.18));
-    border: 1px solid var(--pt-glass-border, rgba(255, 255, 255, 0.3));
-    transition: transform var(--pt-dur-fast, 120ms) var(--pt-ease-out, ease-out);
+    white-space: nowrap;
 }
 
-.pt-departure-ics:hover {
-    transform: translateY(-1px);
+.pt-answer-ics:hover { text-decoration: underline; }
+
+.pt-answer-live {
+    display: flex;
+    align-items: center;
+    gap: var(--pt-space-2);
+    margin-top: var(--pt-space-3);
+    padding-top: var(--pt-space-3);
+    border-top: 1px solid var(--pt-border-subtle);
+    font-size: var(--pt-text-xs);
+    color: var(--pt-fg-tertiary);
+    font-variant-numeric: tabular-nums;
 }
 
-/* #3 — return-trip pairing bar */
+/* ── Evidence ───────────────────────────────────────────────────────────── */
+.pt-evidence-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--pt-space-3);
+    margin-bottom: var(--pt-space-3);
+    flex-wrap: wrap;
+}
+
+/* Comparison, folded in from what used to be its own page with its own pickers.
+   One select, on the chart it modifies. */
+.pt-compare-select {
+    background: var(--pt-bg-surface);
+    border: 1px solid var(--pt-border-subtle);
+    border-radius: var(--pt-radius-sm);
+    color: var(--pt-fg-body);
+    font-size: var(--pt-text-xs);
+    padding: 0.3rem 0.5rem;
+    max-width: 14rem;
+}
+
+.pt-compare-legend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--pt-space-3);
+    margin-bottom: var(--pt-space-2);
+    font-size: var(--pt-text-xs);
+    color: var(--pt-fg-secondary);
+}
+
+.pt-compare-legend-item {
+    display: flex;
+    align-items: center;
+    gap: var(--pt-space-2);
+    min-width: 0;
+}
+
+/* Keys mirror pt-chart.js: series A is brand, series B is warning-amber.
+   Changing one without the other decouples the legend from the lines. */
+.pt-compare-key {
+    border-radius: var(--pt-radius-full);
+    display: inline-block;
+    height: 3px;
+    width: 1.5rem;
+    flex-shrink: 0;
+}
+
+.pt-compare-key-a { background: var(--pt-color-brand-500); }
+.pt-compare-key-b { background: var(--pt-color-warning); }
+
+.pt-compare-verdict-inline {
+    color: var(--pt-fg-primary);
+    font-weight: var(--pt-weight-semibold);
+}
+
+/* ── Details disclosure ─────────────────────────────────────────────────────
+   A native <details>, so open/closed state and keyboard behaviour are the
+   browser's job rather than another bool and another click handler. */
+.pt-details {
+    background: var(--pt-bg-surface);
+    border: 1px solid var(--pt-border-subtle);
+    border-radius: var(--pt-radius-lg);
+    margin-bottom: var(--pt-space-4);
+}
+
+.pt-details-summary {
+    display: flex;
+    align-items: center;
+    gap: var(--pt-space-2);
+    padding: var(--pt-space-3) var(--pt-space-4);
+    cursor: pointer;
+    font-size: var(--pt-text-sm);
+    font-weight: var(--pt-weight-medium);
+    color: var(--pt-fg-secondary);
+    list-style: none;
+    user-select: none;
+}
+
+/* Hide the default disclosure triangle; the component draws its own so it can
+   be animated with the rest of the app's motion tokens. */
+.pt-details-summary::-webkit-details-marker { display: none; }
+.pt-details-summary::marker { content: ""; }
+
+.pt-details[open] .pt-collapsible-icon { transform: rotate(90deg); }
+
+.pt-details-summary:hover { color: var(--pt-fg-primary); }
+
+.pt-details-summary:focus-visible {
+    outline: 2px solid var(--pt-color-brand-on-surface);
+    outline-offset: -2px;
+    border-radius: var(--pt-radius-lg);
+}
+
+.pt-details-body {
+    padding: 0 var(--pt-space-4) var(--pt-space-4);
+    border-top: 1px solid var(--pt-border-subtle);
+    padding-top: var(--pt-space-4);
+}
+
+/* ── Return-trip control (now inside the disclosure) ─────────────────────── */
 .pt-returntrip-bar {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.75rem;
-    padding: 0.6rem 1rem;
-    border-radius: var(--pt-radius-md, 12px);
-    background: var(--pt-bg-elev-1);
-    border: 1px solid var(--pt-border-subtle);
+    gap: var(--pt-space-3);
+    padding: var(--pt-space-2) var(--pt-space-4);
+    border-radius: var(--pt-radius-md);
+    background: var(--pt-bg-tint);
 }
 
 .pt-returntrip-label {
-    font-size: 0.9rem;
+    font-size: var(--pt-text-sm);
     color: var(--pt-fg-secondary);
 }
 
-/* #8 — entry point into the two-route comparison */
-.pt-compare-cta {
-    align-items: center;
-    background: var(--pt-bg-elev-1);
-    border: 1px solid var(--pt-border-subtle);
-    border-radius: var(--pt-radius-md, 12px);
-    display: flex;
-    gap: 0.75rem;
-    justify-content: space-between;
-    padding: 0.6rem 1rem;
-}
-
-.pt-compare-cta-label {
-    color: var(--pt-fg-secondary);
-    font-size: 0.9rem;
-}
-
-/* #4 — day-of-week comparison card */
-.pt-weekday-summary {
-    color: var(--pt-fg-secondary);
-}
-
-.pt-weekday-grid {
-    display: grid;
-    grid-template-columns: 2.5rem 1fr 3rem;
-    align-items: center;
-    gap: 0.35rem 0.6rem;
-}
-
-.pt-weekday-label {
-    font-size: 0.8rem;
-    color: var(--pt-fg-secondary);
-    font-weight: 600;
-}
-
-.pt-weekday-track {
-    height: 0.75rem;
-    background: var(--pt-bg-elev-1);
-    border-radius: var(--pt-radius-pill, 999px);
-    overflow: hidden;
-}
-
-.pt-weekday-bar {
-    height: 100%;
-    /* --pt-weekday-pct (0-100) is supplied per-bar by the component; the rule that
-       turns it into a width lives here rather than in the markup (Rule 4). */
-    width: calc(var(--pt-weekday-pct, 0) * 1%);
-    border-radius: inherit;
-    /* GPU-friendly: animate transform, not width, on first paint (§6.10) */
-    transform-origin: left center;
-    transition: transform var(--pt-dur-base, 200ms) var(--pt-ease-out, ease-out);
-}
-
-.pt-weekday-normal { background: var(--pt-color-brand-400); }
-.pt-weekday-best   { background: var(--pt-color-success); }
-.pt-weekday-worst  { background: var(--pt-color-warning); }
-
-.pt-weekday-value {
-    font-size: 0.8rem;
-    font-variant-numeric: tabular-nums;
-    text-align: right;
-    color: var(--pt-fg-primary);
-}
-
-/* #8 — raw record for the sample clicked on the trend chart. */
+/* ── Sample clicked on the trend chart ──────────────────────────────────── */
 .pt-trend-selection {
     align-items: center;
     background: var(--pt-bg-tint);
@@ -123,7 +229,7 @@
 }
 
 .pt-trend-selection-value {
-    color: var(--pt-color-brand-600);
+    color: var(--pt-color-brand-on-surface);
     font-weight: var(--pt-weight-semibold);
 }
 

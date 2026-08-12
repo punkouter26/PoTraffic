@@ -66,8 +66,11 @@
 
 /* ── Nav links — hover tint, filled pill on active ── */
 
+/* The app shell is a dark bar in both themes, so these colours are pinned to the
+   fixed end of the neutral ramp rather than to the theme-dependent fg tokens.
+   The !important flags are gone — Radzen's .nav-link rules are layered now. */
 .app-nav-link {
-    color: rgba(226, 232, 240, 0.70) !important;
+    color: color-mix(in oklab, var(--pt-color-neutral-200) 70%, transparent);
     padding: var(--pt-space-2) var(--pt-space-3);
     border-radius: var(--pt-radius-sm);
     text-decoration: none;
@@ -83,13 +86,13 @@
 
 .app-nav-link:hover {
     background: rgba(255, 255, 255, 0.06);
-    color: var(--pt-color-neutral-0) !important;
+    color: var(--pt-color-neutral-0);
 }
 
 .app-nav-link.active {
     background: rgba(59, 130, 246, 0.16);
     box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.35);
-    color: var(--pt-color-neutral-0) !important;
+    color: var(--pt-color-neutral-0);
 }
 
 /* Accessibility: visible keyboard focus on the dark bar. */
@@ -204,7 +207,9 @@
 }
 
 .pt-dropdown-item:hover {
-    background: var(--pt-color-neutral-100);
+    /* Was --pt-color-neutral-100: a raw palette step, so the hover stayed pale
+       grey on the dark dropdown surface. The tint washes with the theme. */
+    background: var(--pt-bg-tint);
 }
 
 .pt-dropdown-item.danger {
@@ -247,8 +252,11 @@
         font-size: var(--pt-text-base);
     }
 
-    .app-nav-link {
-        padding: var(--pt-space-2) var(--pt-space-3);
+    /* The centre links have nowhere to go on a phone: the brand and the user chip
+       already claim the bar, and the links were overlapping the wordmark. The
+       bottom nav carries these destinations at this width. */
+    .app-shell-actions {
+        display: none;
     }
 
     .pt-user-chip-label {

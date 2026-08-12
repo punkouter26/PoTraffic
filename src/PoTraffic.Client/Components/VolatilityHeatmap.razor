@@ -86,7 +86,7 @@ else
         <span class="pt-heat pt-heat-l2 pt-heat-volatile" aria-hidden="true"></span>
         <span class="pt-heatmap-legend-label">dot = unpredictable</span>
         <span class="pt-heatmap-legend-sep">·</span>
-        <span class="pt-heatmap-legend-label">minutes, hours in UTC</span>
+        <span class="pt-heatmap-legend-label">minutes, hours in UTC — only hours you travel are shown</span>
     </div>
 }
 
@@ -123,9 +123,10 @@ else
             .GroupBy(c => (c.DayOfWeek, c.Hour))
             .ToDictionary(g => g.Key, g => g.Last());
 
-        int first = Heatmap.Cells.Min(c => c.Hour);
-        int last = Heatmap.Cells.Max(c => c.Hour);
-        _hours = [.. Enumerable.Range(first, last - first + 1)];
+        // Only hours that actually carry a sample get a column. A commute that runs
+        // 06:00–09:00 and 16:00–19:00 spans thirteen hours but occupies six of them;
+        // rendering the range meant seven columns of blank between the two blocks.
+        _hours = [.. Heatmap.Cells.Select(c => c.Hour).Distinct().Order()];
 
         _summary = BuildSummary(Heatmap);
     }

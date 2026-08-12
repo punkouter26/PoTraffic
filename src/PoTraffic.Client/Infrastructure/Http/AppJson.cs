@@ -81,7 +81,6 @@ public static class ClientCacheKeys
 [JsonSerializable(typeof(List<SessionDto>))]
 [JsonSerializable(typeof(PagedResult<PollRecordDto>))]
 [JsonSerializable(typeof(BaselineResponse))]
-[JsonSerializable(typeof(WeekdayComparisonDto))]
 [JsonSerializable(typeof(VolatilityHeatmapDto))]
 [JsonSerializable(typeof(List<AlertDto>))]
 [JsonSerializable(typeof(AlertDto))]

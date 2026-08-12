@@ -1,29 +1,4 @@
-/* ── DashboardPage — scoped styles (replaces inline style="" attributes) ── */
 
-.pt-quota-ring {
-    /* consumed by inline --pt-quota-pct / --pt-quota-color variables */
-    --pt-quota-pct: 0;
-    --pt-quota-color: var(--pt-color-success);
-    --pt-quota-size: 2.25rem;
-    width: var(--pt-quota-size);
-    height: var(--pt-quota-size);
-    border-radius: 50%;
-    background:
-        conic-gradient(var(--pt-quota-color) calc(var(--pt-quota-pct) * 1%),
-                        rgba(148, 163, 184, 0.25) 0);
-    display: inline-block;
-    position: relative;
-}
-
-.pt-quota-ring::after {
-    content: "";
-    position: absolute;
-    inset: 0.22rem;
-    border-radius: 50%;
-    background: var(--pt-bg-surface);
-}
-
-.pt-status-item-muted { color: var(--pt-fg-tertiary); }
 
 /* .pt-empty-state* moved to app.css — the compare page (#8) renders the same block,
    and scoped styles here would only reach the dashboard's copy of it. */

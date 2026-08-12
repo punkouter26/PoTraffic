@@ -1,3 +1,76 @@
 /* SettingsPage — scoped styles replacing inline `Style="..."` on Radzen components. */
 .pt-settings-full { width: 100%; }
 .pt-settings-meta { font-size: var(--pt-text-sm); color: var(--pt-fg-tertiary); }
+
+/* Sections replace what used to be four tabs. A rule between them is enough
+   separation for six controls. */
+.pt-settings-section + .pt-settings-section {
+    margin-top: var(--pt-space-8);
+    padding-top: var(--pt-space-6);
+    border-top: 1px solid var(--pt-border-subtle);
+}
+
+.pt-settings-danger {
+    /* The one section whose actions are irreversible reads as such before it is
+       reached, rather than relying on the button colour alone. */
+    --pt-settings-accent: var(--pt-color-danger);
+}
+
+.pt-settings-danger > :first-child {
+    color: var(--pt-color-danger);
+}
+
+/* ── Appearance pickers ─────────────────────────────────────────────────────
+   A segmented radiogroup rather than a dropdown: three options, all worth
+   showing, and the choice is instant — a select would hide two thirds of the
+   answer behind a click. */
+.pt-choice-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+    gap: var(--pt-space-2);
+    max-width: 32rem;
+}
+
+.pt-choice {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--pt-space-1);
+    padding: var(--pt-space-3) var(--pt-space-2);
+    background: var(--pt-bg-surface);
+    border: 1px solid var(--pt-border-subtle);
+    border-radius: var(--pt-radius-md);
+    color: var(--pt-fg-secondary);
+    font-size: var(--pt-text-sm);
+    font-weight: var(--pt-weight-medium);
+    cursor: pointer;
+    transition: background var(--pt-dur-fast) var(--pt-ease),
+                border-color var(--pt-dur-fast) var(--pt-ease),
+                color var(--pt-dur-fast) var(--pt-ease);
+}
+
+@media (hover: hover) {
+    .pt-choice:hover {
+        border-color: var(--pt-border-strong);
+        background: var(--pt-bg-tint);
+    }
+}
+
+/* Selection reads off aria-checked, so the accessible state and the visible
+   state cannot disagree — there is only one of them. */
+.pt-choice[aria-checked="true"] {
+    border-color: var(--pt-color-brand-on-surface);
+    background: color-mix(in oklab, var(--pt-color-brand-500) 12%, var(--pt-bg-surface));
+    color: var(--pt-fg-primary);
+    box-shadow: inset 0 0 0 1px var(--pt-color-brand-on-surface);
+}
+
+.pt-choice-icon {
+    font-size: var(--pt-text-xl);
+    line-height: 1;
+}
+
+.pt-choice-label {
+    white-space: nowrap;
+}

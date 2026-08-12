@@ -79,23 +79,26 @@
 /* Social auth button overrides.
    Microsoft's branding guidelines fix the sign-in button's palette (white face,
    grey border, near-black label), so these values stay literal and do NOT follow
-   the theme — an inverted Microsoft button is an off-brand Microsoft button. */
+   the theme — an inverted Microsoft button is an off-brand Microsoft button.
+
+   The !important flags these carried are gone: Radzen now lives in the `vendor`
+   cascade layer, so an ordinary declaration here already outranks it. */
 .auth-social-btn {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0.5rem;
+    gap: var(--pt-space-2);
     width: 100%;
-    margin-top: 0.5rem;
-    background: #ffffff !important;
-    color: #374151 !important;
-    border: 1px solid #d1d5db !important;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+    margin-top: var(--pt-space-2);
+    background: #ffffff;
+    color: #374151;
+    border: 1px solid #d1d5db;
+    box-shadow: 0 1px 2px rgb(15 23 42 / 0.05);
 }
 
 .auth-social-btn:hover {
-    background: #f9fafb !important;
-    border-color: #9ca3af !important;
+    background: #f9fafb;
+    border-color: #9ca3af;
 }
 
 /* Compact mobile brand — hidden on desktop (the left brand panel owns branding there). */
@@ -121,7 +124,7 @@
     margin-top: 0.25rem;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
     .auth-brand-panel {
         display: none;
     }

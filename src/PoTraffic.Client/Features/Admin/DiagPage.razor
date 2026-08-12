@@ -6,7 +6,6 @@
 
 <RadzenCard class="rz-p-6 rz-mt-4">
     <RadzenText TextStyle="TextStyle.H5" class="rz-mb-2">Diagnostics &amp; Tools</RadzenText>
-    <AdminNavBar ActivePage="Diag" />
 
     <RadzenTabs>
         <Tabs>
@@ -15,17 +14,20 @@
                     Live ping results for all external dependencies.
                 </RadzenText>
                 <LoadingErrorCard IsLoading="_healthLoading" Error="@_healthError">
-                    <RadzenDataGrid Data="_health" TItem="ConnectionHealthDto" AllowSorting="true" class="rz-mt-2">
+                    <RadzenDataGrid Data="_health" TItem="ConnectionHealthDto" AllowSorting="true"
+                                    Density="Density.Compact" AllowColumnResize="true"
+                                    EmptyText="No dependency results returned."
+                                    class="rz-mt-2">
                         <Columns>
-                            <RadzenDataGridColumn TItem="ConnectionHealthDto" Property="Name" Title="Dependency" Width="160px" />
-                            <RadzenDataGridColumn TItem="ConnectionHealthDto" Title="Status" Width="120px">
+                            <RadzenDataGridColumn TItem="ConnectionHealthDto" Property="Name" Title="Dependency" Width="11rem" />
+                            <RadzenDataGridColumn TItem="ConnectionHealthDto" Title="Status" Width="8rem" Sortable="false">
                                 <Template Context="h">
                                     <RadzenBadge BadgeStyle="@(h.Status == "Healthy" ? BadgeStyle.Success : BadgeStyle.Danger)"
                                                  Text="@h.Status" />
                                 </Template>
                             </RadzenDataGridColumn>
-                            <RadzenDataGridColumn TItem="ConnectionHealthDto" Property="Description" Title="Description" />
-                            <RadzenDataGridColumn TItem="ConnectionHealthDto" Property="DurationMs" Title="ms" Width="80px" FormatString="{0:F0}" />
+                            <RadzenDataGridColumn TItem="ConnectionHealthDto" Property="Description" Title="Description" MinWidth="14rem" />
+                            <RadzenDataGridColumn TItem="ConnectionHealthDto" Property="DurationMs" Title="ms" Width="6rem" FormatString="{0:F0}" />
                         </Columns>
                     </RadzenDataGrid>
                 </LoadingErrorCard>
@@ -36,10 +38,16 @@
                     Sensitive values are masked. Values can be updated by administrators.
                 </RadzenText>
                 <LoadingErrorCard IsLoading="_loading" Error="@_error">
-                    <RadzenDataGrid Data="_configs" TItem="SystemConfigDto" AllowSorting="true" class="rz-mt-2">
+                    <RadzenDataGrid Data="_configs" TItem="SystemConfigDto" AllowSorting="true"
+                                    AllowFiltering="true" FilterMode="FilterMode.Simple"
+                                    FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                    Density="Density.Compact" AllowColumnResize="true"
+                                    AllowColumnPicking="true"
+                                    EmptyText="No configuration entries."
+                                    class="rz-mt-2">
                         <Columns>
-                            <RadzenDataGridColumn TItem="SystemConfigDto" Property="Key" Title="Key" Width="220px" />
-                            <RadzenDataGridColumn TItem="SystemConfigDto" Property="Value" Title="Value" Width="200px">
+                            <RadzenDataGridColumn TItem="SystemConfigDto" Property="Key" Title="Key" Width="14rem" />
+                            <RadzenDataGridColumn TItem="SystemConfigDto" Property="Value" Title="Value" Width="13rem">
                                 <Template Context="c">
                                     @if (c.IsSensitive)
                                     {

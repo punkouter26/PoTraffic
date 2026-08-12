@@ -6,25 +6,39 @@
 
 <RadzenCard class="rz-p-6 rz-mt-4">
     <RadzenText TextStyle="TextStyle.H5" class="rz-mb-2">Admin Tools</RadzenText>
-    <AdminNavBar ActivePage="Usage" />
 
     <RadzenTabs>
         <Tabs>
             <RadzenTabsItem Text="Usage Insights" Icon="people">
                 <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2 rz-mt-3">Daily Usage</RadzenText>
                 <LoadingErrorCard IsLoading="_loading" Error="@_error">
-                    <RadzenDataGrid Data="_users" TItem="UserDailyUsageDto" AllowSorting="true" AllowFiltering="true"
-                                    PageSize="25" AllowPaging="true" class="rz-mt-2">
+                    @* Compact density and column resize/reorder/picking are all built in;
+                       the grid was running at defaults. AllowColumnPicking matters most on
+                       a narrow screen — five columns of user data do not fit a phone, and
+                       hiding two beats scrolling the table sideways. *@
+                    <RadzenDataGrid Data="_users" TItem="UserDailyUsageDto"
+                                    AllowSorting="true" AllowFiltering="true"
+                                    AllowPaging="true" PageSize="25"
+                                    PagerHorizontalAlign="HorizontalAlign.Left"
+                                    Density="Density.Compact"
+                                    AllowColumnResize="true"
+                                    AllowColumnReorder="true"
+                                    AllowColumnPicking="true"
+                                    ColumnWidth="10rem"
+                                    FilterMode="FilterMode.Simple"
+                                    FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                    EmptyText="No users have signed in yet."
+                                    class="rz-mt-2">
                         <Columns>
-                            <RadzenDataGridColumn TItem="UserDailyUsageDto" Property="Email" Title="Email" />
-                            <RadzenDataGridColumn TItem="UserDailyUsageDto" Property="Locale" Title="Locale" Width="80px" />
-                            <RadzenDataGridColumn TItem="UserDailyUsageDto" Property="TodayPollCount" Title="Polls Today" Width="110px" />
-                            <RadzenDataGridColumn TItem="UserDailyUsageDto" Property="TodayEstimatedCostUsd" Title="Est. Cost (USD)" Width="130px">
+                            <RadzenDataGridColumn TItem="UserDailyUsageDto" Property="Email" Title="Email" MinWidth="12rem" />
+                            <RadzenDataGridColumn TItem="UserDailyUsageDto" Property="Locale" Title="Locale" Width="7rem" />
+                            <RadzenDataGridColumn TItem="UserDailyUsageDto" Property="TodayPollCount" Title="Polls Today" Width="9rem" />
+                            <RadzenDataGridColumn TItem="UserDailyUsageDto" Property="TodayEstimatedCostUsd" Title="Est. Cost (USD)" Width="10rem">
                                 <Template Context="u">
                                     @u.TodayEstimatedCostUsd.ToString("C4")
                                 </Template>
                             </RadzenDataGridColumn>
-                            <RadzenDataGridColumn TItem="UserDailyUsageDto" Property="LastLoginAt" Title="Last Login">
+                            <RadzenDataGridColumn TItem="UserDailyUsageDto" Property="LastLoginAt" Title="Last Login" Width="11rem">
                                 <Template Context="u">
                                     @(u.LastLoginAt?.ToString("yyyy-MM-dd HH:mm") ?? "—")
                                 </Template>

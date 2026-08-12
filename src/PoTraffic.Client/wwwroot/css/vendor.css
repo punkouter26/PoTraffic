@@ -1,0 +1,19 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Third-party CSS, quarantined in a cascade layer.
+
+   Bootstrap and Radzen used to be plain <link>s, and Radzen's sat LAST in
+   index.html — after app.css and after the scoped-CSS bundle. Every tie on
+   specificity therefore went to Radzen, which is why app styles had grown a
+   crop of `!important` and hard-coded hex values to shout over it.
+
+   Anything inside a layer loses to unlayered CSS regardless of specificity or
+   order, so importing the vendors here makes every one of our own rules win by
+   default. Load order stops being load-bearing and the overrides can go back to
+   being ordinary declarations.
+
+   Paths resolve relative to this file (/css/), hence the `../`.
+   ═══════════════════════════════════════════════════════════════════════════ */
+@layer vendor;
+
+@import url("../lib/bootstrap/dist/css/bootstrap.min.css") layer(vendor);
+@import url("../_content/Radzen.Blazor/css/default.css") layer(vendor);

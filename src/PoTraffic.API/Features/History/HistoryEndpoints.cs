@@ -69,16 +69,9 @@ public static class HistoryEndpoints
             return result is null ? Results.NoContent() : ConditionalJson.Ok(ctx, result);
         });
 
-        // GET /api/routes/{routeId}/weekday-comparison — mean travel time per day-of-week (#4)
-        group.MapGet("/weekday-comparison", async (
-            RouteId routeId,
-            ISender sender,
-            HttpContext ctx) =>
-        {
-            UserId userId = ctx.User.GetUserId();
-            var result = await sender.Send(new GetWeekdayComparisonQuery(routeId, userId));
-            return ConditionalJson.Ok(ctx, result);
-        });
+        // The weekday-comparison endpoint was removed with the bar chart it fed. It and
+        // the heatmap were two renderings of the same aggregate, and the grid says
+        // everything the bars said, per hour rather than per day.
 
         // GET /api/routes/{routeId}/heatmap — day-of-week × hour congestion grid (#5)
         group.MapGet("/heatmap", async (

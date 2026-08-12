@@ -20,7 +20,10 @@
     <BottomNav />
 </div>
 
-@* Global overlays — one instance each, above the page so they survive navigation. *@
-<CommandPalette />
+@* Global overlay — one instance, above the page so it survives navigation.
+   The command palette used to live here too. It was removed: a Ctrl+K launcher,
+   a hotkey layer and a fuzzy matcher are a lot of machinery for an app with
+   three destinations and a bottom nav, and everything it offered was reachable
+   in one tap already. *@
 <UndoBar />
 

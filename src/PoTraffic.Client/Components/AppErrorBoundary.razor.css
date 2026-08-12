@@ -1,0 +1,104 @@
+/* Error boundary surface.
+
+   This was an inline <style> block in the component. Two problems with that:
+   it declared bare `h2` and `p` rules, which are not scoped and restyled every
+   heading and paragraph in the app the moment the boundary rendered; and it
+   hard-coded a light palette (#f8fafc page, white card, #1e293b text), so the
+   error screen was a white slab on a dark theme — at the exact moment the user
+   most needs to read it. Both fixed by moving here and using the tokens. */
+
+.error-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: var(--pt-space-8);
+    background: var(--pt-bg-page);
+}
+
+.error-card {
+    max-width: 800px;
+    background: var(--pt-bg-surface);
+    border: 1px solid var(--pt-border-subtle);
+    border-radius: var(--pt-radius-lg);
+    padding: var(--pt-space-8);
+    box-shadow: var(--pt-elev-3);
+    text-align: center;
+}
+
+.error-icon {
+    font-size: var(--pt-text-3xl);
+    margin-bottom: var(--pt-space-4);
+}
+
+.error-card h2 {
+    color: var(--pt-fg-primary);
+    margin-bottom: var(--pt-space-2);
+}
+
+.error-card p {
+    color: var(--pt-fg-secondary);
+    margin-bottom: var(--pt-space-6);
+}
+
+/* The dev detail panel stays dark in both themes — it is a console, and a
+   console reads as a console. Its colours are pinned to the neutral ramp's
+   fixed end rather than to the theme-dependent surface tokens. */
+.dev-error-details {
+    text-align: left;
+    margin: var(--pt-space-6) 0;
+    padding: var(--pt-space-4);
+    background: var(--pt-color-neutral-800);
+    border-radius: var(--pt-radius-md);
+    color: var(--pt-color-neutral-200);
+}
+
+.dev-error-details h3 {
+    color: var(--pt-color-warning);
+    margin-bottom: var(--pt-space-4);
+    font-size: var(--pt-text-base);
+}
+
+.error-section {
+    margin-bottom: var(--pt-space-4);
+}
+
+.error-section code,
+.stack-trace {
+    display: block;
+    margin-top: var(--pt-space-1);
+    padding: var(--pt-space-2);
+    background: var(--pt-color-neutral-700);
+    color: var(--pt-color-neutral-100);
+    border-radius: var(--pt-radius-xs);
+}
+
+.error-section code {
+    font-size: var(--pt-text-sm);
+    word-break: break-word;
+}
+
+.stack-trace {
+    font-size: var(--pt-text-xs);
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.retry-button {
+    background: var(--pt-color-brand-600);
+    color: var(--pt-fg-on-brand);
+    border: none;
+    padding: var(--pt-space-3) var(--pt-space-6);
+    border-radius: var(--pt-radius-md);
+    font-size: var(--pt-text-base);
+    font-weight: var(--pt-weight-semibold);
+    cursor: pointer;
+    transition: background var(--pt-dur-fast) var(--pt-ease);
+}
+
+.retry-button:hover {
+    background: var(--pt-color-brand-700);
+}

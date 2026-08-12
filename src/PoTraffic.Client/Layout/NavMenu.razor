@@ -15,9 +15,13 @@
         @if (_isAuthenticated)
         {
             <NavLink class="app-nav-link" href="dashboard" Match="NavLinkMatch.All">Dashboard</NavLink>
+            @* The admin area used to carry its own button bar to switch between these
+               two pages — a fourth navigation mechanism for two destinations. They
+               are links in the one nav bar the app already has. *@
             @if (_isAdmin)
             {
                 <NavLink class="app-nav-link" href="admin">Admin</NavLink>
+                <NavLink class="app-nav-link" href="diag">Diagnostics</NavLink>
             }
         }
         else if (_authResolved)
