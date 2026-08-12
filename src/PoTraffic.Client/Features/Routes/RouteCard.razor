@@ -61,6 +61,14 @@
         <RadzenBadge BadgeStyle="@(Route.Provider == RouteProvider.GoogleMaps ? BadgeStyle.Primary : BadgeStyle.Secondary)"
                      Text="@Route.Provider.ToString()" IsPill="true" />
 
+        @* #10: synthetic history must never read as measurement. *@
+        @if (Route.IsDemo)
+        {
+            <span class="pt-demo-badge" title="Sample route — its history is generated, not measured">
+                SAMPLE DATA
+            </span>
+        }
+
         @* Schedule from first active window *@
         @if (_scheduleLabel is not null)
         {
@@ -68,11 +76,15 @@
         }
 
         <div class="pt-route-card-actions">
-            @* UX-8: Check Now inline — no separate page needed *@
-            <RadzenButton Text="Check Now" Icon="search" Size="ButtonSize.Small"
-                          ButtonStyle="ButtonStyle.Light"
-                          Click="@CheckNowAsync" IsBusy="_checkingNow"
-                          Tooltip="Poll current travel time immediately" />
+            @* UX-8: Check Now inline — no separate page needed. Absent on the sample
+               route, whose addresses are illustrative and whose polls are invented. *@
+            @if (!Route.IsDemo)
+            {
+                <RadzenButton Text="Check Now" Icon="search" Size="ButtonSize.Small"
+                              ButtonStyle="ButtonStyle.Light"
+                              Click="@CheckNowAsync" IsBusy="_checkingNow"
+                              Tooltip="Poll current travel time immediately" />
+            }
             <RadzenButton Text="Details" Icon="arrow_forward" Size="ButtonSize.Small"
                           ButtonStyle="ButtonStyle.Primary"
                           Click="@(() => Nav.NavigateTo($"/routes/{Route.Id}"))" />
@@ -140,6 +152,20 @@
     /// </summary>
     public async Task CheckNowAsync()
     {
+        // The button is hidden for demo routes, but the swipe-left gesture lands here too
+        // (#10) — and the server refuses either way, so say why rather than showing a 422.
+        if (Route.IsDemo)
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Info,
+                Summary = "Sample route",
+                Detail = "This route's history is generated, so there's nothing live to poll. Add your own route to check real traffic.",
+                Duration = 5000
+            });
+            return;
+        }
+
         _checkingNow = true;
         try
         {

@@ -25,37 +25,8 @@
 
 .pt-status-item-muted { color: var(--pt-fg-tertiary); }
 
-.pt-empty-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-height: 52vh;
-    text-align: center;
-    padding: var(--pt-space-12) var(--pt-space-4);
-    background: var(--pt-glass-bg);
-    backdrop-filter: blur(var(--pt-glass-blur)) saturate(var(--pt-glass-saturate));
-    -webkit-backdrop-filter: blur(var(--pt-glass-blur)) saturate(var(--pt-glass-saturate));
-    border: 1px solid var(--pt-glass-border);
-    border-radius: var(--pt-radius-lg);
-}
-
-.pt-empty-state-emoji {
-    font-size: var(--pt-text-3xl);
-    margin-bottom: var(--pt-space-4);
-}
-
-.pt-empty-state-title {
-    font-size: var(--pt-text-xl);
-    font-weight: var(--pt-weight-semibold);
-    color: var(--pt-fg-primary);
-    margin-bottom: var(--pt-space-2);
-}
-
-.pt-empty-state-text {
-    color: var(--pt-fg-secondary);
-    margin-bottom: var(--pt-space-6);
-}
+/* .pt-empty-state* moved to app.css — the compare page (#8) renders the same block,
+   and scoped styles here would only reach the dashboard's copy of it. */
 
 /* Glass surface for the status bar — sits over the mesh background */
 .pt-status-bar {

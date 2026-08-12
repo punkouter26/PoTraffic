@@ -1,0 +1,190 @@
+@using PoTraffic.Shared.DTOs.History
+
+@* ──────────────────────────────────────────────────────────────────────
+   #5 — Day-of-week × hour congestion grid.
+
+   Colour encodes how much slower an hour runs than the route's typical
+   (median) sample; the dot marks hours whose spread is wide enough that the
+   time is unpredictable rather than merely slow. Those are different problems:
+   a reliably-40-minute hour can be planned around, a 25-to-55-minute one can't.
+
+   Only the hours that actually carry samples are drawn. A 07:00–09:00 commute
+   would otherwise render as two columns of data and twenty-two of blank.
+
+   Rule 4: the markup hands CSS the level class only — the ramp itself is
+   owned by .pt-heat-l0…l4 in app.css.
+   ────────────────────────────────────────────────────────────────────── *@
+
+@if (Heatmap is null || Heatmap.TotalSamples == 0)
+{
+    <div class="pt-heatmap-empty">
+        <div class="pt-heatmap-empty-icon" aria-hidden="true">🗓️</div>
+        <div class="pt-heatmap-empty-text">
+            The weekly pattern appears once this route has sampled a few commutes.
+        </div>
+    </div>
+}
+else
+{
+    @if (_summary is not null)
+    {
+        <RadzenText TextStyle="TextStyle.Body2" class="rz-mb-3 pt-heatmap-summary">@_summary</RadzenText>
+    }
+
+    <div class="pt-heatmap-scroll">
+        <table class="pt-heatmap">
+            <caption class="pt-visually-hidden">
+                Mean travel time by day of week and hour, in UTC.
+            </caption>
+            <thead>
+                <tr>
+                    <th scope="col"><span class="pt-visually-hidden">Day</span></th>
+                    @foreach (int hour in _hours)
+                    {
+                        <th scope="col" class="pt-heatmap-hour">@hour.ToString("D2")</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (string day in Week)
+                {
+                    <tr>
+                        <th scope="row" class="pt-heatmap-day">@day[..3]</th>
+                        @foreach (int hour in _hours)
+                        {
+                            HeatmapCellDto? cell = _byDayHour.GetValueOrDefault((day, hour));
+                            @if (cell is null)
+                            {
+                                <td class="pt-heat pt-heat-empty" title="@EmptyTooltip(day, hour)">
+                                    <span class="pt-visually-hidden">@EmptyTooltip(day, hour)</span>
+                                </td>
+                            }
+                            else
+                            {
+                                <td class="pt-heat @LevelClass(cell) @(IsVolatile(cell) ? "pt-heat-volatile" : "")"
+                                    title="@CellTooltip(cell)">
+                                    <span class="pt-heat-value">@((cell.MeanDurationSeconds / 60).ToString("F0"))</span>
+                                    <span class="pt-visually-hidden">@CellTooltip(cell)</span>
+                                </td>
+                            }
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <div class="pt-heatmap-legend">
+        <span class="pt-heatmap-legend-label">Typical</span>
+        <span class="pt-heat pt-heat-l0" aria-hidden="true"></span>
+        <span class="pt-heat pt-heat-l1" aria-hidden="true"></span>
+        <span class="pt-heat pt-heat-l2" aria-hidden="true"></span>
+        <span class="pt-heat pt-heat-l3" aria-hidden="true"></span>
+        <span class="pt-heat pt-heat-l4" aria-hidden="true"></span>
+        <span class="pt-heatmap-legend-label">Congested</span>
+        <span class="pt-heatmap-legend-sep">·</span>
+        <span class="pt-heat pt-heat-l2 pt-heat-volatile" aria-hidden="true"></span>
+        <span class="pt-heatmap-legend-label">dot = unpredictable</span>
+        <span class="pt-heatmap-legend-sep">·</span>
+        <span class="pt-heatmap-legend-label">minutes, hours in UTC</span>
+    </div>
+}
+
+@code {
+    [Parameter] public VolatilityHeatmapDto? Heatmap { get; set; }
+
+    private static readonly string[] Week =
+        ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+    /// <summary>
+    /// Coefficient of variation above which an hour is called unpredictable. Matches the
+    /// stability threshold the adaptive poller uses, so "volatile" means the same thing
+    /// on the grid as it does to the scheduler.
+    /// </summary>
+    private const double VolatileCoefficient = 0.08;
+
+    private Dictionary<(string Day, int Hour), HeatmapCellDto> _byDayHour = [];
+    private int[] _hours = [];
+    private string? _summary;
+
+    protected override void OnParametersSet()
+    {
+        if (Heatmap is null || Heatmap.Cells.Count == 0)
+        {
+            _byDayHour = [];
+            _hours = [];
+            _summary = null;
+            return;
+        }
+
+        // Last cell wins on a duplicate (day, hour) — the server groups by exactly that
+        // pair, so a duplicate would be a server bug rather than something to render twice.
+        _byDayHour = Heatmap.Cells
+            .GroupBy(c => (c.DayOfWeek, c.Hour))
+            .ToDictionary(g => g.Key, g => g.Last());
+
+        int first = Heatmap.Cells.Min(c => c.Hour);
+        int last = Heatmap.Cells.Max(c => c.Hour);
+        _hours = [.. Enumerable.Range(first, last - first + 1)];
+
+        _summary = BuildSummary(Heatmap);
+    }
+
+    /// <summary>"Tuesdays at 17:00 run 62% over your typical 23 min." Null until a cell is
+    /// materially worse than the route's median — flagging a 4% bump as a hotspot is noise.</summary>
+    private static string? BuildSummary(VolatilityHeatmapDto heatmap)
+    {
+        if (heatmap.MedianDurationSeconds <= 0)
+            return null;
+
+        HeatmapCellDto? worst = heatmap.Cells.MaxBy(c => c.MeanDurationSeconds);
+        if (worst is null)
+            return null;
+
+        int pct = (int)Math.Round((worst.MeanDurationSeconds - heatmap.MedianDurationSeconds)
+            / heatmap.MedianDurationSeconds * 100);
+
+        return pct < 10
+            ? $"This route holds steady all week — no hour runs more than {Math.Max(pct, 0)}% over its typical {heatmap.MedianDurationSeconds / 60:F0} min."
+            : $"{worst.DayOfWeek}s at {worst.Hour:D2}:00 are the worst hour of your week — {pct}% over the typical {heatmap.MedianDurationSeconds / 60:F0} min.";
+    }
+
+    private string LevelClass(HeatmapCellDto cell)
+    {
+        double median = Heatmap?.MedianDurationSeconds ?? 0;
+        if (median <= 0)
+            return "pt-heat-l0";
+
+        double ratio = cell.MeanDurationSeconds / median;
+        return ratio switch
+        {
+            <= 1.05 => "pt-heat-l0",
+            <= 1.20 => "pt-heat-l1",
+            <= 1.40 => "pt-heat-l2",
+            <= 1.70 => "pt-heat-l3",
+            _ => "pt-heat-l4"
+        };
+    }
+
+    /// <summary>Wide spread relative to the cell's own mean — slow is plannable, erratic isn't.</summary>
+    private static bool IsVolatile(HeatmapCellDto cell) =>
+        cell.SampleCount > 1
+        && cell.MeanDurationSeconds > 0
+        && cell.StdDevDurationSeconds / cell.MeanDurationSeconds > VolatileCoefficient;
+
+    private static string EmptyTooltip(string day, int hour) =>
+        $"{day} {hour:D2}:00 — no samples";
+
+    private string CellTooltip(HeatmapCellDto cell)
+    {
+        double median = Heatmap?.MedianDurationSeconds ?? 0;
+        string delta = median > 0
+            ? $" · {(cell.MeanDurationSeconds - median) / median * 100:+0;-0;0}% vs typical"
+            : string.Empty;
+        string spread = IsVolatile(cell)
+            ? $" · ±{cell.StdDevDurationSeconds / 60:F0} min swing"
+            : string.Empty;
+
+        return $"{cell.DayOfWeek} {cell.Hour:D2}:00 — {cell.MeanDurationSeconds / 60:F0} min avg{delta}{spread} · {cell.SampleCount} sample(s)";
+    }
+}

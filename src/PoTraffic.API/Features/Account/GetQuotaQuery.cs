@@ -63,6 +63,9 @@ public sealed class GetQuotaHandler : IRequestHandler<GetQuotaQuery, QuotaDto?>
         decimal costToday = 0m;
         foreach (EntityRoute route in _db.Routes.Where(r => userRouteIds.Contains(r.Id)))
         {
+            // The sample route's samples were generated, not bought (#10). Counting them
+            // would report spend against an account that never called a provider.
+            if (route.IsDemo) continue;
             if (!pollsByRoute.TryGetValue(route.Id, out int polls)) continue;
             pollsToday += polls;
             costToday += polls * rates.For((RouteProvider)route.Provider);

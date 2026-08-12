@@ -120,6 +120,17 @@ else if (VisibleRoutes.Count == 0)
         <div class="pt-empty-state-text">Add your first commute route to start monitoring traffic patterns.</div>
         <RadzenButton Text="Add Your First Route" ButtonStyle="ButtonStyle.Primary" Icon="add"
                       Click="@(() => Nav.NavigateTo("/routes/create"))" />
+
+        @* #10: a real route takes days of monitoring before it has anything to say. The
+           sample route fills that gap with data that is clearly labelled as invented. *@
+        <div class="pt-empty-state-alt">
+            <RadzenButton Text="Or explore a sample route" ButtonStyle="ButtonStyle.Light"
+                          Size="ButtonSize.Small" Icon="science"
+                          Click="@LoadDemoRouteAsync" IsBusy="_loadingDemo" />
+            <div class="pt-empty-state-note">
+                Two weeks of made-up commute data, so you can see the charts before your own fill in.
+            </div>
+        </div>
     </div>
 }
 else
@@ -152,6 +163,7 @@ else
     private decimal _estimatedCostToday;
     private decimal _projectedMonthlyCost;
     private bool _hydrated;
+    private bool _loadingDemo;
 
     protected override TimeSpan PollingInterval => TimeSpan.FromSeconds(60);
 
@@ -177,6 +189,35 @@ else
     {
         RecomputeVisible();
         InvokeAsync(StateHasChanged);
+    }
+
+    /// <summary>
+    /// Seeds the sample route (#10) and lands the user on it. The endpoint is idempotent,
+    /// so a double-click produces one route, not two.
+    /// </summary>
+    private async Task LoadDemoRouteAsync()
+    {
+        _loadingDemo = true;
+        try
+        {
+            HttpResponseMessage response = await Http.PostAsync("/api/routes/demo", null);
+            if (!response.IsSuccessStatusCode)
+                return;
+
+            RouteDto? demo = await response.Content.ReadFromJsonAsync(AppJsonContext.Default.RouteDto);
+            await RefreshAsync();
+
+            if (demo is not null)
+                Nav.NavigateTo($"/routes/{demo.Id}");
+        }
+        catch
+        {
+            // Transient — the empty state stays up and the button can be pressed again.
+        }
+        finally
+        {
+            _loadingDemo = false;
+        }
     }
 
     protected override async Task LoadDataAsync()

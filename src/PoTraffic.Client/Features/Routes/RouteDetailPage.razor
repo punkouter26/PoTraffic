@@ -45,8 +45,23 @@ else
         </div>
     }
 
-    @* #3: return-trip pairing *@
-    @if (_route is not null)
+    @* #10: the sample route says so, plainly and above everything it might be mistaken for *@
+    @if (_route?.IsDemo == true)
+    {
+        <div class="pt-demo-banner rz-mb-4" role="note">
+            <span class="pt-demo-banner-tag">SAMPLE DATA</span>
+            <span class="pt-demo-banner-text">
+                Every number below was generated to show what a well-measured route looks like.
+                Monitoring and Check Now are turned off here — add your own route to collect real samples.
+            </span>
+            <RadzenButton Text="Add a real route" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small"
+                          Click="@(() => Nav.NavigateTo("/routes/create"))" />
+        </div>
+    }
+
+    @* #3: return-trip pairing — not offered for the sample route, whose reverse direction
+       would be a real, empty route wearing illustrative addresses. *@
+    @if (_route is not null && !_route.IsDemo)
     {
         <div class="pt-returntrip-bar rz-mb-4">
             @if (_route.ReturnRouteId is RouteId rid)
@@ -125,8 +140,12 @@ else
     <DeparturePlanner Slots="_baselineSlots"
                       SuggestedDepartureMinute="_optimalDeparture?.TimeSlotBucket" />
 
-    @* Monitoring window configuration *@
-    <WindowConfigPanel RouteId="RouteId" OnSaved="OnWindowSaved" />
+    @* Monitoring window configuration. Hidden on the sample route: the server refuses to
+       start a chain against it (#10), and a Start button that always fails is worse than none. *@
+    @if (_route?.IsDemo != true)
+    {
+        <WindowConfigPanel RouteId="RouteId" OnSaved="OnWindowSaved" />
+    }
 
     @* P1/UX-9: Chart always visible — no toggle required.
        Uses the canvas-based TrendChart (GPU-friendly) instead of RadzenChart. *@
@@ -187,6 +206,19 @@ else
         </RadzenCard>
     }
 
+    @* #5: weekly congestion grid — which hour of which day actually hurts *@
+    <RadzenCard class="rz-mb-4">
+        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-1">Your week, hour by hour</RadzenText>
+        <VolatilityHeatmap Heatmap="_heatmap" />
+    </RadzenCard>
+
+    @* Compare this route against another — e.g. the two ways home *@
+    <div class="pt-compare-cta rz-mb-4">
+        <span class="pt-compare-cta-label">⚖️ Wondering if the other way is faster?</span>
+        <RadzenButton Text="Compare with another route" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small"
+                      Click="@(() => Nav.NavigateTo($"/compare?a={RouteId}"))" />
+    </div>
+
     @* UX-9: Raw poll table — collapsed by default for stat-lovers *@
     <PollHistoryTable Polls="_todayPolls" />
 }
@@ -206,6 +238,15 @@ else
     private string _optimalDepartureLabel = string.Empty;
     private WeekdayComparisonDto? _weekdayComparison;
     private string? _weekdaySummary;
+    private VolatilityHeatmapDto? _heatmap;
+
+    /// <summary>
+    /// The heatmap aggregates the route's entire history, so a single new sample can
+    /// barely move it — refetching it on every 15-second refresh would be a whole-history
+    /// scan per tick for a picture that changes hourly. Null until the first fetch.
+    /// </summary>
+    private DateTimeOffset? _heatmapFetchedAt;
+    private static readonly TimeSpan HeatmapMaxAge = TimeSpan.FromMinutes(5);
     private RouteDto? _route;
     private bool _creatingReturn;
     private string _icsHref = string.Empty;
@@ -367,7 +408,15 @@ else
         Task<WeekdayComparisonDto?> weekdayTask =
             Http.GetFromJsonAsync($"/api/routes/{RouteId}/weekday-comparison", AppJsonContext.Default.WeekdayComparisonDto);
 
-        await Task.WhenAll(routeTask, sessionsTask, historyTask, baselineTask, optimalTask, weekdayTask);
+        // #5: the weekly grid rides along with the fan-out, but only when the copy in
+        // hand has aged out — see HeatmapMaxAge.
+        bool refreshHeatmap = _heatmapFetchedAt is not { } fetchedAt
+            || DateTimeOffset.UtcNow - fetchedAt > HeatmapMaxAge;
+        Task<VolatilityHeatmapDto?> heatmapTask = refreshHeatmap
+            ? Http.GetFromJsonAsync($"/api/routes/{RouteId}/heatmap", AppJsonContext.Default.VolatilityHeatmapDto)
+            : Task.FromResult(_heatmap);
+
+        await Task.WhenAll(routeTask, sessionsTask, historyTask, baselineTask, optimalTask, weekdayTask, heatmapTask);
 
         // The route itself — drives the return-trip pairing control (#3)
         _route = await routeTask;
@@ -418,5 +467,11 @@ else
         // Per-weekday comparison (#4)
         _weekdayComparison = await weekdayTask;
         _weekdaySummary = BuildWeekdaySummary(_weekdayComparison);
+
+        // Weekly congestion grid (#5). Only stamp the fetch time on a real round-trip,
+        // so a served-from-memory tick doesn't push the next refresh out another 5 minutes.
+        _heatmap = await heatmapTask;
+        if (refreshHeatmap)
+            _heatmapFetchedAt = DateTimeOffset.UtcNow;
     }
 }

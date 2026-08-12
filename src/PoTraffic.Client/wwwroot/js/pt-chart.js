@@ -29,6 +29,9 @@ function readTheme(canvas) {
         line: pick("--pt-color-brand-500", "#3b82f6"),
         lineStrong: pick("--pt-color-brand-600", "#2563eb"),
         danger: pick("--pt-color-danger", "#f43f5e"),
+        // Second series in compare mode (#8). Warning-amber rather than another blue:
+        // the two lines have to be told apart at a glance, including in greyscale.
+        compare: pick("--pt-color-warning", "#f59e0b"),
         band: "rgba(16, 185, 129, 0.12)",
         brush: "rgba(59, 130, 246, 0.16)"
     };
@@ -116,6 +119,16 @@ function draw(canvas) {
     drawSeries(ctx, points, count, min, max, w, h);
     ctx.stroke();
 
+    // Second route, in compare mode (#8). Drawn over the primary at the same x-scale —
+    // the caller guarantees both series describe the same time slots.
+    if (view.compare.length >= 2) {
+        ctx.strokeStyle = theme.compare;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        drawSeries(ctx, view.compare, view.compare.length, min, max, w, h);
+        ctx.stroke();
+    }
+
     // Reroute markers
     ctx.fillStyle = theme.danger;
     for (let i = 0; i < count; i++) {
@@ -159,7 +172,8 @@ function buildView(data) {
     const points = data.points ?? [];
     const baseline = data.baseline ?? [];
     const upperBand = data.upperBand ?? [];
-    const all = points.concat(baseline).concat(upperBand);
+    const compare = data.compare ?? [];
+    const all = points.concat(baseline).concat(upperBand).concat(compare);
 
     // An all-empty chart still needs a sane axis so gridlines and labels render.
     const min = all.length ? Math.min(...all) * 0.95 : 0;
@@ -169,11 +183,26 @@ function buildView(data) {
         points,
         baseline,
         upperBand,
+        compare,
         rerouted: data.rerouted ?? [],
         labels: data.labels ?? [],
+        // Series names label the tooltip rows in compare mode.
+        names: data.names ?? [],
         min,
         max: max > min ? max : min + 1
     };
+}
+
+/**
+ * The tooltip is assembled as HTML, and series names are route addresses the user
+ * typed — they do not go into innerHTML unescaped.
+ */
+function escapeHtml(value) {
+    return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
 }
 
 function ensureTooltip(canvas) {
@@ -206,7 +235,22 @@ function updateTooltip(canvas) {
 
     const minutes = view.points[i];
     const label = view.labels[i] ?? `#${i + 1}`;
-    const rows = [`<strong>${label}</strong>`, `${minutes.toFixed(0)} min`];
+    const rows = [`<strong>${escapeHtml(label)}</strong>`, `${minutes.toFixed(0)} min`];
+
+    // Compare mode (#8): name both series and say which one wins this slot, rather
+    // than leaving the reader to match line colours against a legend.
+    const other = view.compare[i];
+    if (typeof other === "number") {
+        const nameA = escapeHtml(view.names[0] ?? "Route A");
+        const nameB = escapeHtml(view.names[1] ?? "Route B");
+        const gap = other - minutes;
+
+        rows[1] = `${nameA}: ${minutes.toFixed(0)} min`;
+        rows.push(`${nameB}: ${other.toFixed(0)} min`);
+        rows.push(Math.abs(gap) < 0.5
+            ? "neck and neck"
+            : `<strong>${gap > 0 ? nameA : nameB}</strong> faster by ${Math.abs(gap).toFixed(0)} min`);
+    }
 
     // Deviation from the baseline, expressed in σ when the band gives us one.
     const base = view.baseline[i];

@@ -22,6 +22,12 @@ public static class RouteErrorCodes
 
     /// <summary>The target route/window does not exist or is not owned by the caller.</summary>
     public const string NotFound = "NOT_FOUND";
+
+    /// <summary>
+    /// The operation would bill a real traffic-provider call against the sample route,
+    /// whose history is synthetic. Demo routes are for reading, not measuring.
+    /// </summary>
+    public const string DemoRoute = "DEMO_ROUTE";
 }
 
 /// <summary>

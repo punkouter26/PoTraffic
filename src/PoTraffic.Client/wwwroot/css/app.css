@@ -791,3 +791,97 @@ code {
     margin-bottom: 1rem;
     padding: 0.5rem 0.75rem;
 }
+
+/* ═══════════════════════════════════════════════
+   Empty states. Shared by the dashboard and the route-comparison page (#8),
+   so these live here rather than in either page's scoped stylesheet.
+═══════════════════════════════════════════════ */
+.pt-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 52vh;
+    text-align: center;
+    padding: var(--pt-space-12) var(--pt-space-4);
+    background: var(--pt-glass-bg);
+    backdrop-filter: blur(var(--pt-glass-blur)) saturate(var(--pt-glass-saturate));
+    -webkit-backdrop-filter: blur(var(--pt-glass-blur)) saturate(var(--pt-glass-saturate));
+    border: 1px solid var(--pt-glass-border);
+    border-radius: var(--pt-radius-lg);
+}
+
+.pt-empty-state-emoji {
+    font-size: var(--pt-text-3xl);
+    margin-bottom: var(--pt-space-4);
+}
+
+.pt-empty-state-title {
+    font-size: var(--pt-text-xl);
+    font-weight: var(--pt-weight-semibold);
+    color: var(--pt-fg-primary);
+    margin-bottom: var(--pt-space-2);
+}
+
+.pt-empty-state-text {
+    color: var(--pt-fg-secondary);
+    margin-bottom: var(--pt-space-6);
+    max-width: 34rem;
+}
+
+/* #10 — the secondary "try a sample route" path, deliberately quieter than the
+   primary call to action next to it. */
+.pt-empty-state-alt {
+    border-top: 1px solid var(--pt-border-subtle);
+    margin-top: var(--pt-space-6);
+    padding-top: var(--pt-space-5);
+}
+
+.pt-empty-state-note {
+    color: var(--pt-fg-tertiary);
+    font-size: var(--pt-text-xs);
+    margin-top: var(--pt-space-2);
+    max-width: 26rem;
+}
+
+/* ═══════════════════════════════════════════════
+   #10 — sample-route markers. Synthetic history is labelled everywhere it is
+   shown, in the one colour the app otherwise reserves for "read this".
+═══════════════════════════════════════════════ */
+.pt-demo-badge {
+    background: var(--pt-bg-tint);
+    border: 1px dashed var(--pt-color-info);
+    border-radius: var(--pt-radius-full);
+    color: var(--pt-color-info);
+    font-size: 0.65rem;
+    font-weight: var(--pt-weight-bold);
+    letter-spacing: 0.06em;
+    padding: 0.1rem 0.5rem;
+    white-space: nowrap;
+}
+
+.pt-demo-banner {
+    align-items: center;
+    background: var(--pt-bg-tint);
+    border: 1px dashed var(--pt-color-info);
+    border-radius: var(--pt-radius-md);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--pt-space-3);
+    padding: var(--pt-space-3) var(--pt-space-4);
+}
+
+.pt-demo-banner-tag {
+    color: var(--pt-color-info);
+    font-size: 0.65rem;
+    font-weight: var(--pt-weight-bold);
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+}
+
+.pt-demo-banner-text {
+    color: var(--pt-fg-secondary);
+    flex: 1 1 18rem;
+    font-size: var(--pt-text-sm);
+    min-width: 0;
+}

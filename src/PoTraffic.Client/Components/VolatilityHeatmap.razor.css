@@ -1,0 +1,135 @@
+/* #5 — day-of-week × hour congestion grid.
+
+   The ramp is expressed as alpha over whatever the card sits on, so one set of
+   rules reads correctly in both the light and dark themes instead of needing a
+   second palette under [data-theme="dark"]. */
+
+.pt-heatmap-summary {
+    color: var(--pt-fg-secondary);
+}
+
+.pt-heatmap-scroll {
+    /* 24 columns will not fit a phone. The grid scrolls inside its own card
+       rather than pushing the page sideways. */
+    overflow-x: auto;
+    padding-bottom: var(--pt-space-1);
+}
+
+.pt-heatmap {
+    border-collapse: separate;
+    border-spacing: 3px;
+    table-layout: fixed;
+}
+
+.pt-heatmap-hour,
+.pt-heatmap-day {
+    color: var(--pt-fg-tertiary);
+    font-size: var(--pt-text-xs);
+    font-variant-numeric: tabular-nums;
+    font-weight: var(--pt-weight-medium);
+}
+
+.pt-heatmap-hour {
+    text-align: center;
+    min-width: 2.25rem;
+}
+
+.pt-heatmap-day {
+    text-align: right;
+    padding-right: var(--pt-space-2);
+    white-space: nowrap;
+}
+
+.pt-heat {
+    border-radius: var(--pt-radius-xs);
+    display: inline-block;
+    height: 1.75rem;
+    min-width: 2.25rem;
+    position: relative;
+    text-align: center;
+    vertical-align: middle;
+}
+
+td.pt-heat {
+    cursor: default;
+}
+
+.pt-heat-value {
+    color: var(--pt-fg-primary);
+    font-size: var(--pt-text-xs);
+    font-variant-numeric: tabular-nums;
+    font-weight: var(--pt-weight-semibold);
+    line-height: 1.75rem;
+}
+
+/* Congestion ramp — mean travel time relative to the route's median sample. */
+.pt-heat-empty { background: var(--pt-bg-tint); }
+.pt-heat-l0 { background: rgba(16, 185, 129, 0.20); }
+.pt-heat-l1 { background: rgba(16, 185, 129, 0.42); }
+.pt-heat-l2 { background: rgba(245, 158, 11, 0.48); }
+.pt-heat-l3 { background: rgba(244, 63, 94, 0.45); }
+.pt-heat-l4 { background: rgba(244, 63, 94, 0.80); }
+
+/* At full saturation the primary foreground loses contrast in the light theme. */
+.pt-heat-l4 .pt-heat-value { color: #ffffff; }
+
+/* Wide spread — the hour is unpredictable, not merely slow. */
+.pt-heat-volatile::after {
+    background: var(--pt-fg-primary);
+    border-radius: var(--pt-radius-full);
+    content: "";
+    height: 4px;
+    opacity: 0.55;
+    position: absolute;
+    right: 3px;
+    top: 3px;
+    width: 4px;
+}
+
+.pt-heatmap-legend {
+    align-items: center;
+    color: var(--pt-fg-tertiary);
+    display: flex;
+    flex-wrap: wrap;
+    font-size: var(--pt-text-xs);
+    gap: var(--pt-space-1);
+    margin-top: var(--pt-space-3);
+}
+
+/* Legend swatches are decorative — they carry no number, so they shrink. */
+.pt-heatmap-legend .pt-heat {
+    height: 0.85rem;
+    min-width: 1.25rem;
+}
+
+.pt-heatmap-legend-label {
+    margin: 0 var(--pt-space-1);
+}
+
+.pt-heatmap-legend-sep {
+    color: var(--pt-fg-faint);
+}
+
+.pt-heatmap-empty {
+    align-items: center;
+    color: var(--pt-fg-secondary);
+    display: flex;
+    font-size: var(--pt-text-sm);
+    gap: var(--pt-space-3);
+    padding: var(--pt-space-4) var(--pt-space-2);
+}
+
+.pt-heatmap-empty-icon {
+    font-size: var(--pt-text-2xl);
+    opacity: 0.7;
+}
+
+.pt-visually-hidden {
+    border: 0;
+    clip-path: inset(50%);
+    height: 1px;
+    overflow: hidden;
+    position: absolute;
+    white-space: nowrap;
+    width: 1px;
+}

@@ -224,6 +224,8 @@
             () => { Nav.NavigateTo("/dashboard"); return Task.CompletedTask; });
         yield return new PaletteCommand("➕", "Add route", "Track a new commute", "Go",
             () => { Nav.NavigateTo("/routes/create"); return Task.CompletedTask; });
+        yield return new PaletteCommand("⚖️", "Compare routes", "Which way is actually faster", "Go",
+            () => { Nav.NavigateTo("/compare"); return Task.CompletedTask; });
         yield return new PaletteCommand("⚙️", "Settings", null, "Go",
             () => { Nav.NavigateTo("/settings"); return Task.CompletedTask; });
         yield return new PaletteCommand("⌨️", "Keyboard shortcuts", null, "Help",
@@ -237,8 +239,13 @@
             yield return new PaletteCommand("🛣️", label, "Open route detail", "Route",
                 () => { Nav.NavigateTo($"/routes/{id}"); return Task.CompletedTask; });
 
-            yield return new PaletteCommand("⚡", $"Check now: {label}", "Poll live travel time", "Action",
-                () => CheckNowAsync(id, label));
+            // No live poll for the sample route (#10) — the server refuses it, and offering
+            // the command anyway would spend a keystroke to earn an error.
+            if (!route.IsDemo)
+            {
+                yield return new PaletteCommand("⚡", $"Check now: {label}", "Poll live travel time", "Action",
+                    () => CheckNowAsync(id, label));
+            }
         }
     }
 

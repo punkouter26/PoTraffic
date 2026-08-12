@@ -32,6 +32,8 @@ public static class RoutesEndpoints
         group.MapDelete("{routeId:guid}", DeleteRoute);
         group.MapPost("{routeId:guid}/check-now", CheckNow);
         group.MapPost("{routeId:guid}/return-trip", CreateReturnTrip);
+        // Sample route with synthetic history, for an account that has nothing to show yet (#10)
+        group.MapPost("demo", CreateDemoRoute);
 
         return app;
     }
@@ -153,6 +155,22 @@ public static class RoutesEndpoints
                 : Results.UnprocessableEntity(new { error = result.ErrorCode });
     }
 
+    // POST /api/routes/demo — seed the caller's account with a sample route (#10).
+    // Idempotent: repeat calls return the existing demo route rather than a second copy.
+    private static async Task<IResult> CreateDemoRoute(
+        HttpContext context,
+        ISender sender,
+        ILogger<LogCategory> logger)
+    {
+        UserId? userId = ExtractUserId(context.User, logger);
+        if (userId is null) return Results.Unauthorized();
+
+        CreateRouteResult result = await sender.Send(new CreateDemoRouteCommand(userId.Value));
+        return result.IsSuccess
+            ? Results.Created($"/api/routes/{result.Route!.Id}", result.Route)
+            : Results.UnprocessableEntity(new { error = result.ErrorCode });
+    }
+
     // POST /api/routes/{routeId}/check-now — instant poll, result not persisted
     private static async Task<IResult> CheckNow(
         RouteId routeId,
@@ -172,7 +190,12 @@ public static class RoutesEndpoints
                 distanceMetres = result.DistanceMetres
             });
 
-        return result.ErrorCode == RouteErrorCodes.NotFound ? Results.NotFound() : Results.StatusCode(503);
+        return result.ErrorCode switch
+        {
+            RouteErrorCodes.NotFound => Results.NotFound(),
+            RouteErrorCodes.DemoRoute => Results.UnprocessableEntity(new { error = result.ErrorCode }),
+            _ => Results.StatusCode(503)
+        };
     }
 
 }

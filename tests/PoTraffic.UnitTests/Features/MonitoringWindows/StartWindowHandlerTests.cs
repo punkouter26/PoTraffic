@@ -146,6 +146,55 @@ public sealed class StartWindowHandlerTests
     }
 
     [Fact]
+    public async Task StartWindow_WhenRouteIsTheDemoRoute_RefusesAndEnqueuesNothing()
+    {
+        // Arrange — a window hung off the sample route (#10). The demo ships without one,
+        // but nothing stops a user adding it from the config panel.
+        TableStorageContext db = TestDoubles.CreateDb();
+        UserId userId = UserId.New();
+        RouteId routeId = RouteId.New();
+        WindowId windowId = WindowId.New();
+
+        var route = new Route
+        {
+            Id = routeId,
+            UserId = userId,
+            OriginAddress = "A",
+            OriginCoordinates = "1.0,1.0",
+            DestinationAddress = "B",
+            DestinationCoordinates = "2.0,2.0",
+            Provider = (int)RouteProvider.GoogleMaps,
+            MonitoringStatus = (int)MonitoringStatus.Paused,
+            IsDemo = true,
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+        db.Add(route);
+        db.Add(new MonitoringWindow
+        {
+            Id = windowId,
+            RouteId = routeId,
+            Route = route,
+            StartTime = new TimeOnly(7, 0),
+            EndTime = new TimeOnly(9, 0),
+            DaysOfWeekMask = 0b01111110
+        });
+        await db.SaveChangesAsync();
+
+        IJobScheduler scheduler = Substitute.For<IJobScheduler>();
+        var handler = new StartWindowCommandHandler(db, scheduler, NullLogger<StartWindowCommandHandler>.Instance);
+
+        // Act
+        StartWindowResult result = await handler.Handle(
+            new StartWindowCommand(windowId, userId), CancellationToken.None);
+
+        // Assert — no session, no polling chain, no provider spend
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorCode.Should().Be(RouteErrorCodes.DemoRoute);
+        db.MonitoringSessions.Should().BeEmpty();
+        scheduler.DidNotReceive().Enqueue(Arg.Any<Expression<Func<Task>>>());
+    }
+
+    [Fact]
     public async Task StartWindow_WhenWindowNotFound_ReturnsNotFoundError()
     {
         // Arrange
