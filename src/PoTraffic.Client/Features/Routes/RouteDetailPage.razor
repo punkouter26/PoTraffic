@@ -37,7 +37,30 @@ else
         </div>
     }
 
-    @if (_route?.IsDemo == true)
+    @if (_route is null)
+    {
+        @* Nothing ever loaded. Rendering the sections below in this state produced a
+           route header with no addresses — a bare "→" — over the words "Still
+           learning this route", which reads as a fact about the commute when it is
+           really a failed request. An empty answer is worse than no answer. *@
+        <div class="pt-empty-state">
+            <div class="pt-empty-state-emoji" aria-hidden="true">📡</div>
+            <div class="pt-empty-state-title">Couldn't load this route</div>
+            <div class="pt-empty-state-text">
+                @* Deliberately not "the server didn't respond": the same branch covers a
+                   route that has since been deleted, where the server answered fine. *@
+                @(IsOffline
+                    ? "You're offline. This page will fill in as soon as you're back."
+                    : "The request failed. Retrying automatically — the route may also have been deleted.")
+            </div>
+            <RadzenButton Text="Retry now" ButtonStyle="ButtonStyle.Light" Icon="refresh"
+                          Click="@RefreshAsync" />
+        </div>
+    }
+    else
+    {
+
+    @if (_route.IsDemo)
     {
         <div class="pt-demo-banner rz-mb-4 pt-enter" role="note">
             <span class="pt-demo-banner-tag">SAMPLE DATA</span>
@@ -174,7 +197,7 @@ else
         </summary>
 
         <div class="pt-details-body">
-            @if (_route is not null && !_route.IsDemo)
+            @if (!_route.IsDemo)
             {
                 <div class="pt-returntrip-bar rz-mb-4">
                     @if (_route.ReturnRouteId is RouteId rid)
@@ -190,17 +213,17 @@ else
                                       Click="CreateReturnTripAsync" IsBusy="_creatingReturn" />
                     }
                 </div>
-            }
 
-            @if (_route?.IsDemo != true)
-            {
                 <WindowConfigPanel RouteId="RouteId" OnSaved="OnWindowSaved" />
             }
 
             <PollHistoryTable Polls="_todayPolls" />
         </div>
     </details>
+
+    }
 }
+
 @code {
     [Parameter] public Guid RouteId { get; set; }
 
