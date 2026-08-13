@@ -19,6 +19,11 @@
 
    Now: ANSWER (when to leave), EVIDENCE (one chart, one weekly grid), and a
    single Details disclosure holding the settings and the raw records.
+
+   A status strip between the header and the answer makes it explicit when the
+   page is refreshing and when the next Google Maps probe is happening, so the
+   user can tell the difference between "no samples yet" and "the scheduler is
+   about to ask Google".
    ────────────────────────────────────────────────────────────────────── *@
 
 <PageTitle>Route Detail — PoTraffic</PageTitle>
@@ -32,6 +37,15 @@ else
     @* The page is reached by tapping a card, and had no way back but the browser's
        own control — which a PWA in standalone display mode does not render. *@
     <PageHeader Title="@_pageTitle" BackHref="/dashboard" BackLabel="Commutes" />
+
+    @* Live status strip — refresh-in-flight, last Google Maps probe, cadence. *@
+    <RouteProbeStatus RouteId="RouteId"
+                      IsRefreshing="IsRefreshing"
+                      LastSuccessUtc="LastSuccessUtc"
+                      LatestProbe="LatestPoll"
+                      ProbesToday="_todayPolls.Count"
+                      Schedule="@_activeSession?.Schedule"
+                      OnProbeCompleted="@OnWindowSaved" />
 
     @if (IsOffline || IsStale)
     {

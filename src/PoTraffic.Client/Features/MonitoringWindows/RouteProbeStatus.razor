@@ -1,0 +1,208 @@
+@* ──────────────────────────────────────────────────────────────────────
+   RouteProbeStatus — the at-a-glance "is this page alive?" panel.
+
+   Three signals in one row:
+     1. Refresh state — is the page currently reloading data? (pulsing dot)
+     2. Last probe — when was Google Maps last hit for this route?
+     3. Probe cadence — adaptive interval and "probes today" count.
+
+   The polling loop and the probe scheduler are two different cadences:
+     • Polling = page-side, every 15s, never touches Google Maps.
+     • Probing = server-side, every PollIntervalMinutes (5 base, 15 when stable),
+       each one hits Google Maps and writes a PollRecord.
+
+   "Last probe" comes from the most recent PollRecord on this route. "Probes today"
+   counts PollRecord rows in the today-only page state already loaded by the parent.
+   ────────────────────────────────────────────────────────────────────── *@
+
+@inject HttpClient Http
+@inject NotificationService NotificationService
+@implements IDisposable
+
+<div class="pt-probe-status" aria-label="Route probe status">
+    @* Signal 1: refresh-in-flight *@
+    <span class="pt-probe-cell pt-probe-cell-refresh">
+        @if (IsRefreshing)
+        {
+            <span class="pt-probe-dot pt-probe-dot-pulse" aria-hidden="true"></span>
+            <span class="pt-probe-label">Refreshing…</span>
+        }
+        else
+        {
+            <span class="pt-probe-dot @(LastSuccessLocal is null ? "pt-probe-dot-amber" : "pt-probe-dot-green")"
+                  aria-hidden="true"></span>
+            <span class="pt-probe-label">
+                @(LastSuccessLocal is null
+                    ? "Waiting for first sync"
+                    : $"Synced {FormatAgo(LastSuccessLocal.Value)}")
+            </span>
+        }
+    </span>
+
+    @* Signal 2: last Google Maps probe *@
+    <span class="pt-probe-cell pt-probe-cell-lastprobe">
+        @if (LatestProbe is null)
+        {
+            <PtIcon Name="radar" Size="sm" Class="pt-probe-icon" />
+            <span class="pt-probe-label">No probe yet — scheduler will run it on the next tick</span>
+        }
+        else
+        {
+            <PtIcon Name="radar" Size="sm" Class="pt-probe-icon" />
+            <span class="pt-probe-label">
+                Last Google Maps probe
+                <strong>@LatestProbe.PolledAtDateTime.ToString("HH:mm:ss")</strong>
+                (@FormatAgo(LatestProbe.PolledAtDateTime))
+            </span>
+        }
+    </span>
+
+    @* Signal 3: cadence & today count *@
+    <span class="pt-probe-cell pt-probe-cell-cadence">
+        <PtIcon Name="schedule" Size="sm" Class="pt-probe-icon" />
+        <span class="pt-probe-label">
+            @if (Schedule is { } s)
+            {
+                <text>Adaptive cadence <strong>@s.PollIntervalMinutes min</strong></text>
+            }
+            else
+            {
+                <text>No schedule</text>
+            }
+            @if (ProbesToday > 0)
+            {
+                <span class="pt-probe-sep">·</span>
+                <text><strong>@ProbesToday</strong> probe@(ProbesToday == 1 ? "" : "s") today</text>
+            }
+        </span>
+    </span>
+
+    @* Probe-now button: the only user-initiated way to spend money on this route. *@
+    <div class="pt-probe-actions">
+        <RadzenButton Text="@(_probingNow ? "Probing Google Maps…" : "Probe now")"
+                      Icon="@(_probingNow ? "progress_activity" : "radar")"
+                      ButtonStyle="ButtonStyle.Light"
+                      Size="ButtonSize.Small"
+                      Disabled="_probingNow"
+                      IsBusy="_probingNow"
+                      Click="@ProbeNowAsync" />
+    </div>
+</div>
+
+@code {
+    /// <summary>Route this status belongs to. Drives the probe-now POST.</summary>
+    [Parameter, EditorRequired] public Guid RouteId { get; set; }
+
+    /// <summary>The polling loop's "I'm refreshing" state — pulses a dot while true.</summary>
+    [Parameter] public bool IsRefreshing { get; set; }
+
+    /// <summary>Last successful data fetch, local time. Drives the synced-ago label.</summary>
+    [Parameter] public DateTimeOffset? LastSuccessUtc { get; set; }
+
+    /// <summary>Most recent PollRecord — its time is the last Google Maps hit.</summary>
+    [Parameter] public PollRecordDto? LatestProbe { get; set; }
+
+    /// <summary>How many probes today (already on the parent's paged history).</summary>
+    [Parameter] public int ProbesToday { get; set; }
+
+    /// <summary>Server-computed poll schedule (cadence, window state, next ETA).</summary>
+    [Parameter] public PollScheduleDto? Schedule { get; set; }
+
+    /// <summary>Fired after a successful probe so the parent can refresh from the wire.</summary>
+    [Parameter] public EventCallback OnProbeCompleted { get; set; }
+
+    private bool _probingNow;
+    private System.Timers.Timer? _ticker;
+
+    private DateTime? LastSuccessLocal => LastSuccessUtc?.ToLocalTime().DateTime;
+
+    protected override void OnInitialized()
+    {
+        // 1-second tick so the "X minutes ago" labels stay live without the parent
+        // having to re-render this component on every refresh.
+        _ticker = new System.Timers.Timer(TimeSpan.FromSeconds(1).TotalMilliseconds);
+        _ticker.Elapsed += async (_, _) =>
+        {
+            try { await InvokeAsync(StateHasChanged); }
+            catch (ObjectDisposedException) { _ticker?.Dispose(); }
+        };
+        _ticker.AutoReset = true;
+        _ticker.Start();
+    }
+
+    /// <summary>
+    /// Hit the existing POST /api/routes/{routeId}/check-now endpoint. It calls Google
+    /// Maps synchronously and returns the new travel time without persisting it as a
+    /// scheduled poll — it's the same surface the dashboard's swipe gesture uses.
+    /// </summary>
+    private async Task ProbeNowAsync()
+    {
+        if (_probingNow) return;
+        _probingNow = true;
+        try
+        {
+            HttpResponseMessage resp = await Http.PostAsync($"api/routes/{RouteId}/check-now", null);
+            if (resp.IsSuccessStatusCode)
+            {
+                CheckNowResponse? data = await resp.Content
+                    .ReadFromJsonAsync(AppJsonContext.Default.CheckNowResponse);
+
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Info,
+                    Summary = "Google Maps live probe",
+                    Detail = data is not null
+                        ? $"{data.DurationSeconds / 60} min · {data.DistanceMetres / 1000.0:F1} km"
+                        : "Live travel time retrieved",
+                    Duration = 6000
+                });
+                await OnProbeCompleted.InvokeAsync();
+            }
+            else
+            {
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Probe failed",
+                    Detail = resp.StatusCode == System.Net.HttpStatusCode.ServiceUnavailable
+                        ? "Google Maps unavailable — try again in a moment."
+                        : $"Request failed ({(int)resp.StatusCode}).",
+                    Duration = 5000
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Probe failed",
+                Detail = ex.Message,
+                Duration = 5000
+            });
+        }
+        finally
+        {
+            _probingNow = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        _ticker?.Stop();
+        _ticker?.Dispose();
+        _ticker = null;
+    }
+
+    /// <summary>"just now" / "23s ago" / "4 min ago" / "2 h ago" / "yesterday 16:42".
+    /// Pure formatting — never renders "UTC" or any zone label.</summary>
+    private static string FormatAgo(DateTime whenLocal)
+    {
+        TimeSpan ago = DateTime.Now - whenLocal;
+        if (ago < TimeSpan.FromSeconds(5)) return "just now";
+        if (ago < TimeSpan.FromMinutes(1)) return $"{(int)ago.TotalSeconds}s ago";
+        if (ago < TimeSpan.FromHours(1)) return $"{(int)ago.TotalMinutes} min ago";
+        if (ago < TimeSpan.FromHours(6)) return $"{(int)ago.TotalHours} h ago";
+        return whenLocal.ToString("MMM d, HH:mm");
+    }
+}

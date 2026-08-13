@@ -907,3 +907,90 @@ details[open] > summary .pt-collapsible-icon { transform: rotate(90deg); }
     letter-spacing: -0.005em;
     margin-top: 0;
 }
+
+/* ═══════════════════════════════════════════════
+   Route probe status strip
+   Lives between the page header and the answer card. Three cells in one row:
+     • refresh-in-flight pulse   • last Google Maps probe time   • cadence / count.
+   Designed to read at a glance without competing with the headline departure.
+══════════════════════════════════════════════ */
+.pt-probe-status {
+    display: flex;
+    align-items: center;
+    gap: var(--pt-space-4);
+    padding: var(--pt-space-2) var(--pt-space-4);
+    background: var(--pt-bg-surface);
+    border-radius: var(--pt-radius-md);
+    border: 1px solid var(--pt-border-subtle);
+    box-shadow: var(--pt-elev-1);
+    margin-bottom: var(--pt-space-6);
+    flex-wrap: wrap;
+}
+
+.pt-probe-cell {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--pt-space-2);
+    font-size: var(--pt-text-sm);
+    color: var(--pt-fg-secondary);
+    min-width: 0;       /* allow flex-shrink so long "X min ago" wraps don't push the row off-screen */
+}
+
+.pt-probe-cell-refresh { flex: 0 0 auto; }
+
+.pt-probe-cell-lastprobe,
+.pt-probe-cell-cadence {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.pt-probe-actions {
+    margin-left: auto;
+    flex: 0 0 auto;
+}
+
+.pt-probe-icon {
+    color: var(--pt-fg-tertiary);
+    flex-shrink: 0;
+}
+
+.pt-probe-label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.pt-probe-sep {
+    margin: 0 var(--pt-space-2);
+    color: var(--pt-fg-tertiary);
+}
+
+.pt-probe-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: var(--pt-radius-full);
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+.pt-probe-dot-green { background: var(--pt-color-success); }
+.pt-probe-dot-amber { background: var(--pt-color-warning); }
+
+/* Pulse while a refresh is in flight — the same visual vocabulary as
+   progress_activity, so the two never appear together without it being obvious
+   which is which. */
+.pt-probe-dot-pulse {
+    background: var(--pt-color-brand-500);
+    animation: pt-probe-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pt-probe-pulse {
+    0%, 100% { transform: scale(1);   opacity: 1; }
+    50%      { transform: scale(1.6); opacity: 0.35; }
+}
+
+/* Reduced-motion: drop the pulse animation, keep the static dot — the
+   "Refreshing…" text already conveys the state, the dot is decoration. */
+@media (prefers-reduced-motion: reduce) {
+    .pt-probe-dot-pulse { animation: none; }
+}
