@@ -36,7 +36,7 @@
                             </RadzenDataGridColumn>
                             <RadzenDataGridColumn TItem="UserDailyUsageDto" Property="LastLoginAt" Title="Last Login" Width="11rem">
                                 <Template Context="u">
-                                    @(u.LastLoginAt?.ToString("yyyy-MM-dd HH:mm") ?? "—")
+                                    @(u.LastLoginAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "—")
                                 </Template>
                             </RadzenDataGridColumn>
                         </Columns>
@@ -210,7 +210,13 @@
             _points = await Http.GetFromJsonAsync(
                 "/api/admin/global-volatility/recent?hours=24", AppJsonContext.Default.ListRecentVolatilityPointDto) ?? [];
             _series = [.. _points.Select(p =>
-                new VolatilityPoint(p.PolledAt, p.MeanDurationSeconds / 60.0, p.RouteCount))];
+                // PolledAt is a UTC DateTime on the wire (RecentVolatilityPointDto.PolledAt).
+                // Radzen's CategoryAxis treats DateTime as wall-clock and renders it as-is,
+                // so we convert to local here — an Eastern user seeing 14:00 UTC reads 10:00.
+                new VolatilityPoint(p.PolledAt.Kind == DateTimeKind.Utc
+                    ? p.PolledAt.ToLocalTime()
+                    : DateTime.SpecifyKind(p.PolledAt, DateTimeKind.Utc).ToLocalTime(),
+                    p.MeanDurationSeconds / 60.0, p.RouteCount))];
         }
         catch (Exception ex)
         {

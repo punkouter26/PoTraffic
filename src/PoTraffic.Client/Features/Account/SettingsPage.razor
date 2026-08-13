@@ -178,7 +178,7 @@
                                            ProgressBarStyle="@QuotaStyle"
                                            aria-label="Daily quota used" />
                         <RadzenText class="pt-settings-meta">
-                            Resets at @_quota.ResetsAtUtc.ToString("HH:mm") UTC.
+                            Resets at @_quota.ResetsAtUtc.ToLocalTime().ToString("HH:mm").
                             @if (_quota.PollsToday > 0)
                             {
                                 <text>

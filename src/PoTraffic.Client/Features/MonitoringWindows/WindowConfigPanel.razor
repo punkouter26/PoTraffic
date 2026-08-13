@@ -1,5 +1,6 @@
 @using System.Net.Http.Json
 @using System.Text.Json
+@using PoTraffic.Client.Infrastructure
 @using PoTraffic.Shared.DTOs.Routes
 @using PoTraffic.Shared.DTOs.History
 @using PoTraffic.Shared.Enums
@@ -16,7 +17,7 @@
         <div class="pt-flex pt-items-center pt-gap-4 pt-mb-2">
             <div>
                 <RadzenText TextStyle="TextStyle.Caption" class="pt-mb-0">Schedule</RadzenText>
-                <RadzenText>@string.Join(", ", _activeWindow.DaysOfWeek) · @_activeWindow.StartTime – @_activeWindow.EndTime</RadzenText>
+                <RadzenText>@string.Join(", ", _activeWindow.DaysOfWeek) · @FormatUtcHHmmAsLocal(_activeWindow.StartTime) – @FormatUtcHHmmAsLocal(_activeWindow.EndTime)</RadzenText>
             </div>
             <RadzenButton Text="Edit Schedule" Icon="edit" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small"
                           Click="@StartEditing" />
@@ -32,7 +33,7 @@
                 }
                 @if (!TodayIsScheduled)
                 {
-                    <div class="pt-mt-1">Today (@DateTime.UtcNow.DayOfWeek) is outside this schedule — polling resumes on the next scheduled day.</div>
+                    <div class="pt-mt-1">Today (@DateTime.Now.DayOfWeek) is outside this schedule — polling resumes on the next scheduled day.</div>
                 }
             </RadzenAlert>
         }
@@ -109,11 +110,14 @@
     private MonitoringWindowDto? _activeWindow;
     private SessionDto? _activeSession;
 
-    /// <summary>True when today's UTC day-of-week is one the active window polls on.
+    /// <summary>True when today's local day-of-week is one the active window polls on.
     /// A Mon–Fri schedule viewed on Saturday is "active" (session running) but not scheduled,
-    /// which is why the poll count can sit at 0 all day.</summary>
+    /// which is why the poll count can sit at 0 all day. Uses local time because the
+    /// schedule is interpreted against the user's wall clock — at 11pm Eastern on a Monday,
+    /// <see cref="DateTime.UtcNow"/> reports Tuesday morning and would wrongly mark
+    /// the user as "outside the schedule".</summary>
     private bool TodayIsScheduled =>
-        _activeWindow is not null && _activeWindow.DaysOfWeek.Contains(DateTime.UtcNow.DayOfWeek.ToString());
+        _activeWindow is not null && _activeWindow.DaysOfWeek.Contains(DateTime.Now.DayOfWeek.ToString());
 
     private string _error = "";
     private string _loadError = "";
@@ -171,6 +175,17 @@
     /// <summary>Convert local wall-clock <paramref name="local"/> to UTC and return "HH:mm".
     /// Delegates to <see cref="Routes.CreateRoutePage.ToUtcHHmm"/> so behavior is consistent.</summary>
     private static string ToUtcHHmm(DateTime local) => Routes.CreateRoutePage.ToUtcHHmm(local);
+
+    /// <summary>
+    /// Convert a UTC "HH:mm" wire string (as carried by <see cref="MonitoringWindowDto"/>)
+    /// back to local time for display. The server stores <see cref="TimeOnly"/> values
+    /// in UTC and the DTO formats them with <c>HH:mm</c> — to the user those would render
+    /// as e.g. "13:40 – 01:40" instead of the "9:40 AM – 9:40 PM" they actually picked.
+    /// Wrap-around midnight UTC (end &lt; start) still displays correctly because each
+    /// side is converted independently.
+    /// </summary>
+    private static string FormatUtcHHmmAsLocal(string utcHHmm)
+        => LocalTimeFormatter.FormatUtcHHmmAsLocal(utcHHmm);
 
     private readonly (string name, byte bit)[] _days =
     [
