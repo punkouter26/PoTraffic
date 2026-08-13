@@ -103,17 +103,16 @@ try
     app.UseBlazorFrameworkFiles();
     app.UseStaticFiles();
 
-    // GlobalExceptionHandler handles ValidationException → 422; the rest fall through to the
-    // default handler.
-    app.UseExceptionHandler();
-
     if (app.Environment.IsDevelopment())
     {
-        app.UseDeveloperExceptionPage();
         // Dev-only API docs — anonymous so they don't trip the deny-by-default fallback (§4.5).
         app.MapOpenApi().AllowAnonymous();
         app.MapScalarApiReference().AllowAnonymous();
     }
+
+    // GlobalExceptionHandler handles ValidationException → 422; the rest fall through to the
+    // developer exception page in Development or the default handler elsewhere.
+    app.UseExceptionHandler();
 
     app.UseStatusCodePages();
     app.UseHttpsRedirection();

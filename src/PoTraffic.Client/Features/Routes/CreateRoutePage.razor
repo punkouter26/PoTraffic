@@ -130,11 +130,14 @@
     /// <summary>Backs the RadzenCustomValidator on the end-time picker.</summary>
     private bool EndAfterStart() =>
         _startTime is null || _endTime is null || _endTime > _startTime;
-    // Defaults: start = the user's current local wall-clock time, end = 2 hours later.
-    // Times are shown as wall-clock local and converted to UTC on submit
-    // (see ToUtcHHmm / PollRouteJob).
-    private DateTime? _startTime = LocalNowToMinute();
-    private DateTime? _endTime  = LocalNowToMinute().AddHours(2);
+    // Default to a conventional morning commute window. Keeping the default within
+    // one UTC day avoids turning a valid local window into an overnight UTC window,
+    // which the current daily scheduler model does not represent.
+    private DateTime? _startTime = LocalTime(7, 0);
+    private DateTime? _endTime  = LocalTime(9, 0);
+
+    private static DateTime LocalTime(int hour, int minute) =>
+        new(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day, hour, minute, 0, DateTimeKind.Unspecified);
 
     // Current local wall-clock truncated to the minute. Also used by WindowConfigPanel
     // when adding a window to an existing route (defaults to now → now+2h there).
