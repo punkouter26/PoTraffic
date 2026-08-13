@@ -10,13 +10,16 @@ namespace PoTraffic.Shared.DTOs.History;
 /// that actually have samples are sent; the client draws the empty ones from the gaps.
 /// </para>
 ///
-/// <para>Day-of-week and time are US Eastern (the user's wall-clock day), so a 17:30 row
-/// reads as the rush hour it actually is for the commuter driving it.</para>
+/// <para>Day-of-week and time are bucketed in the user's local time zone
+/// (<see cref="TimeZoneId"/>), so a 17:30 row reads as the rush hour it actually is
+/// for the commuter driving it. The server stores every sample in UTC; this grouping
+/// projects UTC onto the user's wall clock before bucketing.</para>
 /// </summary>
 public sealed record VolatilityHeatmapDto(
     RouteId RouteId,
     double MedianDurationSeconds,
     int TotalSamples,
+    string TimeZoneId,
     IReadOnlyList<HeatmapCellDto> Cells);
 
 /// <summary>

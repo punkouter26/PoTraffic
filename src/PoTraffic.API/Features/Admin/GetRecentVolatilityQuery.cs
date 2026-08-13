@@ -35,16 +35,18 @@ public sealed class GetRecentVolatilityHandler : IRequestHandler<GetRecentVolati
             .ToList();
 
         // Bucket by UTC wall-clock minute truncated to 5 — every chart in the app plots
-        // per-bucket mean so the line is the average across all active routes.
+        // per-bucket mean so the line is the average across all active routes. PolledAt
+        // is a DateTimeOffset carrying the UTC offset, so the bucket is created as
+        // DateTimeOffset rather than the ambiguous DateTime-with-Kind.
         var byBucket = polls
-            .GroupBy(p => new DateTime(
+            .GroupBy(p => new DateTimeOffset(
                 p.PolledAt.UtcDateTime.Year,
                 p.PolledAt.UtcDateTime.Month,
                 p.PolledAt.UtcDateTime.Day,
                 p.PolledAt.UtcDateTime.Hour,
                 (p.PolledAt.UtcDateTime.Minute / 5) * 5,
                 0,
-                DateTimeKind.Utc))
+                TimeSpan.Zero))
             .OrderBy(g => g.Key)
             .Select(g => new RecentVolatilityPointDto(
                 PolledAt: g.Key,

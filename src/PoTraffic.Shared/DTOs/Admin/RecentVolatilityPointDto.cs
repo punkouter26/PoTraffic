@@ -6,6 +6,6 @@ namespace PoTraffic.Shared.DTOs.Admin;
 /// actual wall-clock time rather than a day-of-week + bucket offset.
 /// </summary>
 public sealed record RecentVolatilityPointDto(
-    DateTime PolledAt,
+    DateTimeOffset PolledAt,
     double MeanDurationSeconds,
     int RouteCount);
