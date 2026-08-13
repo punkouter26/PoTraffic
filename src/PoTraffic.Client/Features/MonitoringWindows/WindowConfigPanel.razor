@@ -1,4 +1,5 @@
 @using System.Net.Http.Json
+@using System.Text.Json
 @using PoTraffic.Shared.DTOs.Routes
 @using PoTraffic.Shared.DTOs.History
 @using PoTraffic.Shared.Enums
@@ -35,13 +36,6 @@
                 }
             </RadzenAlert>
         }
-        else
-        {
-            <RadzenAlert AlertStyle="AlertStyle.Info" ShowIcon="true" class="pt-mb-2">
-                No active session for today. Click <strong>Start Monitoring</strong> to begin.
-            </RadzenAlert>
-        }
-
         @if (!string.IsNullOrEmpty(_error))
         {
             <RadzenAlert AlertStyle="AlertStyle.Danger" class="pt-mb-2">@_error</RadzenAlert>
@@ -52,11 +46,6 @@
             {
                 <RadzenButton Text="Stop Monitoring" ButtonStyle="ButtonStyle.Warning" Icon="stop"
                               Click="@StopMonitoringAsync" IsBusy="_saving" />
-            }
-            else
-            {
-                <RadzenButton Text="Start Monitoring" ButtonStyle="ButtonStyle.Success" Icon="play_arrow"
-                              Click="@StartMonitoringAsync" IsBusy="_saving" />
             }
         </div>
     }
@@ -267,30 +256,6 @@
         _error = "";
     }
 
-    private async Task StartMonitoringAsync()
-    {
-        if (_activeWindow is null) return;
-        _saving = true;
-        _error = "";
-        try
-        {
-            HttpResponseMessage resp = await Http.PostAsync(
-                $"/api/routes/{RouteId}/windows/{_activeWindow.Id}/start", null);
-
-            if (resp.IsSuccessStatusCode)
-            {
-                await LoadWindowAsync();
-                await OnSaved.InvokeAsync();
-            }
-            else if (resp.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
-                _error = "Daily monitoring quota exceeded. Try again tomorrow.";
-            else
-                _error = "Failed to start monitoring. Please try again.";
-        }
-        catch { _error = "Unable to connect. Please try again."; }
-        finally { _saving = false; }
-    }
-
     private async Task StopMonitoringAsync()
     {
         if (_activeWindow is null || _activeSession is null) return;
@@ -343,6 +308,32 @@
 
             if (resp.IsSuccessStatusCode)
             {
+                JsonElement body = await resp.Content.ReadFromJsonAsync(
+                    AppJsonContext.Default.JsonElement);
+                Guid windowId = Guid.Empty;
+                if (!body.TryGetProperty("windowId", out JsonElement windowIdElement) ||
+                    !windowIdElement.TryGetGuid(out Guid parsedWindowId))
+                {
+                    _error = "Schedule saved, but monitoring could not be initialized.";
+                    return;
+                }
+                windowId = parsedWindowId;
+
+                HttpResponseMessage startResp = await Http.PostAsync(
+                    $"/api/routes/{RouteId}/windows/{windowId}/start", null);
+                if (!startResp.IsSuccessStatusCode &&
+                    startResp.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+                {
+                    _error = "Schedule saved, but daily monitoring quota is exhausted.";
+                    return;
+                }
+
+                if (!startResp.IsSuccessStatusCode)
+                {
+                    _error = "Schedule saved, but monitoring could not be initialized.";
+                    return;
+                }
+
                 _editing = false;
                 await LoadWindowAsync();
                 await OnSaved.InvokeAsync();

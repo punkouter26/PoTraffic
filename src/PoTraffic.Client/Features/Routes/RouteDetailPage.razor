@@ -7,7 +7,6 @@
 @inherits PollingComponentBase
 @inject HttpClient Http
 @inject NavigationManager Nav
-@inject IJSRuntime JS
 
 @* ──────────────────────────────────────────────────────────────────────
    Route detail — the answer, the evidence, and everything else folded away.
@@ -103,15 +102,7 @@ else
             }
             else if (_activeSession is null)
             {
-                @* Paused route — surface the Settings disclosure directly. The page
-                   otherwise buries the Start Monitoring button behind a chevron and
-                   two-thirds of the page; this turns the sentence into the action it
-                   describes. *@
-                <button type="button" class="pt-callout-action"
-                        @onclick="ExpandAndScrollToSettings">
-                    @next.Detail
-                    <PtIcon Name="arrow_downward" Size="sm" Class="pt-callout-action-icon" />
-                </button>
+                @next.Detail
             }
             else
             {
@@ -161,7 +152,7 @@ else
     @* ── EVERYTHING ELSE ───────────────────────────────────────────────
        Schedule, return trip and raw records. Real controls, rarely needed,
        behind one disclosure instead of three cards. *@
-    <details open="@_detailsOpen" class="pt-details" id="pt-route-details">
+    <details open class="pt-details" id="pt-route-details">
         <summary class="pt-details-summary">
             <PtIcon Name="chevron_right" Class="pt-collapsible-icon" />
             Settings &amp; raw data
@@ -221,8 +212,6 @@ else
     private string _confidenceNote = string.Empty;
     private string _pendingDetail = string.Empty;
     private string _thisLabel = "This route";
-    private bool _detailsOpen;
-
     /// <summary>Heading for the page. Falls back until the route lands.</summary>
     private string _pageTitle = "Route";
 
@@ -256,11 +245,7 @@ else
         get
         {
             if (_activeSession is not { State: SessionState.Active } session)
-                // The callout that surfaces this string on the page is itself a button
-            // that scrolls to and expands the disclosure below — see pt-callout-action.
-            // Kept as a sentence (not "Click here") because the affordance is also
-            // visible at the foot of the page.
-            return new NextSampleInfo("Not monitoring — start it in Settings below", Live: false);
+                return new NextSampleInfo("Waiting for the next scheduled window", Live: false);
 
             if (session.Schedule is not { } schedule)
                 return new NextSampleInfo("No polling days scheduled", Live: false);
@@ -408,28 +393,6 @@ else
         _heatmap = await heatmapTask;
         if (refreshHeatmap)
             _heatmapFetchedAt = DateTimeOffset.UtcNow;
-    }
-
-    /// <summary>
-    /// Opens the disclosure that holds the schedule control and smooth-scrolls it into
-    /// view. Used by the "Not monitoring — start it in Settings below" callout so the
-    /// action it describes lives where the text is, not two screens down.
-    /// </summary>
-    private async Task ExpandAndScrollToSettings()
-    {
-        _detailsOpen = true;
-        StateHasChanged();
-        await Task.Yield();
-        // Re-render so the freshly-open <details> renders before we measure.
-        try
-        {
-            // Lazy-import via the dynamic-import JS API rather than maintaining
-            // a separate <script> tag in index.html — keeps the module count
-            // bounded by what the app actually uses.
-            await using IJSObjectReference module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/pt-scroll.js");
-            await module.InvokeVoidAsync("ptScrollIntoView", "pt-route-details");
-        }
-        catch { /* no-op if JS not available */ }
     }
 
     /// <summary>
