@@ -3,7 +3,9 @@
 //
 // Naming convention enforced:
 //   resourceGroup        = PoTraffic
-//   appService (web app) = app-potraffic-api-{env}-{region}-{seq}   (e.g. app-potraffic-api-prod-wus2-001)
+//   appService (web app) = app-potraffic-{app}-{env}-{region}-{seq} (target shape). Current
+//                          deployment is `potraffic-api-win` (legacy, retained for continuity);
+//                          new environments should adopt the target shape.
 //   Key Vault            = kv-poshared                                (in PoShared RG, reused across all Po* apps)
 //   Managed Identity     = mi-poshared-*                              (in PoShared RG)
 //

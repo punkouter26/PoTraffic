@@ -125,7 +125,6 @@ try
     app.UseMiddleware<LogContextEnrichmentMiddleware>();
 
     // ── API endpoints ─────────────────────────────────────────────────────────
-    app.MapClientLogEndpoints();
     app.MapAccountEndpoints();
     app.MapAdminEndpoints();
     app.MapAuthEndpoints();

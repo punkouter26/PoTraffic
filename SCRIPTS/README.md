@@ -14,7 +14,7 @@ PowerShell / Python utility scripts for local development and CI. Run all script
 | `run-tests.ps1` | Runs Unit → Integration → E2E tests in order. Integration tests use in-memory persistence (no external dependencies). E2E tests require the API to be running on port 5000 (`Testing` profile). |
 | `post-deploy-smoke.ps1` | CI/CD rule #9 — runs three browser-style smoke checks against a freshly-deployed App Service instance: `/health/json` (dependency status), `/health/ready` (hydration complete), `GET /` (render-tree / Blazor bundle hash), `/diag/keyvault` (Key Vault + Managed Identity wiring, optional). Exits non-zero if any check fails. |
 | `triage-50030.ps1` | Forensic triage for `HTTP Error 500.30 - ASP.NET Core app failed to start`. Captures App Service instance state, downloads + greps the application-log filesystem files for `500.30`, `HostingStartupException`, `AuthorizationPermissionMismatch`, `HydrationFailed`, lists storage RBAC for the target account, live-probes `/health/json`, `/health/ready`, `/health`, `/`, and tails logs. **Read-only — never mutates the environment.** Use this when a deploy goes red. |
-| `arg-governance.ps1` | Lints inline `style="…"` usages in `.razor` files. |
+| `arg-governance.ps1` | CI/CD rule #7 — Azure Resource Graph governance audit. Runs KQL to flag orphan assets, Po naming-convention violations, and idle compute (< 5% avg CPU over 7 days, non-production only). |
 
 ---
 

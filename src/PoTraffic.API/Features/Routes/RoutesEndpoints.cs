@@ -28,7 +28,6 @@ public static class RoutesEndpoints
         group.MapGet("providers", GetProviders);
         // Standalone verify — no route ID required (used by create-route form)
         group.MapPost("verify-address", VerifySingleAddress);
-        group.MapPut("{routeId:guid}", UpdateRoute);
         group.MapDelete("{routeId:guid}", DeleteRoute);
         group.MapPost("{routeId:guid}/check-now", CheckNow);
         group.MapPost("{routeId:guid}/return-trip", CreateReturnTrip);
@@ -102,26 +101,6 @@ public static class RoutesEndpoints
             : Results.UnprocessableEntity(new { error = result.ErrorCode });
     }
 
-    // PUT /api/routes/{routeId}
-    private static async Task<IResult> UpdateRoute(
-        RouteId routeId,
-        HttpContext context,
-        ISender sender,
-        [FromBody] UpdateRouteRequest request)
-    {
-        UserId? userId = ExtractUserId(context.User);
-        if (userId is null) return Results.Unauthorized();
-
-        UpdateRouteResult result = await sender.Send(
-            new UpdateRouteCommand(routeId, userId.Value, request.OriginAddress, request.DestinationAddress, request.Provider));
-
-        return result.IsSuccess
-            ? Results.Ok(result.Route)
-            : result.ErrorCode == RouteErrorCodes.NotFound
-                ? Results.NotFound()
-                : Results.UnprocessableEntity(new { error = result.ErrorCode });
-    }
-
     // DELETE /api/routes/{routeId}
     private static async Task<IResult> DeleteRoute(
         RouteId routeId,
@@ -181,8 +160,5 @@ public static class RoutesEndpoints
 
 }
 
-// Request DTO scoped to this endpoint only
-public sealed record UpdateRouteRequest(
-    string? OriginAddress,
-    string? DestinationAddress,
-    RouteProvider? Provider);
+// UpdateRouteRequest was removed (#1 cleanup): no client caller; the editing surface (origin/destination/provider)
+// is reached via DELETE + re-create, which is the documented user flow.

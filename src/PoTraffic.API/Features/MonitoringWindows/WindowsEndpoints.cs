@@ -18,7 +18,6 @@ public static class WindowsEndpoints
 
         group.MapGet("", GetWindows);
         group.MapPost("", CreateWindow);
-        group.MapPut("{windowId:guid}", UpdateWindow);
         group.MapDelete("{windowId:guid}", DeleteWindow);
         group.MapPost("{windowId:guid}/start", StartWindow);
         group.MapPost("{windowId:guid}/stop", StopWindow);
@@ -74,10 +73,6 @@ public static class WindowsEndpoints
                 _ => Results.UnprocessableEntity(new { error = result.ErrorCode })
             };
     }
-
-    // PUT /api/routes/{routeId}/windows/{windowId} — stub
-    private static IResult UpdateWindow(RouteId routeId, WindowId windowId) =>
-        Results.StatusCode(501); // Not Implemented — Phase 4
 
     // DELETE /api/routes/{routeId}/windows/{windowId}
     private static async Task<IResult> DeleteWindow(

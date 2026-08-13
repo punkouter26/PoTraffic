@@ -1,6 +1,5 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using PoTraffic.Client.Infrastructure.Logging;
 using PoTraffic.Shared.DTOs.Account;
 using PoTraffic.Shared.DTOs.Admin;
 using PoTraffic.Shared.DTOs.Alerts;
@@ -16,7 +15,6 @@ public sealed record FeatureFlags(bool UseMockProviders);
 public sealed record CheckNowResponse(int DurationSeconds, int DistanceMetres);
 public sealed record StopSessionRequest(SessionId SessionId);
 public sealed record SaveWindowRequest(string StartTime, string EndTime, byte DaysOfWeekMask);
-internal sealed record ClientLogBatch(List<ClientLogEntry> Entries);
 
 /// <summary>
 /// Everything the dashboard renders, in one cacheable payload.
@@ -78,6 +76,5 @@ public static class ClientCacheKeys
 [JsonSerializable(typeof(AlertDto))]
 [JsonSerializable(typeof(StopSessionRequest))]
 [JsonSerializable(typeof(SaveWindowRequest))]
-[JsonSerializable(typeof(ClientLogBatch))]
 [JsonSerializable(typeof(DashboardSnapshot))]
 internal sealed partial class AppJsonContext : JsonSerializerContext;
