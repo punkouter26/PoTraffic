@@ -82,6 +82,72 @@ public sealed class PollRouteJobWindowBoundaryTests
             .Should().BeFalse("Tuesday is not in the Wednesday+Thursday mask");
     }
 
+    /// <summary>
+    /// Regression: an Eastern-time user picking 09:21–21:21 local submits a
+    /// window stored as 13:21–01:21 UTC (wraps midnight UTC). Pre-fix the
+    /// validator rejected this and the polling chain never fired — "Failed to
+    /// save schedule" in production. Post-fix the validator permits wrap-around
+    /// and IsWithinWindow must include any UTC time on the same day that lies
+    /// within [start, 24:00) ∪ [00:00, end).
+    /// </summary>
+    [Theory]
+    // Same-day (afternoon / evening leg of the wrap)
+    [InlineData("2026-07-01T13:21:00Z", true,  "13:21 exactly — start of window")]
+    [InlineData("2026-07-01T18:00:00Z", true,  "well within afternoon leg")]
+    [InlineData("2026-07-01T23:59:59Z", true,  "just before midnight — still in wrap")]
+    // Same-day (early-morning leg of the wrap)
+    [InlineData("2026-07-01T00:00:00Z", true,  "midnight exactly — start of morning leg")]
+    [InlineData("2026-07-01T01:20:59Z", true,  "just before window end")]
+    [InlineData("2026-07-01T01:21:00Z", false, "01:21 exactly is OUT (closed-open end)")]
+    // Gap — the closed-open interval has no coverage here
+    [InlineData("2026-07-01T02:00:00Z", false, "after end — outside the wrap")]
+    [InlineData("2026-07-01T13:20:59Z", false, "before start — outside the wrap")]
+    public void IsWithinWindow_WrapAroundMidnightUtc(string nowIso, bool expected, string because)
+    {
+        var window = new MonitoringWindow
+        {
+            Id = WindowId.New(),
+            RouteId = RouteId.New(),
+            DaysOfWeekMask = AllDays,
+            StartTime = new TimeOnly(13, 21),
+            EndTime = new TimeOnly(1, 21),
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+        DateTimeOffset now = DateTimeOffset.Parse(nowIso);
+
+        IsWithin(window, now).Should().Be(expected, because);
+    }
+
+    /// <summary>
+    /// A wrap-around window still needs to respect the day mask: polling must
+    /// only happen on the days the user ticked.
+    /// </summary>
+    [Fact]
+    public void IsWithinWindow_WrapAround_StillRespectsDayMask()
+    {
+        var window = new MonitoringWindow
+        {
+            Id = WindowId.New(),
+            RouteId = RouteId.New(),
+            DaysOfWeekMask = Mon | Wed | Fri,
+            StartTime = new TimeOnly(22, 0), // 22:00 → 02:00 next day
+            EndTime = new TimeOnly(2, 0),
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+
+        // Tuesday 23:00 UTC — even though in time range, Tuesday not enabled
+        IsWithin(window, new DateTimeOffset(2026, 7, 7, 23, 0, 0, TimeSpan.Zero))
+            .Should().BeFalse("Tuesday is not in Mon|Wed|Fri mask");
+        // Wednesday 23:00 UTC — Wednesday enabled, in afternoon leg of wrap
+        IsWithin(window, new DateTimeOffset(2026, 7, 8, 23, 0, 0, TimeSpan.Zero))
+            .Should().BeTrue("Wednesday is enabled and 23:00 is within the wrap");
+        // Wednesday 01:00 UTC — Wednesday still counts (morning leg of same day's wrap)
+        IsWithin(window, new DateTimeOffset(2026, 7, 8, 1, 0, 0, TimeSpan.Zero))
+            .Should().BeTrue("Wednesday is enabled and 01:00 is in the morning leg");
+    }
+
     [Fact]
     public void NextWindowStart_WhenInsideNow_ReturnsNextDaysStart_NotTodays()
     {

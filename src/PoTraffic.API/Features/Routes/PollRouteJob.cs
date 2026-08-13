@@ -228,13 +228,18 @@ public sealed class PollRouteJob
             : TimeSpan.FromMinutes(QuotaConstants.PollIntervalMinutes);
     }
 
-    /// <summary>Window times are UTC; mask bit 0 = Monday … bit 6 = Sunday.</summary>
+    /// <summary>Window times are UTC; mask bit 0 = Monday … bit 6 = Sunday.
+    /// Supports wrap-around midnight UTC: when EndTime &lt; StartTime the window
+    /// is active from StartTime through midnight and from midnight through EndTime.</summary>
     internal static bool IsWithinWindow(MonitoringWindow window, DateTimeOffset nowUtc)
     {
+        if (!IsDayEnabled(window.DaysOfWeekMask, nowUtc.UtcDateTime.DayOfWeek))
+            return false;
+
         TimeOnly time = TimeOnly.FromDateTime(nowUtc.UtcDateTime);
-        return IsDayEnabled(window.DaysOfWeekMask, nowUtc.UtcDateTime.DayOfWeek)
-            && time >= window.StartTime
-            && time < window.EndTime;
+        return window.EndTime > window.StartTime
+            ? time >= window.StartTime && time < window.EndTime   // same-day window
+            : time >= window.StartTime || time < window.EndTime;  // wraps midnight UTC
     }
 
     /// <summary>Next UTC instant the window opens after <paramref name="nowUtc"/>; null when no days are enabled.</summary>

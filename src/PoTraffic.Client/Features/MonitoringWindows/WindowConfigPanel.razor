@@ -339,9 +339,52 @@
                 await OnSaved.InvokeAsync();
             }
             else
-                _error = "Failed to save schedule. Please try again.";
+                _error = await BuildSaveErrorMessageAsync(resp);
         }
         catch { _error = "Unable to connect. Please try again."; }
         finally { _saving = false; }
+    }
+
+    /// <summary>
+    /// Maps non-2xx POST /windows responses to a user-facing message. Without
+    /// this the panel just said "Failed to save schedule" regardless of cause,
+    /// which hid wrap-around-midnight-UTC rejections (422), already-active
+    /// windows (409), and auth issues (401/403) behind a single generic line.
+    /// </summary>
+    private static async Task<string> BuildSaveErrorMessageAsync(HttpResponseMessage resp)
+    {
+        string serverMessage = "";
+        try
+        {
+            string body = await resp.Content.ReadAsStringAsync();
+            if (!string.IsNullOrWhiteSpace(body))
+            {
+                using JsonDocument doc = JsonDocument.Parse(body);
+                if (doc.RootElement.TryGetProperty("error", out JsonElement err)
+                    && err.ValueKind == JsonValueKind.String)
+                {
+                    serverMessage = err.GetString() ?? "";
+                }
+            }
+        }
+        catch { /* body wasn't JSON — fall through to default message */ }
+
+        return resp.StatusCode switch
+        {
+            System.Net.HttpStatusCode.BadRequest => serverMessage switch
+            {
+                "INVALID_START_TIME" => "Start time is not a valid time. Please re-enter.",
+                "INVALID_END_TIME"   => "End time is not a valid time. Please re-enter.",
+                _                    => "The server rejected the schedule format."
+            },
+            System.Net.HttpStatusCode.UnprocessableEntity => serverMessage.Contains("Equal", StringComparison.OrdinalIgnoreCase)
+                ? "End time cannot equal start time."
+                : "The server rejected this schedule — check the times and selected days.",
+            System.Net.HttpStatusCode.Conflict => "A schedule is already active for this route. " +
+                                                  "Stop monitoring or refresh the page, then try again.",
+            System.Net.HttpStatusCode.NotFound => "This route no longer exists.",
+            System.Net.HttpStatusCode.Unauthorized => "You're signed out. Sign in and try again.",
+            _ => "Failed to save schedule. Please try again."
+        };
     }
 }

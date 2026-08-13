@@ -26,9 +26,15 @@ public sealed class CreateWindowValidator : AbstractValidator<CreateWindowComman
 {
     public CreateWindowValidator()
     {
+        // The client converts local wall-clock times to UTC before submitting
+        // (CreateRoutePage.ToUtcHHmm). For Eastern-time users picking e.g.
+        // 09:21–21:21 local, the UTC conversion produces 13:21–01:21 — a
+        // window that spans midnight UTC. Allow EndTime <= StartTime (wrap-around)
+        // and only reject the degenerate EndTime == StartTime case, which would
+        // produce zero polling slots.
         RuleFor(x => x.EndTime)
-            .GreaterThan(x => x.StartTime)
-            .WithMessage("EndTime must be after StartTime.");
+            .NotEqual(x => x.StartTime)
+            .WithMessage("EndTime must be different from StartTime.");
         RuleFor(x => x.DaysOfWeekMask)
             .GreaterThan((byte)0)
             .WithMessage("At least one day must be selected.");
