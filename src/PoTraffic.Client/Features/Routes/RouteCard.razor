@@ -26,16 +26,21 @@
 
     <div class="pt-route-card-body">
         <div class="pt-route-card-answer">
-            @if (OptimalDeparture is not null)
-            {
-                <div class="pt-departure-hero">@_leaveByLabel</div>
-                <div class="pt-departure-sub">@_durationLabel</div>
-            }
-            else
-            {
-                <div class="pt-departure-pending">Learning this route</div>
-                <div class="pt-departure-sub">@_pendingDetail</div>
-            }
+            <div class="pt-route-card-route">
+                <span class="pt-route-addr-from">@_originStreet</span>
+                <PtIcon Name="arrow_right_alt" Size="sm" Class="pt-route-addr-arrow" />
+                <span class="pt-route-addr-to">@_destStreet</span>
+            </div>
+            <div class="pt-route-card-time">
+                @if (OptimalDeparture is not null)
+                {
+                    <span class="pt-route-card-time-value">@_durationLabel</span>
+                }
+                else
+                {
+                    <span class="pt-route-card-time-pending">@_pendingDetail</span>
+                }
+            </div>
         </div>
 
         @if (RecentPolls.Count > 0)
@@ -44,19 +49,11 @@
         }
     </div>
 
-    <div class="pt-route-card-foot">
-        <span class="pt-route-addresses">
-            <span class="pt-route-addr-from">@_originStreet</span>
-            <PtIcon Name="arrow_right_alt" Size="sm" Class="pt-route-addr-arrow" />
-            <span class="pt-route-addr-to">@_destStreet</span>
-        </span>
-
-        @* Only one state worth flagging: monitoring is paused. *@
-        @if (Route.MonitoringStatus != MonitoringStatus.Active)
-        {
-            <span class="pt-route-flag pt-route-flag-paused">Paused</span>
-        }
-    </div>
+    @* Only one state worth flagging: monitoring is paused. *@
+    @if (Route.MonitoringStatus != MonitoringStatus.Active)
+    {
+        <span class="pt-route-flag pt-route-flag-paused">Paused</span>
+    }
 </div>
 
 @code {
@@ -68,13 +65,12 @@
 
     private string _originStreet = string.Empty;
     private string _destStreet = string.Empty;
-    private string _leaveByLabel = string.Empty;
     private string _durationLabel = string.Empty;
     private string _pendingDetail = string.Empty;
 
     private string AriaLabel =>
         $"{_originStreet} to {_destStreet}. " +
-        (OptimalDeparture is not null ? $"{_leaveByLabel}, {_durationLabel}." : "Still learning this route.");
+        (OptimalDeparture is not null ? _durationLabel : "Still learning this route.");
 
     // Ambient colour: green once the route can actually answer the question,
     // amber while it is still learning, slate when it isn't collecting at all.
@@ -104,20 +100,15 @@
 
         if (OptimalDeparture is { } optimal)
         {
-            int h = optimal.TimeSlotBucket / 60;
-            int m = optimal.TimeSlotBucket % 60;
-            string period = h >= 12 ? "PM" : "AM";
-            int displayH = h > 12 ? h - 12 : (h == 0 ? 12 : h);
-            int estMin = (int)(optimal.PredictedDurationSeconds / 60);
+            // Currently recording best travel time — the single most useful
+            // number on the card, with the [lower–upper] range to telegraph
+            // how confident we are. Rounded, not truncated, so a 35-second
+            // probe displays as "1 min" rather than "0 min".
+            int estMin = (int)Math.Round(optimal.PredictedDurationSeconds / 60.0);
 
-            _leaveByLabel = $"Leave by {displayH}:{m:D2} {period}";
-
-            // The range is the honest part of the estimate; it belongs on the
-            // face of the card rather than behind a confidence meter that asked
-            // the reader to convert "38 / 60 samples" into trust on their own.
             _durationLabel = optimal is { LowerBound: { } lower, UpperBound: { } upper }
-                ? $"about {estMin} min ({lower / 60:F0}–{upper / 60:F0})"
-                : $"about {estMin} min";
+                ? $"{estMin} min · {lower / 60:F0}–{upper / 60:F0} min"
+                : $"{estMin} min";
         }
         else
         {

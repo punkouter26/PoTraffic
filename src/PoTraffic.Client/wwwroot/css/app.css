@@ -1,3 +1,48 @@
+/* ═══════════════════════════════════════════════════════════════
+   Reset
+
+   Bootstrap's Reboot used to provide this. Removing Bootstrap removed it too,
+   and the border-box rule in particular is load-bearing: without it .content's
+   16px padding was ADDED to its 100% width and every page overflowed its own
+   viewport by 32px. Stated explicitly here so the app owns its own baseline
+   instead of inheriting one from a dependency it no longer has.
+   ═══════════════════════════════════════════════════════════════ */
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+}
+
+/* Headings and paragraphs arrive with UA margins that fight the spacing scale.
+   Components set their own; anything that wants the default asks for it. */
+h1, h2, h3, h4, h5, h6, p, figure, blockquote, dl, dd {
+    margin: 0;
+}
+
+/* Media should never be the thing that widens a layout.
+
+   `canvas` is deliberately NOT in this list. Leaflet's panes are zero-sized
+   positioning containers, so `max-width: 100%` on a canvas inside one resolves
+   against a width of 0 and collapses it — which silently killed the map's flow
+   overlay while leaving its width ATTRIBUTE correct, so it looked fine in the
+   DOM and drew nothing. Every canvas in this app is sized explicitly by the
+   code that owns it; none of them needs this guard. */
+img, svg, video {
+    max-width: 100%;
+    height: auto;
+}
+
+/* Form controls do not inherit the page font by default. */
+button, input, select, textarea {
+    font: inherit;
+    color: inherit;
+}
+
 html, body {
     font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
     font-size: var(--pt-text-base, 16px);
@@ -35,14 +80,8 @@ h1:focus {
     outline: none;
 }
 
-a, .btn-link {
+a {
     color: var(--pt-color-brand-on-surface);
-}
-
-.btn-primary {
-    color: var(--pt-fg-on-brand);
-    background-color: var(--pt-color-brand-600);
-    border-color: var(--pt-color-brand-700);
 }
 
 /* One focus ring for everything, drawn with outline so it follows the shape and
@@ -166,11 +205,6 @@ a, .btn-link {
 
 code {
     color: var(--pt-color-danger);
-}
-
-.form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
-    color: var(--bs-secondary-color);
-    text-align: end;
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -492,7 +526,12 @@ details[open] > summary .pt-collapsible-icon { transform: rotate(90deg); }
 .pt-route-cards {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(22rem, 100%), 1fr));
-    align-items: start;
+    /* Stretch, not start. A route that has samples carries a sparkline and one
+       that doesn't carries a line of text, so side-by-side cards used to differ
+       in height by the whole height of the sparkline — two cards showing the
+       same kind of thing, drawn as two different shapes. Every card in a row is
+       the tallest card's height now; the extra space falls below the content. */
+    align-items: stretch;
     gap: var(--pt-space-4);
 }
 
@@ -505,6 +544,15 @@ details[open] > summary .pt-collapsible-icon { transform: rotate(90deg); }
     container-type: inline-size;
     container-name: pt-cards;
     min-width: 0;
+}
+
+/* Carry the stretched row height down through the two wrappers between the grid
+   cell and the card itself, or the card keeps its content height and the cell
+   just grows an empty gap under it. */
+.pt-route-cards > *,
+.pt-route-cards .pt-swipe-wrap,
+.pt-route-cards .pt-route-card {
+    height: 100%;
 }
 
 .pt-route-card {
@@ -553,7 +601,7 @@ details[open] > summary .pt-collapsible-icon { transform: rotate(90deg); }
 }
 
 .pt-route-card-body {
-    padding: var(--pt-space-4) var(--pt-space-5) var(--pt-space-2);
+    padding: var(--pt-space-3) var(--pt-space-5);
     display: flex;
     align-items: center;
     gap: var(--pt-space-4);
@@ -565,6 +613,9 @@ details[open] > summary .pt-collapsible-icon { transform: rotate(90deg); }
 .pt-route-card-answer {
     flex: 1 1 auto;
     min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--pt-space-1);
 }
 
 .pt-route-card-body > .pt-sparkline-wrap {
@@ -579,58 +630,48 @@ details[open] > summary .pt-collapsible-icon { transform: rotate(90deg); }
         flex-direction: column;
         align-items: stretch;
         gap: var(--pt-space-2);
-        padding: var(--pt-space-3) var(--pt-space-4) var(--pt-space-2);
+        padding: var(--pt-space-3) var(--pt-space-4);
     }
 
     .pt-route-card-foot { padding-inline: var(--pt-space-4); }
     .pt-departure-hero { font-size: var(--pt-text-lg); }
 }
 
-/* The answer. Everything else on the card is subordinate to this line. */
-.pt-departure-hero {
-    font-size: var(--pt-text-xl);
-    font-weight: var(--pt-weight-bold);
-    color: var(--pt-fg-primary);
-    line-height: var(--pt-leading-tight);
-    letter-spacing: -0.01em;
-}
-
-.pt-departure-sub {
-    font-size: var(--pt-text-sm);
-    color: var(--pt-fg-secondary);
-    margin-top: var(--pt-space-1);
-    font-variant-numeric: tabular-nums;
-}
-
-.pt-departure-pending {
-    font-size: var(--pt-text-lg);
-    font-weight: var(--pt-weight-medium);
-    color: var(--pt-fg-secondary);
-    line-height: var(--pt-leading-tight);
-}
-
-.pt-route-card-foot {
-    padding: 0 var(--pt-space-5) var(--pt-space-3);
-    display: flex;
-    align-items: center;
-    gap: var(--pt-space-3);
-}
-
-.pt-route-addresses {
+/* The route line — the street pair, biggest on the card. */
+.pt-route-card-route {
     display: flex;
     align-items: center;
     gap: var(--pt-space-2);
-    font-size: var(--pt-text-xs);
-    color: var(--pt-fg-tertiary);
+    color: var(--pt-fg-primary);
+    font-weight: var(--pt-weight-semibold);
+    font-size: var(--pt-text-base);
+    line-height: var(--pt-leading-tight);
     min-width: 0;
-    overflow: hidden;
-    white-space: nowrap;
 }
 
+.pt-route-card-time {
+    font-size: var(--pt-text-sm);
+    color: var(--pt-fg-secondary);
+    font-variant-numeric: tabular-nums;
+}
+
+.pt-route-card-time-value {
+    font-weight: var(--pt-weight-medium);
+    color: var(--pt-fg-secondary);
+}
+
+.pt-route-card-time-pending {
+    color: var(--pt-fg-tertiary);
+}
+
+/* Address line inside the card body. Each side can ellipsis-truncate if the
+   street name is long, but the arrow stays visible. */
 .pt-route-addr-from,
 .pt-route-addr-to {
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
 }
 
 .pt-route-addr-arrow {
@@ -640,7 +681,11 @@ details[open] > summary .pt-collapsible-icon { transform: rotate(90deg); }
 
 /* Two states, and only two, are allowed to interrupt the answer. */
 .pt-route-flag {
-    margin-left: auto;
+    /* Floats to the top-right corner of the card so the route line and travel
+       time stay left-aligned without competing for horizontal space. */
+    position: absolute;
+    top: var(--pt-space-3);
+    right: var(--pt-space-3);
     flex-shrink: 0;
     font-size: var(--pt-text-xs);
     font-weight: var(--pt-weight-bold);
@@ -649,6 +694,7 @@ details[open] > summary .pt-collapsible-icon { transform: rotate(90deg); }
     padding: var(--pt-space-1) var(--pt-space-2);
     border-radius: var(--pt-radius-full);
     line-height: 1;
+    background: var(--pt-bg-surface);
 }
 
 .pt-route-flag-demo {
@@ -993,4 +1039,488 @@ details[open] > summary .pt-collapsible-icon { transform: rotate(90deg); }
    "Refreshing…" text already conveys the state, the dot is decoration. */
 @media (prefers-reduced-motion: reduce) {
     .pt-probe-dot-pulse { animation: none; }
+}
+
+/* ── Route map ────────────────────────────────────────────────────────────
+   Leaflet ships its own stylesheet (lib/leaflet/leaflet.css), which is loaded
+   unlayered alongside this file. Everything below either sizes the container —
+   Leaflet refuses to draw into a zero-height element — or restyles the two
+   chrome pieces that would otherwise look pasted on from another app. */
+
+.pt-map-frame {
+    border-radius: var(--pt-radius-md);
+    overflow: hidden;
+    border: 1px solid var(--pt-border-subtle);
+    background: var(--pt-bg-sunken);
+}
+
+.pt-map-canvas {
+    /* Leaflet measures the element, so the height must be a real length, never
+       a percentage of an auto-height parent. Short on phones, taller once there
+       is room, so the map never eats the whole first screen. */
+    height: 16rem;
+    width: 100%;
+}
+
+/* Sized by the COLUMN it is in, not the window. On route detail the evidence
+   column on a 1440px desktop is narrower than the window by the width of the
+   answer column, and a viewport query would have given the map a tall aspect
+   ratio in a column too narrow to justify it. */
+@container pt-main (min-width: 40rem) {
+    .pt-map-canvas { height: 22rem; }
+}
+
+/* No container to query — the dashboard and other pages that host a map are not
+   inside .pt-route-evidence. Falls back to the viewport there. */
+@supports not (container-type: inline-size) {
+    @media (min-width: 40rem) {
+        .pt-map-canvas { height: 22rem; }
+    }
+}
+
+/* Leaflet's default panes are white, which flashes bright in dark mode before
+   the first tiles paint and shows through at the edges of the world. */
+.pt-map-canvas.leaflet-container {
+    background: var(--pt-bg-sunken);
+    font: inherit;
+}
+
+.pt-map-canvas .leaflet-control-attribution {
+    background: color-mix(in srgb, var(--pt-bg-surface) 88%, transparent);
+    color: var(--pt-fg-muted);
+    font-size: 0.6875rem;
+}
+
+.pt-map-canvas .leaflet-control-attribution a { color: var(--pt-fg-secondary); }
+
+.pt-map-canvas .leaflet-bar a {
+    background: var(--pt-bg-surface);
+    color: var(--pt-fg-primary);
+    border-bottom-color: var(--pt-border-subtle);
+}
+
+.pt-map-canvas .leaflet-bar a:hover { background: var(--pt-bg-elev-2); }
+
+/* Endpoint pins. A divIcon rather than Leaflet's default sprite so the two ends
+   are told apart by shape-and-fill, and so they follow the theme. */
+.pt-map-pin-dot {
+    display: block;
+    width: 0.875rem;
+    height: 0.875rem;
+    border-radius: var(--pt-radius-full);
+    border: 2px solid var(--pt-bg-surface);
+    box-shadow: 0 1px 4px rgb(var(--pt-shadow-rgb) / 0.45);
+}
+
+.pt-map-pin-origin .pt-map-pin-dot { background: var(--pt-fg-primary); }
+.pt-map-pin-dest .pt-map-pin-dot   { background: var(--pt-color-brand-500); }
+
+/* Legend — the sentence that makes the colour mean something. */
+.pt-map-legend {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.625rem;
+    font-size: 0.875rem;
+    color: var(--pt-fg-body);
+}
+
+.pt-map-legend-swatch {
+    width: 1.25rem;
+    height: 0.25rem;
+    border-radius: var(--pt-radius-full);
+    align-self: center;
+    flex-shrink: 0;
+}
+
+.pt-map-swatch-clear   { background: var(--pt-traffic-clear); }
+.pt-map-swatch-normal  { background: var(--pt-traffic-normal); }
+.pt-map-swatch-slow    { background: var(--pt-traffic-slow); }
+.pt-map-swatch-heavy   { background: var(--pt-traffic-heavy); }
+.pt-map-swatch-unknown { background: var(--pt-traffic-unknown); }
+
+.pt-map-legend-note {
+    color: var(--pt-fg-muted);
+    font-size: 0.8125rem;
+}
+
+.pt-map-empty {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 1.5rem;
+    border-radius: var(--pt-radius-md);
+    border: 1px dashed var(--pt-border-subtle);
+    color: var(--pt-fg-muted);
+    font-size: 0.875rem;
+}
+
+/* ═══════════════════════════════════════════════
+   FX layers — the canvases the effects draw into
+   ═══════════════════════════════════════════════
+
+   All three are inert decoration: no pointer events, aria-hidden in markup, and
+   removed entirely when the motion level is "off". They are positioned rather
+   than laid out, so none of them can move a single pixel of real content. */
+
+/* The living gradient. Behind everything, including the page background, which is
+   why <body> must not paint an opaque colour over it — see the rule below. */
+.pt-ambient {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    pointer-events: none;
+    /* Its own compositor layer: the shader repaints 30 times a second and must never
+       drag the page's paint along with it. */
+    will-change: opacity;
+    contain: strict;
+}
+
+/* Getting the wash BEHIND the page without losing the page colour.
+
+   A z-index:-1 child of <body> paints above the canvas background but below every
+   block background, so <body> must not paint one. It cannot simply be made
+   transparent though: with <html> also transparent the browser propagates body's
+   background up to the canvas, and "transparent" propagated is a white page in dark
+   mode. So the page colour moves to <html>, which stops the propagation and becomes
+   the ground the wash sits on. */
+:root:has(.pt-ambient) {
+    background: var(--pt-bg-page);
+}
+
+:root:has(.pt-ambient) body {
+    background: transparent;
+}
+
+/* Confetti. Above the page, below the toasts, and never in the way of a tap. */
+.pt-particles {
+    position: fixed;
+    inset: 0;
+    z-index: calc(var(--pt-z-toast) - 1);
+    pointer-events: none;
+}
+
+/* The flow particles on the map. Leaflet positions this inside its overlay pane;
+   only the stacking and the pointer behaviour are ours. */
+.pt-flow-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    z-index: 350;   /* above tiles (200) and the route line, below markers (600) */
+}
+
+/* Motion off: nothing decorative renders at all. Belt and braces — the JS already
+   declines to create these — so a stale canvas from a previous setting cannot linger. */
+[data-motion="off"] .pt-ambient,
+[data-motion="off"] .pt-particles,
+[data-motion="off"] .pt-flow-canvas {
+    display: none;
+}
+
+/* ═══════════════════════════════════════════════
+   Glass pass
+   ═══════════════════════════════════════════════
+
+   Applied only to surfaces that FLOAT over content — the header, the bottom nav,
+   the toasts. Cards do not get it: a card is where text lives, and text on a
+   translucent pane over a moving gradient is the classic accessibility failure of
+   this style. The tokens already collapse to solid under forced-colors and
+   prefers-contrast, so those users get flat surfaces automatically. */
+
+.app-header {
+    background: var(--pt-glass-bg-strong);
+    backdrop-filter: blur(var(--pt-glass-blur)) saturate(var(--pt-glass-saturate));
+    -webkit-backdrop-filter: blur(var(--pt-glass-blur)) saturate(var(--pt-glass-saturate));
+    border-bottom: 1px solid var(--pt-glass-border);
+}
+
+/* Cards get a whisper of the same treatment: still fully opaque behind text, but
+   with the saturation lift and the hairline that make the set read as glass rather
+   than as flat rectangles. */
+.rz-card,
+.pt-skeleton-card {
+    border: 1px solid var(--pt-glass-border);
+    box-shadow: var(--pt-elev-2), inset 0 1px 0 light-dark(rgb(255 255 255 / 0.6), rgb(255 255 255 / 0.04));
+}
+
+/* No backdrop-filter support: the tokens are already translucent, which over a
+   moving gradient would be unreadable. Fall back to the solid surface. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .app-header {
+        background: var(--pt-bg-surface);
+    }
+}
+
+/* ═══════════════════════════════════════════════
+   Loading shimmer
+   ═══════════════════════════════════════════════
+
+   The skeleton lines already shimmered. What they lacked was a HIGHLIGHT — a
+   specular sweep travelling across the whole card rather than each line animating
+   in isolation, which is what made three lines look like three separate loaders
+   instead of one surface waiting to be filled. */
+
+.pt-skeleton-card {
+    position: relative;
+    overflow: hidden;
+}
+
+.pt-skeleton-card::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        105deg,
+        transparent 30%,
+        light-dark(rgb(255 255 255 / 0.55), rgb(255 255 255 / 0.07)) 48%,
+        transparent 66%);
+    transform: translateX(-100%);
+    animation: pt-sheen 1.9s var(--pt-ease) infinite;
+    pointer-events: none;
+}
+
+/* Staggered so the three cards sweep in sequence, reading as one wave down the
+   list rather than three synchronised flashes. */
+.pt-skeleton-stack .pt-skeleton-card:nth-child(2)::after { animation-delay: 0.18s; }
+.pt-skeleton-stack .pt-skeleton-card:nth-child(3)::after { animation-delay: 0.36s; }
+
+@keyframes pt-sheen {
+    to { transform: translateX(100%); }
+}
+
+/* The progress line gets the same specular treatment, so a page that is loading
+   looks like the cards that are loading. */
+.pt-progress-line {
+    position: relative;
+    overflow: hidden;
+}
+
+/* Reduced motion, or motion switched off: the shimmer and the sheen both stop. The
+   skeleton still communicates "loading" by being a skeleton. */
+@media (prefers-reduced-motion: reduce) {
+    .pt-skeleton-line { animation: none; }
+    .pt-skeleton-card::after { animation: none; opacity: 0; }
+}
+
+[data-motion="off"] .pt-skeleton-line { animation: none; }
+[data-motion="off"] .pt-skeleton-card::after { animation: none; opacity: 0; }
+
+/* ═══════════════════════════════════════════════
+   3D route ribbon
+   ═══════════════════════════════════════════════ */
+
+.pt-ribbon-block {
+    margin-top: var(--pt-space-3);
+}
+
+.pt-ribbon-toggle {
+    align-items: center;
+    background: var(--pt-bg-tint);
+    border: 1px solid var(--pt-border-subtle);
+    border-radius: var(--pt-radius-full);
+    color: var(--pt-fg-body);
+    cursor: pointer;
+    display: inline-flex;
+    font-size: var(--pt-text-sm);
+    font-weight: var(--pt-weight-semibold);
+    gap: 0.45rem;
+    padding: 0.4rem 0.9rem;
+    transition: background-color var(--pt-dur-fast) var(--pt-ease);
+}
+
+.pt-ribbon-toggle:hover { background: var(--pt-bg-tint-strong); }
+
+.pt-ribbon-loading {
+    color: var(--pt-fg-muted);
+    font-weight: var(--pt-weight-regular);
+}
+
+.pt-ribbon-stage {
+    border: 1px solid var(--pt-border-subtle);
+    border-radius: var(--pt-radius-md);
+    /* Three.js measures this element, so the height has to be a real length — a
+       percentage of an auto-height parent resolves to zero and renders nothing. */
+    height: 18rem;
+    margin-top: var(--pt-space-3);
+    overflow: hidden;
+    /* Sits on the sunken tone rather than the card, so the object reads as being
+       inside a stage instead of floating on the page. */
+    background:
+        radial-gradient(ellipse at 50% 120%,
+            light-dark(rgb(59 130 246 / 0.10), rgb(59 130 246 / 0.16)),
+            transparent 65%),
+        var(--pt-bg-sunken);
+    touch-action: pan-y;
+}
+
+@container pt-main (min-width: 40rem) {
+    .pt-ribbon-stage { height: 24rem; }
+}
+
+.pt-ribbon-stage canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.pt-ribbon-caption {
+    color: var(--pt-fg-muted);
+    font-size: 0.8125rem;
+    margin: var(--pt-space-2) 0 0;
+}
+
+/* Empty state for routes with no road polyline — Three.js can't render
+   anything meaningful over two points, so mount nothing and tell the
+   user what the 3D view is waiting for instead. */
+.pt-ribbon-empty {
+    align-items: center;
+    background: var(--pt-bg-tint);
+    border-radius: var(--pt-radius-md);
+    color: var(--pt-fg-muted);
+    display: flex;
+    flex-direction: column;
+    gap: var(--pt-space-2);
+    height: 24rem;
+    justify-content: center;
+    padding: var(--pt-space-6);
+    text-align: center;
+}
+
+.pt-ribbon-empty-title {
+    color: var(--pt-fg-default);
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.pt-ribbon-empty-text {
+    font-size: 0.875rem;
+    line-height: 1.45;
+    max-width: 28rem;
+}
+
+/* ═══════════════════════════════════════════════
+   Volume row (Settings → Effects & sound)
+   ═══════════════════════════════════════════════ */
+
+.pt-volume-row {
+    align-items: center;
+    display: flex;
+    gap: var(--pt-space-3);
+    max-width: 26rem;
+}
+
+.pt-volume-slider {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+/* ═══════════════════════════════════════════════
+   Wide layouts (route detail)
+   ═══════════════════════════════════════════════
+
+   .pt-split and .pt-split-main used to live here, for the route rail beside the
+   route page. Route detail is .pt-route-two now — the answer and its controls
+   on the left, the evidence on the right — and nothing else ever used the
+   split, so only the width allowance it needed remains. */
+
+@media (min-width: 1200px) {
+    /* Two columns need more room than the reading-width cap allows. Prose still
+       gets its measure from --pt-measure inside each column; this only lets the
+       pair sit side by side without squeezing either.
+
+       It lives here rather than in RouteDetailPage.razor.css because .content
+       is MainLayout's element and never carries another component's scope
+       attribute — the same trap .app-nav-link documents above. */
+    .content:has(.pt-route-two) {
+        max-width: 1440px;
+    }
+}
+
+/* ═══════════════════════════════════════════════
+   Child-component overrides for route detail's two-column layout.
+
+   Every rule below targets markup owned by a CHILD component — RouteMap,
+   RouteProbeStatus — so it cannot live in RouteDetailPage.razor.css: scoped CSS
+   stamps its attribute only on the elements written in its own .razor file. Same
+   trap NavMenu.razor.css documents for .app-nav-link.
+   ═══════════════════════════════════════════════ */
+
+/* Beside the chart rather than above it, the map is a shape, not a document.
+   22rem inside a wide column made the evidence row taller than the fold. */
+@container pt-main (min-width: 44rem) {
+    .pt-route-evidence-top .pt-map-canvas { height: 15rem; }
+}
+
+/* A header carrying the probe chips is sharing its row with about 30rem of live
+   status, so the title gets one step down the scale. Without this, a two-address
+   title ("1 Apple Park Way → Googleplex") wrapped to three lines at --pt-text-2xl
+   and pushed the whole page down before it had said anything. */
+.pt-page-header:has(.pt-probe-chips) .pt-page-title {
+    font-size: var(--pt-text-xl);
+}
+
+/* And the chips are capped so they wrap to a second line instead of taking the
+   room the title needs. Status yields to identity, not the other way round. */
+.pt-probe-chips {
+    max-width: 32rem;
+}
+
+/* Radzen's alert is sized for a full-width card. In the answer column it is a
+   status line, and its default padding made "Monitoring active" the tallest
+   block on the page. */
+.pt-route-side .rz-alert {
+    padding: var(--pt-space-2) var(--pt-space-3);
+    font-size: var(--pt-text-sm);
+}
+
+/* The probe signals as header chips: same three cells, no card, no row of its
+   own. Wraps onto a second line before it will squeeze the page title. */
+.pt-probe-chips {
+    display: flex;
+    align-items: center;
+    gap: var(--pt-space-3);
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.pt-probe-chips .pt-probe-cell {
+    font-size: var(--pt-text-xs);
+    color: var(--pt-fg-secondary);
+}
+
+/* In the strip the button is pushed to the far end by margin-left:auto. In the
+   header the chips are already right-aligned, so it just follows the last one. */
+.pt-probe-chips .pt-probe-actions {
+    margin-left: 0;
+}
+
+/* The header's action slot is the narrowest place these chips ever render, and
+   a wrapping "5 min ago" is worth more than a truncated one. */
+.pt-probe-chips .pt-probe-label {
+    white-space: normal;
+}
+
+/* ═══════════════════════════════════════════════
+   Measure — prose line length
+   ═══════════════════════════════════════════════
+
+   Body copy that runs the full width of a 1440px shell is measurably harder to
+   read: the eye loses the line on the return sweep. These are the blocks that
+   are genuinely prose; tables, charts and card grids are exempt and want every
+   pixel they can get. */
+
+.pt-empty-state-text,
+.pt-ribbon-caption,
+.pt-map-legend,
+.pt-settings-meta {
+    max-width: var(--pt-measure);
+}
+
+.pt-empty-state-text {
+    /* Centred blocks need the margin too, or the cap just pushes them left. */
+    margin-inline: auto;
 }

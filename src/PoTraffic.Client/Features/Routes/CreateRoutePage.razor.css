@@ -27,7 +27,7 @@
 .pt-field-error {
     display: block;
     margin: 0 0 var(--pt-space-3);
-    color: var(--pt-color-danger);
+    color: var(--pt-color-danger-on-surface);
     font-size: var(--pt-text-xs);
     font-weight: var(--pt-weight-medium);
 }

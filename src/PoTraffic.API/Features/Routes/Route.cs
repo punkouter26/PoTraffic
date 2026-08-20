@@ -24,6 +24,24 @@ public sealed class Route
     /// routes when a return trip is created; null for standalone routes.</summary>
     public RouteId? ReturnRouteId { get; set; }
 
+    /// <summary>
+    /// The road shape between origin and destination, as a Google-encoded polyline.
+    /// Fetched lazily the first time the route's map is opened and kept forever — the
+    /// roads between two fixed addresses do not change between probes, so this is one
+    /// provider call per route rather than one per map view.
+    /// Null means "not fetched yet"; see <see cref="PathUnavailable"/> for "asked and
+    /// the provider had nothing".
+    /// </summary>
+    public string? PathPolyline { get; set; }
+
+    /// <summary>
+    /// Set when a geometry fetch came back empty (provider not enabled for this key,
+    /// no drivable route, request failed). Without this the app would re-ask the
+    /// provider on every single map view for a route that will never have a shape.
+    /// The map draws a straight line in that case.
+    /// </summary>
+    public DateTimeOffset? PathUnavailableAt { get; set; }
+
     [JsonIgnore]
     public User User { get; set; } = null!;
     [JsonIgnore]

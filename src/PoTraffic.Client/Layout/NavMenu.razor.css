@@ -238,7 +238,7 @@
 }
 
 .pt-dropdown-item.danger {
-    color: var(--pt-color-danger);
+    color: var(--pt-color-danger-on-surface);
 }
 
 .pt-dropdown-item.danger:hover {
@@ -290,8 +290,16 @@
         display: none;
     }
 
-    .pt-user-chip-label {
-        max-width: 7rem;
+    /* NAV CONSOLIDATION. The chip's dropdown offered Account settings, System
+       status and Sign out — the same three items, in the same order, as the
+       bottom nav's action sheet. Two menus, one set of destinations, and the
+       one in the top-right corner was the one a thumb could not reach.
+
+       On a phone the header is now identity and alerts only; the bottom sheet
+       is the single account menu, and it carries the "Signed in as" line that
+       used to be this chip's only unique content. */
+    .pt-user-chip-btn {
+        display: none;
     }
 }
 

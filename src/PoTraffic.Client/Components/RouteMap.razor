@@ -1,0 +1,133 @@
+@using PoTraffic.Shared.DTOs.Routes
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+@*  Route map — the trip drawn on real roads, tinted by how today compares.
+
+    The map is decoration around a verdict, not the verdict itself: the legend
+    line under it states in words what the colour means, because a coloured line
+    on its own is unreadable to anyone who cannot separate the four hues.        *@
+
+@if (Path is null)
+{
+    <div class="pt-map-empty" role="status">
+        <PtIcon Name="map" Size="lg" />
+        <span>No map for this route yet.</span>
+    </div>
+}
+else
+{
+    <div class="pt-map-frame">
+        <div class="pt-map-canvas" @ref="_container"></div>
+    </div>
+
+    <div class="pt-map-legend">
+        <span class="pt-map-legend-swatch @SwatchClass" aria-hidden="true"></span>
+        <span class="pt-map-legend-text">@Verdict</span>
+        @if (Path.IsApproximate)
+        {
+            <span class="pt-map-legend-note">
+                Straight line — road directions aren't available for this route.
+            </span>
+        }
+    </div>
+}
+
+@code {
+    /// <summary>The shape and verdict to draw. Null renders the empty state and touches no JS.</summary>
+    [Parameter] public RoutePathDto? Path { get; set; }
+
+    /// <summary>Short label for the start pin's tooltip.</summary>
+    [Parameter] public string OriginLabel { get; set; } = "Start";
+
+    /// <summary>Short label for the end pin's tooltip.</summary>
+    [Parameter] public string DestinationLabel { get; set; } = "End";
+
+    private ElementReference _container;
+    private IJSObjectReference? _module;
+
+    /// <summary>
+    /// What was last drawn. The detail page refreshes every few seconds and re-renders
+    /// this component each time; redrawing an unchanged map would tear down and refit
+    /// the view — visible as a flicker and a lost pan — several times a minute.
+    /// </summary>
+    private string? _drawn;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (Path is null)
+            return;
+
+        string signature = $"{Path.EncodedPolyline?.Length}|{Path.TrafficLevel}|{Path.IsApproximate}";
+        if (signature == _drawn)
+            return;
+
+        try
+        {
+            _module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/pt-map.js");
+            await _module.InvokeVoidAsync("render", _container, new
+            {
+                encodedPolyline = Path.EncodedPolyline,
+                originLat = Path.OriginLat,
+                originLng = Path.OriginLng,
+                destinationLat = Path.DestinationLat,
+                destinationLng = Path.DestinationLng,
+                trafficLevel = Path.TrafficLevel,
+                isApproximate = Path.IsApproximate,
+                originLabel = OriginLabel,
+                destinationLabel = DestinationLabel,
+            });
+            _drawn = signature;
+        }
+        catch (JSDisconnectedException) { /* page tearing down */ }
+        catch (ObjectDisposedException) { /* page tearing down */ }
+    }
+
+    private string SwatchClass => $"pt-map-swatch-{Path?.TrafficLevel ?? "unknown"}";
+
+    /// <summary>
+    /// The colour, said out loud. "Normal" names the comparison explicitly because the
+    /// baseline is per weekday and time slot — "usual for a Tuesday at 8am", not an
+    /// all-day average, and a user who reads it as the latter will distrust the app.
+    /// </summary>
+    private string Verdict
+    {
+        get
+        {
+            if (Path is null) return string.Empty;
+
+            string minutes = Path.LatestDurationSeconds is { } s
+                ? $"{Math.Round(s / 60.0):F0} min now"
+                : "No sample yet";
+
+            if (Path.TypicalDurationSeconds is not { } typical || Path.LatestDurationSeconds is not { } latest)
+                return $"{minutes} — not enough history yet to say if that's good or bad.";
+
+            int deltaMin = (int)Math.Round((latest - typical) / 60.0);
+            string usual = $"usually {Math.Round(typical / 60.0):F0} min at this time";
+
+            return Path.TrafficLevel switch
+            {
+                "clear" => $"{minutes} — better than usual ({usual}).",
+                "normal" => $"{minutes} — about normal ({usual}).",
+                "slow" => $"{minutes} — about {deltaMin} min slower than usual ({usual}).",
+                "heavy" => $"{minutes} — heavy, about {deltaMin} min over ({usual}).",
+                _ => $"{minutes} — {usual}.",
+            };
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_module is null)
+            return;
+
+        try
+        {
+            await _module.InvokeVoidAsync("destroy", _container);
+            await _module.DisposeAsync();
+        }
+        catch (JSDisconnectedException) { /* page already gone */ }
+        catch (ObjectDisposedException) { /* page already gone */ }
+    }
+}

@@ -31,6 +31,8 @@ public static class RoutesEndpoints
         group.MapDelete("{routeId:guid}", DeleteRoute);
         group.MapPost("{routeId:guid}/check-now", CheckNow);
         group.MapPost("{routeId:guid}/return-trip", CreateReturnTrip);
+        // Road shape + how today compares, for the map on the route detail page.
+        group.MapGet("{routeId:guid}/path", GetRoutePath);
         // Sample route with synthetic history, for an account that has nothing to show yet (#10)
         return app;
     }
@@ -99,6 +101,20 @@ public static class RoutesEndpoints
         return result.IsSuccess
             ? Results.Created($"/api/routes/{result.Route!.Id}", result.Route)
             : Results.UnprocessableEntity(new { error = result.ErrorCode });
+    }
+
+    // GET /api/routes/{routeId}/path — road shape + traffic tint for the map
+    private static async Task<IResult> GetRoutePath(
+        RouteId routeId,
+        HttpContext context,
+        ISender sender,
+        ILogger<LogCategory> logger)
+    {
+        UserId? userId = ExtractUserId(context.User, logger);
+        if (userId is null) return Results.Unauthorized();
+
+        RoutePathDto? path = await sender.Send(new GetRoutePathQuery(routeId, userId.Value));
+        return path is null ? Results.NotFound() : Results.Ok(path);
     }
 
     // DELETE /api/routes/{routeId}

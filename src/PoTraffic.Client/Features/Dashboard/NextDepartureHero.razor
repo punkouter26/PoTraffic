@@ -1,0 +1,149 @@
+@using PoTraffic.Shared.DTOs.Routes
+@using PoTraffic.Shared.DTOs.History
+@using PoTraffic.Shared.Enums
+@using PoTraffic.Client.Infrastructure
+@inject NavigationManager Nav
+
+@*  The one answer the app exists to give, at the size that says so.
+
+    Every route card carries a "Leave by" line, which means that on a dashboard
+    with four routes the app offers four equally-weighted answers and leaves the
+    reader to work out which one is about to matter. This picks that one — the
+    next departure still ahead of you today — and states it once, large.
+
+    It renders nothing at all when there is no such answer. A hero that says
+    "no data" is worse than no hero: it takes the most valuable space on the
+    page to report an absence.                                                  *@
+
+@if (_route is not null)
+{
+    @* The wrapper is the query container, not the button. An element cannot query
+       itself — `container-type` on .pt-hero with `@container` rules targeting
+       .pt-hero silently never matched, and the wide two-column layout below never
+       fired at any width. Same trap the dashboard's card grid documents. *@
+    <div class="pt-hero-wrap">
+    <button type="button" class="pt-hero @_urgencyClass" @onclick="Open"
+            aria-label="@($"Next departure: {_time} for {_where}. {_countdownText}. Open route.")">
+        <span class="pt-hero-eyebrow">Next departure</span>
+
+        <span class="pt-hero-time">@_time</span>
+
+        <span class="pt-hero-where">@_where</span>
+
+        <span class="pt-hero-meta">
+            <span class="pt-hero-countdown">@_countdownText</span>
+            @if (_duration is { Length: > 0 })
+            {
+                <span class="pt-hero-dot" aria-hidden="true">·</span>
+                <span>@_duration</span>
+            }
+        </span>
+    </button>
+    </div>
+}
+
+@code {
+    /// <summary>Every visible route. The hero picks one; it does not filter the list below.</summary>
+    [Parameter] public IReadOnlyList<RouteDto> Routes { get; set; } = [];
+
+    /// <summary>Optimal departures by route, as the dashboard already fetched them.</summary>
+    [Parameter] public IReadOnlyDictionary<RouteId, OptimalDepartureDto> Departures { get; set; }
+        = new Dictionary<RouteId, OptimalDepartureDto>();
+
+    /// <summary>Ticks the countdown. The dashboard already polls on a timer; this rides it.</summary>
+    [Parameter] public DateTimeOffset Now { get; set; } = DateTimeOffset.Now;
+
+    private RouteDto? _route;
+    private string _time = string.Empty;
+    private string _where = string.Empty;
+    private string _duration = string.Empty;
+    private string _countdownText = string.Empty;
+    private string _urgencyClass = string.Empty;
+
+    /// <summary>
+    /// Past this many minutes out, the departure is not "next" in any useful sense —
+    /// it is tomorrow's problem, and putting tomorrow at the top of the page pushes
+    /// today's routes down for nothing.
+    /// </summary>
+    private const int HorizonMinutes = 12 * 60;
+
+    protected override void OnParametersSet()
+    {
+        _route = null;
+
+        DateTime today = Now.LocalDateTime;
+        int nowMinutes = today.Hour * 60 + today.Minute;
+
+        RouteDto? best = null;
+        OptimalDepartureDto? bestDeparture = null;
+        int bestDelta = int.MaxValue;
+
+        foreach (RouteDto route in Routes)
+        {
+            // A paused route's departure time is a fact about a thing that is not
+            // being measured any more. It should not be the headline.
+            if (route.MonitoringStatus != MonitoringStatus.Active)
+                continue;
+
+            if (!Departures.TryGetValue(route.Id, out OptimalDepartureDto? departure))
+                continue;
+
+            int delta = departure.TimeSlotBucket - nowMinutes;
+
+            // Already gone today: not the next departure, and not worth counting
+            // down to. The card below still shows it.
+            if (delta < 0 || delta > HorizonMinutes)
+                continue;
+
+            if (delta < bestDelta)
+            {
+                bestDelta = delta;
+                best = route;
+                bestDeparture = departure;
+            }
+        }
+
+        if (best is null || bestDeparture is null)
+            return;
+
+        _route = best;
+        _time = FormatClock(bestDeparture.TimeSlotBucket);
+        _where = TextFormatting.ToTitleCase(best.DestinationAddress.Split(',')[0]);
+
+        int minutes = (int)(bestDeparture.PredictedDurationSeconds / 60);
+        _duration = minutes > 0 ? $"about {minutes} min on the road" : string.Empty;
+
+        _countdownText = Describe(bestDelta);
+
+        // Urgency is a colour, not a number: inside twenty minutes the hero warms
+        // up, inside five it goes hot. The words say the same thing for anyone who
+        // cannot see the difference.
+        _urgencyClass = bestDelta <= 5 ? "pt-hero-now"
+                      : bestDelta <= 20 ? "pt-hero-soon"
+                      : string.Empty;
+    }
+
+    private static string FormatClock(int minutesFromMidnight)
+    {
+        int h = minutesFromMidnight / 60;
+        int m = minutesFromMidnight % 60;
+        string period = h >= 12 ? "PM" : "AM";
+        int display = h > 12 ? h - 12 : (h == 0 ? 12 : h);
+        return $"{display}:{m:D2} {period}";
+    }
+
+    private static string Describe(int minutes) => minutes switch
+    {
+        <= 0 => "leave now",
+        1 => "in 1 minute",
+        < 60 => $"in {minutes} minutes",
+        < 120 => $"in about an hour",
+        _ => $"in about {minutes / 60} hours",
+    };
+
+    private void Open()
+    {
+        if (_route is not null)
+            Nav.NavigateTo($"/routes/{_route.Id}");
+    }
+}

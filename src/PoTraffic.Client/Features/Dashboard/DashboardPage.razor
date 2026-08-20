@@ -118,6 +118,12 @@ else
        fetches at most 100 routes (pageSize=100) and a card is a handful of
        spans; the ItemSize="120" hint it relied on had already drifted from the
        card's real height twice. *@
+    @* One card per route and nothing above them. The hero that used to sit here
+       promised a "next departure" the app does not model: it read a time-slot
+       bucket off the optimal-departure row and counted down to it as though a
+       departure had been scheduled. Nothing schedules one, so the number was an
+       invention — and it gave one route a treatment none of the others could
+       earn. Every route is the same card now. *@
     <div class="pt-route-cards pt-stagger" role="list">
         @foreach (RouteDto route in VisibleRoutes)
         {
@@ -227,18 +233,38 @@ else
         {
             try
             {
-                Task<OptimalDepartureDto?> optimalTask = Http.GetFromJsonAsync(
-                    $"/api/routes/{route.Id}/optimal-departure?dayOfWeek={dayOfWeek}", AppJsonContext.Default.OptimalDepartureDto);
-                Task<PagedResult<PollRecordDto>?> historyTask = Http.GetFromJsonAsync(
-                    $"/api/routes/{route.Id}/poll-history?page=1&pageSize=60&sinceUtc={sinceUtc}", AppJsonContext.Default.PagedResultPollRecordDto);
+                // Routes with no active monitoring window cannot have polls yet,
+                // so /optimal-departure is guaranteed to return 204 and
+                // /poll-history is guaranteed to return empty. Both endpoints
+                // are cheap, but on a dashboard with several freshly-created
+                // routes the noise was real: every 60 s the WASM client logged
+                // requestFailed / pageError and forwarded a row to
+                // /api/diag/client-error.
+                bool isMonitored = route.Windows.Any(w => w.IsActive);
 
-                OptimalDepartureDto? optimal = await optimalTask;
-                if (optimal is not null)
-                    departures[route.Id] = optimal;
+                Task<OptimalDepartureDto?>? optimalTask = isMonitored
+                    ? Http.GetFromJsonAsync(
+                        $"/api/routes/{route.Id}/optimal-departure?dayOfWeek={dayOfWeek}", AppJsonContext.Default.OptimalDepartureDto)
+                    : null;
 
-                PagedResult<PollRecordDto>? history = await historyTask;
-                if (history is not null && history.Items.Count > 0)
-                    polls[route.Id] = [.. history.Items];
+                Task<PagedResult<PollRecordDto>?>? historyTask = isMonitored
+                    ? Http.GetFromJsonAsync(
+                        $"/api/routes/{route.Id}/poll-history?page=1&pageSize=60&sinceUtc={sinceUtc}", AppJsonContext.Default.PagedResultPollRecordDto)
+                    : null;
+
+                if (optimalTask is not null)
+                {
+                    OptimalDepartureDto? optimal = await optimalTask;
+                    if (optimal is not null)
+                        departures[route.Id] = optimal;
+                }
+
+                if (historyTask is not null)
+                {
+                    PagedResult<PollRecordDto>? history = await historyTask;
+                    if (history is not null && history.Items.Count > 0)
+                        polls[route.Id] = [.. history.Items];
+                }
             }
             catch
             {

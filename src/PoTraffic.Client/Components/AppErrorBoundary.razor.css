@@ -27,7 +27,7 @@
 }
 
 .error-icon {
-    color: var(--pt-color-danger);
+    color: var(--pt-color-danger-on-surface);
     margin-bottom: var(--pt-space-4);
 }
 
@@ -54,7 +54,7 @@
 }
 
 .dev-error-details h3 {
-    color: var(--pt-color-warning);
+    color: var(--pt-color-warning-on-surface);
     margin-bottom: var(--pt-space-4);
     font-size: var(--pt-text-base);
 }

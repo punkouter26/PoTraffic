@@ -26,3 +26,8 @@
    in one tap already. *@
 <UndoBar />
 
+@* Registers the service worker on first render, then offers the reload when a newer
+   build is downloaded and waiting. In the layout so it happens once per session and
+   the notice is not lost by navigating. *@
+<PwaUpdateBar />
+

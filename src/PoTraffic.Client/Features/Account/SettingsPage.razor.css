@@ -17,7 +17,7 @@
 }
 
 .pt-settings-danger > :first-child {
-    color: var(--pt-color-danger);
+    color: var(--pt-color-danger-on-surface);
 }
 
 /* ── Appearance pickers ─────────────────────────────────────────────────────
@@ -34,4 +34,85 @@
    <span> and needs to be a block or it shares the bar's line. */
 .pt-settings-section .rz-text-caption {
     display: block;
+}
+
+/* ── Section index ────────────────────────────────────────────────────────
+   Six sections in one scroll. The index answers "what else is on this page"
+   without scrolling and makes a jump one click, on screens wide enough to
+   carry it. Below 1024px it does not render: a phone has no spare column, and
+   an index that is itself as long as the content it indexes helps nobody. */
+
+.pt-settings-layout {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--pt-space-5);
+    align-items: start;
+}
+
+.pt-settings-index {
+    display: none;
+}
+
+@media (min-width: 1024px) {
+    .pt-settings-layout {
+        grid-template-columns: 13rem minmax(0, 1fr);
+    }
+
+    .pt-settings-index {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        position: sticky;
+        top: calc(var(--pt-space-5) + 4rem);
+        padding: var(--pt-space-2);
+        background: var(--pt-bg-surface);
+        border: 1px solid var(--pt-border-subtle);
+        border-radius: var(--pt-radius-lg);
+        box-shadow: var(--pt-elev-1);
+    }
+}
+
+.pt-settings-index a {
+    padding: var(--pt-space-2) var(--pt-space-3);
+    border-radius: var(--pt-radius-md);
+    border-left: 3px solid transparent;
+    color: var(--pt-fg-body);
+    font-size: var(--pt-text-sm);
+    text-decoration: none;
+    transition: background-color var(--pt-dur-fast) var(--pt-ease);
+}
+
+.pt-settings-index a:hover {
+    background: var(--pt-bg-tint);
+    color: var(--pt-fg-primary);
+}
+
+/* :target marks the section the URL fragment points at, so the index shows
+   where the last jump landed with no JavaScript and no scroll listener. */
+.pt-settings-index a:has(+ *),
+.pt-settings-index a:focus-visible {
+    outline-offset: 2px;
+}
+
+.pt-settings-index-danger { color: var(--pt-color-danger-on-surface); }
+
+/* The fixed header would otherwise cover the heading of whichever section was
+   jumped to. scroll-margin-top reserves that space at the anchor itself. */
+.pt-settings-section {
+    scroll-margin-top: 5rem;
+}
+
+/* A brief tint on the section that was just jumped to, so the eye lands in the
+   right place instead of hunting for what changed. */
+.pt-settings-section:target {
+    animation: pt-target-flash 1.6s var(--pt-ease);
+}
+
+@keyframes pt-target-flash {
+    from { background: var(--pt-bg-tint); }
+    to   { background: transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .pt-settings-section:target { animation: none; }
 }

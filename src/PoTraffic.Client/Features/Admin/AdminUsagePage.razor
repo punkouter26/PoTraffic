@@ -12,10 +12,18 @@
             <RadzenTabsItem Text="Usage Insights" Icon="people">
                 <RadzenText TextStyle="TextStyle.H3" class="pt-mb-2 pt-mt-3 pt-section-heading">Daily Usage</RadzenText>
                 <LoadingErrorCard IsLoading="_loading" Error="@_error">
+                    @* Virtualized rather than paged.
+
+                       The endpoint returns every user in one payload, so paging was
+                       only ever hiding rows that had already been downloaded and
+                       parsed — it bounded the DOM but not the work. Virtualization
+                       bounds the DOM too, and replaces "which of 14 pages was that
+                       user on" with a scrollbar. Radzen needs an explicit height to
+                       virtualize against, hence Style. *@
                     <RadzenDataGrid Data="_users" TItem="UserDailyUsageDto"
                                     AllowSorting="true" AllowFiltering="true"
-                                    AllowPaging="true" PageSize="25"
-                                    PagerHorizontalAlign="HorizontalAlign.Left"
+                                    AllowVirtualization="true"
+                                    Style="height: 32rem"
                                     Density="Density.Compact"
                                     AllowColumnResize="true"
                                     AllowColumnReorder="true"

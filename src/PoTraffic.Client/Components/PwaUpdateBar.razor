@@ -1,0 +1,53 @@
+@using PoTraffic.Client.Infrastructure
+@implements IDisposable
+@inject PwaService Pwa
+@inject FxService Fx
+
+@*  Lives in the root layout, so the service worker is registered once per session
+    regardless of which page was opened first, and so the update notice survives
+    navigation.
+
+    The bar is not a toast and does not auto-dismiss: a build that is already
+    downloaded but not applied is a state the user should be able to act on when
+    they are ready, not something that disappears while they are reading it.      *@
+
+@if (Pwa.UpdateReady)
+{
+    <div class="pt-update-bar pt-enter" role="status">
+        <PtIcon Name="rocket_launch" Size="sm" />
+        <span class="pt-update-bar-text">A new version of PoTraffic is ready.</span>
+        <RadzenButton Text="Reload" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Small"
+                      Click="ApplyAsync" IsBusy="_applying" />
+    </div>
+}
+
+@code {
+    private bool _applying;
+
+    protected override void OnInitialized() => Pwa.StateChanged += OnStateChanged;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        await Pwa.StartAsync();
+        // Mounts the background wash. Deliberately after the PWA registration: the
+        // service worker is functional, the wash is decoration, and on a slow device
+        // the order in which they contend for the first idle moment is visible.
+        await Fx.StartAsync();
+    }
+
+    private async Task ApplyAsync()
+    {
+        // Stays busy on purpose. ApplyUpdateAsync ends in a page reload, so there is
+        // no "finished" state to return to — clearing the flag would just flash the
+        // button back to normal a moment before the page vanishes.
+        _applying = true;
+        await Pwa.ApplyUpdateAsync();
+    }
+
+    private void OnStateChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Pwa.StateChanged -= OnStateChanged;
+}

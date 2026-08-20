@@ -119,9 +119,16 @@
     protected override async Task OnInitializedAsync()
     {
         AuthStateProvider.AuthenticationStateChanged += HandleAuthStateChanged;
+        // Close the dropdown on every navigation — it survives Blazor's router
+        // otherwise, sits there intercepting clicks on the new page, and the
+        // overlay click-outside never fires because the click happens under it.
+        Nav.LocationChanged += CloseMenuOnNavigate;
         await LoadFeatureFlagsAsync();
         UpdateUserState(await AuthStateProvider.GetAuthenticationStateAsync());
     }
+
+    private void CloseMenuOnNavigate(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+        => _menuOpen = false;
 
     private void ToggleUserMenu() => _menuOpen = !_menuOpen;
     private void CloseUserMenu() => _menuOpen = false;
@@ -198,6 +205,7 @@
     public void Dispose()
     {
         AuthStateProvider.AuthenticationStateChanged -= HandleAuthStateChanged;
+        Nav.LocationChanged -= CloseMenuOnNavigate;
     }
 
 }

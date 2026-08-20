@@ -66,6 +66,7 @@ public static class ClientCacheKeys
 [JsonSerializable(typeof(CreateRouteRequest))]
 [JsonSerializable(typeof(List<PlaceSuggestionDto>))]
 [JsonSerializable(typeof(CheckNowResponse))]
+[JsonSerializable(typeof(RoutePathDto))]
 [JsonSerializable(typeof(OptimalDepartureDto))]
 [JsonSerializable(typeof(List<MonitoringWindowDto>))]
 [JsonSerializable(typeof(List<SessionDto>))]

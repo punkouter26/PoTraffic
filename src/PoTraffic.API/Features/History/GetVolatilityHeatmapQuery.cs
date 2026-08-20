@@ -8,14 +8,14 @@ public sealed record GetVolatilityHeatmapQuery(RouteId RouteId, UserId UserId)
     : IRequest<VolatilityHeatmapDto>;
 
 /// <summary>
-/// Aggregates a route's whole history into a day-of-week × half-hour grid (#5), so
-/// "Tuesday at 17:30 is the worst 30 minutes of your week" is one glance rather than
+/// Aggregates a route's whole history into a day-of-week × quarter-hour grid (#5), so
+/// "Tuesday at 17:30 is the worst 15 minutes of your week" is one glance rather than
 /// seven baseline reads.
 ///
 /// <para>
 /// The reference point is the <em>median</em> sample, not the mean: a handful of 3× outlier
 /// commutes drags a mean upward far enough that genuinely congested cells stop looking
-/// congested relative to it. Day-of-week and half-hour are bucketed in the user's local
+/// congested relative to it. Day-of-week and quarter-hour are bucketed in the user's local
 /// time zone (derived from their <c>User.Locale</c>), so a 17:30 row reads as the rush
 /// hour the user actually drives in.
 /// </para>
@@ -52,7 +52,9 @@ public sealed class GetVolatilityHeatmapQueryHandler(TableStorageContext db)
                 return (
                     local.DayOfWeek,
                     local.Hour,
-                    HalfHour: local.Minute >= 30 ? 1 : 0);
+                    // 15-minute resolution: :00 :15 :30 :45. Integer division floors
+                    // the minute into its quarter, so 11:44 lands in quarter 2 (:30).
+                    Quarter: local.Minute / 15);
             })
             .Select(g =>
             {
@@ -65,13 +67,13 @@ public sealed class GetVolatilityHeatmapQueryHandler(TableStorageContext db)
                 return new HeatmapCellDto(
                     g.Key.DayOfWeek.ToString(),
                     g.Key.Hour,
-                    g.Key.HalfHour,
+                    g.Key.Quarter,
                     mean,
                     stdDev,
                     durations.Count);
             })
             .OrderBy(c => c.Hour)
-            .ThenBy(c => c.HalfHour)];
+            .ThenBy(c => c.Quarter)];
 
         return Task.FromResult(new VolatilityHeatmapDto(
             query.RouteId,

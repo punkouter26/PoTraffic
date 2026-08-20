@@ -1,25 +1,25 @@
 @using PoTraffic.Shared.DTOs.History
 
 @* ──────────────────────────────────────────────────────────────────────
-   #5 — Day-of-week × half-hour congestion grid.
+   #5 — Day-of-week × quarter-hour congestion grid.
 
-   Colour encodes how much slower a half-hour slot runs than the route's
+   Colour encodes how much slower a 15-minute slot runs than the route's
    typical (median) sample; the dot marks slots whose spread is wide enough
    that the time is unpredictable rather than merely slow. Those are
    different problems: a reliably-40-minute slot can be planned around, a
    25-to-55-minute one can't.
 
-   Only the half-hour slots that actually carry samples are drawn. A 07:00–
-   09:00 commute would otherwise render as two columns of data and
-   twenty-two of blank per hour-of-day.
+   Only the quarter-hour slots that actually carry samples are drawn. That
+   matters more at 15 minutes than it did at 30: a full day is 96 columns, and
+   a 07:00–09:00 commute occupies eight of them.
 
    Rule 4: the markup hands CSS the level class only — the ramp itself is
    owned by .pt-heat-l0…l4 in app.css.
 
    Times are bucketed in the user's local time zone (Heatmap.TimeZoneId,
-   resolved server-side from the user's ProfileDto.Locale) at 30-minute
-   resolution, so "17:30" reads as the rush hour it actually is for the
-   driver — not as some other zone's 17:30.
+   resolved server-side from the user's ProfileDto.Locale) at 15-minute
+   resolution — 11:00, 11:15, 11:30, 11:45 — so "17:30" reads as the rush hour
+   it actually is for the driver, not as some other zone's 17:30.
    ────────────────────────────────────────────────────────────────────── *@
 
 @if (Heatmap is null || Heatmap.TotalSamples == 0)
@@ -41,12 +41,12 @@ else
     <div class="pt-heatmap-scroll">
         <table class="pt-heatmap">
             <caption class="pt-visually-hidden">
-                Mean travel time by day of week and half-hour, in @(Heatmap?.TimeZoneId ?? "the user's local time").
+                Mean travel time by day of week and quarter-hour, in @(Heatmap?.TimeZoneId ?? "the user's local time").
             </caption>
             <thead>
                 <tr>
                     <th scope="col"><span class="pt-visually-hidden">Day</span></th>
-                    @foreach (HalfHourSlot slot in _slots)
+                    @foreach (QuarterSlot slot in _slots)
                     {
                         <th scope="col" class="pt-heatmap-hour">@SlotLabel(slot)</th>
                     }
@@ -57,9 +57,9 @@ else
                 {
                     <tr>
                         <th scope="row" class="pt-heatmap-day">@day[..3]</th>
-                        @foreach (HalfHourSlot slot in _slots)
+                        @foreach (QuarterSlot slot in _slots)
                         {
-                            HeatmapCellDto? cell = _byKey.GetValueOrDefault((day, slot.Hour, slot.HalfHour));
+                            HeatmapCellDto? cell = _byKey.GetValueOrDefault((day, slot.Hour, slot.Quarter));
                             @if (cell is null)
                             {
                                 <td class="pt-heat pt-heat-empty" title="@EmptyTooltip(day, slot)">
@@ -93,7 +93,7 @@ else
         <span class="pt-heat pt-heat-l2 pt-heat-volatile" aria-hidden="true"></span>
         <span class="pt-heatmap-legend-label">dot = unpredictable</span>
         <span class="pt-heatmap-legend-sep">·</span>
-        <span class="pt-heatmap-legend-label">minutes, half-hours in @(Heatmap?.TimeZoneId ?? "your local time") — only times you travel are shown</span>
+        <span class="pt-heatmap-legend-label">minutes, 15-minute slots in @(Heatmap?.TimeZoneId ?? "your local time") — only times you travel are shown</span>
     </div>
 }
 
@@ -110,16 +110,16 @@ else
     /// </summary>
     private const double VolatileCoefficient = 0.08;
 
-    /// <summary>One 30-minute slot in the user's local day.</summary>
+    /// <summary>One 15-minute slot in the user's local day.</summary>
     /// <param name="Hour">Local hour 0–23 in <see cref="VolatilityHeatmapDto.TimeZoneId"/>.</param>
-    /// <param name="HalfHour">0 for :00–:29, 1 for :30–:59.</param>
-    private readonly record struct HalfHourSlot(int Hour, int HalfHour)
+    /// <param name="Quarter">0 = :00, 1 = :15, 2 = :30, 3 = :45.</param>
+    private readonly record struct QuarterSlot(int Hour, int Quarter)
     {
-        public int StartMinute => HalfHour * 30;
+        public int StartMinute => Quarter * 15;
     }
 
-    private Dictionary<(string Day, int Hour, int HalfHour), HeatmapCellDto> _byKey = [];
-    private List<HalfHourSlot> _slots = [];
+    private Dictionary<(string Day, int Hour, int Quarter), HeatmapCellDto> _byKey = [];
+    private List<QuarterSlot> _slots = [];
     private string? _summary;
 
     protected override void OnParametersSet()
@@ -135,17 +135,17 @@ else
         // Last cell wins on a duplicate key — the server groups by exactly that triple,
         // so a duplicate would be a server bug rather than something to render twice.
         _byKey = Heatmap.Cells
-            .GroupBy(c => (c.DayOfWeek, c.Hour, c.HalfHour))
+            .GroupBy(c => (c.DayOfWeek, c.Hour, c.Quarter))
             .ToDictionary(g => g.Key, g => g.Last());
 
-        // Only slots that actually carry a sample get a column. A commute that runs
-        // 07:00–09:00 and 16:00–19:00 spans 12 half-hours but occupies 12 of them;
-        // rendering a contiguous range would put six empty columns between the two blocks.
+        // Only slots that actually carry a sample get a column. At 15-minute resolution
+        // a full day is 96 columns, so rendering a contiguous range would put dozens of
+        // empty ones between a morning block and an evening one.
         _slots = Heatmap.Cells
-            .Select(c => new HalfHourSlot(c.Hour, c.HalfHour))
+            .Select(c => new QuarterSlot(c.Hour, c.Quarter))
             .Distinct()
             .OrderBy(static s => s.Hour)
-            .ThenBy(static s => s.HalfHour)
+            .ThenBy(static s => s.Quarter)
             .ToList();
 
         _summary = BuildSummary(Heatmap);
@@ -165,10 +165,10 @@ else
         int pct = (int)Math.Round((worst.MeanDurationSeconds - heatmap.MedianDurationSeconds)
             / heatmap.MedianDurationSeconds * 100);
 
-        string when = $"{worst.DayOfWeek}s at {worst.Hour:D2}:{worst.HalfHour * 30:D2}";
+        string when = $"{worst.DayOfWeek}s at {worst.Hour:D2}:{worst.Quarter * 15:D2}";
         return pct < 10
             ? $"This route holds steady all week — no slot runs more than {Math.Max(pct, 0)}% over its typical {heatmap.MedianDurationSeconds / 60:F0} min."
-            : $"{when} are the worst 30 minutes of your week — {pct}% over the typical {heatmap.MedianDurationSeconds / 60:F0} min.";
+            : $"{when} are the worst 15 minutes of your week — {pct}% over the typical {heatmap.MedianDurationSeconds / 60:F0} min.";
     }
 
     private string LevelClass(HeatmapCellDto cell)
@@ -194,10 +194,10 @@ else
         && cell.MeanDurationSeconds > 0
         && cell.StdDevDurationSeconds / cell.MeanDurationSeconds > VolatileCoefficient;
 
-    private static string SlotLabel(HalfHourSlot slot) =>
+    private static string SlotLabel(QuarterSlot slot) =>
         $"{slot.Hour:D2}:{slot.StartMinute:D2}";
 
-    private static string EmptyTooltip(string day, HalfHourSlot slot) =>
+    private static string EmptyTooltip(string day, QuarterSlot slot) =>
         $"{day} {SlotLabel(slot)} — no samples";
 
     private string CellTooltip(HeatmapCellDto cell)
@@ -210,6 +210,6 @@ else
             ? $" · ±{cell.StdDevDurationSeconds / 60:F0} min swing"
             : string.Empty;
 
-        return $"{cell.DayOfWeek} {SlotLabel(new HalfHourSlot(cell.Hour, cell.HalfHour))} — {cell.MeanDurationSeconds / 60:F0} min avg{delta}{spread} · {cell.SampleCount} sample(s)";
+        return $"{cell.DayOfWeek} {SlotLabel(new QuarterSlot(cell.Hour, cell.Quarter))} — {cell.MeanDurationSeconds / 60:F0} min avg{delta}{spread} · {cell.SampleCount} sample(s)";
     }
 }

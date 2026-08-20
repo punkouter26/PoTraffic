@@ -50,8 +50,14 @@
 
     /* Accents — semantic. Identical in both themes; the surfaces they sit on
        are what changes, and each accent clears AA on either. */
-    --pt-color-success: #10b981;
-    --pt-color-warning: #f59e0b;
+    /* Success and warning are theme-split. As FILLS on a white card the -500 steps
+       measured 2.54:1 and 2.15:1, under the 3:1 that WCAG 1.4.11 asks of a
+       graphical object carrying meaning — these paint status dots and heatmap
+       cells, so they carry it. One step darker clears it on white; dark mode keeps
+       the vivid original, which it needs against a near-black surface.
+       Danger and info clear 3:1 on both themes unchanged. */
+    --pt-color-success: light-dark(#059669, #10b981);
+    --pt-color-warning: light-dark(#d97706, #f59e0b);
     --pt-color-danger:  #f43f5e;
     --pt-color-info:    #6366f1;
 
@@ -59,6 +65,21 @@
        needs a darker blue on white and a lighter one on navy; every link and
        accented label reads this rather than picking a step by hand. */
     --pt-color-brand-on-surface: light-dark(var(--pt-color-brand-700), var(--pt-color-brand-300));
+
+    /* ── Accents, at TEXT weight ───────────────────────────────────────
+       The four accents above are chosen to work as FILLS — heatmap cells,
+       badges, swipe actions — where a vivid colour is the point. As text they
+       are too light: measured against a white card, success came in at 2.54:1
+       and warning at 2.15:1, where AA asks 4.5:1.
+
+       These are the same four hues pushed to a weight that clears AA on the
+       current surface, exactly as --pt-color-brand-on-surface does. Anything
+       that COLOURS TEXT uses these; anything that fills a shape keeps the
+       vivid original. */
+    --pt-color-success-on-surface: light-dark(#047857, #6ee7b7);
+    --pt-color-warning-on-surface: light-dark(#b45309, #fbbf24);
+    --pt-color-danger-on-surface:  light-dark(#be123c, #fda4af);
+    --pt-color-info-on-surface:    light-dark(#4338ca, #a5b4fc);
 
     /* ── Surfaces ─────────────────────────────────────────────────────
        Light: page sits lowest, cards are white. Dark: page is darkest and
@@ -76,7 +97,10 @@
     --pt-fg-strong:    light-dark(var(--pt-color-neutral-800), var(--pt-color-neutral-100));
     --pt-fg-body:      light-dark(var(--pt-color-neutral-700), var(--pt-color-neutral-200));
     --pt-fg-secondary: light-dark(var(--pt-color-neutral-600), var(--pt-color-neutral-300));
-    --pt-fg-muted:     light-dark(var(--pt-color-neutral-500), var(--pt-color-neutral-400));
+    /* Not neutral-500: that measured 4.34:1 against the sunken well it is used on
+       (captions inside .pt-bg-sunken), just under AA. Nudged darker until the
+       WORST surface it appears on clears 4.5, rather than only the best one. */
+    --pt-fg-muted:     light-dark(#5a6779, var(--pt-color-neutral-400));
     --pt-fg-tertiary:  light-dark(var(--pt-color-neutral-500), var(--pt-color-neutral-400));
     --pt-fg-faint:     light-dark(var(--pt-color-neutral-400), var(--pt-color-neutral-600));
     --pt-fg-on-brand:  var(--pt-color-neutral-0);
@@ -99,6 +123,25 @@
 
     /* Semantic danger surface (destructive menu items). */
     --pt-danger-bg: light-dark(#fef2f2, #2a1215);
+
+    /* ── Traffic verdict ramp (route map line) ─────────────────────────
+       Green → blue → amber → red, ordered by how much worse than usual the
+       latest sample is. Blue, not green, is "normal": green must be reserved
+       for the genuinely-better-than-usual case, or a routine commute reads as
+       a win. Each pair is lifted for dark so the line stays legible over the
+       dark grey of a night-mode map tile. */
+    --pt-traffic-clear:   light-dark(#15803d, #4ade80);
+    --pt-traffic-normal:  light-dark(#2563eb, #60a5fa);
+    --pt-traffic-slow:    light-dark(#b45309, #fbbf24);
+    --pt-traffic-heavy:   light-dark(#b91c1c, #f87171);
+    --pt-traffic-unknown: light-dark(#64748b, #94a3b8);
+
+    /* ── Ambient wash (the living background) ──────────────────────────
+       Two poles the field mixes between, driven by the traffic mood. Kept
+       far apart in hue so the shift from "clear" to "jammed" is legible
+       peripherally, without ever being read as an alert. */
+    --pt-ambient-cool: light-dark(#2166d9, #1d4ed8);
+    --pt-ambient-hot:  light-dark(#d9384a, #b91c1c);
 
     /* Shadow base as raw channels so alpha can vary per use. A slate-tinted
        shadow is invisible on a slate page, so dark goes to pure black.
@@ -129,18 +172,38 @@
     --pt-space-10: calc(2.5rem * var(--pt-density));  /* 40 */
     --pt-space-12: calc(3rem   * var(--pt-density));  /* 48 */
 
-    /* ── Type scale (modular 1.250) ───────────────────────────────────── */
+    /* ── Type scale (modular 1.250, fluid at the top) ──────────────────
+
+       The small end is FIXED. Body copy and captions are read at the same size
+       on a phone as on a monitor — scaling them with the viewport makes text
+       smaller exactly where the screen is smallest, which is backwards.
+
+       The display sizes are FLUID, via clamp(). A 30px page title that is
+       right on a laptop is oversized on a 375px phone and undersized on a
+       27-inch monitor; interpolating between 22.5rem (360px) and 90rem
+       (1440px) lets one token be correct at both ends.
+
+       No `vw` unit appears outside a clamp() with both bounds set, so the text
+       can always be zoomed and never collapses to nothing (WCAG 1.4.4). */
     --pt-text-xs:   0.75rem;     /* 12 */
     --pt-text-sm:   0.875rem;    /* 14 */
     --pt-text-base: 1rem;        /* 16 */
     --pt-text-lg:   1.125rem;    /* 18 */
-    --pt-text-xl:   1.25rem;     /* 20 */
-    --pt-text-2xl:  1.5rem;      /* 24 */
-    --pt-text-3xl:  1.875rem;    /* 30 */
+    --pt-text-xl:   clamp(1.125rem, 1.03rem + 0.42vw, 1.375rem);   /* 18 → 22 */
+    --pt-text-2xl:  clamp(1.3rem,   1.11rem + 0.83vw, 1.75rem);    /* 21 → 28 */
+    --pt-text-3xl:  clamp(1.55rem,  1.20rem + 1.55vw, 2.375rem);   /* 25 → 38 */
 
     --pt-leading-tight: 1.25;
     --pt-leading-normal: 1.5;
     --pt-leading-loose: 1.75;
+
+    /* ── Measure (line length) ─────────────────────────────────────────
+       Prose past about 75 characters is measurably harder to read: the eye
+       loses its place on the return sweep. `ch` is the width of a "0" in the
+       current font, so this tracks the type size instead of being a magic
+       pixel count. */
+    --pt-measure:      68ch;
+    --pt-measure-wide: 88ch;
 
     --pt-weight-regular: 400;
     --pt-weight-medium:  500;

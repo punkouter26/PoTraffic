@@ -54,6 +54,16 @@
     <meta name="theme-color" content="#3b82f6" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="PoTraffic" />
+    <!-- Service worker + install prompt. Loaded here, not imported from .NET:
+         beforeinstallprompt fires long before Blazor WASM has finished booting, and
+         it is the only chance to capture it. See js/pt-pwa.js. -->
+    <script src="js/pt-pwa.js"></script>
+
+    <!-- View Transitions for SPA navigation. A classic script and not a module,
+         because it installs a capture-phase click listener that has to be in place
+         before Blazor's own link interception runs. -->
+    <script src="js/pt-viewtransition.js"></script>
+
     <script type="importmap"></script>
 </head>
 

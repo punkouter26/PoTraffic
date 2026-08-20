@@ -1,0 +1,206 @@
+@using PoTraffic.Shared.DTOs.Routes
+@using PoTraffic.Client.Infrastructure
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject FxService Fx
+
+@*  The route as a 3D object. Collapsed by default and mounted only when opened:
+    Three.js is roughly 750KB, and nobody should pay that to look at a chart.       *@
+
+<div class="pt-ribbon-block">
+    <button type="button" class="pt-ribbon-toggle" @onclick="ToggleAsync"
+            aria-expanded="@(_open ? "true" : "false")" aria-controls="pt-ribbon-stage">
+        <PtIcon Name="@(_open ? "expand_less" : "deployed_code")" Size="sm" />
+        <span>@(_open ? "Hide the 3D view" : "See it in 3D")</span>
+        @if (_loading)
+        {
+            <span class="pt-ribbon-loading">loading…</span>
+        }
+    </button>
+
+    @if (_open)
+    {
+        @if (!HasRenderablePath)
+        {
+            @* Routes that lack an EncodedPolyline collapse to the straight
+               line between two endpoints — there is no shape to drape a
+               ribbon over. Showing the empty Three.js stage looked like a
+               broken page; this card names what is and isn't possible. *@
+            <div class="pt-ribbon-empty" role="status">
+                <PtIcon Name="polyline" Size="lg" />
+                <div class="pt-ribbon-empty-title">No road shape to drape yet</div>
+                <div class="pt-ribbon-empty-text">
+                    The 3D view needs a real road geometry, not just two endpoints. Once
+                    your route has a polyline on file, this view will fill in automatically.
+                </div>
+            </div>
+        }
+        else
+        {
+            <div id="pt-ribbon-stage" class="pt-ribbon-stage pt-enter" @ref="_container"></div>
+
+            <p class="pt-ribbon-caption">
+                Drag to turn it. Height is how long the drive took, sample by sample,
+                laid along the route — PoTraffic times the whole trip, so this doesn't
+                claim to know which individual road was slow.
+            </p>
+        }
+    }
+</div>
+
+@code {
+    /// <summary>Encoded polyline for the route. Null falls back to the straight line between endpoints.</summary>
+    [Parameter] public RoutePathDto? Path { get; set; }
+
+    /// <summary>Today's samples, oldest first, in minutes. An empty list draws a flat ribbon.</summary>
+    [Parameter] public IReadOnlyList<double> Samples { get; set; } = [];
+
+    private ElementReference _container;
+    private IJSObjectReference? _module;
+    private bool _open;
+    private bool _loading;
+    private string? _drawn;
+
+    /// <summary>
+    /// True when the polyline encodes enough points to draw a meaningful ribbon.
+    /// A straight-line two-point fallback collapses to a degenerate tube that
+    /// Three.js renders as nothing visible — better to admit that to the user
+    /// than to mount a 750 KB module and show a black void.
+    /// </summary>
+    private bool HasRenderablePath =>
+        Path is not null && !string.IsNullOrEmpty(Path.EncodedPolyline);
+
+    private async Task ToggleAsync()
+    {
+        _open = !_open;
+
+        if (_open)
+        {
+            _loading = true;
+            // The click that opened this is a user gesture — the one moment browsers
+            // allow audio to be unlocked, so it is not wasted.
+            await Fx.UnlockAudioAsync();
+            await Fx.PlayAsync("click");
+        }
+        else
+        {
+            await TeardownAsync();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_open || Path is null)
+            return;
+
+        // Skip the Three.js mount entirely when there is no polyline — the
+        // empty-state card above already explains what is missing, and the
+        // module load + render attempt would just waste ~750 KB and end in
+        // a silent failure (see JSException swallow in the catch below).
+        if (!HasRenderablePath)
+            return;
+
+        string signature = $"{Path.EncodedPolyline?.Length}|{Path.TrafficLevel}|{Samples.Count}";
+        if (signature == _drawn)
+            return;
+
+        try
+        {
+            _module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/pt-ribbon.js");
+            await _module.InvokeVoidAsync("render", _container, new
+            {
+                path = BuildPath(),
+                samples = Samples,
+                level = Path.TrafficLevel,
+            });
+            _drawn = signature;
+        }
+        catch (JSDisconnectedException) { /* page tearing down */ }
+        catch (ObjectDisposedException) { /* page tearing down */ }
+        catch (JSException) { /* WebGL unavailable — the toggle just shows an empty stage */ }
+        finally
+        {
+            if (_loading)
+            {
+                _loading = false;
+                StateHasChanged();
+            }
+        }
+    }
+
+    /// <summary>
+    /// The path as [lat, lng] pairs. Decoding happens in JS for the 2D map; here the
+    /// encoded string is handed over whole and pt-ribbon.js is given the endpoints so
+    /// it can fall back to a two-point line when there is no road geometry.
+    /// </summary>
+    private double[][] BuildPath()
+    {
+        if (Path is null)
+            return [];
+
+        if (string.IsNullOrEmpty(Path.EncodedPolyline))
+            return [[Path.OriginLat, Path.OriginLng], [Path.DestinationLat, Path.DestinationLng]];
+
+        return Decode(Path.EncodedPolyline);
+    }
+
+    /// <summary>
+    /// Google's encoded-polyline format, precision 5.
+    ///
+    /// <para>Duplicated from pt-map.js on purpose: shipping the decoded path as JSON
+    /// would be several times the size of the encoded string over the wire for every
+    /// refresh, and the alternative — a JS round-trip to borrow the other module's
+    /// decoder — costs an interop call to save twenty lines.</para>
+    /// </summary>
+    private static double[][] Decode(string encoded)
+    {
+        List<double[]> points = [];
+        int index = 0, lat = 0, lng = 0;
+
+        while (index < encoded.Length)
+        {
+            for (int axis = 0; axis < 2; axis++)
+            {
+                int result = 0, shift = 0, b;
+                do
+                {
+                    b = encoded[index++] - 63;
+                    result |= (b & 0x1f) << shift;
+                    shift += 5;
+                } while (b >= 0x20 && index < encoded.Length);
+
+                int delta = (result & 1) != 0 ? ~(result >> 1) : result >> 1;
+                if (axis == 0) lat += delta; else lng += delta;
+            }
+            points.Add([lat / 1e5, lng / 1e5]);
+        }
+
+        return [.. points];
+    }
+
+    private async Task TeardownAsync()
+    {
+        if (_module is null)
+            return;
+
+        try { await _module.InvokeVoidAsync("destroy", _container); }
+        catch (JSDisconnectedException) { }
+        catch (ObjectDisposedException) { }
+        catch (JSException) { }
+
+        _drawn = null;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await TeardownAsync();
+
+        if (_module is null)
+            return;
+
+        try { await _module.DisposeAsync(); }
+        catch (JSDisconnectedException) { }
+        catch (ObjectDisposedException) { }
+        catch (JSException) { }
+    }
+}

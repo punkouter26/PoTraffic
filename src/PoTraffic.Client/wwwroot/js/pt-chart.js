@@ -10,11 +10,46 @@
 // Colours resolve from the design tokens on the element, so the chart follows the
 // light/dark theme instead of baking in one palette.
 
+import * as fx from "./pt-fx.js";
+
 /** @type {WeakMap<HTMLCanvasElement, object>} */
 const states = new WeakMap();
 
 /** Minimum horizontal drag, in CSS px, before a gesture counts as a brush not a click. */
 const BRUSH_THRESHOLD_PX = 8;
+
+/**
+ * The bloom, as passes over the same path. Widest and faintest first so the halo
+ * builds outward; the opaque stroke is drawn separately, after these.
+ * Dropped to a single cheap pass once the frame budget has been missed.
+ */
+const BLOOM_FULL = [
+    { width: 9, blur: 18, alpha: 0.10 },
+    { width: 5, blur: 10, alpha: 0.16 },
+    { width: 3, blur: 5, alpha: 0.22 },
+];
+const BLOOM_CHEAP = [{ width: 5, blur: 8, alpha: 0.18 }];
+
+/** How long the draw-in takes. Long enough to read as motion, short enough to ignore. */
+const REVEAL_SECONDS = 0.85;
+
+/**
+ * The first `fraction` of a series, with the final point interpolated so the leading
+ * end advances smoothly instead of snapping from sample to sample.
+ */
+function revealed(values, fraction) {
+    if (values.length < 2) return values;
+
+    const exact = fraction * (values.length - 1);
+    const whole = Math.floor(exact);
+    const rest = exact - whole;
+
+    const out = values.slice(0, whole + 1);
+    if (whole + 1 < values.length) {
+        out.push(values[whole] + (values[whole + 1] - values[whole]) * rest);
+    }
+    return out;
+}
 
 /**
  * Gutters reserved around the plot for the axes. The left one holds the minutes
@@ -209,56 +244,61 @@ function draw(canvas) {
         ctx.fillRect(x1, plot.y, x2 - x1, plot.h);
     }
 
-    // ±1σ band between baseline and upper band
-    if (view.upperBand.length >= 2 && view.baseline.length >= 2) {
-        ctx.fillStyle = theme.band;
-        ctx.beginPath();
-        drawSeries(ctx, view.upperBand, view.upperBand.length, min, max, plot);
-        for (let i = view.baseline.length - 1; i >= 0; i--) {
-            ctx.lineTo(
-                xForIndex(i, view.baseline.length, plot),
-                yForValue(view.baseline[i], min, max, plot));
+    // ── Observed travel times ────────────────────────────────────────────
+    //
+    // Single line: the actual probed travel times. No baseline, no ±1σ band,
+    // no reroute dots, no compare route. The chart answers "how long has this
+    // trip been taking today?" — the dashboard card lists the best/worst from
+    // the same data, and the weekly heatmap handles the comparison.
+    //
+    // The glow (three additive passes at falling alpha and rising blur) is the
+    // only ornament: at a 2px stroke it reads as a subtle bloom rather than a
+    // halo, and `st.reveal` runs 0→1 when the points change so the line draws
+    // itself in instead of snapping into place.
+    const reveal = st.reveal ?? 1;
+    const shown = reveal >= 1 ? points : revealed(points, reveal);
+
+    if (shown.length >= 2) {
+        ctx.lineJoin = "round";
+        ctx.lineCap = "round";
+        ctx.globalCompositeOperation = "lighter";
+
+        for (const pass of (fx.isDegraded() ? BLOOM_CHEAP : BLOOM_FULL)) {
+            ctx.strokeStyle = theme.line;
+            ctx.globalAlpha = pass.alpha;
+            ctx.lineWidth = pass.width;
+            ctx.shadowColor = theme.line;
+            ctx.shadowBlur = pass.blur;
+            ctx.beginPath();
+            drawSeries(ctx, shown, count, min, max, plot);
+            ctx.stroke();
         }
-        ctx.closePath();
-        ctx.fill();
-    }
 
-    // Baseline, dashed
-    if (view.baseline.length >= 2) {
-        ctx.strokeStyle = theme.baseline;
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash([4, 4]);
-        ctx.beginPath();
-        drawSeries(ctx, view.baseline, view.baseline.length, min, max, plot);
-        ctx.stroke();
-        ctx.setLineDash([]);
-    }
+        ctx.shadowBlur = 0;
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = "source-over";
 
-    // Observed travel times
-    ctx.strokeStyle = theme.line;
-    ctx.lineWidth = 2;
-    ctx.lineJoin = "round";
-    ctx.beginPath();
-    drawSeries(ctx, points, count, min, max, plot);
-    ctx.stroke();
-
-    // Second route, in compare mode (#8). Drawn over the primary at the same x-scale —
-    // the caller guarantees both series describe the same time slots.
-    if (view.compare.length >= 2) {
-        ctx.strokeStyle = theme.compare;
+        ctx.strokeStyle = theme.line;
         ctx.lineWidth = 2;
         ctx.beginPath();
-        drawSeries(ctx, view.compare, view.compare.length, min, max, plot);
+        drawSeries(ctx, shown, count, min, max, plot);
         ctx.stroke();
-    }
 
-    // Reroute markers
-    ctx.fillStyle = theme.danger;
-    for (let i = 0; i < count; i++) {
-        if (!view.rerouted[i]) continue;
-        ctx.beginPath();
-        ctx.arc(xForIndex(i, count, plot), yForValue(points[i], min, max, plot), 4, 0, Math.PI * 2);
-        ctx.fill();
+        // Leading dot during the draw-in animation.
+        if (reveal < 1) {
+            const i = shown.length - 1;
+            const x = xForIndex(i, count, plot);
+            const y = yForValue(shown[i], min, max, plot);
+            ctx.save();
+            ctx.globalCompositeOperation = "lighter";
+            ctx.fillStyle = theme.line;
+            ctx.shadowColor = theme.line;
+            ctx.shadowBlur = 14;
+            ctx.beginPath();
+            ctx.arc(x, y, 3.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
     }
 
     // Crosshair on the hovered sample
@@ -289,24 +329,14 @@ function draw(canvas) {
 
 function buildView(data) {
     const points = data.points ?? [];
-    const baseline = data.baseline ?? [];
-    const upperBand = data.upperBand ?? [];
-    const compare = data.compare ?? [];
-    const all = points.concat(baseline).concat(upperBand).concat(compare);
 
     // An all-empty chart still needs a sane axis so gridlines and labels render.
-    const min = all.length ? Math.min(...all) * 0.95 : 0;
-    const max = all.length ? Math.max(...all) * 1.05 : 60;
+    const min = points.length ? Math.min(...points) * 0.95 : 0;
+    const max = points.length ? Math.max(...points) * 1.05 : 60;
 
     return {
         points,
-        baseline,
-        upperBand,
-        compare,
-        rerouted: data.rerouted ?? [],
         labels: data.labels ?? [],
-        // Series names label the tooltip rows in compare mode.
-        names: data.names ?? [],
         min,
         max: max > min ? max : min + 1
     };
@@ -354,40 +384,7 @@ function updateTooltip(canvas) {
 
     const minutes = view.points[i];
     const label = view.labels[i] ?? `#${i + 1}`;
-    const rows = [`<strong>${escapeHtml(label)}</strong>`, `${minutes.toFixed(0)} min`];
-
-    // Compare mode (#8): name both series and say which one wins this slot, rather
-    // than leaving the reader to match line colours against a legend.
-    const other = view.compare[i];
-    if (typeof other === "number") {
-        const nameA = escapeHtml(view.names[0] ?? "Route A");
-        const nameB = escapeHtml(view.names[1] ?? "Route B");
-        const gap = other - minutes;
-
-        rows[1] = `${nameA}: ${minutes.toFixed(0)} min`;
-        rows.push(`${nameB}: ${other.toFixed(0)} min`);
-        rows.push(Math.abs(gap) < 0.5
-            ? "neck and neck"
-            : `<strong>${gap > 0 ? nameA : nameB}</strong> faster by ${Math.abs(gap).toFixed(0)} min`);
-    }
-
-    // Deviation from the baseline, expressed in σ when the band gives us one.
-    const base = view.baseline[i];
-    if (typeof base === "number" && base > 0) {
-        const sigma = (view.upperBand[i] ?? base) - base;
-        const delta = minutes - base;
-        if (sigma > 0.01) {
-            const z = delta / sigma;
-            const dir = z >= 0 ? "above" : "below";
-            rows.push(`${Math.abs(z).toFixed(1)}σ ${dir} baseline`);
-        } else {
-            rows.push(`${delta >= 0 ? "+" : ""}${delta.toFixed(0)} min vs baseline`);
-        }
-    }
-
-    if (view.rerouted[i]) rows.push(`<span class="pt-chart-tip-flag">rerouted</span>`);
-
-    tip.innerHTML = rows.join("<br>");
+    tip.innerHTML = `<strong>${escapeHtml(label)}</strong><br>${minutes.toFixed(0)} min`;
     tip.classList.add("visible");
 
     // Flip the tooltip to the left of the cursor near the right edge so it
@@ -440,13 +437,21 @@ export function render(canvas, data) {
     const previous = states.get(canvas) ?? {};
     const view = buildView(data);
 
+    // The reveal replays only when the SHAPE of the data changes. This page refreshes
+    // every fifteen seconds; re-animating an unchanged line on every tick would be a
+    // chart that never stops twitching.
+    const signature = `${view.points.length}:${view.points[0] ?? ""}:${view.points[view.points.length - 1] ?? ""}`;
+    const changed = signature !== previous.signature;
+
     states.set(canvas, {
         ...previous,
         ctx,
         w: cssW,
         h: cssH,
         view,
+        signature,
         theme: readTheme(canvas),
+        reveal: changed && fx.animates() && view.points.length >= 2 ? 0 : 1,
         // A hover index from a longer previous series would point at nothing.
         hoverIndex: previous.hoverIndex !== undefined
             && previous.hoverIndex !== null
@@ -456,8 +461,39 @@ export function render(canvas, data) {
         brush: previous.brush ?? null
     });
 
+    if (changed && fx.animates() && view.points.length >= 2) startReveal(canvas);
+
     draw(canvas);
     updateTooltip(canvas);
+}
+
+/**
+ * Runs the draw-in. Registered under a per-canvas key so two charts on one page
+ * animate independently, and unregistered the moment it completes — a finished
+ * chart costs nothing.
+ */
+function startReveal(canvas) {
+    const key = `chart-reveal-${revealKey(canvas)}`;
+
+    const stop = fx.register(key, (dt) => {
+        const st = states.get(canvas);
+        // The canvas can be detached mid-animation by a navigation.
+        if (!st || !canvas.isConnected) { stop(); return; }
+
+        st.reveal = Math.min(1, (st.reveal ?? 0) + dt / REVEAL_SECONDS);
+        draw(canvas);
+
+        if (st.reveal >= 1) stop();
+    });
+}
+
+/** Stable per-canvas id, so re-rendering the same chart replaces its ticker slot. */
+let revealCounter = 0;
+const revealKeys = new WeakMap();
+function revealKey(canvas) {
+    let key = revealKeys.get(canvas);
+    if (key === undefined) revealKeys.set(canvas, key = ++revealCounter);
+    return key;
 }
 
 /**

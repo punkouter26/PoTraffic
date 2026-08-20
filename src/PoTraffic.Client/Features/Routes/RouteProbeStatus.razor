@@ -17,9 +17,13 @@
 
 @inject HttpClient Http
 @inject NotificationService NotificationService
+@inject PoTraffic.Client.Infrastructure.FxService Fx
 @implements IDisposable
 
-<div class="pt-probe-status" aria-label="Route probe status">
+@* Compact renders the same three signals as header chips instead of a strip of its
+   own. Same content, same order, no card — the route page puts them in the
+   PageHeader's action slot so the fold is not spent on a status row. *@
+<div class="@(Compact ? "pt-probe-chips" : "pt-probe-status")" aria-label="Route probe status">
     @* Signal 1: refresh-in-flight *@
     <span class="pt-probe-cell pt-probe-cell-refresh">
         @if (IsRefreshing)
@@ -50,9 +54,17 @@
         {
             <PtIcon Name="radar" Size="sm" Class="pt-probe-icon" />
             <span class="pt-probe-label">
-                Last Google Maps probe
+                @(Compact ? "Probe" : "Last Google Maps probe")
                 <strong>@LatestProbe.PolledAtDateTime.ToString("HH:mm:ss")</strong>
-                (@FormatAgo(LatestProbe.PolledAtDateTime))
+                @if (Compact)
+                {
+                    <span class="pt-probe-sep">·</span>
+                    <text>@FormatAgo(LatestProbe.PolledAtDateTime)</text>
+                }
+                else
+                {
+                    <text>(@FormatAgo(LatestProbe.PolledAtDateTime))</text>
+                }
             </span>
         }
     </span>
@@ -63,7 +75,7 @@
         <span class="pt-probe-label">
             @if (Schedule is { } s)
             {
-                <text>Adaptive cadence <strong>@s.PollIntervalMinutes min</strong></text>
+                <text>@(Compact ? "Adaptive" : "Adaptive cadence") <strong>@s.PollIntervalMinutes min</strong></text>
             }
             else
             {
@@ -72,7 +84,14 @@
             @if (ProbesToday > 0)
             {
                 <span class="pt-probe-sep">·</span>
-                <text><strong>@ProbesToday</strong> probe@(ProbesToday == 1 ? "" : "s") today</text>
+                @if (Compact)
+                {
+                    <text><strong>@ProbesToday</strong> today</text>
+                }
+                else
+                {
+                    <text><strong>@ProbesToday</strong> probe@(ProbesToday == 1 ? "" : "s") today</text>
+                }
             }
         </span>
     </span>
@@ -92,6 +111,12 @@
 @code {
     /// <summary>Route this status belongs to. Drives the probe-now POST.</summary>
     [Parameter, EditorRequired] public Guid RouteId { get; set; }
+
+    /// <summary>
+    /// Render as header chips rather than a full-width strip. Same three signals and
+    /// the same probe-now button; only the container and a few label words change.
+    /// </summary>
+    [Parameter] public bool Compact { get; set; }
 
     /// <summary>The polling loop's "I'm refreshing" state — pulses a dot while true.</summary>
     [Parameter] public bool IsRefreshing { get; set; }
@@ -139,6 +164,15 @@
     {
         if (_probingNow) return;
         _probingNow = true;
+
+        // The drone runs for exactly as long as the request is in flight. Google Maps
+        // takes a second or two and the button is the only other feedback, so this is
+        // the difference between "did that do anything?" and a request you can hear
+        // working. The click is also the gesture that unlocks audio for the session.
+        await Fx.UnlockAudioAsync();
+        await Fx.PlayAsync("probe");
+        await Fx.SetEngineAsync(true);
+
         try
         {
             HttpResponseMessage resp = await Http.PostAsync($"api/routes/{RouteId}/check-now", null);
@@ -184,6 +218,7 @@
         finally
         {
             _probingNow = false;
+            await Fx.SetEngineAsync(false);
         }
     }
 

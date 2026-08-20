@@ -1,7 +1,7 @@
 namespace PoTraffic.Shared.DTOs.History;
 
 /// <summary>
-/// Day-of-week × half-hour congestion grid for a route (#5).
+/// Day-of-week × quarter-hour congestion grid for a route (#5).
 ///
 /// <para>
 /// Every cell is expressed relative to <see cref="MedianDurationSeconds"/> — the route's
@@ -11,9 +11,14 @@ namespace PoTraffic.Shared.DTOs.History;
 /// </para>
 ///
 /// <para>Day-of-week and time are bucketed in the user's local time zone
-/// (<see cref="TimeZoneId"/>), so a 17:30 row reads as the rush hour it actually is
+/// (<see cref="TimeZoneId"/>), so a 17:30 column reads as the rush hour it actually is
 /// for the commuter driving it. The server stores every sample in UTC; this grouping
 /// projects UTC onto the user's wall clock before bucketing.</para>
+///
+/// <para>Resolution is 15 minutes. The poller's base cadence is five minutes, so a
+/// quarter-hour bucket still averages several samples while being fine enough to show
+/// congestion building and clearing inside a single hour — which a half-hour bucket
+/// flattened into one number.</para>
 /// </summary>
 public sealed record VolatilityHeatmapDto(
     RouteId RouteId,
@@ -23,16 +28,18 @@ public sealed record VolatilityHeatmapDto(
     IReadOnlyList<HeatmapCellDto> Cells);
 
 /// <summary>
-/// One half-hour of one weekday, expressed in US Eastern time.
+/// One quarter-hour of one weekday, in the user's local time zone.
 /// <see cref="StdDevDurationSeconds"/> is 0 when the cell holds a single sample —
 /// no spread can be computed from one point.
-/// <para><see cref="Hour"/> is the local Eastern hour 0–23, and <see cref="HalfHour"/>
-/// is 0 or 1 for the first or second half of that hour.</para>
 /// </summary>
+/// <param name="Hour">Local hour, 0–23.</param>
+/// <param name="Quarter">
+/// Which quarter of that hour: 0 = :00, 1 = :15, 2 = :30, 3 = :45.
+/// </param>
 public sealed record HeatmapCellDto(
     string DayOfWeek,
     int Hour,
-    int HalfHour,
+    int Quarter,
     double MeanDurationSeconds,
     double StdDevDurationSeconds,
     int SampleCount);

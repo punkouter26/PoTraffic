@@ -15,5 +15,15 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 @layer vendor;
 
-@import url("../lib/bootstrap/dist/css/bootstrap.min.css") layer(vendor);
+/* Bootstrap was removed. An audit of every class attribute in every .razor file
+   found zero Bootstrap classes in use — no grid, no utilities, no components. It
+   was 230KB of CSS the app had stopped using, plus a second opinion about what
+   `.btn` and `.card` mean, competing with Radzen for the same selectors.
+   pt-tokens.css owns the design system; Radzen owns the components. */
 @import url("../_content/Radzen.Blazor/css/default.css") layer(vendor);
+
+/* Leaflet belongs in the layer for the same reason. It was a plain <link>, which
+   left it unlayered and competing on specificity: `.leaflet-pane > canvas` (0,1,1)
+   beat our `.pt-flow-canvas` (0,1,0) and silently overrode the flow overlay's
+   z-index. Inside the layer it loses to every app rule regardless. */
+@import url("../lib/leaflet/leaflet.css") layer(vendor);

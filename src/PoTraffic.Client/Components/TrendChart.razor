@@ -39,10 +39,6 @@ else
 
 @code {
     [Parameter, EditorRequired] public IReadOnlyList<double> Points { get; set; } = [];
-    [Parameter] public IReadOnlyList<double> Baseline { get; set; } = [];
-    [Parameter] public IReadOnlyList<double> UpperBand { get; set; } = [];
-    [Parameter] public IReadOnlyList<bool> ReroutedFlags { get; set; } = [];
-    [Parameter] public string? SeriesName { get; set; }
 
     /// <summary>Per-sample labels shown in the hover tooltip, e.g. "08:42".</summary>
     [Parameter] public IReadOnlyList<string> Labels { get; set; } = [];
@@ -143,11 +139,7 @@ else
             await _module.InvokeVoidAsync("render", _canvas, new
             {
                 points = Slice(Points),
-                baseline = Slice(Baseline),
-                upperBand = Slice(UpperBand),
-                rerouted = Slice(ReroutedFlags),
-                labels = Slice(Labels),
-                name = SeriesName ?? "Route"
+                labels = Slice(Labels)
             });
         }
         catch

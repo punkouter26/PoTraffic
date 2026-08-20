@@ -13,7 +13,23 @@
     let lastReportAt = 0;
     const MIN_INTERVAL_MS = 1000; // throttle: at most 1 report/sec
 
+    // Some exceptions fire repeatedly during normal use: a fetch aborted by a
+    // navigation, a pointer-capture error from synthetic mouse events, the
+    // browser dropping a never-active pointer id. None of these are bugs —
+    // they're how the platform signals "the user moved on" — and forwarding
+    // them crowds out the genuine renderer errors we want to see.
+    function isNoise(message) {
+        if (!message) return false;
+        const m = String(message);
+        return m.includes('AbortError')
+            || m.includes('setPointerCapture')
+            || m.includes('releasePointerCapture')
+            || m.includes('ERR_ABORTED')
+            || m.includes('Failed to fetch');
+    }
+
     function send(payload) {
+        if (payload && isNoise(payload.message)) return;
         const now = Date.now();
         if (now - lastReportAt < MIN_INTERVAL_MS) return;
         lastReportAt = now;

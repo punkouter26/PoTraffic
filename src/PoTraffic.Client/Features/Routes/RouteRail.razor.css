@@ -1,0 +1,131 @@
+/* The rail exists only where there is spare horizontal space for it.
+
+   1200px is the point at which the 1180px content column stops growing and the
+   window starts adding margin instead — i.e. exactly the width at which the page
+   began wasting space. Below it the rail is not hidden with `visibility`, it is
+   `display: none`, so its markup costs nothing on a phone. */
+
+.pt-rail {
+    display: none;
+}
+
+@media (min-width: 1200px) {
+    .pt-rail {
+        display: flex;
+        flex-direction: column;
+        gap: var(--pt-space-1);
+
+        /* Sticks beside a long detail page instead of scrolling off the top of it.
+           The offset clears the fixed header; the max-height keeps a long list
+           scrolling inside the rail rather than pushing the page taller. */
+        position: sticky;
+        top: calc(var(--pt-space-5) + 4rem);
+        max-height: calc(100vh - 8rem);
+        overflow-y: auto;
+        overscroll-behavior: contain;
+
+        padding: var(--pt-space-3);
+        background: var(--pt-bg-surface);
+        border: 1px solid var(--pt-border-subtle);
+        border-radius: var(--pt-radius-lg);
+        box-shadow: var(--pt-elev-1);
+    }
+}
+
+.pt-rail-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--pt-space-2);
+    padding: var(--pt-space-1) var(--pt-space-2) var(--pt-space-2);
+}
+
+.pt-rail-title {
+    color: var(--pt-fg-muted);
+    font-size: var(--pt-text-xs);
+    font-weight: var(--pt-weight-semibold);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.pt-rail-add {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: var(--pt-radius-full);
+    color: var(--pt-fg-secondary);
+    background: var(--pt-bg-tint);
+    text-decoration: none;
+    transition: background-color var(--pt-dur-fast) var(--pt-ease);
+}
+
+.pt-rail-add:hover {
+    background: var(--pt-bg-tint-strong);
+    color: var(--pt-fg-primary);
+}
+
+.pt-rail-item {
+    display: flex;
+    align-items: center;
+    gap: var(--pt-space-3);
+    padding: var(--pt-space-2) var(--pt-space-3);
+    border-radius: var(--pt-radius-md);
+    color: var(--pt-fg-body);
+    text-decoration: none;
+    /* Left border rather than a background on the current item: a filled pill in
+       a narrow column reads as a button, and every row would look pressable. */
+    border-left: 3px solid transparent;
+    transition: background-color var(--pt-dur-fast) var(--pt-ease);
+}
+
+.pt-rail-item:hover { background: var(--pt-bg-tint); }
+
+.pt-rail-current {
+    background: var(--pt-bg-tint);
+    border-left-color: var(--pt-color-brand-500);
+}
+
+.pt-rail-current .pt-rail-where {
+    color: var(--pt-fg-primary);
+    font-weight: var(--pt-weight-semibold);
+}
+
+.pt-rail-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: var(--pt-radius-full);
+    background: var(--pt-border-strong);
+    flex-shrink: 0;
+}
+
+.pt-rail-dot-active { background: var(--pt-color-success); }
+.pt-rail-dot-paused { background: var(--pt-color-warning); }
+
+.pt-rail-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.pt-rail-where,
+.pt-rail-from {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pt-rail-where { font-size: var(--pt-text-sm); }
+
+.pt-rail-from {
+    color: var(--pt-fg-muted);
+    font-size: var(--pt-text-xs);
+}
+
+.pt-rail-empty {
+    color: var(--pt-fg-muted);
+    font-size: var(--pt-text-sm);
+    margin: 0;
+    padding: var(--pt-space-2) var(--pt-space-3);
+}

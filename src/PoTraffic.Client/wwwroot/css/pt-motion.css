@@ -212,3 +212,67 @@ article.content { animation: pt-slide-up var(--pt-dur-base) var(--pt-ease); }
         min-inline-size: var(--pt-tap-min);
     }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   View transitions
+   ═══════════════════════════════════════════════════════════════
+
+   Blazor WASM swaps the routed component in place; the browser sees one
+   long-lived document, so the native cross-document transition never fires.
+   js/pt-viewtransition.js wraps each navigation in document.startViewTransition()
+   instead, which gives the same effect for a SPA.
+
+   Everything here is inside @supports: where the API is missing the app renders
+   exactly as it did before, with no fallback animation to maintain. */
+
+@supports (view-transition-name: none) {
+    ::view-transition-old(root),
+    ::view-transition-new(root) {
+        /* The default is a cross-fade of the whole page, which on a page whose
+           header and nav do not change reads as the entire UI flickering. Both
+           halves are animated explicitly instead. */
+        animation-duration: var(--pt-dur-base);
+        animation-timing-function: var(--pt-ease);
+    }
+
+    ::view-transition-old(root) {
+        animation-name: pt-vt-out;
+    }
+
+    ::view-transition-new(root) {
+        animation-name: pt-vt-in;
+    }
+
+    /* The shell does not participate. Naming these keeps the header, the bottom
+       nav and the toasts OUT of the snapshot, so they stay put while the content
+       beneath them changes — which is what makes the transition read as "the page
+       changed" rather than "everything blinked". */
+    .app-header,
+    .pt-bottom-nav,
+    .pt-ambient,
+    .pt-particles {
+        view-transition-name: none;
+    }
+}
+
+@keyframes pt-vt-out {
+    to { opacity: 0; transform: translateY(-4px); }
+}
+
+@keyframes pt-vt-in {
+    from { opacity: 0; transform: translateY(6px); }
+}
+
+/* Reduced motion: no slide, no fade. The API still runs so the DOM swap is
+   atomic, but there is nothing to see. */
+@media (prefers-reduced-motion: reduce) {
+    ::view-transition-old(root),
+    ::view-transition-new(root) {
+        animation: none;
+    }
+}
+
+[data-motion="off"] ::view-transition-old(root),
+[data-motion="off"] ::view-transition-new(root) {
+    animation: none;
+}

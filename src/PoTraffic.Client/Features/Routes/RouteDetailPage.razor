@@ -2,11 +2,11 @@
 @using PoTraffic.Shared.DTOs.History
 @using PoTraffic.Shared.DTOs.Routes
 @using PoTraffic.Shared.Enums
-@using PoTraffic.Shared.Constants
 @using PoTraffic.Client.Features.MonitoringWindows
 @inherits PollingComponentBase
 @inject HttpClient Http
 @inject NavigationManager Nav
+@inject PoTraffic.Client.Infrastructure.FxService Fx
 
 @* ──────────────────────────────────────────────────────────────────────
    Route detail — the answer, the evidence, and everything else folded away.
@@ -36,16 +36,21 @@ else
 {
     @* The page is reached by tapping a card, and had no way back but the browser's
        own control — which a PWA in standalone display mode does not render. *@
-    <PageHeader Title="@_pageTitle" BackHref="/dashboard" BackLabel="Commutes" />
-
-    @* Live status strip — refresh-in-flight, last Google Maps probe, cadence. *@
-    <RouteProbeStatus RouteId="RouteId"
-                      IsRefreshing="IsRefreshing"
-                      LastSuccessUtc="LastSuccessUtc"
-                      LatestProbe="LatestPoll"
-                      ProbesToday="_todayPolls.Count"
-                      Schedule="@_activeSession?.Schedule"
-                      OnProbeCompleted="@OnWindowSaved" />
+    @* The live probe state rides the header as chips. It used to own a full-width
+       strip between the header and the answer — three facts that never change shape
+       do not need a row of their own, and that row cost 60px of the first screen. *@
+    <PageHeader Title="@_pageTitle" BackHref="/dashboard" BackLabel="Commutes">
+        <Actions>
+            <RouteProbeStatus RouteId="RouteId"
+                              Compact="true"
+                              IsRefreshing="IsRefreshing"
+                              LastSuccessUtc="LastSuccessUtc"
+                              LatestProbe="LatestPoll"
+                              ProbesToday="_todayPolls.Count"
+                              Schedule="@_activeSession?.Schedule"
+                              OnProbeCompleted="@OnWindowSaved" />
+        </Actions>
+    </PageHeader>
 
     @if (IsOffline || IsStale)
     {
@@ -80,28 +85,36 @@ else
     {
 
     @* ── THE ANSWER ────────────────────────────────────────────────────
-       Route name, when to leave, how long, how live the number is. Nothing
-       else competes for this space. *@
-    <section class="pt-answer" aria-label="Departure recommendation">
+       Where the trip runs and how long it has taken today. The "leave by"
+       countdown and the confidence sentence moved out: the dashboard runs
+       the next-departure countdown in its hero, and the chart below shows
+       every sample without summarising trust into a one-line caveat. *@
+    @* Two columns past 1200px: everything ABOUT this route on the left — the answer
+       and every control that acts on it — and every piece of EVIDENCE on the right.
+       Below 1200px the grid collapses to the single column it always was. *@
+    <div class="pt-route-two">
+
+    <aside class="pt-route-side">
+
+    <section class="pt-answer" aria-label="Route summary">
         <div class="pt-answer-route">
             <span class="pt-answer-from">@_originStreet</span>
             <PtIcon Name="arrow_right_alt" Size="sm" Class="pt-answer-arrow" />
             <span class="pt-answer-to">@_destStreet</span>
         </div>
 
-        @if (_optimalDeparture is { } optimal)
+        @if (_todayPolls.Count == 0)
         {
-            <div class="pt-answer-headline">@_leaveByLabel</div>
-            <div class="pt-answer-duration">@_durationLabel</div>
+            <div class="pt-answer-headline pt-answer-pending">Still learning this route</div>
+            <div class="pt-answer-duration">@_pendingDetail</div>
+        }
+        else
+        {
+            <div class="pt-answer-headline">@_durationLabel</div>
             <div class="pt-answer-meta">
                 @_confidenceNote
                 <a class="pt-answer-ics" href="@_icsHref" download="departure.ics">Add to calendar</a>
             </div>
-        }
-        else
-        {
-            <div class="pt-answer-headline pt-answer-pending">Still learning this route</div>
-            <div class="pt-answer-duration">@_pendingDetail</div>
         }
 
         @{ NextSampleInfo next = NextSample; }
@@ -109,7 +122,9 @@ else
             <span class="pt-status-dot @(next.Live ? "pt-status-dot-green" : "pt-status-dot-amber")"></span>
             @if (next.CountdownTargetUtc is { } target)
             {
-                <text>Next sample in&nbsp;</text>
+                @* LiveCountdown's own text already starts "in …", so this label must
+                   not repeat the word — it rendered "Next sample in in 4:32". *@
+                <text>Next sample&nbsp;</text>
                 <LiveCountdown TargetUtc="target"
                                PeriodHint="@TimeSpan.FromMinutes(_activeSession?.Schedule?.PollIntervalMinutes ?? 5)"
                                DueText="moments" />
@@ -125,17 +140,51 @@ else
         </div>
     </section>
 
+    @* ── THE CONTROLS ──────────────────────────────────────────────────
+       Return trip and the monitoring schedule. These used to sit under a
+       "Settings & raw data" disclosure below three full-width cards, which put
+       the only controls on the page two scrolls from the answer they act on. *@
+    <div class="pt-returntrip-bar">
+        @if (_route.ReturnRouteId is RouteId rid)
+        {
+            <span class="pt-returntrip-label">Return trip linked</span>
+            <RadzenButton Text="View return trip" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small"
+                          Click="@(() => Nav.NavigateTo($"/routes/{rid}"))" />
+        }
+        else
+        {
+            <span class="pt-returntrip-label">Also track the trip home?</span>
+            <RadzenButton Text="Track return trip" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small"
+                          Click="CreateReturnTripAsync" IsBusy="_creatingReturn" />
+        }
+    </div>
+
+    <WindowConfigPanel RouteId="RouteId" OnSaved="OnWindowSaved" />
+
+    </aside>
+
     @* ── THE EVIDENCE ──────────────────────────────────────────────────
-       Today's samples against the baseline, and the week at a glance. *@
-    <RadzenCard class="pt-mb-4">
-        <RadzenText TextStyle="TextStyle.H3" class="pt-mb-0 pt-section-heading">Today</RadzenText>
+       The drive and today's samples share a row; the week sits under both. *@
+    <div class="pt-route-evidence">
+
+    <div class="pt-route-evidence-top">
+
+    <RadzenCard>
+        <RadzenText TextStyle="TextStyle.H3" class="pt-mb-1 pt-section-heading">The drive</RadzenText>
+        <RouteMap Path="_path"
+                  OriginLabel="@_originStreet"
+                  DestinationLabel="@_destStreet" />
+
+        <RouteRibbon Path="_path" Samples="_ribbonSamples" />
+    </RadzenCard>
+
+    <RadzenCard>
+        @* Not pt-mb-0: the canvas draws its "min" axis caption at its own top edge,
+           which collided with this heading's descenders. *@
+        <RadzenText TextStyle="TextStyle.H3" class="pt-mb-2 pt-section-heading">Today</RadzenText>
 
         <TrendChart Points="@_trendPoints"
-                    Baseline="@_trendBaseline"
-                    UpperBand="@_trendUpperBand"
-                    ReroutedFlags="@_trendRerouted"
                     Labels="@_trendLabels"
-                    SeriesName="@_thisLabel"
                     OnPointSelected="OnTrendPointSelected" />
 
         @if (_selectedPoll is { } selected)
@@ -158,40 +207,15 @@ else
         }
     </RadzenCard>
 
-    <RadzenCard class="pt-mb-4">
+    </div>
+
+    <RadzenCard>
         <RadzenText TextStyle="TextStyle.H3" class="pt-mb-1 pt-section-heading">Your week, hour by hour</RadzenText>
         <VolatilityHeatmap Heatmap="_heatmap" />
     </RadzenCard>
 
-    @* ── EVERYTHING ELSE ───────────────────────────────────────────────
-       Schedule, return trip and raw records. Real controls, rarely needed,
-       behind one disclosure instead of three cards. *@
-    <details open class="pt-details" id="pt-route-details">
-        <summary class="pt-details-summary">
-            <PtIcon Name="chevron_right" Class="pt-collapsible-icon" />
-            Settings &amp; raw data
-        </summary>
-
-        <div class="pt-details-body">
-            <div class="pt-returntrip-bar pt-mb-4">
-                @if (_route.ReturnRouteId is RouteId rid)
-                {
-                    <span class="pt-returntrip-label">Return trip linked</span>
-                    <RadzenButton Text="View return trip" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small"
-                                  Click="@(() => Nav.NavigateTo($"/routes/{rid}"))" />
-                }
-                else
-                {
-                    <span class="pt-returntrip-label">Also track the trip home?</span>
-                    <RadzenButton Text="Track return trip" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small"
-                                  Click="CreateReturnTripAsync" IsBusy="_creatingReturn" />
-                }
-            </div>
-
-            <WindowConfigPanel RouteId="RouteId" OnSaved="OnWindowSaved" />
-
-            </div>
-    </details>
+    </div>
+    </div>
 
     }
 }
@@ -205,13 +229,21 @@ else
     /// </summary>
     private List<PollRecordDto> _todayPolls = [];
     private double[] _trendPoints = [];
-    private double[] _trendBaseline = [];
-    private double[] _trendUpperBand = [];
-    private bool[] _trendRerouted = [];
     private string[] _trendLabels = [];
     private PollRecordDto? _selectedPoll;
     private OptimalDepartureDto? _optimalDeparture;
     private VolatilityHeatmapDto? _heatmap;
+    private RoutePathDto? _path;
+
+    /// <summary>Today's durations in minutes, oldest first — the ribbon's height profile.</summary>
+    private double[] _ribbonSamples = [];
+
+    /// <summary>
+    /// The verdict the last render reacted to. The page refreshes every few seconds;
+    /// without this the app would sing the same result over and over.
+    /// </summary>
+    private string? _announcedLevel;
+
     private RouteDto? _route;
     private SessionDto? _activeSession;
     private bool _creatingReturn;
@@ -221,12 +253,16 @@ else
     // which would recompute them on every one of the page's refreshes.
     private string _originStreet = string.Empty;
     private string _destStreet = string.Empty;
-    private string _leaveByLabel = string.Empty;
     private string _durationLabel = string.Empty;
     private string _confidenceNote = string.Empty;
     private string _pendingDetail = string.Empty;
     private string _thisLabel = "This route";
-    /// <summary>Heading for the page. Falls back until the route lands.</summary>
+    /// <summary>
+    /// Heading for the page. Two fallbacks: "Route" until the route lands so the
+    /// header has something to render during the first paint, and "Route not
+    /// found" once we've tried and the server said no — the bare "Route" was
+    /// misleading on its own when the rest of the page is an empty state.
+    /// </summary>
     private string _pageTitle = "Route";
 
     /// <summary>
@@ -336,15 +372,18 @@ else
         // None of these reads depends on another's result, so they all go out at once.
         // Awaited one-by-one, a refresh cost the SUM of the round-trips — every 15
         // seconds, per open tab.
-        Task<RouteDto?> routeTask =
-            Http.GetFromJsonAsync($"/api/routes/{RouteId}", AppJsonContext.Default.RouteDto);
+        Task<RouteDto?> routeTask = LoadRouteAsync();
         Task<List<SessionDto>?> sessionsTask =
             Http.GetFromJsonAsync($"/api/routes/{RouteId}/sessions", AppJsonContext.Default.ListSessionDto);
         Task<PagedResult<PollRecordDto>?> historyTask =
             Http.GetFromJsonAsync($"/api/routes/{RouteId}/poll-history?page=1&pageSize=300&sinceUtc={sinceUtc}", AppJsonContext.Default.PagedResultPollRecordDto);
-        Task<BaselineResponse?> baselineTask =
-            Http.GetFromJsonAsync($"/api/routes/{RouteId}/baseline?dayOfWeek={dayOfWeek}", AppJsonContext.Default.BaselineResponse);
         Task<OptimalDepartureDto?> optimalTask = GetOptimalDepartureAsync(dayOfWeek);
+
+        // The road shape is fetched from the provider once per route and stored, so this
+        // rides the normal refresh cadence: after the first call the server is only
+        // re-deciding the colour, which is exactly what should follow a new sample.
+        Task<RoutePathDto?> pathTask =
+            Http.GetFromJsonAsync($"/api/routes/{RouteId}/path", AppJsonContext.Default.RoutePathDto);
 
         // The weekly grid rides along with the fan-out, but only when the copy in hand
         // has aged out — see HeatmapMaxAge.
@@ -354,7 +393,10 @@ else
             ? Http.GetFromJsonAsync($"/api/routes/{RouteId}/heatmap", AppJsonContext.Default.VolatilityHeatmapDto)
             : Task.FromResult(_heatmap);
 
-        await Task.WhenAll(routeTask, sessionsTask, historyTask, baselineTask, optimalTask, heatmapTask);
+        await Task.WhenAll(routeTask, sessionsTask, historyTask, optimalTask, heatmapTask, pathTask);
+
+        _path = await pathTask;
+        await AnnounceVerdictAsync();
 
         _route = await routeTask;
         if (_route is not null)
@@ -366,6 +408,14 @@ else
             _destStreet = TextFormatting.ToTitleCase(_route.DestinationAddress.Split(',')[0]);
             _thisLabel = _originStreet;
             _pageTitle = $"{_originStreet} → {_destStreet}";
+        }
+        else
+        {
+            // The route genuinely doesn't exist (or isn't ours). "Route" on its
+            // own reads as a real heading next to the empty state, not as a
+            // loading placeholder, so swap to something that pairs with the
+            // "Couldn't load this route" copy below.
+            _pageTitle = "Route not found";
         }
 
         // Today's active monitoring session — carries the server-computed poll schedule.
@@ -382,23 +432,12 @@ else
             _todayPolls = [.. historyResult.Items.OrderBy(p => p.PolledAtDateTime)];
             LatestPoll = _todayPolls.Count > 0 ? _todayPolls[^1] : null;
             _trendPoints = [.. _todayPolls.Select(p => p.TravelDurationSeconds / 60.0)];
-            _trendRerouted = [.. _todayPolls.Select(p => p.IsRerouted)];
+            _ribbonSamples = _trendPoints;
             _trendLabels = [.. _todayPolls.Select(p => p.PolledAtDateTime.ToString("HH:mm"))];
 
             // A selection from the previous payload may no longer exist.
             if (_selectedPoll is not null && !_todayPolls.Contains(_selectedPoll))
                 _selectedPoll = null;
-        }
-
-        BaselineResponse? baseline = await baselineTask;
-        if (baseline is not null)
-        {
-            List<BaselineSlotDto> slots = [.. baseline.Slots];
-            _trendBaseline = [.. slots.Select(s => s.MeanDurationSeconds / 60.0)];
-            _trendUpperBand = [.. slots
-                .Select(s => s.StdDevDurationSeconds.HasValue
-                    ? (s.MeanDurationSeconds + s.StdDevDurationSeconds.Value) / 60.0
-                    : s.MeanDurationSeconds / 60.0)];
         }
 
         _optimalDeparture = await optimalTask;
@@ -426,6 +465,44 @@ else
     /// The dashboard calls the same endpoint inside a try/catch, which is why the
     /// cards were unaffected and the bug only appeared one tap deeper.
     /// </summary>
+    /// <summary>
+    /// Reacts to a NEW verdict: sets the app-wide mood (which retunes the background
+    /// wash, the map's flow speed and the ambient drone), sings the result, and throws
+    /// confetti when the commute came back better than usual.
+    ///
+    /// <para>Guarded on a change of verdict, not on every load. This page refreshes on
+    /// a timer, and an app that plays a chime every fifteen seconds gets muted within
+    /// the minute.</para>
+    /// </summary>
+    private async Task AnnounceVerdictAsync()
+    {
+        if (_path is null)
+            return;
+
+        await Fx.SetMoodAsync(_path.TrafficLevel);
+
+        // "unknown" is the absence of a verdict, not a verdict. Announcing it would
+        // mean a chime every time a brand-new route loads with no history.
+        if (_path.TrafficLevel == _announcedLevel || _path.TrafficLevel == "unknown")
+        {
+            _announcedLevel = _path.TrafficLevel;
+            return;
+        }
+
+        bool first = _announcedLevel is null;
+        _announcedLevel = _path.TrafficLevel;
+
+        // The first paint of a page is not news. Setting the mood above is enough;
+        // sound and confetti are for a result that CHANGED while you were watching.
+        if (first)
+            return;
+
+        await Fx.VerdictAsync(_path.TrafficLevel);
+
+        if (_path.TrafficLevel == "clear")
+            await Fx.CelebrateAsync();
+    }
+
     private async Task<OptimalDepartureDto?> GetOptimalDepartureAsync(string dayOfWeek)
     {
         HttpResponseMessage response = await Http.GetAsync(
@@ -445,39 +522,52 @@ else
     }
 
     /// <summary>
-    /// Formats the headline. The confidence note replaces the old meter: "38 of 60
-    /// samples" asked the reader to convert a fraction into trust, where a sentence
-    /// just says how much to trust it.
+    /// Loads the route and converts a 404 — "this id doesn't exist, or it isn't
+    /// yours" — into a successful <c>null</c> result so the page can render its
+    /// empty state with the "Route not found" heading instead of going into
+    /// exponential backoff. Any other failure (network, 5xx) still propagates
+    /// to <see cref="PollingComponentBase"/> so the existing retry-with-backoff
+    /// machinery keeps working.
+    /// </summary>
+    private async Task<RouteDto?> LoadRouteAsync()
+    {
+        HttpResponseMessage response = await Http.GetAsync($"/api/routes/{RouteId}");
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            _pageTitle = "Route not found";
+            return null;
+        }
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync(AppJsonContext.Default.RouteDto);
+    }
+
+    /// <summary>
+    /// Formats the answer card. The answer card holds two facts: where the trip
+    /// runs (origin → destination) and how long it has taken today — the fastest
+    /// and slowest of the live samples we already have on file. The "leave by"
+    /// countdown and the confidence sentence moved out: the dashboard already
+    /// runs the next-departure countdown in its hero, and the chart below shows
+    /// every sample without summarising trust into a one-line caveat.
     /// </summary>
     private void BuildAnswer()
     {
-        if (_optimalDeparture is not { } optimal)
+        if (_todayPolls.Count == 0)
         {
-            int samples = _todayPolls.Count;
-            _pendingDetail = samples == 0
-                ? "No samples recorded yet."
-                : $"{samples} sample{(samples == 1 ? "" : "s")} so far — a recommendation needs a few more.";
+            _pendingDetail = "No samples recorded yet.";
             return;
         }
 
-        int h = optimal.TimeSlotBucket / 60;
-        int m = optimal.TimeSlotBucket % 60;
-        string period = h >= 12 ? "PM" : "AM";
-        int displayH = h > 12 ? h - 12 : (h == 0 ? 12 : h);
+        // The polled values are whole seconds. Round to minutes so the worst
+        // ever reads as the integer minute a reader would actually feel on
+        // the road; truncation (the previous behaviour) under-reported every
+        // sample shorter than 60 s as zero.
+        int bestMin = (int)Math.Round(_todayPolls.Min(p => p.TravelDurationSeconds) / 60.0);
+        int worstMin = (int)Math.Round(_todayPolls.Max(p => p.TravelDurationSeconds) / 60.0);
 
-        _leaveByLabel = $"Leave by {displayH}:{m:D2} {period}";
+        _durationLabel = bestMin == worstMin
+            ? $"{bestMin} min today"
+            : $"{bestMin}–{worstMin} min today";
 
-        int estMin = (int)(optimal.PredictedDurationSeconds / 60);
-        _durationLabel = optimal is { LowerBound: { } lower, UpperBound: { } upper }
-            ? $"about {estMin} min, usually {lower / 60:F0}–{upper / 60:F0}"
-            : $"about {estMin} min";
-
-        string basis = optimal.DayOfWeekSpecific
-            ? $"{DateTime.Today.DayOfWeek}s"
-            : "all days (not enough history for this weekday yet)";
-
-        _confidenceNote = optimal.SampleCount >= QuotaConstants.BaselineConfidentSampleCount
-            ? $"Based on {optimal.SampleCount} samples from {basis}."
-            : $"Based on {optimal.SampleCount} samples from {basis} — still firming up.";
+        _confidenceNote = $"{_todayPolls.Count} sample{(_todayPolls.Count == 1 ? "" : "s")} so far today.";
     }
 }

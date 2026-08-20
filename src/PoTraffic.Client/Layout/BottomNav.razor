@@ -1,5 +1,6 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @using PoTraffic.Client.Infrastructure.Auth
+@using PoTraffic.Shared.Constants
 @inject AuthenticationStateProvider AuthStateProvider
 
 @* Bottom navigation — only visible on mobile portrait (≤640px). Provides
@@ -42,6 +43,13 @@
     @* Same role/aria pattern as the desktop user dropdown — kept here so a
        screen reader announcing the trigger button lands on a labelled menu. *@
     <div class="pt-bottom-sheet" role="menu" aria-label="Account menu">
+        @* Identity moved here from the header's user chip, which is hidden at this
+           width now that the two menus have been merged. Presentational: a screen
+           reader walking the menu should hear items, not a heading. *@
+        <div class="pt-bottom-sheet-header" role="presentation">
+            <div class="pt-bottom-sheet-label">Signed in as</div>
+            <div class="pt-bottom-sheet-email">@_displayLabel</div>
+        </div>
         <a class="pt-bottom-sheet-item" href="/account/settings" role="menuitem" @onclick="CloseSheet">
             <PtIcon Name="settings" Size="sm" />Account settings
         </a>
@@ -75,6 +83,9 @@ else if (_sheetOpen)
     private bool _sheetOpen;
     private bool IsAuthenticated { get; set; }
 
+    /// <summary>Who is signed in, for the sheet's header. Empty until auth resolves.</summary>
+    private string _displayLabel = string.Empty;
+
     protected override async Task OnInitializedAsync()
     {
         // The same auth state may surface through the auth provider's interface
@@ -86,7 +97,22 @@ else if (_sheetOpen)
             cookie.AuthenticationStateChanged += OnAuthChanged;
 
         AuthenticationState state = await AuthStateProvider.GetAuthenticationStateAsync();
+        Apply(state);
+    }
+
+    /// <summary>
+    /// Guest accounts are minted as guest12345678@potraffic.dev; showing the raw
+    /// address is noise, so they render as GUEST12345678 exactly as the header chip
+    /// used to. Anyone else sees their real address.
+    /// </summary>
+    private void Apply(AuthenticationState state)
+    {
         IsAuthenticated = state.User.Identity?.IsAuthenticated == true;
+
+        string email = state.User.Identity?.Name ?? string.Empty;
+        _displayLabel = GuestAccountConstants.IsGuestEmail(email)
+            ? GuestAccountConstants.ToDisplayLabel(email)
+            : email;
     }
 
     private void OnAuthChanged(Task<AuthenticationState> task)
@@ -94,7 +120,7 @@ else if (_sheetOpen)
         _ = InvokeAsync(async () =>
         {
             AuthenticationState state = await task;
-            IsAuthenticated = state.User.Identity?.IsAuthenticated == true;
+            Apply(state);
             _sheetOpen = false;
             StateHasChanged();
         });

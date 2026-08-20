@@ -1,0 +1,40 @@
+/* The "a newer build is waiting" notice.
+
+   Deliberately the same glass pill as UndoBar, and deliberately ABOVE it: both are
+   fixed to the bottom of the viewport, and a delete undo — which expires in seconds —
+   must never be the one that gets covered. An update can wait. */
+
+.pt-update-bar {
+    align-items: center;
+    animation: pt-slide-up var(--pt-dur-base) var(--pt-ease);
+    backdrop-filter: blur(var(--pt-glass-blur)) saturate(var(--pt-glass-saturate));
+    background: var(--pt-glass-bg-strong);
+    border: 1px solid var(--pt-glass-border);
+    border-radius: var(--pt-radius-full);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 9rem);
+    box-shadow: var(--pt-elev-3);
+    display: flex;
+    gap: var(--pt-space-3);
+    left: 50%;
+    max-width: calc(100vw - 2rem);
+    padding: 0.55rem 0.7rem 0.55rem 1rem;
+    position: fixed;
+    transform: translateX(-50%);
+    z-index: var(--pt-z-toast);
+}
+
+.pt-update-bar-text {
+    color: var(--pt-fg-body);
+    font-size: var(--pt-text-sm);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+    .pt-update-bar {
+        left: var(--pt-space-4);
+        right: var(--pt-space-4);
+        transform: none;
+    }
+}

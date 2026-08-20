@@ -5,6 +5,9 @@
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 @inject NotificationService NotificationService
+@inject PoTraffic.Client.Infrastructure.PwaService Pwa
+@inject PoTraffic.Client.Infrastructure.FxService Fx
+@using PoTraffic.Client.Infrastructure
 
 <PageTitle>Account Settings</PageTitle>
 
@@ -12,10 +15,24 @@
             Subtitle="Profile, appearance, and what this account is costing."
             BackHref="/dashboard" BackLabel="Commutes" />
 
+@*  Six sections, one long scroll. The index on the left is sticky, so on a wide
+    screen "where am I and what else is here" is answered without scrolling, and
+    a jump is one click. It is display:none below 1024px — a phone has no column
+    to spare and the scroll is short enough to flick.                            *@
+<div class="pt-settings-layout">
+    <nav class="pt-settings-index" aria-label="Settings sections">
+        <a href="#settings-profile">Profile</a>
+        <a href="#settings-appearance">Appearance</a>
+        <a href="#settings-effects">Effects &amp; sound</a>
+        <a href="#settings-install">Install</a>
+        <a href="#settings-limits">Limits &amp; cost</a>
+        <a href="#settings-delete" class="pt-settings-index-danger">Delete account</a>
+    </nav>
+
 <RadzenCard class="pt-p-6">
     @* Four tabs held about six controls between them, which cost a click and hid
        two thirds of the page to save no scrolling. They are sections now. *@
-    <section class="pt-settings-section">
+    <section class="pt-settings-section" id="settings-profile">
         <RadzenText TextStyle="TextStyle.H3" class="pt-mb-2 pt-section-heading">Profile</RadzenText>
                 @if (_loading)
                 {
@@ -87,7 +104,7 @@
                 }
     </section>
 
-    <section class="pt-settings-section">
+    <section class="pt-settings-section" id="settings-appearance">
         <RadzenText TextStyle="TextStyle.H3" class="pt-mb-2 pt-section-heading">Appearance</RadzenText>
                 <RadzenStack Gap="1.5rem" class="pt-mt-4">
                     @* Both pickers were hand-rolled <button role="radio"> grids with their
@@ -150,7 +167,99 @@
                 </RadzenStack>
     </section>
 
-    <section class="pt-settings-section">
+    <section class="pt-settings-section" id="settings-effects">
+        <RadzenText TextStyle="TextStyle.H3" class="pt-mb-2 pt-section-heading">Effects &amp; sound</RadzenText>
+
+        <RadzenStack Gap="1.5rem" class="pt-mt-4">
+            <div>
+                <RadzenText TextStyle="TextStyle.Subtitle2" class="pt-mb-1">Motion</RadzenText>
+                <RadzenText TextStyle="TextStyle.Caption" class="pt-mb-2 pt-settings-meta">
+                    Full adds the moving background, the traffic flow on the map, and
+                    animated charts. Still keeps the colours but stops the movement.
+                </RadzenText>
+                <RadzenSelectBar TValue="MotionLevel" Value="@Fx.Motion" Change="@OnMotionChanged"
+                                 Size="ButtonSize.Medium" aria-label="Motion">
+                    <Items>
+                        <RadzenSelectBarItem Value="@MotionLevel.Full" Text="Full" Icon="auto_awesome" />
+                        <RadzenSelectBarItem Value="@MotionLevel.Reduced" Text="Still" Icon="motion_photos_off" />
+                        <RadzenSelectBarItem Value="@MotionLevel.Off" Text="Off" Icon="block" />
+                    </Items>
+                </RadzenSelectBar>
+
+                @if (_prefersReducedMotion && Fx.Motion != MotionLevel.Off)
+                {
+                    @* The OS preference is a floor: it can force motion down but this
+                       setting can never force it back up. Saying so beats leaving the
+                       user to wonder why "Full" did not look full. *@
+                    <RadzenText TextStyle="TextStyle.Caption" class="pt-mt-2 pt-settings-meta">
+                        Your device asks for reduced motion, so animation stays off
+                        whatever is picked here.
+                    </RadzenText>
+                }
+            </div>
+
+            <div>
+                <RadzenText TextStyle="TextStyle.Subtitle2" class="pt-mb-1">Sound</RadzenText>
+                <RadzenText TextStyle="TextStyle.Caption" class="pt-mb-2 pt-settings-meta">
+                    Short musical cues when a check finishes or something is saved.
+                    Nothing is downloaded — the sounds are generated in the browser.
+                </RadzenText>
+                <RadzenSwitch Value="@Fx.SoundEnabled" Change="@OnSoundChanged" aria-label="Sound effects" />
+
+                @if (Fx.SoundEnabled)
+                {
+                    <div class="pt-volume-row pt-mt-3">
+                        <PtIcon Name="volume_down" Size="sm" />
+                        <RadzenSlider TValue="double" Value="@Fx.Volume" Min="0" Max="1" Step="0.05"
+                                      Change="@OnVolumeChanged" aria-label="Volume" class="pt-volume-slider" />
+                        <PtIcon Name="volume_up" Size="sm" />
+                        <RadzenButton Text="Test" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small"
+                                      Click="@TestSoundAsync" />
+                    </div>
+                }
+            </div>
+        </RadzenStack>
+    </section>
+
+    <section class="pt-settings-section" id="settings-install">
+        <RadzenText TextStyle="TextStyle.H3" class="pt-mb-2 pt-section-heading">Install on this device</RadzenText>
+        <RadzenText TextStyle="TextStyle.Caption" class="pt-mb-3 pt-settings-meta">
+            Installing adds PoTraffic to your home screen and keeps the last data it loaded
+            available when you have no signal.
+        </RadzenText>
+
+        @if (!Pwa.Supported)
+        {
+            @* Private windows and insecure origins have no service worker at all. Saying so
+               beats an Install button that silently does nothing when tapped. *@
+            <RadzenText TextStyle="TextStyle.Body2" class="pt-settings-meta">
+                This browser can't install web apps. Everything else works normally.
+            </RadzenText>
+        }
+        else if (Pwa.Installed)
+        {
+            <RadzenText TextStyle="TextStyle.Body2" class="pt-settings-meta">
+                Installed — you're running the app version right now.
+            </RadzenText>
+        }
+        else if (Pwa.CanInstall)
+        {
+            <RadzenButton Text="Install PoTraffic" Icon="install_mobile"
+                          ButtonStyle="ButtonStyle.Primary" Click="InstallAsync" />
+        }
+        else
+        {
+            @* Chrome and Edge only offer beforeinstallprompt once their own heuristics are
+               satisfied, and iOS Safari never fires it. Neither case is an error, so the
+               manual route is spelled out rather than hidden behind a dead button. *@
+            <RadzenText TextStyle="TextStyle.Body2" class="pt-settings-meta">
+                Use your browser's menu to add PoTraffic to your home screen.
+                On iPhone: Share, then "Add to Home Screen".
+            </RadzenText>
+        }
+    </section>
+
+    <section class="pt-settings-section" id="settings-limits">
         <RadzenText TextStyle="TextStyle.H3" class="pt-mb-2 pt-section-heading">Monitoring limits &amp; cost</RadzenText>
                 @if (_loading)
                 {
@@ -192,7 +301,7 @@
                 }
     </section>
 
-    <section class="pt-settings-section pt-settings-danger">
+    <section class="pt-settings-section pt-settings-danger" id="settings-delete">
         <RadzenText TextStyle="TextStyle.H3" class="pt-mb-2 pt-section-heading">Delete account</RadzenText>
                 <RadzenStack Gap="1rem" class="pt-mt-4">
                     <RadzenAlert AlertStyle="AlertStyle.Danger" AllowClose="false"
@@ -232,8 +341,15 @@
                 </RadzenStack>
     </section>
 </RadzenCard>
+</div>
 
 @code {
+    /// <summary>
+    /// The install section reflects browser state that can change after the page has
+    /// rendered — the prompt event may not have fired yet when Settings first paints.
+    /// </summary>
+    private void OnPwaStateChanged() => InvokeAsync(StateHasChanged);
+
     /// <summary>Bound by the profile form so validation has a model to work against.</summary>
     private sealed class ProfileForm
     {
@@ -281,6 +397,8 @@
 
     protected override async Task OnInitializedAsync()
     {
+        Pwa.StateChanged += OnPwaStateChanged;
+
         try
         {
             _profile = await Http.GetFromJsonAsync("/api/account/profile", AppJsonContext.Default.ProfileDto);
@@ -348,6 +466,11 @@
         _theme = theme;
         if (_appearance is not null)
             await _appearance.InvokeVoidAsync("setTheme", theme);
+
+        // The background wash resolves its palette from the design tokens, which have
+        // just changed meaning. Without this it keeps the old theme's colours until
+        // something else forces it to rebuild.
+        await Fx.RefreshThemeAsync();
     }
 
     private async Task OnDensityChanged(object? value)
@@ -433,8 +556,48 @@
         bool PrefersContrast,
         bool PrefersReducedMotion);
 
+    private async Task OnMotionChanged(MotionLevel level) => await Fx.SetMotionAsync(level);
+
+    private async Task OnSoundChanged(bool enabled)
+    {
+        await Fx.SetSoundAsync(enabled);
+        // Turning sound ON from a click is the one moment the browser will let us
+        // unlock the audio context, so the very next cue is audible rather than the
+        // one after it.
+        if (enabled)
+        {
+            await Fx.UnlockAudioAsync();
+            await Fx.PlayAsync("save");
+        }
+    }
+
+    private async Task OnVolumeChanged(double volume)
+    {
+        await Fx.SetVolumeAsync(volume);
+        await Fx.UnlockAudioAsync();
+        // Play at the new level as it is dragged — a volume slider with no audible
+        // feedback is a slider you have to guess at.
+        await Fx.PlayAsync("click");
+    }
+
+    private async Task TestSoundAsync()
+    {
+        await Fx.UnlockAudioAsync();
+        await Fx.PlayAsync("success");
+    }
+
+    /// <summary>Shows the browser's own install dialog.</summary>
+    private async Task InstallAsync()
+    {
+        if (await Pwa.InstallAsync())
+            NotificationService.Notify(NotificationSeverity.Success, "Installed",
+                "PoTraffic has been added to this device.");
+    }
+
     public async ValueTask DisposeAsync()
     {
+        Pwa.StateChanged -= OnPwaStateChanged;
+
         if (_appearance is not null)
         {
             try { await _appearance.DisposeAsync(); } catch { /* page tearing down */ }

@@ -113,3 +113,26 @@
     transform: scale(0.95);
     box-shadow: 0 3px 10px color-mix(in oklab, var(--pt-color-brand-600) 50%, transparent);
 }
+/* Identity line, absorbed from the header's user chip when the two account menus
+   were merged into this one. Mirrors .pt-user-dropdown-header in NavMenu so the
+   phone and desktop menus still look like the same object. */
+.pt-bottom-sheet-header {
+    padding: var(--pt-space-3) var(--pt-space-4);
+    border-bottom: 1px solid var(--pt-border-subtle);
+}
+
+.pt-bottom-sheet-label {
+    color: var(--pt-fg-muted);
+    font-size: var(--pt-text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.pt-bottom-sheet-email {
+    color: var(--pt-fg-strong);
+    font-size: var(--pt-text-sm);
+    font-weight: var(--pt-weight-semibold);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

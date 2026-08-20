@@ -46,4 +46,13 @@ builder.Services.AddScoped<PageActivityMonitor>();
 // Holds deletes for a grace period so "Undo" has something to undo.
 builder.Services.AddScoped<PendingDeletionService>();
 
+// Service-worker registration, offline caching and the install prompt. Scoped rather
+// than transient: the browser's beforeinstallprompt event fires once per page load and
+// this is what holds it until Settings asks.
+builder.Services.AddScoped<PwaService>();
+
+// Visual effects and sound design: the background wash, the map's traffic flow, the
+// celebration burst and the synthesised cue set, plus the settings that govern them.
+builder.Services.AddScoped<FxService>();
+
 await builder.Build().RunAsync();

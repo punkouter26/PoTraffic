@@ -34,7 +34,7 @@
 }
 
 .pt-countdown-due .pt-countdown-text {
-    color: var(--pt-color-success);
+    color: var(--pt-color-success-on-surface);
     font-weight: var(--pt-weight-semibold);
 }
 
