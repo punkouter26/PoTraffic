@@ -84,6 +84,17 @@ public static class HistoryEndpoints
             return ConditionalJson.Ok(ctx, result);
         });
 
+        // GET /api/routes/{routeId}/weather-impact — what each condition costs this route
+        group.MapGet("/weather-impact", async (
+            RouteId routeId,
+            ISender sender,
+            HttpContext ctx) =>
+        {
+            UserId userId = ctx.User.GetUserId();
+            var result = await sender.Send(new GetWeatherImpactQuery(routeId, userId));
+            return ConditionalJson.Ok(ctx, result);
+        });
+
         // GET /api/routes/{routeId} — single route (drives the return-trip link, #3)
         group.MapGet("", async (
             RouteId routeId,

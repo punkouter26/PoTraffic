@@ -19,6 +19,8 @@ public sealed record ExecutePollCommand(RouteId RouteId) : IRequest<bool>;
 public sealed class ExecutePollCommandHandler(
     TableStorageContext db,
     ITrafficProviderFactory providerFactory,
+    IWeatherProvider weatherProvider,
+    Config.FeatureFlags featureFlags,
     Alerts.AlertEvaluator alertEvaluator,
     ILogger<ExecutePollCommandHandler> logger) : IRequestHandler<ExecutePollCommand, bool>
 {
@@ -94,6 +96,24 @@ public sealed class ExecutePollCommandHandler(
             return false;
         }
 
+        // 4b. Conditions at the origin, for the weather split on the route page. Deliberately
+        // after the travel call and deliberately non-fatal: the sample is the thing worth
+        // having, and a weather outage must cost a null column rather than a lost poll.
+        WeatherObservation? weather = null;
+        if (featureFlags.EnableWeather)
+        {
+            try
+            {
+                weather = await weatherProvider.GetCurrentAsync(route.OriginCoordinates, ct);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex,
+                    "ExecutePollCommand: weather lookup failed for route {RouteId} — poll recorded without it",
+                    cmd.RouteId);
+            }
+        }
+
         // 5. Create PollRecord
         var record = new PollRecord
         {
@@ -102,7 +122,10 @@ public sealed class ExecutePollCommandHandler(
             SessionId = session.Id,
             PolledAt = DateTimeOffset.UtcNow,
             TravelDurationSeconds = travelResult.DurationSeconds,
-            DistanceMetres = travelResult.DistanceMetres
+            DistanceMetres = travelResult.DistanceMetres,
+            WeatherCondition = weather?.Condition,
+            TemperatureC = weather?.TemperatureC,
+            PrecipitationMm = weather?.PrecipitationMm
         };
 
         // 6. Reroute detection. Only the single most recent prior record is needed alongside

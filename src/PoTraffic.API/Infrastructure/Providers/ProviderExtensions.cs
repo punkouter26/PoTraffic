@@ -39,6 +39,20 @@ public static class ProviderExtensions
         // Factory pattern — ITrafficProviderFactory hides IKeyedServiceProvider cast from handlers
         services.AddScoped<ITrafficProviderFactory, KeyedServiceTrafficProviderFactory>();
 
+        // Conditions feed. Not keyed: weather is a property of a place, not of the route's
+        // mapping provider. Registered unconditionally so ExecutePollCommand can take the
+        // dependency without a null check — the flag decides whether it is consulted.
+        if (flags.UseMockProviders)
+        {
+            services.AddScoped<IWeatherProvider, MockWeatherProvider>();
+        }
+        else
+        {
+            services.AddHttpClient<OpenMeteoWeatherProvider>()
+                .AddResilienceHandler(ResiliencePipelineExtensions.WeatherPipeline);
+            services.AddScoped<IWeatherProvider>(sp => sp.GetRequiredService<OpenMeteoWeatherProvider>());
+        }
+
         return services;
     }
 }

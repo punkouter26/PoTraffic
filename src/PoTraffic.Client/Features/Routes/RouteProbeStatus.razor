@@ -165,14 +165,6 @@
         if (_probingNow) return;
         _probingNow = true;
 
-        // The drone runs for exactly as long as the request is in flight. Google Maps
-        // takes a second or two and the button is the only other feedback, so this is
-        // the difference between "did that do anything?" and a request you can hear
-        // working. The click is also the gesture that unlocks audio for the session.
-        await Fx.UnlockAudioAsync();
-        await Fx.PlayAsync("probe");
-        await Fx.SetEngineAsync(true);
-
         try
         {
             HttpResponseMessage resp = await Http.PostAsync($"api/routes/{RouteId}/check-now", null);
@@ -218,7 +210,6 @@
         finally
         {
             _probingNow = false;
-            await Fx.SetEngineAsync(false);
         }
     }
 

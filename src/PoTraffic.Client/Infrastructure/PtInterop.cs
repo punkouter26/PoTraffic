@@ -4,36 +4,18 @@ using Microsoft.JSInterop;
 namespace PoTraffic.Client.Infrastructure;
 
 /// <summary>
-/// Thin wrapper around the pt-audio.js / pt-gestures.js JS modules.
-/// Lazy-loads each module on first use; safe to no-op if the module is missing.
+/// Thin wrapper around the pt-gestures.js module. Lazy-loads on first use; safe to no-op
+/// if the module is missing. The audio half went with the sound layer.
 /// </summary>
 public sealed class PtInterop : IAsyncDisposable
 {
     private readonly IJSRuntime _js;
-    private Task<IJSObjectReference>? _audio;
     private Task<IJSObjectReference>? _gestures;
 
     public PtInterop(IJSRuntime js) => _js = js;
 
-    private Task<IJSObjectReference> Audio() => _audio ??= _js.InvokeAsync<IJSObjectReference>(
-        "import", "./js/pt-audio.js").AsTask();
-
     private Task<IJSObjectReference> Gestures() => _gestures ??= _js.InvokeAsync<IJSObjectReference>(
         "import", "./js/pt-gestures.js").AsTask();
-
-    /// <summary>Unlock the audio context after a user gesture.</summary>
-    public async Task UnlockAudioAsync()
-    {
-        try { await (await Audio()).InvokeVoidAsync("unlock"); }
-        catch { /* JS not ready yet */ }
-    }
-
-    /// <summary>Play a feedback cue. Silent no-op if context is not yet unlocked.</summary>
-    public async Task PlayAsync(string kind)
-    {
-        try { await (await Audio()).InvokeVoidAsync("play", kind); }
-        catch { /* ignore */ }
-    }
 
     /// <summary>
     /// Attach swipe/long-press gesture handlers to <paramref name="element"/>.
@@ -62,8 +44,6 @@ public sealed class PtInterop : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        if (_audio is { IsCompletedSuccessfully: true } a)
-            try { await (await a).DisposeAsync(); } catch { }
         if (_gestures is { IsCompletedSuccessfully: true } g)
             try { await (await g).DisposeAsync(); } catch { }
     }

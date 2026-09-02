@@ -1,6 +1,6 @@
 # Infrastructure (IaC)
 
-`main.bicep` captures the **production App Service configuration** for `potraffic-api`
+`main.bicep` captures the **production App Service configuration** for `potraffic-api-win`
 so it is reproducible and drift-proof. The App Service Plan, shared user-assigned
 managed identity, and Key Vault live in the **PoShared** resource group and are
 referenced by ID (not created here).

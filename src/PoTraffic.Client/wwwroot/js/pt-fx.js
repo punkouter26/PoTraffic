@@ -16,8 +16,6 @@
 //      "calm" in one channel and "bad" in another.
 
 const STORAGE_MOTION = "pt-motion-level";
-const STORAGE_SOUND = "pt-sound";
-const STORAGE_VOLUME = "pt-volume";
 
 /** Frame budget guard. Anything slower than this and we shed work rather than stutter. */
 const SLOW_FRAME_MS = 24;          // ~40fps — two consecutive misses trigger a downgrade
@@ -78,26 +76,6 @@ export function animates() {
 /** True when an effect may draw, even if it must not move (static gradient, still glow). */
 export function draws() {
     return motionLevel() !== "off";
-}
-
-export function soundEnabled() {
-    return read(STORAGE_SOUND, "on") === "on";
-}
-
-export function setSoundEnabled(on) {
-    write(STORAGE_SOUND, on ? "on" : "off");
-    emit();
-}
-
-/** Master output level, 0–1. Applied by pt-audio.js to its output bus. */
-export function volume() {
-    const v = parseFloat(read(STORAGE_VOLUME, "0.6"));
-    return Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0.6;
-}
-
-export function setVolume(v) {
-    write(STORAGE_VOLUME, String(Math.min(1, Math.max(0, v))));
-    emit();
 }
 
 export function onChange(fn) {
@@ -206,24 +184,6 @@ export function unregister(key) {
 
 export function isDegraded() {
     return degraded;
-}
-
-// ── Audio unlock ─────────────────────────────────────────────────────────────
-//
-// Browsers refuse to start an AudioContext outside a user gesture, and every place
-// in the app that wants a sound is somewhere downstream of one. Rather than making
-// each of them remember to unlock first, the FIRST gesture anywhere on the page
-// unlocks once and the listener removes itself.
-//
-// The import is dynamic and deliberately late: a user who never interacts never
-// downloads the synthesiser.
-function unlockAudioOnce() {
-    if (!soundEnabled()) return;
-    import("./pt-audio.js").then((audio) => audio.unlock()).catch(() => { });
-}
-
-for (const event of ["pointerdown", "keydown", "touchstart"]) {
-    window.addEventListener(event, unlockAudioOnce, { once: true, passive: true });
 }
 
 // A hidden tab must not burn a frame budget. rAF already throttles hard in most

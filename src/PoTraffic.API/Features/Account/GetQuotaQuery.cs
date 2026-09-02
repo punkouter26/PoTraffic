@@ -35,12 +35,20 @@ public sealed class GetQuotaHandler : IRequestHandler<GetQuotaQuery, QuotaDto?>
         // navigation property to back the old `s.Route.UserId` access.
         HashSet<RouteId> userRouteIds = _db.GetUserRouteIds(query.UserId);
 
+        // The sample route's sessions and samples were generated, not bought (#10). Counting
+        // them would spend the user's daily quota on a demo and report provider spend against
+        // an account that never called a provider — so quota and cost both work off the
+        // billable subset, and everything below uses it in place of the full route list.
+        HashSet<RouteId> billableRouteIds = [.. _db.Routes
+            .Where(r => userRouteIds.Contains(r.Id) && !r.IsSample)
+            .Select(r => r.Id)];
+
         // Count today's sessions only. The previous `>= today && <= dayEnd` range was
         // inclusive of dayEnd (tomorrow), over-counting future-dated sessions; this matches
         // StartWindowCommand's `SessionDate == today` so the displayed quota equals what is enforced.
         DateOnly today = DateOnly.FromDateTime(dayStart.UtcDateTime);
         int usedToday = _db.MonitoringSessions
-            .Count(s => userRouteIds.Contains(s.RouteId) && s.SessionDate == today);
+            .Count(s => billableRouteIds.Contains(s.RouteId) && s.SessionDate == today);
 
         int remaining = Math.Max(0, dailyLimit - usedToday);
 
@@ -54,17 +62,15 @@ public sealed class GetQuotaHandler : IRequestHandler<GetQuotaQuery, QuotaDto?>
         // One pass over the poll table — a per-route Count() would rescan the whole
         // (global) poll list once per route the user owns.
         Dictionary<RouteId, int> pollsByRoute = _db.Polls
-            .Where(p => userRouteIds.Contains(p.RouteId)
+            .Where(p => billableRouteIds.Contains(p.RouteId)
                         && DateOnly.FromDateTime(p.PolledAt.UtcDateTime) == today)
             .GroupBy(p => p.RouteId)
             .ToDictionary(g => g.Key, g => g.Count());
 
         int pollsToday = 0;
         decimal costToday = 0m;
-        foreach (EntityRoute route in _db.Routes.Where(r => userRouteIds.Contains(r.Id)))
+        foreach (EntityRoute route in _db.Routes.Where(r => billableRouteIds.Contains(r.Id)))
         {
-            // The sample route's samples were generated, not bought (#10). Counting them
-            // would report spend against an account that never called a provider.
             if (!pollsByRoute.TryGetValue(route.Id, out int polls)) continue;
             pollsToday += polls;
             costToday += polls * rates.For((RouteProvider)route.Provider);

@@ -7,6 +7,8 @@
 @inject NotificationService NotificationService
 @inject DialogService DialogService
 @inject PendingDeletionService Pending
+@inject PtInterop Pt
+@implements IDisposable
 
 @* ──────────────────────────────────────────────────────────────────────
    Route card — one answer, one tap.
@@ -20,6 +22,13 @@
    The whole card is the target — a card that navigates should not need a button
    inside it that also navigates.
    ────────────────────────────────────────────────────────────────────── *@
+@* The swipe wrapper that used to sit around this card is folded in: it was a second
+   component whose whole job was to attach gestures and forward them to the two public
+   methods below. One card, one set of actions, one place they are triggered from. *@
+<div class="pt-swipe-wrap @(_pendingDelete ? "pending-delete" : "")" @ref="_cardElement">
+    <div class="pt-swipe-action pt-swipe-action-left" aria-hidden="true"><span>Check Now</span></div>
+    <div class="pt-swipe-action pt-swipe-action-right" aria-hidden="true"><span>Delete</span></div>
+
 <div class="pt-route-card @AmbientClass" role="button" tabindex="0"
      aria-label="@AriaLabel"
      @onclick="OpenDetail" @onkeydown="OnKeyDown">
@@ -30,6 +39,13 @@
                 <span class="pt-route-addr-from">@_originStreet</span>
                 <PtIcon Name="arrow_right_alt" Size="sm" Class="pt-route-addr-arrow" />
                 <span class="pt-route-addr-to">@_destStreet</span>
+                @* The card deliberately sheds status badges (see above), and this is the
+                   one exception: the sample route's numbers are generated, and unlabelled
+                   invented data presented next to real commutes is a lie, not a clean UI. *@
+                @if (Route.IsSample)
+                {
+                    <span class="pt-sample-chip">Sample</span>
+                }
             </div>
             <div class="pt-route-card-time">
                 @if (OptimalDeparture is not null)
@@ -54,6 +70,20 @@
     {
         <span class="pt-route-flag pt-route-flag-paused">Paused</span>
     }
+
+    @* These two actions used to exist only as swipe gestures, which "simply don't fire on
+       desktop" — so Check Now and Delete were unreachable there entirely, and unreachable
+       by keyboard everywhere. The gestures still work; these are the equivalents that a
+       pointer or a Tab key can find. stopPropagation keeps them from also opening the card. *@
+    <div class="pt-route-card-actions" @onclick:stopPropagation="true" @onkeydown:stopPropagation="true">
+        <RadzenButton Text="Check now" Icon="radar" ButtonStyle="ButtonStyle.Light"
+                      Size="ButtonSize.ExtraSmall" Click="@CheckNowAsync"
+                      title="@($"Check {_originStreet} to {_destStreet} right now")" />
+        <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Light"
+                      Size="ButtonSize.ExtraSmall" Click="@ScheduleDelete"
+                      title="@($"Delete {_originStreet} to {_destStreet}")" />
+    </div>
+</div>
 </div>
 
 @code {
@@ -62,6 +92,11 @@
     [Parameter] public IReadOnlyList<PollRecordDto> RecentPolls { get; set; } = [];
     [Parameter] public EventCallback OnDeleted { get; set; }
     [Parameter] public EventCallback OnRefresh { get; set; }
+
+    private ElementReference _cardElement;
+    private DotNetObjectReference<RouteCard>? _selfRef;
+    private IAsyncDisposable? _gestureCleanup;
+    private bool _pendingDelete;
 
     private string _originStreet = string.Empty;
     private string _destStreet = string.Empty;
@@ -80,6 +115,67 @@
         MonitoringStatus.Active => "pt-ambient-amber",
         _ => "pt-ambient-slate"
     };
+
+    protected override void OnInitialized()
+    {
+        _selfRef = DotNetObjectReference.Create(this);
+        Pending.Changed += OnPendingChanged;
+    }
+
+    /// <summary>
+    /// Keeps the slide-out tied to the service rather than to a local flag: an undo restores
+    /// the route, and the card has to come back with it instead of staying visually deleted
+    /// because a bool was never reset.
+    /// </summary>
+    private void OnPendingChanged()
+    {
+        bool nowPending = Pending.IsPending(Route.Id);
+        if (nowPending == _pendingDelete)
+            return;
+
+        _pendingDelete = nowPending;
+        InvokeAsync(StateHasChanged);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+            _gestureCleanup = await Pt.AttachSwipeAsync(_cardElement, _selfRef!, nameof(OnGestureAsync));
+    }
+
+    /// <summary>Swipe gestures are shortcuts to the buttons, never the only way to reach them.</summary>
+    [JSInvokable]
+    public async Task OnGestureAsync(string gesture)
+    {
+        switch (gesture)
+        {
+            case "left":
+                await CheckNowAsync();
+                break;
+            case "right":
+                await AnimateThenScheduleDeleteAsync();
+                break;
+        }
+    }
+
+    /// <summary>Plays the slide-out, then hands the delete to the same undo-window scheduler
+    /// the button uses. Nothing reaches the server until that window closes.</summary>
+    private async Task AnimateThenScheduleDeleteAsync()
+    {
+        if (_pendingDelete) return;
+        _pendingDelete = true;
+        StateHasChanged();
+
+        await Task.Delay(500);
+        ScheduleDelete();
+    }
+
+    public void Dispose()
+    {
+        Pending.Changed -= OnPendingChanged;
+        _ = _gestureCleanup?.DisposeAsync();
+        _selfRef?.Dispose();
+    }
 
     private void OpenDetail() => Nav.NavigateTo($"/routes/{Route.Id}");
 
@@ -120,10 +216,9 @@
     }
 
     /// <summary>
-    /// Runs a live poll. The card no longer shows a button for this — the swipe
-    /// gesture on <see cref="SwipeableRouteCard"/> is the single entry point, so
-    /// the one action that spends money is deliberate rather than adjacent to
-    /// everything else.
+    /// Runs a live poll. Reachable from the card's own button and from a swipe-left,
+    /// which are the same call — the one action that spends money should not have two
+    /// implementations that can drift.
     /// </summary>
     public async Task CheckNowAsync()
     {
@@ -157,7 +252,7 @@
 
     /// <summary>
     /// Hides the route now and sends the DELETE only once the undo window closes.
-    /// Shared with <see cref="SwipeableRouteCard"/>'s swipe gesture.
+    /// Shared by the card's delete button and the swipe-right gesture.
     /// </summary>
     public void ScheduleDelete() =>
         Pending.Schedule(

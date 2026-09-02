@@ -14,7 +14,8 @@ public static class SystemEndpoints
         app.MapGet("/api/system/features", (FeatureFlags flags) =>
             Results.Ok(new
             {
-                useMockProviders = flags.UseMockProviders
+                useMockProviders = flags.UseMockProviders,
+                enableWeather = flags.EnableWeather
             }))
             .AllowAnonymous()
             .WithName("GetFeatureFlags")

@@ -54,14 +54,18 @@ public sealed class CreateRouteValidator : AbstractValidator<CreateRouteCommand>
         RuleFor(x => x.EndTime).NotEmpty()
             .Matches(TimePattern).WithMessage("End time must be in HH:mm format.")
             .Must(t => TimeOnly.TryParse(t, out _)).WithMessage("End time must be a valid time of day.");
+        // Times are UTC on the wire, so a perfectly ordinary local window (e.g. 15:00–21:00
+        // EDT) lands as 19:00–01:00 UTC and wraps midnight. PollRouteJob.IsWithinWindow
+        // already evaluates a wrapped window correctly, and CreateWindowCommand already
+        // accepts one, so only the degenerate zero-length window is rejected here.
         RuleFor(x => x.EndTime)
             .Must((cmd, endTime) =>
             {
                 if (!TimeOnly.TryParse(cmd.StartTime, out TimeOnly s)) return true;
                 if (!TimeOnly.TryParse(endTime, out TimeOnly e)) return true;
-                return e > s;
+                return e != s;
             })
-            .WithMessage("End time must be after start time.");
+            .WithMessage("End time must be different from start time.");
         // Only the low 7 bits map to days (Mon–Sun); a high-bit-only mask like 0x80
         // would pass `m > 0` yet decode to zero real days and silently stall polling.
         RuleFor(x => x.DaysOfWeekMask)
@@ -146,5 +150,6 @@ public sealed class CreateRouteCommandHandler(
         r.JobChainId,
         r.CreatedAt,
         r.Windows.Select(w => w.ToDto()).ToList(),
-        r.ReturnRouteId);
+        r.ReturnRouteId,
+        r.IsSample);
 }

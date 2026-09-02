@@ -52,7 +52,6 @@
     <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.16.0" />
     <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.16.0" />
     <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.16.0" />
-    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.16.0" />
   </ItemGroup>
 
   <ItemGroup Label="Microsoft Extensions">
@@ -64,10 +63,6 @@
   <ItemGroup Label="Other">
     <PackageVersion Include="Radzen.Blazor" Version="11.1.4" />
     <PackageVersion Include="Scalar.AspNetCore" Version="2.16.11" />
-  </ItemGroup>
-
-  <ItemGroup Label="Build Tooling">
-    <PackageVersion Include="MinVer" Version="6.0.0" />
   </ItemGroup>
 
   <ItemGroup Label="Security">
@@ -85,7 +80,7 @@
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageVersion Include="Microsoft.Playwright" Version="1.52.0" />
     <PackageVersion Include="NSubstitute" Version="5.1.0" />
-    <PackageVersion Include="Testcontainers" Version="4.12.0" />
+    <PackageVersion Include="Testcontainers" Version="4.14.0" />
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.4" />
   </ItemGroup>

@@ -13,13 +13,12 @@
     <!-- Silence informational-only MSBuild messages that are not actionable warnings -->
     <NoWarn>$(NoWarn)</NoWarn>
     <!--
-      Git-driven versioning via MinVer (Rule 1 — Git-Driven Versioning).
-      MinVer reads the nearest git tag and produces a deterministic version
-      (e.g. 1.2.0+local.5.gabc123). Tag main with v1.0.0 to cut a release.
-      Override per-project with <MinVerSkip>true</MinVerSkip> if needed.
+      Git-driven versioning was configured here (MinVerTagPrefix / MinVerDefaultPreReleasePhase)
+      but MinVer was never referenced by any project, so the properties configured a package that
+      was not in the build and no version was ever produced from a tag. Removed rather than left
+      as a setting that looks load-bearing: to actually get tag-driven versions, add MinVer to
+      Directory.Packages.props and a PackageReference in the projects that should carry it.
     -->
-    <MinVerTagPrefix>v</MinVerTagPrefix>
-    <MinVerDefaultPreReleasePhase>preview</MinVerDefaultPreReleasePhase>
   </PropertyGroup>
 
 </Project>

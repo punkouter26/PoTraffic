@@ -69,10 +69,10 @@
                     </ChildContent>
                     <Helper>
                         <RadzenRequiredValidator Component="EndTime" Text="Set an end time." />
-                        @* The window is what the poller reads; an inverted one silently
+                        @* The window is what the poller reads; a zero-length one silently
                            never fires, so it is caught here rather than at the API. *@
-                        <RadzenCustomValidator Component="EndTime" Validator="@EndAfterStart"
-                                               Text="End time must be after start time." />
+                        <RadzenCustomValidator Component="EndTime" Validator="@EndDiffersFromStart"
+                                               Text="End time must be different from start time." />
                     </Helper>
                 </RadzenFormField>
             </div>
@@ -127,13 +127,20 @@
     private string? _destinationError;
     private string? _daysError;
 
-    /// <summary>Backs the RadzenCustomValidator on the end-time picker.</summary>
-    private bool EndAfterStart() =>
-        _startTime is null || _endTime is null || _endTime > _startTime;
-    // Default to the window the user is most likely to want right now: this
-    // minute through two hours from now, matching WindowConfigPanel's default.
+    /// <summary>
+    /// Backs the RadzenCustomValidator on the end-time picker. Only the time-of-day matters
+    /// to the poller, and a window may legitimately wrap midnight (start 21:00, end 03:00),
+    /// so the only unusable window is a zero-length one.
+    /// </summary>
+    private bool EndDiffersFromStart() =>
+        _startTime is null || _endTime is null ||
+        TimeOnly.FromDateTime(_endTime.Value) != TimeOnly.FromDateTime(_startTime.Value);
+
+    // Default to the window the user is most likely to want right now: this minute through
+    // six hours from now. The end may land on the following calendar day; that is a
+    // wrap-around window, which PollRouteJob evaluates correctly.
     private DateTime? _startTime = LocalNowToMinute();
-    private DateTime? _endTime  = LocalNowToMinute().AddHours(2);
+    private DateTime? _endTime = LocalNowToMinute().AddHours(6);
 
     // Current local wall-clock truncated to the minute. Also used by WindowConfigPanel
     // when adding a window to an existing route (defaults to now → now+2h there).
@@ -197,7 +204,7 @@
 
         // Belt and braces: the picker validators run first, but a submit that
         // somehow arrives with an unusable window must not reach the API.
-        if (_startTime is null || _endTime is null || _endTime <= _startTime)
+        if (_startTime is null || _endTime is null || !EndDiffersFromStart())
             return;
 
         _loading = true;

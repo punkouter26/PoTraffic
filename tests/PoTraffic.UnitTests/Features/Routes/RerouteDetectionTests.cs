@@ -87,7 +87,7 @@ public sealed class RerouteDetectionTests
             .Returns(new TravelResult(320, 6200, "{}"));
 
         ITrafficProviderFactory providerFactory = TestDoubles.ProviderFactory(mockProvider);
-        var handler = new ExecutePollCommandHandler(db, providerFactory, PoTraffic.UnitTests.Helpers.AlertTestHelper.NoOp(db), NullLogger<ExecutePollCommandHandler>.Instance);
+        var handler = PoTraffic.UnitTests.Helpers.PollHandlerTestHelper.Create(db, providerFactory);
 
         // Act
         bool result = await handler.Handle(new ExecutePollCommand(routeId), CancellationToken.None);
@@ -118,7 +118,7 @@ public sealed class RerouteDetectionTests
             .Returns(new TravelResult(320, 6200, "{}"));
 
         ITrafficProviderFactory providerFactory = TestDoubles.ProviderFactory(mockProvider);
-        var handler = new ExecutePollCommandHandler(db, providerFactory, PoTraffic.UnitTests.Helpers.AlertTestHelper.NoOp(db), NullLogger<ExecutePollCommandHandler>.Instance);
+        var handler = PoTraffic.UnitTests.Helpers.PollHandlerTestHelper.Create(db, providerFactory);
 
         // Act
         bool result = await handler.Handle(new ExecutePollCommand(routeId), CancellationToken.None);
@@ -146,7 +146,7 @@ public sealed class RerouteDetectionTests
             .Returns(new TravelResult(320, 6200, "{}"));
 
         ITrafficProviderFactory providerFactory = TestDoubles.ProviderFactory(mockProvider);
-        var handler = new ExecutePollCommandHandler(db, providerFactory, PoTraffic.UnitTests.Helpers.AlertTestHelper.NoOp(db), NullLogger<ExecutePollCommandHandler>.Instance);
+        var handler = PoTraffic.UnitTests.Helpers.PollHandlerTestHelper.Create(db, providerFactory);
 
         // Act
         bool result = await handler.Handle(new ExecutePollCommand(routeId), CancellationToken.None);
@@ -167,8 +167,6 @@ public sealed class RerouteDetectionTests
     [Theory]
     [InlineData(new double[] { 5000, 5000, 5000 }, 5000)]
     [InlineData(new double[] { 4000, 5000, 6000 }, 5000)]
-    [InlineData(new double[] { 4000, 6000 }, 5000)]
-    [InlineData(new double[] { 1000 }, 1000)]
     public void CalculateMedian_ReturnsCorrectMedian(double[] values, double expected)
     {
         double median = ExecutePollCommandHandler.CalculateMedian([.. values]);

@@ -61,6 +61,20 @@ else
         </div>
     }
 
+    @* Every chart below this is generated data. Saying so once, at the top, is the
+       difference between a demo and a fabrication. *@
+    @if (_route?.IsSample == true)
+    {
+        <div class="pt-sample-banner" role="note">
+            <PtIcon Name="science" Size="sm" />
+            <span>
+                This is a sample commute. Its history was generated to show what the app
+                looks like with a few weeks of data — nothing here was measured, and it is
+                never probed or counted against your quota.
+            </span>
+        </div>
+    }
+
     @if (_route is null)
     {
         @* Nothing ever loaded. Rendering the sections below in this state produced a
@@ -174,8 +188,6 @@ else
         <RouteMap Path="_path"
                   OriginLabel="@_originStreet"
                   DestinationLabel="@_destStreet" />
-
-        <RouteRibbon Path="_path" Samples="_ribbonSamples" />
     </RadzenCard>
 
     <RadzenCard>
@@ -212,6 +224,10 @@ else
     <RadzenCard>
         <RadzenText TextStyle="TextStyle.H3" class="pt-mb-1 pt-section-heading">Your week, hour by hour</RadzenText>
         <VolatilityHeatmap Heatmap="_heatmap" />
+
+        @* Sits under the weekly grid because it answers the question the grid provokes:
+           the grid shows that some mornings are worse, this says which of them were wet. *@
+        <WeatherImpact Impact="_weatherImpact" />
     </RadzenCard>
 
     </div>
@@ -234,9 +250,6 @@ else
     private OptimalDepartureDto? _optimalDeparture;
     private VolatilityHeatmapDto? _heatmap;
     private RoutePathDto? _path;
-
-    /// <summary>Today's durations in minutes, oldest first — the ribbon's height profile.</summary>
-    private double[] _ribbonSamples = [];
 
     /// <summary>
     /// The verdict the last render reacted to. The page refreshes every few seconds;
@@ -272,6 +285,15 @@ else
     /// </summary>
     private DateTimeOffset? _heatmapFetchedAt;
     private static readonly TimeSpan HeatmapMaxAge = TimeSpan.FromMinutes(5);
+
+    /// <summary>
+    /// Weather impact is the same shape of aggregate as the heatmap — the whole history
+    /// behind a picture that shifts over days, not seconds — so it rides the same cadence
+    /// rather than the 15-second refresh.
+    /// </summary>
+    private WeatherImpactResponse? _weatherImpact;
+    private DateTimeOffset? _weatherFetchedAt;
+    private static readonly TimeSpan WeatherMaxAge = TimeSpan.FromMinutes(5);
 
     // Cached rather than derived on each read: the markup reads it several times
     // per render, and re-sorting up to 300 records each time is pure waste.
@@ -393,7 +415,13 @@ else
             ? Http.GetFromJsonAsync($"/api/routes/{RouteId}/heatmap", AppJsonContext.Default.VolatilityHeatmapDto)
             : Task.FromResult(_heatmap);
 
-        await Task.WhenAll(routeTask, sessionsTask, historyTask, optimalTask, heatmapTask, pathTask);
+        bool refreshWeather = _weatherFetchedAt is not { } weatherAt
+            || DateTimeOffset.UtcNow - weatherAt > WeatherMaxAge;
+        Task<WeatherImpactResponse?> weatherTask = refreshWeather
+            ? Http.GetFromJsonAsync($"/api/routes/{RouteId}/weather-impact", AppJsonContext.Default.WeatherImpactResponse)
+            : Task.FromResult(_weatherImpact);
+
+        await Task.WhenAll(routeTask, sessionsTask, historyTask, optimalTask, heatmapTask, pathTask, weatherTask);
 
         _path = await pathTask;
         await AnnounceVerdictAsync();
@@ -432,7 +460,6 @@ else
             _todayPolls = [.. historyResult.Items.OrderBy(p => p.PolledAtDateTime)];
             LatestPoll = _todayPolls.Count > 0 ? _todayPolls[^1] : null;
             _trendPoints = [.. _todayPolls.Select(p => p.TravelDurationSeconds / 60.0)];
-            _ribbonSamples = _trendPoints;
             _trendLabels = [.. _todayPolls.Select(p => p.PolledAtDateTime.ToString("HH:mm"))];
 
             // A selection from the previous payload may no longer exist.
@@ -446,6 +473,10 @@ else
         _heatmap = await heatmapTask;
         if (refreshHeatmap)
             _heatmapFetchedAt = DateTimeOffset.UtcNow;
+
+        _weatherImpact = await weatherTask;
+        if (refreshWeather)
+            _weatherFetchedAt = DateTimeOffset.UtcNow;
     }
 
     /// <summary>
@@ -479,28 +510,12 @@ else
         if (_path is null)
             return;
 
-        await Fx.SetMoodAsync(_path.TrafficLevel);
-
-        // "unknown" is the absence of a verdict, not a verdict. Announcing it would
-        // mean a chime every time a brand-new route loads with no history.
-        if (_path.TrafficLevel == _announcedLevel || _path.TrafficLevel == "unknown")
-        {
-            _announcedLevel = _path.TrafficLevel;
-            return;
-        }
-
-        bool first = _announcedLevel is null;
+        // Track the verdict so a change is still detectable by anything that wants it.
+        // The chime, the confetti and the WebGL mood wash that used to fire here are gone
+        // with the ambience layer: ~40KB of JS and a synthesised cue set, on a page whose
+        // job is to tell you when to leave.
         _announcedLevel = _path.TrafficLevel;
-
-        // The first paint of a page is not news. Setting the mood above is enough;
-        // sound and confetti are for a result that CHANGED while you were watching.
-        if (first)
-            return;
-
-        await Fx.VerdictAsync(_path.TrafficLevel);
-
-        if (_path.TrafficLevel == "clear")
-            await Fx.CelebrateAsync();
+        return;
     }
 
     private async Task<OptimalDepartureDto?> GetOptimalDepartureAsync(string dayOfWeek)

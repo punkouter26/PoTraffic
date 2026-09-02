@@ -6,7 +6,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/PoTraffic.UnitTests/PoTraffic.UnitTests.csproj" />
-    <Project Path="tests/PoTraffic.Tests/PoTraffic.Tests.csproj" />
-    <Project Path="tests/PoTraffic.Tests.E2E/PoTraffic.Tests.E2E.csproj" />
+    <Project Path="tests/PoTraffic.IntegrationTests/PoTraffic.IntegrationTests.csproj" />
+    <Project Path="tests/PoTraffic.E2ETests/PoTraffic.E2ETests.csproj" />
   </Folder>
 </Solution>

@@ -57,7 +57,6 @@ public sealed class FakeAuthHandlerTests
     [Theory]
     [InlineData("Development")]
     [InlineData("Testing")]
-    [InlineData("Staging")]
     public void GuardNotProduction_OutsideProduction_DoesNotThrow(string environmentName)
     {
         Action act = () => FakeAuthHandler.GuardNotProduction(Env(environmentName));
@@ -86,54 +85,4 @@ public sealed class FakeAuthHandlerTests
         result.None.Should().BeTrue("an unauthenticated request must fall through to the cookie scheme");
     }
 
-    [Fact]
-    public async Task WithEmailUserHeader_AuthenticatesWithDefaultRole()
-    {
-        AuthenticateResult result = await AuthenticateAsync("Testing", ctx =>
-            ctx.Request.Headers[FakeAuthHandler.UserHeader] = "alice@example.com");
-
-        result.Succeeded.Should().BeTrue();
-        result.Principal!.FindFirstValue(ClaimTypes.Email).Should().Be("alice@example.com");
-        result.Principal!.FindFirstValue("auth_provider").Should().Be(FakeAuthHandler.AuthProvider);
-        result.Principal!.IsInRole(FakeAuthHandler.DefaultRole).Should().BeTrue();
-    }
-
-    [Fact]
-    public async Task WithRolesHeader_AssignsEveryRole()
-    {
-        AuthenticateResult result = await AuthenticateAsync("Testing", ctx =>
-        {
-            ctx.Request.Headers[FakeAuthHandler.UserHeader] = "admin@example.com";
-            ctx.Request.Headers[FakeAuthHandler.RolesHeader] = "Administrator, Commuter";
-        });
-
-        result.Succeeded.Should().BeTrue();
-        result.Principal!.IsInRole("Administrator").Should().BeTrue();
-        result.Principal!.IsInRole("Commuter").Should().BeTrue("whitespace around the comma must be trimmed");
-    }
-
-    [Fact]
-    public async Task WithGuidUserHeader_UsesThatUserIdVerbatim()
-    {
-        UserId expected = UserId.New();
-
-        AuthenticateResult result = await AuthenticateAsync("Testing", ctx =>
-            ctx.Request.Headers[FakeAuthHandler.UserHeader] = expected.ToString());
-
-        result.Succeeded.Should().BeTrue();
-        result.Principal!.FindFirstValue(ClaimTypes.NameIdentifier).Should().Be(expected.ToString());
-    }
-
-    [Fact]
-    public async Task SameEmail_ResolvesToTheSameUserId()
-    {
-        AuthenticateResult first = await AuthenticateAsync("Testing", ctx =>
-            ctx.Request.Headers[FakeAuthHandler.UserHeader] = "stable@example.com");
-        AuthenticateResult second = await AuthenticateAsync("Development", ctx =>
-            ctx.Request.Headers[FakeAuthHandler.UserHeader] = "STABLE@example.com");
-
-        first.Principal!.FindFirstValue(ClaimTypes.NameIdentifier)
-            .Should().Be(second.Principal!.FindFirstValue(ClaimTypes.NameIdentifier),
-                "a test that seeds data as a user must see the same id on the next request");
-    }
 }

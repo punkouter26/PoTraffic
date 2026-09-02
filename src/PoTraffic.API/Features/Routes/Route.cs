@@ -25,6 +25,17 @@ public sealed class Route
     public RouteId? ReturnRouteId { get; set; }
 
     /// <summary>
+    /// The demo route, whose history was generated rather than polled (#10). A new account
+    /// has nothing to look at for days — every chart on this app needs accumulated samples
+    /// — so one seeded route makes the product legible immediately.
+    ///
+    /// <para>A sample route is never polled and never charged: it is created Paused with no
+    /// monitoring window, and its samples are excluded from quota and cost reporting. Both
+    /// facts have to hold, or the demo silently spends the user's daily quota.</para>
+    /// </summary>
+    public bool IsSample { get; set; }
+
+    /// <summary>
     /// The road shape between origin and destination, as a Google-encoded polyline.
     /// Fetched lazily the first time the route's map is opened and kept forever — the
     /// roads between two fixed addresses do not change between probes, so this is one

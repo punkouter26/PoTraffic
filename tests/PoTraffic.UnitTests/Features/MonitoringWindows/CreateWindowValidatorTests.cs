@@ -42,9 +42,8 @@ public sealed class CreateWindowValidatorTests
     }
 
     [Theory]
-    [InlineData(8, 0, 8, 0, "00:00–08:00 would be an empty window")]
     [InlineData(0, 0, 0, 0, "midnight-to-midnight is a zero-width window")]
-    [InlineData(13, 21, 13, 21, "13:21–13:21 — same as the exact regressed UTC pair")]
+    [InlineData(13, 21, 13, 21, "13:21–13:21 — the exact regressed UTC pair")]
     public void Rejects_StartEqualsEnd(int sh, int sm, int eh, int em, string because)
     {
         CreateWindowCommand cmd = BuildCommand(new TimeOnly(sh, sm), new TimeOnly(eh, em));

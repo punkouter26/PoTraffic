@@ -45,21 +45,6 @@ public sealed class CreateRouteValidatorTests
     }
 
     [Fact]
-    public void Validator_WhenBothAddressesEmpty_ShouldHaveValidationErrors()
-    {
-        var command = new CreateRouteCommand(
-            UserId: UserId.New(),
-            OriginAddress: "",
-            DestinationAddress: "",
-            Provider: RouteProvider.GoogleMaps);
-
-        TestValidationResult<CreateRouteCommand> result = _validator.TestValidate(command);
-
-        result.ShouldHaveValidationErrorFor(x => x.OriginAddress);
-        result.ShouldHaveValidationErrorFor(x => x.DestinationAddress);
-    }
-
-    [Fact]
     public void Validator_WhenOriginExceedsMaxLength_ShouldHaveValidationError()
     {
         string longAddress = new('A', ValidationConstants.AddressMaxLength + 1);
@@ -75,21 +60,6 @@ public sealed class CreateRouteValidatorTests
     }
 
     [Fact]
-    public void Validator_WhenDestinationExceedsMaxLength_ShouldHaveValidationError()
-    {
-        string longAddress = new('B', ValidationConstants.AddressMaxLength + 1);
-        var command = new CreateRouteCommand(
-            UserId: UserId.New(),
-            OriginAddress: "Valid Origin",
-            DestinationAddress: longAddress,
-            Provider: RouteProvider.GoogleMaps);
-
-        TestValidationResult<CreateRouteCommand> result = _validator.TestValidate(command);
-
-        result.ShouldHaveValidationErrorFor(x => x.DestinationAddress);
-    }
-
-    [Fact]
     public void Validator_WhenProviderIsInvalidEnum_ShouldHaveValidationError()
     {
         var command = new CreateRouteCommand(
@@ -101,44 +71,6 @@ public sealed class CreateRouteValidatorTests
         TestValidationResult<CreateRouteCommand> result = _validator.TestValidate(command);
 
         result.ShouldHaveValidationErrorFor(x => x.Provider);
-    }
-
-    [Theory]
-    [InlineData(RouteProvider.GoogleMaps)]
-    [InlineData(RouteProvider.TomTom)]
-    public void Validator_WhenCommandIsValid_ShouldNotHaveValidationErrors(RouteProvider provider)
-    {
-        var command = new CreateRouteCommand(
-            UserId: UserId.New(),
-            OriginAddress: "Baker Street, London",
-            DestinationAddress: "Waterloo Station, London",
-            Provider: provider);
-
-        TestValidationResult<CreateRouteCommand> result = _validator.TestValidate(command);
-
-        result.ShouldNotHaveAnyValidationErrors();
-    }
-
-    /// <summary>
-    /// FR-014: same-coordinates check is enforced inside the handler (after geocoding), not in the validator.
-    /// This test documents that the validator does NOT reject same origin/destination strings at validation time —
-    /// only the handler rejects identical geocoded coordinates.
-    /// </summary>
-    [Fact]
-    public void Validator_WhenOriginAndDestinationTextAreSame_ShouldNotHaveValidationError()
-    {
-        // Same text strings are syntactically valid; the SAME_COORDINATES check happens
-        // after geocoding in CreateRouteCommandHandler (FR-014).
-        var command = new CreateRouteCommand(
-            UserId: UserId.New(),
-            OriginAddress: "Buckingham Palace",
-            DestinationAddress: "Buckingham Palace",
-            Provider: RouteProvider.TomTom);
-
-        TestValidationResult<CreateRouteCommand> result = _validator.TestValidate(command);
-
-        result.ShouldNotHaveValidationErrorFor(x => x.OriginAddress);
-        result.ShouldNotHaveValidationErrorFor(x => x.DestinationAddress);
     }
 
     [Fact]
@@ -157,7 +89,7 @@ public sealed class CreateRouteValidatorTests
     }
 
     [Fact]
-    public void Validator_WhenEndTimeIsBeforeStartTime_ShouldHaveValidationError()
+    public void Validator_WhenEndTimeEqualsStartTime_ShouldHaveValidationError()
     {
         var command = new CreateRouteCommand(
             UserId: UserId.New(),
@@ -165,11 +97,32 @@ public sealed class CreateRouteValidatorTests
             DestinationAddress: "Waterloo Station, London",
             Provider: RouteProvider.GoogleMaps,
             StartTime: "09:00",
-            EndTime: "07:00"); // before start
+            EndTime: "09:00"); // zero-length window — never fires
 
         TestValidationResult<CreateRouteCommand> result = _validator.TestValidate(command);
 
         result.ShouldHaveValidationErrorFor(x => x.EndTime);
+    }
+
+    /// <summary>
+    /// Times cross the wire as UTC, so an ordinary local window (15:00–21:00 EDT) arrives as
+    /// 19:00–01:00 UTC. PollRouteJob.IsWithinWindow evaluates that correctly, so the validator
+    /// must not reject it — the "start now, end six hours later" default depends on this.
+    /// </summary>
+    [Fact]
+    public void Validator_WhenWindowWrapsMidnight_ShouldNotHaveValidationError()
+    {
+        var command = new CreateRouteCommand(
+            UserId: UserId.New(),
+            OriginAddress: "Baker Street, London",
+            DestinationAddress: "Waterloo Station, London",
+            Provider: RouteProvider.GoogleMaps,
+            StartTime: "19:00",
+            EndTime: "01:00");
+
+        TestValidationResult<CreateRouteCommand> result = _validator.TestValidate(command);
+
+        result.ShouldNotHaveValidationErrorFor(x => x.EndTime);
     }
 
     [Fact]

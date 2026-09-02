@@ -10,6 +10,11 @@ public static class QuotaConstants
     // against. Below it the client shows how far along the route is rather than
     // presenting an estimate built on a handful of points as settled fact.
     public const int BaselineConfidentSampleCount = 60;
+    // Polls under one weather condition before its effect is presented as a number rather
+    // than as "still watching". Twelve is an hour of fast-cadence polling — enough that one
+    // freak crash on one rainy morning cannot define what rain costs.
+    public const int WeatherImpactMinSamples = 12;
+
     public const int PollIntervalMinutes = 5;
     public const int RetentionDays = 90;
 

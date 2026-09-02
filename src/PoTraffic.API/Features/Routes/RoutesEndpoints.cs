@@ -9,8 +9,11 @@ using PoTraffic.Shared.Enums;
 
 namespace PoTraffic.API.Features.Routes;
 
-/// <summary>Request DTO for the standalone verify-address endpoint.</summary>
-public sealed record VerifySingleAddressRequest(string Address, int Provider);
+/// <summary>
+/// Request DTO for the sample-route endpoint. The offset is the browser's, so the generated
+/// commute lands on the user's morning; a missing body defaults it to UTC.
+/// </summary>
+public sealed record CreateSampleRouteRequest(int UtcOffsetMinutes);
 
 public static class RoutesEndpoints
 {
@@ -24,41 +27,33 @@ public static class RoutesEndpoints
 
         group.MapGet("", GetRoutes);
         group.MapPost("", CreateRoute);
-        // Modernization: Dynamic provider discovery for UI
-        group.MapGet("providers", GetProviders);
-        // Standalone verify — no route ID required (used by create-route form)
-        group.MapPost("verify-address", VerifySingleAddress);
+        // Sample route with synthetic history, for an account that has nothing to show yet (#10)
+        group.MapPost("sample", CreateSampleRoute);
         group.MapDelete("{routeId:guid}", DeleteRoute);
         group.MapPost("{routeId:guid}/check-now", CheckNow);
         group.MapPost("{routeId:guid}/return-trip", CreateReturnTrip);
         // Road shape + how today compares, for the map on the route detail page.
         group.MapGet("{routeId:guid}/path", GetRoutePath);
-        // Sample route with synthetic history, for an account that has nothing to show yet (#10)
         return app;
-    }
-
-    private static IResult GetProviders()
-    {
-        // Strategy discovery — list all available RouteProvider enum values
-        var list = Enum.GetValues<RouteProvider>()
-            .Select(p => new { value = (int)p, label = p.ToString() });
-        return Results.Ok(list);
     }
 
     private static UserId? ExtractUserId(ClaimsPrincipal user, ILogger? logger = null)
         => user.GetUserIdOrNull(logger);
 
-    // POST /api/routes/verify-address
-    private static async Task<IResult> VerifySingleAddress(
+    // POST /api/routes/sample
+    private static async Task<IResult> CreateSampleRoute(
+        HttpContext context,
         ISender sender,
-        [FromBody] VerifySingleAddressRequest request)
+        ILogger<LogCategory> logger,
+        [FromBody] CreateSampleRouteRequest? request = null)
     {
-        VerifySingleAddressResult result = await sender.Send(
-            new VerifySingleAddressCommand(request.Address, (RouteProvider)request.Provider));
+        UserId? userId = ExtractUserId(context.User, logger);
+        if (userId is null) return Results.Unauthorized();
 
-        return result.IsValid
-            ? Results.Ok(new { isValid = true, coordinates = result.Coordinates })
-            : Results.UnprocessableEntity(new { isValid = false, errorCode = result.ErrorCode });
+        RouteDto route = await sender.Send(
+            new CreateSampleRouteCommand(userId.Value, request?.UtcOffsetMinutes ?? 0));
+
+        return Results.Ok(route);
     }
 
     // GET /api/routes?page=1&pageSize=20

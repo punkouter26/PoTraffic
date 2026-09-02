@@ -13,6 +13,8 @@ public static class TestingEndpoints
     private sealed record SeedAdminResponse(string Email);
     private sealed record SeedRouteRequest(string UserEmail, string OriginAddress, string DestinationAddress, int Provider);
     private sealed record SeedRouteResponse(RouteId RouteId, string OriginAddress, string DestinationAddress);
+    private sealed record ExecutePollRequest(RouteId RouteId);
+    private sealed record ExecutePollResponse(bool Recorded);
 
     // Marker nested type used as ILogger<T> category
     private sealed class LogCategory;
@@ -36,7 +38,36 @@ public static class TestingEndpoints
         // POST /e2e/seed-route — creates a route directly in DB for a given user email
         group.MapPost("/seed-route", SeedRoute).AllowAnonymous();
 
+        // POST /e2e/execute-poll — runs one poll for a route, synchronously
+        group.MapPost("/execute-poll", ExecutePoll).AllowAnonymous();
+
         return app;
+    }
+
+    /// <summary>
+    /// Runs a single <see cref="ExecutePollCommand"/> against a route and returns whether it
+    /// recorded a sample.
+    ///
+    /// <para>
+    /// Testing registers <c>NoOpJobScheduler</c> and no background worker, so nothing in this
+    /// environment ever polls on its own. An E2E test that waits for the scheduler therefore
+    /// waits forever — the correct fix is to let the test ask for the poll rather than to run
+    /// a real one-second-tick worker underneath every other E2E test, mutating their routes
+    /// while they assert on them. The scheduler's own timing rules (window matching, next-start
+    /// calculation, adaptive cadence) are covered by unit and integration tests; what this
+    /// endpoint buys the E2E tier is proof that a poll travels the whole HTTP-to-storage path
+    /// on the live host.
+    /// </para>
+    /// </summary>
+    private static async Task<IResult> ExecutePoll(
+        [FromBody] ExecutePollRequest request,
+        ISender sender,
+        ILogger<LogCategory> logger,
+        CancellationToken ct)
+    {
+        bool recorded = await sender.Send(new ExecutePollCommand(request.RouteId), ct);
+        logger.LogInformation("[E2E] Poll for route {RouteId} recorded={Recorded}.", request.RouteId, recorded);
+        return Results.Ok(new ExecutePollResponse(recorded));
     }
 
     private static async Task<IResult> DevLogin(

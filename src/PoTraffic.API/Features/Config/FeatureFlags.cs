@@ -12,10 +12,14 @@ namespace PoTraffic.API.Features.Config;
 /// on mocks while telling the client it was live.
 /// </para>
 /// </summary>
-public sealed record FeatureFlags(bool UseMockProviders)
+public sealed record FeatureFlags(bool UseMockProviders, bool EnableWeather)
 {
     /// <summary>Evaluates the flags from configuration and the host environment.</summary>
     public static FeatureFlags Resolve(IConfiguration configuration, IHostEnvironment environment) => new(
         UseMockProviders: environment.IsEnvironment("Testing")
-            || configuration.GetValue<bool>("Features:UseMockProviders"));
+            || configuration.GetValue<bool>("Features:UseMockProviders"),
+        // Defaults on: the conditions feed needs no key and no secret, and a route with
+        // weather recorded from day one can answer "is rain the reason" months later —
+        // whereas switching it on late leaves a permanent blind spot in the history.
+        EnableWeather: configuration.GetValue("Features:EnableWeather", true));
 }

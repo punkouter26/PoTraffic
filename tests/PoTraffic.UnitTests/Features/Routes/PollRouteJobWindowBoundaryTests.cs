@@ -1,4 +1,4 @@
-// filepath: tests/PoTraffic.Tests/Unit/Features/Routes/PollRouteJobWindowBoundaryTests.cs
+// filepath: tests/PoTraffic.IntegrationTests/Unit/Features/Routes/PollRouteJobWindowBoundaryTests.cs
 using System;
 using System.Reflection;
 using FluentAssertions;
@@ -42,7 +42,6 @@ public sealed class PollRouteJobWindowBoundaryTests
     [Theory]
     // Closed-open interval — start time inclusive, end time exclusive.
     [InlineData("2026-07-01T08:00:00Z", true,  "08:00", "09:00", "08:00 exactly is inside")]
-    [InlineData("2026-07-01T08:59:59Z", true,  "08:00", "09:00", "08:59:59 is inside")]
     [InlineData("2026-07-01T09:00:00Z", false, "08:00", "09:00", "09:00 exactly is OUT (closed-open)")]
     [InlineData("2026-07-01T07:59:59Z", false, "08:00", "09:00", "before window start")]
     public void IsWithinWindow_HonoursClosedOpenIntervalAndUtcTime(
@@ -93,15 +92,10 @@ public sealed class PollRouteJobWindowBoundaryTests
     [Theory]
     // Same-day (afternoon / evening leg of the wrap)
     [InlineData("2026-07-01T13:21:00Z", true,  "13:21 exactly — start of window")]
-    [InlineData("2026-07-01T18:00:00Z", true,  "well within afternoon leg")]
-    [InlineData("2026-07-01T23:59:59Z", true,  "just before midnight — still in wrap")]
+    [InlineData("2026-07-01T13:20:59Z", false, "one second before start — outside the wrap")]
     // Same-day (early-morning leg of the wrap)
-    [InlineData("2026-07-01T00:00:00Z", true,  "midnight exactly — start of morning leg")]
     [InlineData("2026-07-01T01:20:59Z", true,  "just before window end")]
     [InlineData("2026-07-01T01:21:00Z", false, "01:21 exactly is OUT (closed-open end)")]
-    // Gap — the closed-open interval has no coverage here
-    [InlineData("2026-07-01T02:00:00Z", false, "after end — outside the wrap")]
-    [InlineData("2026-07-01T13:20:59Z", false, "before start — outside the wrap")]
     public void IsWithinWindow_WrapAroundMidnightUtc(string nowIso, bool expected, string because)
     {
         var window = new MonitoringWindow

@@ -160,3 +160,6 @@ output.json
 # Tracked per AGENTS.md §11 / local-tools skill — do not ignore.
 !.config/dotnet-tools.json
 publish-test/
+
+# curl cookie jars from manual API probing — contain live session cookies
+cookies*.txt

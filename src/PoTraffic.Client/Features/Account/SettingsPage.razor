@@ -168,14 +168,14 @@
     </section>
 
     <section class="pt-settings-section" id="settings-effects">
-        <RadzenText TextStyle="TextStyle.H3" class="pt-mb-2 pt-section-heading">Effects &amp; sound</RadzenText>
+        <RadzenText TextStyle="TextStyle.H3" class="pt-mb-2 pt-section-heading">Motion</RadzenText>
 
         <RadzenStack Gap="1.5rem" class="pt-mt-4">
             <div>
                 <RadzenText TextStyle="TextStyle.Subtitle2" class="pt-mb-1">Motion</RadzenText>
                 <RadzenText TextStyle="TextStyle.Caption" class="pt-mb-2 pt-settings-meta">
-                    Full adds the moving background, the traffic flow on the map, and
-                    animated charts. Still keeps the colours but stops the movement.
+                    Full animates the traffic flow on the map and the charts.
+                    Still keeps the colours but stops the movement.
                 </RadzenText>
                 <RadzenSelectBar TValue="MotionLevel" Value="@Fx.Motion" Change="@OnMotionChanged"
                                  Size="ButtonSize.Medium" aria-label="Motion">
@@ -198,26 +198,6 @@
                 }
             </div>
 
-            <div>
-                <RadzenText TextStyle="TextStyle.Subtitle2" class="pt-mb-1">Sound</RadzenText>
-                <RadzenText TextStyle="TextStyle.Caption" class="pt-mb-2 pt-settings-meta">
-                    Short musical cues when a check finishes or something is saved.
-                    Nothing is downloaded — the sounds are generated in the browser.
-                </RadzenText>
-                <RadzenSwitch Value="@Fx.SoundEnabled" Change="@OnSoundChanged" aria-label="Sound effects" />
-
-                @if (Fx.SoundEnabled)
-                {
-                    <div class="pt-volume-row pt-mt-3">
-                        <PtIcon Name="volume_down" Size="sm" />
-                        <RadzenSlider TValue="double" Value="@Fx.Volume" Min="0" Max="1" Step="0.05"
-                                      Change="@OnVolumeChanged" aria-label="Volume" class="pt-volume-slider" />
-                        <PtIcon Name="volume_up" Size="sm" />
-                        <RadzenButton Text="Test" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small"
-                                      Click="@TestSoundAsync" />
-                    </div>
-                }
-            </div>
         </RadzenStack>
     </section>
 
@@ -466,11 +446,6 @@
         _theme = theme;
         if (_appearance is not null)
             await _appearance.InvokeVoidAsync("setTheme", theme);
-
-        // The background wash resolves its palette from the design tokens, which have
-        // just changed meaning. Without this it keeps the old theme's colours until
-        // something else forces it to rebuild.
-        await Fx.RefreshThemeAsync();
     }
 
     private async Task OnDensityChanged(object? value)
@@ -557,34 +532,6 @@
         bool PrefersReducedMotion);
 
     private async Task OnMotionChanged(MotionLevel level) => await Fx.SetMotionAsync(level);
-
-    private async Task OnSoundChanged(bool enabled)
-    {
-        await Fx.SetSoundAsync(enabled);
-        // Turning sound ON from a click is the one moment the browser will let us
-        // unlock the audio context, so the very next cue is audible rather than the
-        // one after it.
-        if (enabled)
-        {
-            await Fx.UnlockAudioAsync();
-            await Fx.PlayAsync("save");
-        }
-    }
-
-    private async Task OnVolumeChanged(double volume)
-    {
-        await Fx.SetVolumeAsync(volume);
-        await Fx.UnlockAudioAsync();
-        // Play at the new level as it is dragged — a volume slider with no audible
-        // feedback is a slider you have to guess at.
-        await Fx.PlayAsync("click");
-    }
-
-    private async Task TestSoundAsync()
-    {
-        await Fx.UnlockAudioAsync();
-        await Fx.PlayAsync("success");
-    }
 
     /// <summary>Shows the browser's own install dialog.</summary>
     private async Task InstallAsync()

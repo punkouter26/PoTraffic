@@ -11,10 +11,11 @@ namespace PoTraffic.Client.Infrastructure.Http;
 
 // ── Client-side contracts (previously anonymous objects or page-private records) ──
 public sealed record ProvidersResponse(List<string> Providers, bool GuestEnabled);
-public sealed record FeatureFlags(bool UseMockProviders);
+public sealed record FeatureFlags(bool UseMockProviders, bool EnableWeather);
 public sealed record CheckNowResponse(int DurationSeconds, int DistanceMetres);
 public sealed record StopSessionRequest(SessionId SessionId);
 public sealed record SaveWindowRequest(string StartTime, string EndTime, byte DaysOfWeekMask);
+public sealed record CreateSampleRouteRequest(int UtcOffsetMinutes);
 
 /// <summary>
 /// Everything the dashboard renders, in one cacheable payload.
@@ -77,5 +78,7 @@ public static class ClientCacheKeys
 [JsonSerializable(typeof(AlertDto))]
 [JsonSerializable(typeof(StopSessionRequest))]
 [JsonSerializable(typeof(SaveWindowRequest))]
+[JsonSerializable(typeof(WeatherImpactResponse))]
+[JsonSerializable(typeof(CreateSampleRouteRequest))]
 [JsonSerializable(typeof(DashboardSnapshot))]
 internal sealed partial class AppJsonContext : JsonSerializerContext;

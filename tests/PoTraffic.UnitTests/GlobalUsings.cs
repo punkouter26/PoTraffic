@@ -26,7 +26,7 @@ internal static class UnitTierGuard
         // a sentinel trace write to the AppContext — if a handler ever
         // resolves a System.Net.Http.HttpClient here, the smoke assertion
         // below would fail.
-        AppContext.SetSwitch("PoTraffic.Tests.UnitTier", true);
+        AppContext.SetSwitch("PoTraffic.IntegrationTests.UnitTier", true);
     }
 }
 
@@ -49,7 +49,7 @@ public sealed class UnitTierFixture
         // the build will still succeed but the test will fail with the message
         // below. We assert that the AppContext switch was set (proving the
         // module initializer ran) and that no forbidden assemblies are loaded.
-        if (!AppContext.TryGetSwitch("PoTraffic.Tests.UnitTier", out bool ok) || !ok)
+        if (!AppContext.TryGetSwitch("PoTraffic.IntegrationTests.UnitTier", out bool ok) || !ok)
             throw new InvalidOperationException(
                 "UnitTierGuard module initializer did not run — the Unit test " +
                 "assembly is corrupted. Re-run `dotnet build`.");

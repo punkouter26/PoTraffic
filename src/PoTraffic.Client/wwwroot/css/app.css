@@ -1310,112 +1310,170 @@ details[open] > summary .pt-collapsible-icon { transform: rotate(90deg); }
 [data-motion="off"] .pt-skeleton-card::after { animation: none; opacity: 0; }
 
 /* ═══════════════════════════════════════════════
-   3D route ribbon
+   Sample route markers
    ═══════════════════════════════════════════════ */
 
-.pt-ribbon-block {
-    margin-top: var(--pt-space-3);
+/* Quiet by design. It has to be legible enough that nobody mistakes generated data
+   for measured data, and plain enough that it never competes with the answer. */
+.pt-sample-chip {
+    background: var(--pt-bg-tint-strong);
+    border-radius: var(--pt-radius-full);
+    color: var(--pt-fg-muted);
+    font-size: var(--pt-text-xs);
+    font-weight: var(--pt-weight-semibold);
+    letter-spacing: 0.02em;
+    margin-inline-start: var(--pt-space-2);
+    padding: 0.1rem 0.45rem;
+    text-transform: uppercase;
+    white-space: nowrap;
 }
 
-.pt-ribbon-toggle {
+.pt-sample-banner {
     align-items: center;
     background: var(--pt-bg-tint);
     border: 1px solid var(--pt-border-subtle);
-    border-radius: var(--pt-radius-full);
+    border-radius: var(--pt-radius-md);
     color: var(--pt-fg-body);
-    cursor: pointer;
-    display: inline-flex;
+    display: flex;
     font-size: var(--pt-text-sm);
-    font-weight: var(--pt-weight-semibold);
-    gap: 0.45rem;
-    padding: 0.4rem 0.9rem;
-    transition: background-color var(--pt-dur-fast) var(--pt-ease);
+    gap: var(--pt-space-2);
+    line-height: var(--pt-leading-normal);
+    margin-bottom: var(--pt-space-3);
+    padding: var(--pt-space-3);
 }
 
-.pt-ribbon-toggle:hover { background: var(--pt-bg-tint-strong); }
+/* The empty state had one button and stacked naturally; with two it needs to wrap
+   rather than push the secondary action off a narrow screen. */
+.pt-empty-state-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--pt-space-2);
+    justify-content: center;
+}
 
-.pt-ribbon-loading {
+/* ═══════════════════════════════════════════════
+   Weather impact
+   ═══════════════════════════════════════════════ */
+
+.pt-weather {
+    margin-top: var(--pt-space-4);
+}
+
+.pt-weather-lede {
+    color: var(--pt-fg-body);
+    font-size: var(--pt-text-sm);
+    line-height: var(--pt-leading-normal);
+    margin: 0 0 var(--pt-space-3);
+    max-width: var(--pt-measure);
+}
+
+.pt-weather-rows {
+    display: flex;
+    flex-direction: column;
+    gap: var(--pt-space-2);
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+/* Four columns on a comfortable viewport: label, bar, delta, sample count. The bar
+   column is the flexible one so the numbers stay in their own aligned tracks. */
+.pt-weather-row {
+    align-items: center;
+    display: grid;
+    gap: var(--pt-space-2);
+    grid-template-columns: 7rem 1fr auto;
+    grid-template-areas: "name track delta" "count count count";
+}
+
+@container pt-main (min-width: 34rem) {
+    .pt-weather-row {
+        grid-template-columns: 7rem 1fr 4.5rem 9rem;
+        grid-template-areas: "name track delta count";
+    }
+}
+
+.pt-weather-name {
+    align-items: center;
+    color: var(--pt-fg-body);
+    display: inline-flex;
+    font-size: var(--pt-text-sm);
+    font-weight: var(--pt-weight-medium);
+    gap: 0.35rem;
+    grid-area: name;
+}
+
+/* The track is the baseline: its centre line is "the usual time for this slot", and a
+   bar grows out from there in the direction of the effect. */
+.pt-weather-track {
+    background: var(--pt-bg-sunken);
+    border-radius: var(--pt-radius-full);
+    display: block;
+    grid-area: track;
+    height: 0.5rem;
+    position: relative;
+}
+
+.pt-weather-track::before {
+    background: var(--pt-border-strong);
+    content: "";
+    inset-block: -0.15rem;
+    inset-inline-start: 50%;
+    position: absolute;
+    width: 1px;
+}
+
+.pt-weather-bar {
+    border-radius: var(--pt-radius-full);
+    height: 100%;
+    position: absolute;
+    top: 0;
+    transition: width var(--pt-dur-base) var(--pt-ease);
+}
+
+.pt-weather-bar.is-slower {
+    background: var(--pt-traffic-slow);
+    inset-inline-start: 50%;
+}
+
+.pt-weather-bar.is-faster {
+    background: var(--pt-traffic-clear);
+    /* Grows leftwards from the centre — right edge pinned, width extends back. */
+    inset-inline-end: 50%;
+}
+
+.pt-weather-delta {
+    color: var(--pt-fg-strong);
+    font-size: var(--pt-text-sm);
+    font-variant-numeric: tabular-nums;
+    font-weight: var(--pt-weight-semibold);
+    grid-area: delta;
+    text-align: end;
+}
+
+/* A number built on too few samples is shown, but never with the visual authority of
+   one that has earned it. */
+.pt-weather-delta.is-provisional {
     color: var(--pt-fg-muted);
     font-weight: var(--pt-weight-regular);
 }
 
-.pt-ribbon-stage {
-    border: 1px solid var(--pt-border-subtle);
-    border-radius: var(--pt-radius-md);
-    /* Three.js measures this element, so the height has to be a real length — a
-       percentage of an auto-height parent resolves to zero and renders nothing. */
-    height: 18rem;
-    margin-top: var(--pt-space-3);
-    overflow: hidden;
-    /* Sits on the sunken tone rather than the card, so the object reads as being
-       inside a stage instead of floating on the page. */
-    background:
-        radial-gradient(ellipse at 50% 120%,
-            light-dark(rgb(59 130 246 / 0.10), rgb(59 130 246 / 0.16)),
-            transparent 65%),
-        var(--pt-bg-sunken);
-    touch-action: pan-y;
-}
-
-@container pt-main (min-width: 40rem) {
-    .pt-ribbon-stage { height: 24rem; }
-}
-
-.pt-ribbon-stage canvas {
-    display: block;
-    width: 100%;
-    height: 100%;
-}
-
-.pt-ribbon-caption {
+.pt-weather-count {
     color: var(--pt-fg-muted);
-    font-size: 0.8125rem;
-    margin: var(--pt-space-2) 0 0;
+    font-size: var(--pt-text-xs);
+    grid-area: count;
+    text-align: start;
 }
 
-/* Empty state for routes with no road polyline — Three.js can't render
-   anything meaningful over two points, so mount nothing and tell the
-   user what the 3D view is waiting for instead. */
-.pt-ribbon-empty {
-    align-items: center;
-    background: var(--pt-bg-tint);
-    border-radius: var(--pt-radius-md);
+@container pt-main (min-width: 34rem) {
+    .pt-weather-count { text-align: end; }
+}
+
+.pt-weather-note {
     color: var(--pt-fg-muted);
-    display: flex;
-    flex-direction: column;
-    gap: var(--pt-space-2);
-    height: 24rem;
-    justify-content: center;
-    padding: var(--pt-space-6);
-    text-align: center;
-}
-
-.pt-ribbon-empty-title {
-    color: var(--pt-fg-default);
-    font-size: 1rem;
-    font-weight: 600;
-}
-
-.pt-ribbon-empty-text {
-    font-size: 0.875rem;
-    line-height: 1.45;
-    max-width: 28rem;
-}
-
-/* ═══════════════════════════════════════════════
-   Volume row (Settings → Effects & sound)
-   ═══════════════════════════════════════════════ */
-
-.pt-volume-row {
-    align-items: center;
-    display: flex;
-    gap: var(--pt-space-3);
-    max-width: 26rem;
-}
-
-.pt-volume-slider {
-    flex: 1 1 auto;
-    min-width: 0;
+    font-size: var(--pt-text-xs);
+    margin: var(--pt-space-3) 0 0;
+    max-width: var(--pt-measure);
 }
 
 /* ═══════════════════════════════════════════════
@@ -1514,7 +1572,6 @@ details[open] > summary .pt-collapsible-icon { transform: rotate(90deg); }
    pixel they can get. */
 
 .pt-empty-state-text,
-.pt-ribbon-caption,
 .pt-map-legend,
 .pt-settings-meta {
     max-width: var(--pt-measure);
@@ -1523,4 +1580,30 @@ details[open] > summary .pt-collapsible-icon { transform: rotate(90deg); }
 .pt-empty-state-text {
     /* Centred blocks need the margin too, or the cap just pushes them left. */
     margin-inline: auto;
+}
+
+/* ═══════════════════════════════════════════════
+   Route card actions
+   ═══════════════════════════════════════════════ */
+
+/* Sits at the card's trailing edge, quiet until the card is hovered or something inside
+   it takes focus — but always in the tab order, because a control that only appears on
+   hover is a control a keyboard user does not have. */
+.pt-route-card-actions {
+    display: flex;
+    gap: var(--pt-space-1);
+    justify-content: flex-end;
+    margin-top: var(--pt-space-2);
+    opacity: 0.55;
+    transition: opacity var(--pt-dur-fast) var(--pt-ease);
+}
+
+.pt-route-card:hover .pt-route-card-actions,
+.pt-route-card-actions:focus-within {
+    opacity: 1;
+}
+
+@media (hover: none) {
+    /* No hover to reveal them on touch, where the swipe gestures are the primary path. */
+    .pt-route-card-actions { opacity: 1; }
 }

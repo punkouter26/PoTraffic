@@ -54,14 +54,6 @@ public static class AdminEndpoints
         .WithName("GetRecentVolatility")
         .Produces<IReadOnlyList<RecentVolatilityPointDto>>();
 
-        grp.MapGet("/poll-cost-summary", async (ISender sender, CancellationToken ct) =>
-        {
-            IReadOnlyList<PollCostSummaryDto> summary = await sender.Send(new GetPollCostSummaryQuery(), ct);
-            return Results.Ok(summary);
-        })
-        .WithName("GetPollCostSummary")
-        .Produces<IReadOnlyList<PollCostSummaryDto>>();
-
         grp.MapPut("/configuration/{key}", async (
             string key,
             [FromBody] UpdateConfigRequest body,

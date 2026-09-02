@@ -19,6 +19,10 @@
 @using Radzen.Blazor
 @using PoTraffic.Client.Infrastructure
 @using PoTraffic.Client.Components
+@* Feature components resolve here too: Components/ holds only the shared, generic pieces
+   (PtIcon, PageHeader, UndoBar...), and anything that knows what a route is lives in its
+   own slice. RouteMap, TrendChart and VolatilityHeatmap moved for exactly that reason. *@
+@using PoTraffic.Client.Features.Routes
 @using PoTraffic.Shared.Constants
 @using PoTraffic.Client.Infrastructure.Http
 @using PoTraffic.Shared.DTOs.History

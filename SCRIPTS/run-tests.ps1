@@ -7,11 +7,11 @@
 .DESCRIPTION
     Tier ratio enforced: 100 / 50 / 25 / 25.
       • PoTraffic.UnitTests          → 100% (no I/O, FluentValidation, DTO mapping)
-      • PoTraffic.Tests              →  50% (WAF + Azurite via Testcontainers, IAsyncDisposable)
-      • PoTraffic.Tests.E2E/Api      →  25% (live HTTP)
-      • PoTraffic.Tests.E2E/Ui       →  25% (Playwright mobile + desktop landscape)
+      • PoTraffic.IntegrationTests              →  50% (WAF + Azurite via Testcontainers, IAsyncDisposable)
+      • PoTraffic.E2ETests/Api      →  25% (live HTTP)
+      • PoTraffic.E2ETests/Ui       →  25% (Playwright mobile + desktop landscape)
 
-    Azurite is owned by Testcontainers inside PoTraffic.Tests — explicitly torn
+    Azurite is owned by Testcontainers inside PoTraffic.IntegrationTests — explicitly torn
     down at the end of the run. E2E UI launches Chrome in headed mode by default
     (E2E_HEADED=0 to force headless on CI).
 
@@ -107,7 +107,7 @@ function Install-PlaywrightChromium {
         Write-Host "  Reusing cached Chromium: $($existing.FullName)" -ForegroundColor Green
         return
     }
-    $script = Join-Path $root 'tests/PoTraffic.Tests.E2E/bin/Debug/net10.0/playwright.ps1'
+    $script = Join-Path $root 'tests/PoTraffic.E2ETests/bin/Debug/net10.0/playwright.ps1'
     if (Test-Path $script) {
         & pwsh -NoProfile -ExecutionPolicy Bypass -File $script install chromium
     }
@@ -269,11 +269,11 @@ function Render-HtmlReport {
     [void]$sb.AppendLine('</ol></div>')
     [void]$sb.AppendLine('<h2>Top 10 ideas - implementation status</h2><table><thead><tr><th>#</th><th>Idea</th><th>Status</th><th>Files touched</th></tr></thead><tbody>')
     $ideas = @(
-        '1|Tiered test execution (100/50/25/25)|Implemented|tests/PoTraffic.UnitTests/*, tests/PoTraffic.Tests/*'
+        '1|Tiered test execution (100/50/25/25)|Implemented|tests/PoTraffic.UnitTests/*, tests/PoTraffic.IntegrationTests/*'
         '2|Simplified CI/CD YAML|Implemented|.github/workflows/deploy.yml'
-        '3|Lifecycle-managed Testcontainers Azurite|Implemented|tests/PoTraffic.Tests/Integration/Infrastructure/AzuriteTestContainer.cs'
+        '3|Lifecycle-managed Testcontainers Azurite|Implemented|tests/PoTraffic.IntegrationTests/Integration/Infrastructure/AzuriteTestContainer.cs'
         '4|Mock AI boundaries via DelegatingHandler|Implemented|src/PoTraffic.API/Infrastructure/Security/MockExternalAuthDelegatingHandler.cs'
-        '5|Mobile + desktop Playwright viewports|Implemented|tests/PoTraffic.Tests.E2E/Ui/Viewports.cs, ViewportsTheory.cs'
+        '5|Mobile + desktop Playwright viewports|Implemented|tests/PoTraffic.E2ETests/Ui/Viewports.cs, ViewportsTheory.cs'
         '6|Po naming + Managed Identity + PoShared|Implemented|infra/main.bicep'
         '7|ARG governance script|Implemented|SCRIPTS/arg-governance.ps1'
         '8|App Insights adaptive sampling + storage lifecycle|Implemented|src/PoTraffic.API/Infrastructure/Observability/*, infra/main.bicep'
@@ -316,7 +316,7 @@ if ($runUnit) {
 # ── Tier 2: Integration (WAF + Azurite via Testcontainers) ──────────────────
 if ($runIntegration) {
     Invoke-Tier -TierName 'IntegrationTests' -DisplayName 'Integration (WAF + Azurite)' `
-        -Project 'tests/PoTraffic.Tests'
+        -Project 'tests/PoTraffic.IntegrationTests'
     # Explicit teardown — even though Testcontainers' resource reaper handles leftovers,
     # proactively kill the container so nothing lingers on the host.
     try {
@@ -336,14 +336,14 @@ if ($runE2eApi -or $runE2eUi) {
 
         if ($runE2eApi) {
             Invoke-Tier -TierName 'E2EApiTests' -DisplayName 'E2E API (live HTTP)' `
-                -Project 'tests/PoTraffic.Tests.E2E'
+                -Project 'tests/PoTraffic.E2ETests'
         }
         if ($runE2eUi) {
             Install-PlaywrightChromium
             # Headed Chrome by default on dev workstations
             if (-not $env:E2E_HEADED) { $env:E2E_HEADED = '1' }
             Invoke-Tier -TierName 'E2EUiTests' -DisplayName 'E2E UI (Playwright mobile + desktop landscape)' `
-                -Project 'tests/PoTraffic.Tests.E2E'
+                -Project 'tests/PoTraffic.E2ETests'
         }
     }
     finally {

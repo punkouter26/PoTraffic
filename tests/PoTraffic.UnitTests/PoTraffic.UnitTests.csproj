@@ -10,7 +10,7 @@
         FluentValidation.TestHelper, xUnit.
       • FluentValidation tests live here.
       • DTO mapping tests live here.
-      • Handler tests that need I/O go to PoTraffic.Tests (Integration).
+      • Handler tests that need I/O go to PoTraffic.IntegrationTests (Integration).
 
     Enforced by UnitTierGuard module initializer in GlobalUsings.cs.
   -->

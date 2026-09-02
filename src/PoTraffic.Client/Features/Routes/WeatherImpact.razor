@@ -1,0 +1,124 @@
+@using PoTraffic.Shared.DTOs.History
+
+@*
+    What the weather costs on this route. The numbers are deltas against each sample's own
+    time-of-day baseline (see GetWeatherImpactQuery), so this answers "does rain cost me
+    time" rather than "does it happen to rain during rush hour".
+*@
+
+@if (Impact is { SampleCount: > 0 } impact && impact.Slices.Count > 0)
+{
+    <div class="pt-weather">
+        <RadzenText TextStyle="TextStyle.H3" class="pt-mb-1 pt-section-heading">Weather</RadzenText>
+        <p class="pt-weather-lede">@Lede(impact)</p>
+
+        <ul class="pt-weather-rows">
+            @foreach (WeatherImpactSlice slice in impact.Slices)
+            {
+                <li class="pt-weather-row">
+                    <span class="pt-weather-name">
+                        <PtIcon Name="@IconFor(slice.Condition)" Size="sm" />
+                        @slice.Condition
+                    </span>
+
+                    @* The bar is centred on the baseline: slower grows right, faster grows
+                       left, so the comparison is visible without reading a single number. *@
+                    <span class="pt-weather-track" aria-hidden="true">
+                        <span class="pt-weather-bar @(slice.DeltaSeconds >= 0 ? "is-slower" : "is-faster")"
+                              style="@BarStyle(slice, impact)"></span>
+                    </span>
+
+                    <span class="pt-weather-delta @(slice.IsConfident ? "" : "is-provisional")">
+                        @DeltaText(slice)
+                    </span>
+
+                    <span class="pt-weather-count">
+                        @if (slice.IsConfident)
+                        {
+                            @($"{slice.SampleCount} samples")
+                        }
+                        else
+                        {
+                            @($"{slice.SampleCount} so far — need {impact.MinimumSamples}")
+                        }
+                    </span>
+                </li>
+            }
+        </ul>
+
+        @if (impact.UnknownCount > 0)
+        {
+            <p class="pt-weather-note">
+                @impact.UnknownCount of @(impact.SampleCount + impact.UnknownCount) samples have no
+                conditions recorded and are left out of this comparison.
+            </p>
+        }
+    </div>
+}
+else if (Impact is not null)
+{
+    <div class="pt-weather">
+        <RadzenText TextStyle="TextStyle.H3" class="pt-mb-1 pt-section-heading">Weather</RadzenText>
+        <p class="pt-weather-lede">
+            No conditions recorded yet. Once this route has been probed through a few different
+            kinds of weather, this is where you will see what each one costs you.
+        </p>
+    </div>
+}
+
+@code {
+    [Parameter] public WeatherImpactResponse? Impact { get; set; }
+
+    /// <summary>
+    /// Leads with the finding rather than the table. The worst confident condition is the
+    /// one sentence worth reading; everything below it is the working.
+    /// </summary>
+    private static string Lede(WeatherImpactResponse impact)
+    {
+        WeatherImpactSlice? worst = impact.Slices
+            .Where(s => s.IsConfident && s.DeltaSeconds > 0)
+            .MaxBy(s => s.DeltaSeconds);
+
+        if (worst is null)
+            return "Nothing has cost you measurable time yet — no condition is far enough from this route's normal to call.";
+
+        int minutes = (int)Math.Round(worst.DeltaSeconds / 60.0);
+        string cost = minutes >= 1
+            ? $"about {minutes} minute{(minutes == 1 ? "" : "s")}"
+            : $"about {worst.DeltaSeconds} seconds";
+
+        return $"{worst.Condition} costs you {cost} on this route — {worst.PercentDelta:0.#}% slower than the same time of day usually runs.";
+    }
+
+    private static string DeltaText(WeatherImpactSlice slice)
+    {
+        int seconds = Math.Abs(slice.DeltaSeconds);
+        string sign = slice.DeltaSeconds >= 0 ? "+" : "−";
+        return seconds >= 60
+            ? $"{sign}{seconds / 60}m {seconds % 60:00}s"
+            : $"{sign}{seconds}s";
+    }
+
+    /// <summary>
+    /// Bar width as a share of the largest absolute delta on the card, so the biggest effect
+    /// fills the track and the rest are read against it. Scaling to a fixed ceiling instead
+    /// would render a route with mild weather as five invisible slivers.
+    /// </summary>
+    private static string BarStyle(WeatherImpactSlice slice, WeatherImpactResponse impact)
+    {
+        int largest = impact.Slices.Max(s => Math.Abs(s.DeltaSeconds));
+        double share = largest == 0 ? 0 : Math.Abs(slice.DeltaSeconds) / (double)largest;
+        return FormattableString.Invariant($"width: {share * 50:0.#}%");
+    }
+
+    private static string IconFor(string condition) => condition switch
+    {
+        "Clear" => "clear_day",
+        "Cloudy" => "cloud",
+        "Fog" => "foggy",
+        "Rain" => "rainy",
+        "Snow" => "weather_snowy",
+        "Storm" => "thunderstorm",
+        _ => "cloud",
+    };
+}

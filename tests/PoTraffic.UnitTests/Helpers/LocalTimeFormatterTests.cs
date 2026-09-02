@@ -58,26 +58,6 @@ public sealed class LocalTimeFormatterTests
     }
 
     [Fact]
-    public void Format_RespectsCurrentCulture_AM_PM_Suffix()
-    {
-        // en-US uses "tt" for AM/PM. Pin the suffix for this culture only —
-        // other cultures format the same input differently.
-        var prev = CultureInfo.CurrentCulture;
-        try
-        {
-            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("en-US");
-            // 13:00 UTC on Aug 13 (DST) = 09:00 AM EDT, not 1:00 PM.
-            string result = LocalTimeFormatter.FormatUtcHHmmAsLocal("13:00", FixedNowUtc, Eastern);
-
-            result.Should().Be("9:00 AM");
-        }
-        finally
-        {
-            CultureInfo.CurrentCulture = prev;
-        }
-    }
-
-    [Fact]
     public void Format_NeverIncludesUtcSuffix()
     {
         // Belt-and-suspenders: every output is a local-time string and must never

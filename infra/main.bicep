@@ -17,7 +17,7 @@ targetScope = 'resourceGroup'
 @description('App Service (web app) name. MUST follow app-potraffic-api-{env}-{region}-{seq}.')
 @minLength(10)
 @maxLength(60)
-param webAppName string = 'app-potraffic-api-prod-wus2-001'
+param webAppName string = 'potraffic-api-win'
 
 @description('Region — MUST match the App Service Plan region.')
 param location string = 'westus2'
@@ -198,4 +198,8 @@ resource storageLifecycle 'Microsoft.Storage/storageAccounts/managementPolicies@
 output defaultHostName string = web.properties.defaultHostName
 output principalId string = web.identity.principalId
 output kvRoleAssignmentId string = webKvSecretsUser.id
+// Reports false for the live app: production is `potraffic-api-win`, which predates the
+// `app-potraffic-*` convention. Left as an honest signal rather than relaxed to match — the
+// name is what CI deploys to (see .github/workflows/deploy.yml), and renaming an App Service
+// means a new hostname, so this stays false until someone decides to migrate.
 output poNamingCompliant bool = startsWith(webAppName, 'app-potraffic-')

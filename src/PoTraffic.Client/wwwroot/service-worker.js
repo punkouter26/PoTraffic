@@ -40,19 +40,12 @@ const SHELL = [
     "/css/vendor.css",
     "/lib/leaflet/leaflet.css",
     "/lib/leaflet/leaflet.js",
-    // The effects runtime. Small, loaded on every page, and the background wash is
-    // the first thing drawn — precaching it keeps a cold offline start from opening
-    // on a flat page that then lights up a second later.
+    // The effects runtime. Small and loaded on every page — it decides whether the
+    // map flow and chart draw-in may animate, so precaching it keeps a cold offline
+    // start from opening on a flat page that then lights up a second later.
     "/js/pt-fx.js",
-    "/js/pt-ambient.js",
-    "/js/pt-audio.js",
     "/js/pt-viewtransition.js",
 ];
-
-// Deliberately NOT precached: /lib/three/*, which is ~750KB and only ever needed by
-// the 3D view. It lands in the runtime cache the first time someone opens that view,
-// so it works offline afterwards without costing every install three quarters of a
-// megabyte up front.
 
 /** Map tiles are immutable per {z}/{x}/{y} and large, so they get their own capped cache. */
 const TILE_HOST = "tile.openstreetmap.org";

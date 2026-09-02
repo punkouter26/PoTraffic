@@ -100,10 +100,19 @@ else if (VisibleRoutes.Count == 0)
             and once we've sampled it a few days the page will start telling you
             when to leave.
         </div>
-        <div>
+        <div class="pt-empty-state-actions">
             <RadzenButton Text="Add your first commute" ButtonStyle="ButtonStyle.Primary"
                           Icon="add" Click="@(() => Nav.NavigateTo("/routes/create"))" />
+            @* "Once we've sampled it a few days" is an honest promise and a terrible first
+               run: every chart here needs accumulated history, so a brand-new account has
+               nothing to judge the app by. The sample route is that history, pre-built. *@
+            <RadzenButton Text="Explore a sample commute" ButtonStyle="ButtonStyle.Light"
+                          Icon="science" Click="CreateSampleRouteAsync" IsBusy="_creatingSample" />
         </div>
+        @if (_sampleError is not null)
+        {
+            <div class="pt-field-error" role="alert">@_sampleError</div>
+        }
     </div>
 }
 else
@@ -128,7 +137,7 @@ else
         @foreach (RouteDto route in VisibleRoutes)
         {
             <div role="listitem" @key="route.Id">
-                <SwipeableRouteCard Route="route"
+                <RouteCard Route="route"
                            OptimalDeparture="@(_optimalDepartures.GetValueOrDefault(route.Id))"
                            RecentPolls="@(_recentPolls.GetValueOrDefault(route.Id, []))"
                            OnDeleted="@RefreshAsync"
@@ -150,8 +159,54 @@ else
     private decimal _estimatedCostToday;
     private decimal _projectedMonthlyCost;
     private bool _hydrated;
+    private bool _creatingSample;
+    private string? _sampleError;
 
     protected override TimeSpan PollingInterval => TimeSpan.FromSeconds(60);
+
+    /// <summary>
+    /// Seeds the demo route and opens it. The browser's UTC offset goes with the request:
+    /// the server generates the history around the user's morning, and it has no other way
+    /// to know what that is.
+    /// </summary>
+    private async Task CreateSampleRouteAsync()
+    {
+        _creatingSample = true;
+        _sampleError = null;
+        try
+        {
+            int offsetMinutes = (int)DateTimeOffset.Now.Offset.TotalMinutes;
+            HttpResponseMessage response = await Http.PostAsJsonAsync(
+                "/api/routes/sample",
+                new CreateSampleRouteRequest(offsetMinutes),
+                AppJsonContext.Default.CreateSampleRouteRequest);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _sampleError = "Couldn't build the sample commute. Please try again.";
+                return;
+            }
+
+            RouteDto? route = await response.Content.ReadFromJsonAsync(AppJsonContext.Default.RouteDto);
+            if (route is null)
+            {
+                _sampleError = "Couldn't build the sample commute. Please try again.";
+                return;
+            }
+
+            // Straight to the route page: the sample exists to be looked at, and the
+            // dashboard card is a worse first impression than the charts it links to.
+            Nav.NavigateTo($"/routes/{route.Id}");
+        }
+        catch
+        {
+            _sampleError = "Unable to connect. Please try again.";
+        }
+        finally
+        {
+            _creatingSample = false;
+        }
+    }
 
     /// <summary>
     /// Routes with a pending delete are hidden immediately, so the swipe feels instant

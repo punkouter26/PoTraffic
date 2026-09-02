@@ -21,12 +21,16 @@ namespace PoTraffic.API.Infrastructure.Resilience;
 ///     Aggressive timeout (8s), 2 retries with jitter, breaker at 50%.</item>
 ///   <item><c>external-auth</c> — Microsoft OAuth token + userinfo endpoints.
 ///     Slightly longer timeout (10s), 1 retry, breaker at 30%.</item>
+///   <item><c>weather</c> — Open-Meteo conditions feed. Short timeout (4s) and no retry:
+///     the observation decorates a poll that must land on time, and a missed one costs a
+///     null weather column rather than a lost sample.</item>
 /// </list>
 /// </summary>
 public static class ResiliencePipelineExtensions
 {
     public const string TrafficPipeline = "traffic";
     public const string ExternalAuthPipeline = "external-auth";
+    public const string WeatherPipeline = "weather";
 
     /// <summary>
     /// Configures every external HTTP client with its dependency-specific
@@ -48,10 +52,13 @@ public static class ResiliencePipelineExtensions
             case ExternalAuthPipeline:
                 builder.AddResilienceHandler(ExternalAuthPipeline, ConfigureExternalAuthPipeline);
                 break;
+            case WeatherPipeline:
+                builder.AddResilienceHandler(WeatherPipeline, ConfigureWeatherPipeline);
+                break;
             default:
                 throw new ArgumentException(
                     $"Unknown PoTraffic resilience pipeline '{pipelineName}'. " +
-                    $"Use '{TrafficPipeline}' or '{ExternalAuthPipeline}' (or add a new entry in {nameof(ResiliencePipelineExtensions)}).",
+                    $"Use '{TrafficPipeline}', '{ExternalAuthPipeline}' or '{WeatherPipeline}' (or add a new entry in {nameof(ResiliencePipelineExtensions)}).",
                     nameof(pipelineName));
         }
         return builder;
@@ -75,6 +82,21 @@ public static class ResiliencePipelineExtensions
                 BreakDuration = TimeSpan.FromSeconds(15),
             })
             .AddTimeout(TimeSpan.FromSeconds(8));
+    }
+
+    private static void ConfigureWeatherPipeline(ResiliencePipelineBuilder<HttpResponseMessage> builder)
+    {
+        builder
+            // No retry: a poll is on a clock, and the observation is optional. Retrying
+            // would spend the poll's latency budget on the least important part of it.
+            .AddCircuitBreaker(new HttpCircuitBreakerStrategyOptions
+            {
+                FailureRatio = 0.5,
+                MinimumThroughput = 5,
+                SamplingDuration = TimeSpan.FromSeconds(60),
+                BreakDuration = TimeSpan.FromSeconds(60),
+            })
+            .AddTimeout(TimeSpan.FromSeconds(4));
     }
 
     private static void ConfigureExternalAuthPipeline(ResiliencePipelineBuilder<HttpResponseMessage> builder)

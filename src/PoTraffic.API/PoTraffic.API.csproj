@@ -13,7 +13,7 @@
   -->
 
   <ItemGroup>
-    <InternalsVisibleTo Include="PoTraffic.Tests" />
+    <InternalsVisibleTo Include="PoTraffic.IntegrationTests" />
   </ItemGroup>
 
   <ItemGroup>

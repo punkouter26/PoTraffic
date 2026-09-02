@@ -2,7 +2,7 @@
   "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
   "contentVersion": "1.0.0.0",
   "parameters": {
-    "webAppName": { "value": "potraffic-api" },
+    "webAppName": { "value": "potraffic-api-win" },
     "location": { "value": "westus2" },
     "appServicePlanId": {
       "value": "/subscriptions/bbb8dfbe-9169-432f-9b7a-fbf861b51037/resourceGroups/PoShared/providers/Microsoft.Web/serverfarms/asp-poissues-b1-wus2"

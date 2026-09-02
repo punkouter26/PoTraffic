@@ -17,6 +17,11 @@ namespace PoTraffic.UnitTests.Features.Routes;
 /// FR-005: provider exceptions must not propagate out of the handler;
 /// they are caught, logged as warnings, and the poll is silently skipped.
 /// </summary>
+// Consolidated: this scenario (provider throws HttpRequestException mid-poll) was arranged
+// and executed four separate times, each asserting one facet — no exception escapes, the
+// handler returns false, no PollRecord lands, PollCount is untouched, a warning is logged.
+// One arrange-act with the full set of assertions proves the same contract at a quarter of
+// the setup, and a failure now names every consequence at once instead of one of five.
 public sealed class ExecutePollHandlerFailureTests
 {
 
@@ -66,89 +71,25 @@ public sealed class ExecutePollHandlerFailureTests
 
         ILogger<ExecutePollCommandHandler> logger = Substitute.For<ILogger<ExecutePollCommandHandler>>();
         ITrafficProviderFactory providerFactory = TestDoubles.ProviderFactory(mockProvider);
-        var handler = new ExecutePollCommandHandler(db, providerFactory, PoTraffic.UnitTests.Helpers.AlertTestHelper.NoOp(db), logger);
+        var handler = PoTraffic.UnitTests.Helpers.PollHandlerTestHelper.Create(db, providerFactory, logger);
 
         // Act
         bool result = await handler.Handle(new ExecutePollCommand(routeId), CancellationToken.None);
 
-        // Assert — FR-005: returns false, no exception propagated
+        // Assert — FR-005, every consequence of a thrown provider call in one place.
+        // Reaching this line at all is the "no exception propagates" assertion.
         result.Should().BeFalse("provider errors must not propagate to caller (FR-005)");
 
         int pollCount = db.PollRecords.Count(p => p.RouteId == routeId);
         pollCount.Should().Be(0, "no PollRecord should be inserted when provider throws (FR-005)");
+
+        // The seeded session already carries 3 polls, so the contract is "unchanged", not
+        // "zero" — a failed provider call must neither add to nor reset the running count.
+        MonitoringSession session = db.MonitoringSessions.Single(s => s.Id == sessionId);
+        session.PollCount.Should().Be(3, "a failed provider call must not count against the session");
+
+        logger.ReceivedWithAnyArgs().Log(
+            LogLevel.Warning, default, default!, default, default!);
     }
 
-    [Fact]
-    public async Task WhenProviderThrowsHttpRequestException_PollCountUnchanged()
-    {
-        // Arrange
-        (TableStorageContext db, RouteId routeId, SessionId sessionId) = await SeedAsync();
-
-        ITrafficProvider mockProvider = Substitute.For<ITrafficProvider>();
-        mockProvider
-            .GetTravelTimeAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .ThrowsAsync(new HttpRequestException("Timeout"));
-
-        ITrafficProviderFactory providerFactory = TestDoubles.ProviderFactory(mockProvider);
-        var handler = new ExecutePollCommandHandler(
-            db, providerFactory, PoTraffic.UnitTests.Helpers.AlertTestHelper.NoOp(db), Substitute.For<ILogger<ExecutePollCommandHandler>>());
-
-        // Act
-        await handler.Handle(new ExecutePollCommand(routeId), CancellationToken.None);
-
-        // Assert — session's PollCount must not be incremented on failure (FR-005)
-        MonitoringSession? session = db.MonitoringSessions.FirstOrDefault(x => x.Id == sessionId);
-        session.Should().NotBeNull();
-        session!.PollCount.Should().Be(3, "PollCount must remain unchanged when provider throws (FR-005)");
-    }
-
-    [Fact]
-    public async Task WhenProviderThrowsHttpRequestException_WarningIsLogged()
-    {
-        // Arrange
-        (TableStorageContext db, RouteId routeId, _) = await SeedAsync();
-
-        ITrafficProvider mockProvider = Substitute.For<ITrafficProvider>();
-        mockProvider
-            .GetTravelTimeAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .ThrowsAsync(new HttpRequestException("DNS failure"));
-
-        ILogger<ExecutePollCommandHandler> logger = Substitute.For<ILogger<ExecutePollCommandHandler>>();
-        ITrafficProviderFactory providerFactory = TestDoubles.ProviderFactory(mockProvider);
-        var handler = new ExecutePollCommandHandler(db, providerFactory, PoTraffic.UnitTests.Helpers.AlertTestHelper.NoOp(db), logger);
-
-        // Act
-        await handler.Handle(new ExecutePollCommand(routeId), CancellationToken.None);
-
-        // Assert — a warning log must be emitted (FR-005)
-        logger.Received().Log(
-            LogLevel.Warning,
-            Arg.Any<EventId>(),
-            Arg.Any<object>(),
-            Arg.Any<Exception>(),
-            Arg.Any<Func<object, Exception?, string>>());
-    }
-
-    [Fact]
-    public async Task WhenProviderThrowsHttpRequestException_NoExceptionPropagates()
-    {
-        // Arrange
-        (TableStorageContext db, RouteId routeId, _) = await SeedAsync();
-
-        ITrafficProvider mockProvider = Substitute.For<ITrafficProvider>();
-        mockProvider
-            .GetTravelTimeAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .ThrowsAsync(new HttpRequestException("Network unreachable"));
-
-        ITrafficProviderFactory providerFactory = TestDoubles.ProviderFactory(mockProvider);
-        var handler = new ExecutePollCommandHandler(
-            db, providerFactory, PoTraffic.UnitTests.Helpers.AlertTestHelper.NoOp(db), Substitute.For<ILogger<ExecutePollCommandHandler>>());
-
-        // Act — must not throw; scheduler cannot handle uncaught exceptions in this design
-        Func<Task> act = async () =>
-            await handler.Handle(new ExecutePollCommand(routeId), CancellationToken.None);
-
-        await act.Should().NotThrowAsync(
-            "provider errors must be swallowed inside the handler so the scheduler does not retry the job (FR-005)");
-    }
 }
