@@ -100,7 +100,7 @@ try {
         Run-Check 'health/ready' 'Pass' "HTTP 200 status=$($body.status) durable=$($body.durable) after $(($i+1)*5)s"
     }
     else {
-        Run-Check 'health/ready' 'Fail' "Still 503 after 60s — hydration likely failing. Run ./SCRIPTS/triage-50030.ps1"
+        Run-Check 'health/ready' 'Fail' "Still 503 after 60s — hydration likely failing. Check the App Service application logs for HydrationFailed or AuthorizationPermissionMismatch."
     }
 }
 catch {

@@ -14,6 +14,8 @@ env:
   AZURE_WEBAPP_NAME: potraffic-api-win
   AZURE_RESOURCE_GROUP: PoTraffic
   API_PROJECT_PATH: src/PoTraffic.API/PoTraffic.API.csproj
+  UNIT_TEST_PATH: tests/PoTraffic.UnitTests/PoTraffic.UnitTests.csproj
+  PRODUCTION_URL: https://potraffic-api-win.azurewebsites.net
   DOTNET_NOLOGO: 'true'
   DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
@@ -23,8 +25,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ── CI/CD rule #2: lightweight YAML. No test execution — tests run locally
-  # via `pwsh ./SCRIPTS/run-tests.ps1` and produce an HTML report.
+  # Lightweight YAML: the UNIT tier only. It is 99 tests in under a second and needs
+  # nothing but the SDK, so it costs the pipeline almost nothing and stops a broken build
+  # from ever becoming an artifact. The integration and E2E tiers stay out deliberately —
+  # they need Docker for Azurite and a live Testing host for Playwright, which would take
+  # this job from about a minute to many. Those run locally via
+  # `pwsh ./SCRIPTS/run-tests.ps1`, which produces the full four-tier HTML report.
   build:
     name: Build
     runs-on: ubuntu-latest
@@ -41,6 +47,8 @@ jobs:
           restore-keys: nuget-${{ runner.os }}-
       - run: dotnet restore ${{ env.API_PROJECT_PATH }}
       - run: dotnet build ${{ env.API_PROJECT_PATH }} --no-restore -c Release
+      - name: Unit tests
+        run: dotnet test ${{ env.UNIT_TEST_PATH }} -c Release --logger "console;verbosity=minimal"
       - run: dotnet publish ${{ env.API_PROJECT_PATH }} -c Release --no-build -o publish
       - uses: actions/upload-artifact@v4
         with:
@@ -59,6 +67,12 @@ jobs:
       name: production
       url: https://potraffic-api-win.azurewebsites.net
     steps:
+      # Only SCRIPTS/ — the deploy job needs the smoke script and nothing else, and a full
+      # checkout here would pull the whole repo to run one file.
+      - uses: actions/checkout@v6
+        with:
+          sparse-checkout: SCRIPTS
+          sparse-checkout-cone-mode: false
       - uses: actions/download-artifact@v4
         with:
           name: webapp
@@ -73,3 +87,11 @@ jobs:
           app-name: ${{ env.AZURE_WEBAPP_NAME }}
           resource-group-name: ${{ env.AZURE_RESOURCE_GROUP }}
           package: publish
+
+      # The deploy step reports success once App Service accepts the package, which says
+      # nothing about whether the app then starts. This is the check that it did: health,
+      # hydration, and the Blazor shell and boot assets actually serving. It exits non-zero
+      # on any Fail, so a green deploy that boots into 500.30 turns the run red.
+      - name: Post-deploy smoke
+        shell: pwsh
+        run: ./SCRIPTS/post-deploy-smoke.ps1 -BaseUrl "${{ env.PRODUCTION_URL }}"

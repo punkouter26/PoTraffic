@@ -159,11 +159,14 @@ else
        "Settings & raw data" disclosure below three full-width cards, which put
        the only controls on the page two scrolls from the answer they act on. *@
     <div class="pt-returntrip-bar">
-        @if (_route.ReturnRouteId is RouteId rid)
+        @* Both states go through the same call: the endpoint creates the reversed route and
+           links it, or hands back the one already linked. Navigating straight to a stored
+           ReturnRouteId could open a route that had since been deleted. *@
+        @if (_route.ReturnRouteId is not null)
         {
             <span class="pt-returntrip-label">Return trip linked</span>
             <RadzenButton Text="View return trip" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small"
-                          Click="@(() => Nav.NavigateTo($"/routes/{rid}"))" />
+                          Click="CreateReturnTripAsync" IsBusy="_creatingReturn" />
         }
         else
         {
@@ -238,6 +241,35 @@ else
 
 @code {
     [Parameter] public Guid RouteId { get; set; }
+
+    /// <summary>The route this page is showing. Changing it reloads the page from scratch.</summary>
+    protected override object? SubjectKey => RouteId;
+
+    /// <summary>
+    /// Drops everything held for the previous route. The two fetch timestamps matter most:
+    /// they gate their fetches on a five-minute window, so without clearing them the weekly
+    /// grid and the weather card would keep showing the route you just navigated away from.
+    /// </summary>
+    protected override void ResetForSubjectChange()
+    {
+        _route = null;
+        _path = null;
+        _heatmap = null;
+        _heatmapFetchedAt = null;
+        _weatherImpact = null;
+        _weatherFetchedAt = null;
+        _todayPolls = [];
+        _trendPoints = [];
+        _trendLabels = [];
+        _selectedPoll = null;
+        _optimalDeparture = null;
+        _activeSession = null;
+        LatestPoll = null;
+        _announcedLevel = null;
+        _pageTitle = "Route";
+        _originStreet = string.Empty;
+        _destStreet = string.Empty;
+    }
 
     /// <summary>
     /// Oldest first. Every chart series is built by position from this list, so its order
@@ -374,8 +406,13 @@ else
             if (resp.IsSuccessStatusCode)
             {
                 RouteDto? created = await resp.Content.ReadFromJsonAsync(AppJsonContext.Default.RouteDto);
-                if (created is not null)
+                if (created is not null && created.Id.Value != RouteId)
+                {
+                    // forceLoad stays false: PollingComponentBase now reloads on a route
+                    // change, so this is a normal SPA navigation rather than a full
+                    // WASM restart. Before that it navigated and showed the old route.
                     Nav.NavigateTo($"/routes/{created.Id}", forceLoad: false);
+                }
             }
         }
         catch { /* transient — user can retry */ }

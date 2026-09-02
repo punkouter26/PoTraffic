@@ -263,7 +263,6 @@ function Render-HtmlReport {
     [void]$sb.AppendLine('<li><strong>AI boundary mocked</strong> - Microsoft OAuth calls intercepted by MockExternalAuthDelegatingHandler in test hosts.</li>')
     [void]$sb.AppendLine('<li><strong>Mobile + desktop viewport parity</strong> - Playwright runs against iPhone 14 mobile and desktop-landscape profiles.</li>')
     [void]$sb.AppendLine('<li><strong>Identity and hub centralization</strong> - app-potraffic-* naming, kv-poshared, Managed Identity only.</li>')
-    [void]$sb.AppendLine('<li><strong>ARG governance</strong> - <code>./SCRIPTS/arg-governance.ps1</code> flags naming/orphan/idle issues.</li>')
     [void]$sb.AppendLine('<li><strong>Telemetry budgets</strong> - CompositeRoutingSampler at 5%/1% in prod; 30-day storage lifecycle.</li>')
     [void]$sb.AppendLine('<li><strong>Post-deploy smoke</strong> - <code>./SCRIPTS/post-deploy-smoke.ps1</code> checks /health, render tree, /diag.</li>')
     [void]$sb.AppendLine('</ol></div>')
@@ -275,7 +274,6 @@ function Render-HtmlReport {
         '4|Mock AI boundaries via DelegatingHandler|Implemented|src/PoTraffic.API/Infrastructure/Security/MockExternalAuthDelegatingHandler.cs'
         '5|Mobile + desktop Playwright viewports|Implemented|tests/PoTraffic.E2ETests/Ui/Viewports.cs, ViewportsTheory.cs'
         '6|Po naming + Managed Identity + PoShared|Implemented|infra/main.bicep'
-        '7|ARG governance script|Implemented|SCRIPTS/arg-governance.ps1'
         '8|App Insights adaptive sampling + storage lifecycle|Implemented|src/PoTraffic.API/Infrastructure/Observability/*, infra/main.bicep'
         '9|Post-deploy smoke (Playwright + /health + /diag)|Implemented|SCRIPTS/post-deploy-smoke.ps1, src/PoTraffic.API/Features/Diagnostics/*'
         '10|Test-run HTML report|Implemented|SCRIPTS/run-tests.ps1'

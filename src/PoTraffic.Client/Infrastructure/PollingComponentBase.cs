@@ -75,8 +75,60 @@ public abstract class PollingComponentBase : ComponentBase, IAsyncDisposable
     /// <summary>When data last landed successfully; null until the first success.</summary>
     protected DateTimeOffset? LastSuccessUtc { get; private set; }
 
+    /// <summary>
+    /// Identifies what this page is currently showing. Return the route parameter(s) the
+    /// page loads from — when the value changes, the base treats it as a different subject
+    /// and reloads from scratch.
+    ///
+    /// <para>
+    /// Blazor reuses one component instance across navigations that match the same
+    /// <c>@page</c> template, so going from <c>/routes/A</c> to <c>/routes/B</c> updates the
+    /// parameter and the URL but never re-runs <see cref="OnInitializedAsync"/>. Without
+    /// this, the page kept rendering the previous route's data until the next poll tick
+    /// happened to fetch the new one — and any state cached with its own expiry (a heatmap
+    /// held for five minutes, say) went on showing the previous route for far longer.
+    /// </para>
+    ///
+    /// <para>Null (the default) means the page has no subject and never needs this.</para>
+    /// </summary>
+    protected virtual object? SubjectKey => null;
+
+    private object? _loadedSubject;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        object? subject = SubjectKey;
+        if (subject is null || Equals(subject, _loadedSubject))
+            return;
+
+        // First pass is handled by OnInitializedAsync; only a genuine change reloads.
+        bool isChange = _loadedSubject is not null;
+        _loadedSubject = subject;
+
+        if (!isChange)
+            return;
+
+        // Back to the skeleton: the previous route's numbers must not sit under the new
+        // route's heading while the fetch is in flight, which is exactly how "the button
+        // didn't navigate" looked.
+        IsFirstLoad = true;
+        ResetForSubjectChange();
+        StateHasChanged();
+
+        await RefreshAsync();
+    }
+
+    /// <summary>
+    /// Clears anything the page cached for the previous subject. Override alongside
+    /// <see cref="SubjectKey"/> when the page holds state with its own lifetime — a plain
+    /// reload does not reset a timestamp that says "this is still fresh".
+    /// </summary>
+    protected virtual void ResetForSubjectChange() { }
+
     protected override async Task OnInitializedAsync()
     {
+        _loadedSubject = SubjectKey;
+
         await Activity.EnsureStartedAsync();
         Activity.Resumed += OnResumedAsync;
         Activity.Suspended += OnSuspended;

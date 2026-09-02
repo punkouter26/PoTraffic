@@ -11,10 +11,8 @@ PowerShell / Python utility scripts for local development and CI. Run all script
 | `setup.ps1` | First-time setup: installs missing tools via `winget` (.NET SDK, Docker Desktop, Azure CLI), checks `az login`, verifies Key Vault access, and starts Azurite. (Rule 9) |
 | `start-dev.ps1` | Starts all local dependencies (Azurite via Docker) and then launches the PoTraffic API + Blazor client. Kills any existing `dotnet` processes on port 5000/5001 first. |
 | `stop-dev.ps1` | Stops and removes the local Docker containers (Azurite). |
-| `run-tests.ps1` | Runs Unit → Integration → E2E tests in order. Integration tests use in-memory persistence (no external dependencies). E2E tests require the API to be running on port 5000 (`Testing` profile). |
-| `post-deploy-smoke.ps1` | CI/CD rule #9 — runs three browser-style smoke checks against a freshly-deployed App Service instance: `/health/json` (dependency status), `/health/ready` (hydration complete), `GET /` (render-tree / Blazor bundle hash), `/diag/keyvault` (Key Vault + Managed Identity wiring, optional). Exits non-zero if any check fails. |
-| `triage-50030.ps1` | Forensic triage for `HTTP Error 500.30 - ASP.NET Core app failed to start`. Captures App Service instance state, downloads + greps the application-log filesystem files for `500.30`, `HostingStartupException`, `AuthorizationPermissionMismatch`, `HydrationFailed`, lists storage RBAC for the target account, live-probes `/health/json`, `/health/ready`, `/health`, `/`, and tails logs. **Read-only — never mutates the environment.** Use this when a deploy goes red. |
-| `arg-governance.ps1` | CI/CD rule #7 — Azure Resource Graph governance audit. Runs KQL to flag orphan assets, Po naming-convention violations, and idle compute (< 5% avg CPU over 7 days, non-production only). |
+| `run-tests.ps1` | Runs all four tiers and writes `TestResults/test-report.html`. Integration owns an Azurite container via Testcontainers (needs Docker); the E2E tiers get a `Testing` host started and stopped for them on `http://localhost:5150`. |
+| `post-deploy-smoke.ps1` | Run automatically by the deploy workflow after every push to `master`, and runnable by hand against any instance. Browser-style smoke checks against a freshly-deployed App Service instance: `/health/json` (dependency status), `/health/ready` (hydration complete), `GET /` (render-tree / Blazor bundle hash), `/diag/keyvault` (Key Vault + Managed Identity wiring, optional). Exits non-zero if any check fails. |
 
 ---
 
