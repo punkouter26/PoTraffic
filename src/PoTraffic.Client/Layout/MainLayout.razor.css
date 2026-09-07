@@ -17,3 +17,32 @@ main {
    This file used to set `max-width: 1280px; margin: 0 auto; width: 100%` while
    app.css set 1180px, and scoped CSS wins on specificity — so the measure cap
    documented in app.css was never the one in force. One owner now. */
+
+/* ── Skip link (shared Po convention) ──────────────────────────────────────
+   Visually hidden until focused, then pinned to the top of the viewport. Uses
+   var() fallbacks so it renders correctly whatever this app's token set is. */
+.skip-link {
+    position: absolute;
+    left: -9999px;
+    top: auto;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+}
+
+.skip-link:focus {
+    position: fixed;
+    top: 0.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    width: auto;
+    height: auto;
+    padding: 0.5rem 1rem;
+    background: var(--po-skip-bg, #111);
+    color: var(--po-skip-fg, #fff);
+    border: 2px solid currentColor;
+    border-radius: 0.25rem;
+    font-weight: 700;
+    z-index: 9999;
+    text-decoration: none;
+}

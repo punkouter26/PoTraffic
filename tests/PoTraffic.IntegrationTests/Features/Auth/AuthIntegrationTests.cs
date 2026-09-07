@@ -28,7 +28,7 @@ public sealed class AuthIntegrationTests : BaseIntegrationTest
         guestAuth.Should().NotBeNull();
         guestAuth!.Email.Should().StartWith("guest").And.EndWith("@potraffic.dev");
         guestResponse.Headers.TryGetValues("Set-Cookie", out IEnumerable<string>? cookies).Should().BeTrue();
-        cookies!.Should().Contain(c => c.StartsWith(".PoTraffic.Auth="), "BFF session must be an HttpOnly cookie");
+        cookies!.Should().Contain(c => c.StartsWith("PoTraffic.Auth="), "BFF session must be an HttpOnly cookie");
 
         // Act 2 — /me reflects the cookie session (the factory client persists cookies).
         AuthMeResponse? me = await client.GetFromJsonAsync<AuthMeResponse>("/api/auth/me");
@@ -80,7 +80,7 @@ public sealed class AuthIntegrationTests : BaseIntegrationTest
         callbackResponse.StatusCode.Should().Be(HttpStatusCode.Redirect);
         callbackResponse.Headers.Location!.ToString().Should().Be("/dashboard");
         callbackResponse.Headers.TryGetValues("Set-Cookie", out IEnumerable<string>? cookies).Should().BeTrue();
-        cookies!.Should().Contain(c => c.StartsWith(".PoTraffic.Auth="), "callback must establish the cookie session");
+        cookies!.Should().Contain(c => c.StartsWith("PoTraffic.Auth="), "callback must establish the cookie session");
     }
 
     [SkipUnlessAzuriteAvailable]

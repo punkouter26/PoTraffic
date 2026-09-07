@@ -1,16 +1,19 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
 
 @* Radzen service host components — must be present exactly once in the root layout *@
 <RadzenNotification />
 <RadzenDialog />
 <RadzenTooltip />
 
+@* First tab stop skips the nav straight to the page's own content. *@
+<a class="skip-link" href="#main-content">Skip to main content</a>
+
 <div class="page">
     <header class="app-header">
         <NavMenu />
     </header>
 
-    <main>
+    <main id="main-content" tabindex="-1">
         <article class="content">
             @Body
         </article>

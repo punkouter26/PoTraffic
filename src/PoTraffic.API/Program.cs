@@ -1,3 +1,4 @@
+using PoTraffic.API.Platform;
 using FluentValidation;
 using Microsoft.AspNetCore.HttpOverrides;
 using PoTraffic.API.Features.Account;
@@ -146,6 +147,9 @@ try
     app.MapGet("/error", () => Results.Problem()).ExcludeFromDescription().AllowAnonymous();
 
     app.MapPoTrafficHealthChecks();   // /health + /health/ready
+    // Uniform cross-app liveness probe (see PoPlatform). Same shape in every Po app, which
+    // is what lets the portfolio dashboard poll them all and render one uptime grid.
+    app.MapPoLiveness();
     app.MapBlazorClientHost();        // unknown-/api 404, client-error sink, SPA fallback
 
     app.RunStartupTasks();            // background Table Storage hydration + nightly prune job

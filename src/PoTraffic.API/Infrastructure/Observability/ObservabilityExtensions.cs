@@ -2,6 +2,7 @@ using Azure.Monitor.OpenTelemetry.AspNetCore;
 using System.Reflection;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using PoTraffic.API.Platform;
 using Serilog;
 
 namespace PoTraffic.API.Infrastructure.Observability;
@@ -71,17 +72,24 @@ internal static class ObservabilityExtensions
         {
             cfg.ReadFrom.Configuration(ctx.Configuration)
                .ReadFrom.Services(services)
-               .Enrich.FromLogContext();
-            // AppInsights telemetry handled by AddAzureMonitorTraceExporter() in OTel pipeline.
-        });
+               .Enrich.FromLogContext()
+               .Enrich.WithProperty(PoPlatform.ApplicationProperty, PoPlatform.AppName);
+            // AppInsights log export rides the UseAzureMonitor() OTel pipeline configured above.
+        },
+        // writeToProviders:true is what makes the comment above TRUE. Serilog otherwise replaces
+        // the logging providers outright and becomes the only ILogger backend, so the Azure Monitor
+        // log exporter that UseAzureMonitor() registers is wired up but never receives a record —
+        // the traces table stays empty however much the app logs. With this flag Serilog forwards
+        // to the registered providers as well, so structured logs (the UserSignedIn record among
+        // them) reach App Insights through the OTel pipeline that already exists here.
+        writeToProviders: true);
 
         return builder;
     }
 
     private static string? ResolveAppInsightsConnectionString(IConfiguration configuration)
     {
-        string? connectionString = configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]
-            ?? configuration["ApplicationInsights:ConnectionString"];
+        string? connectionString = PoPlatform.ResolveAppInsightsConnectionString(configuration);
 
         if (!string.IsNullOrWhiteSpace(connectionString))
             return connectionString;

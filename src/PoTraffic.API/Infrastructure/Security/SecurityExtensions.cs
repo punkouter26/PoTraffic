@@ -1,3 +1,4 @@
+using PoTraffic.API.Platform;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
@@ -60,10 +61,15 @@ internal static class SecurityExtensions
         authentication
             .AddCookie(options =>
             {
-                options.Cookie.Name = ".PoTraffic.Auth";
+                // Secure is pinned in Production so the __Host- prefix is legal there; the
+                // local http:// dev loop and the E2E suites keep SameAsRequest and the plain name.
+                var secureCookie = environment.IsProduction();
+                options.Cookie.Name = PoPlatform.SessionCookieName(secureCookie);
                 options.Cookie.HttpOnly = true;
                 options.Cookie.SameSite = SameSiteMode.Strict;
-                options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+                options.Cookie.SecurePolicy = secureCookie
+                    ? CookieSecurePolicy.Always
+                    : CookieSecurePolicy.SameAsRequest;
                 options.SlidingExpiration = true;
                 options.ExpireTimeSpan = TimeSpan.FromDays(14);
                 // API host — return status codes instead of redirecting to a login page.
@@ -92,6 +98,18 @@ internal static class SecurityExtensions
                 {
                     ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
                     ctx.Response.Headers["WWW-Authenticate"] = "Cookie realm=\"PoTraffic\"";
+                    return Task.CompletedTask;
+                };
+                // Canonical UserSignedIn record. OnSignedIn fires once, as the session cookie is
+                // minted, so it captures EVERY external provider rather than a single OIDC handler —
+                // and the provider is read from the claim the sign-in itself stamped.
+                options.Events.OnSignedIn = ctx =>
+                {
+                    SignInTelemetry.TrackFrom(
+                        ctx.HttpContext,
+                        ctx.Principal,
+                        "PoTraffic",
+                        ctx.Principal?.FindFirst("auth_provider")?.Value ?? "microsoft");
                     return Task.CompletedTask;
                 };
             });
