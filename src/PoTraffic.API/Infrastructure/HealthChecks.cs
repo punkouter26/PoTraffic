@@ -60,12 +60,12 @@ public sealed class StorageHealthCheck(
 }
 
 /// <summary>
-/// Surfaces background-scheduler liveness: a tick is expected every second, so a
+/// Surfaces background-scheduler liveness: a tick is expected every <see cref="BackgroundSchedulerService.TickInterval"/>, so a
 /// stale or failed tick means polling and pruning have silently stopped.
 /// </summary>
 public sealed class SchedulerHealthCheck(IServiceProvider services) : IHealthCheck
 {
-    private static readonly TimeSpan StaleAfter = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan StaleAfter = BackgroundSchedulerService.TickInterval * 2;
 
     public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken ct = default)
     {

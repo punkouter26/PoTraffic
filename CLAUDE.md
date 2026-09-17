@@ -124,7 +124,7 @@ derives auth state from `GET /api/auth/me`. Key points in
 
 ### Scheduling
 
-`BackgroundSchedulerService` ticks every second against Table Storage-backed job rows,
+`BackgroundSchedulerService` ticks every 15 minutes against Table Storage-backed job rows,
 executing each due job in its own DI scope. Job types (`PollRouteJob`,
 `PruneOldPollRecordsJob`) are resolved from DI by the type name stored on the job, so a new
 job type must also be registered in `Program.cs`. On startup it requeues jobs a crashed

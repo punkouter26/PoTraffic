@@ -11,7 +11,7 @@ using PoTraffic.Shared.Enums;
 namespace PoTraffic.API.Infrastructure.Scheduling;
 
 /// <summary>
-/// BackgroundService that ticks every second, queries Azurite for due jobs,
+/// BackgroundService that ticks every <see cref="TickInterval"/>, queries Azurite for due jobs,
 /// and executes them within a DI scope.
 /// </summary>
 public sealed class BackgroundSchedulerService : BackgroundService
@@ -20,6 +20,12 @@ public sealed class BackgroundSchedulerService : BackgroundService
     private readonly TableStorageJobScheduler? _tableScheduler;
     private readonly ILogger<BackgroundSchedulerService> _logger;
     private static readonly ActivitySource s_activitySource = new("PoTraffic.Scheduler");
+
+    /// <summary>
+    /// How often due jobs are checked. Each tick issues Table Storage queries that are exported
+    /// as App Insights dependencies, so a short interval drives Log Analytics ingestion cost.
+    /// </summary>
+    public static readonly TimeSpan TickInterval = TimeSpan.FromMinutes(15);
 
     /// <summary>
     /// Thread-safe, process-wide snapshot of the scheduler's last tick, surfaced on the
@@ -69,7 +75,7 @@ public sealed class BackgroundSchedulerService : BackgroundService
             }
         }
 
-        using PeriodicTimer timer = new(TimeSpan.FromSeconds(1));
+        using PeriodicTimer timer = new(TickInterval);
 
         try
         {
