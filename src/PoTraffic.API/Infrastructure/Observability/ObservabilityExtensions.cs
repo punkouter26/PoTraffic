@@ -36,9 +36,20 @@ internal static class ObservabilityExtensions
 
         var otel = builder.Services.AddOpenTelemetry()
             .ConfigureResource(r => r.AddService(roleName))
-            .WithMetrics(metrics => metrics
-                .AddMeter("Microsoft.AspNetCore.Hosting")
-                .AddMeter("Microsoft.AspNetCore.Server.Kestrel"));
+            .WithMetrics(metrics =>
+            {
+                metrics
+                    .AddMeter("Microsoft.AspNetCore.Hosting")
+                    .AddMeter("Microsoft.AspNetCore.Server.Kestrel");
+
+                // Cost cap: drop the noisy ASP.NET HTTP client/hosting pre-aggregated meters
+                // (~70–80% of this app's Log Analytics ingestion). Reversible via config.
+                if (!builder.Configuration.GetValue("ApplicationInsights:EnableAspNetCoreMeters", false))
+                {
+                    metrics.RemoveMeter("Microsoft.AspNetCore.Hosting");
+                    metrics.RemoveMeter("Microsoft.AspNetCore.HttpClient");
+                }
+            });
 
         if (!string.IsNullOrWhiteSpace(appInsightsConnStr))
         {
