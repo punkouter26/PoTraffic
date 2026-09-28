@@ -4,7 +4,7 @@ using PoTraffic.API.Infrastructure.Storage;
 namespace PoTraffic.API.Features.Routes;
 
 /// <summary>Sets (or clears, with null) the local time the user needs to arrive by.</summary>
-public sealed record SetArriveByCommand(RouteId RouteId, UserId UserId, string? ArriveBy) : IRequest<bool>;
+public sealed record SetArriveByCommand(RouteId RouteId, UserId UserId, string? ArriveBy);
 
 public sealed record SetArriveByRequest(string? ArriveBy);
 
@@ -18,10 +18,14 @@ public sealed class SetArriveByValidator : AbstractValidator<SetArriveByCommand>
     }
 }
 
-public sealed class SetArriveByHandler(TableStorageContext db) : IRequestHandler<SetArriveByCommand, bool>
+public sealed class SetArriveByHandler(TableStorageContext db)
 {
+    private static readonly SetArriveByValidator Validator = new();
+
     public async Task<bool> Handle(SetArriveByCommand cmd, CancellationToken ct)
     {
+        await Validator.ValidateAndThrowAsync(cmd, ct);
+
         EntityRoute? route = db.GetOwnedRoute(cmd.RouteId, cmd.UserId, excludeDeleted: true);
         if (route is null)
             return false;

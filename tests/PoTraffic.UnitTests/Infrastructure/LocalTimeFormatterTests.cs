@@ -4,7 +4,7 @@ using FluentAssertions;
 using PoTraffic.Client.Infrastructure;
 using Xunit;
 
-namespace PoTraffic.UnitTests.Helpers;
+namespace PoTraffic.UnitTests.Infrastructure;
 
 /// <summary>
 /// The server stores monitoring-window times in UTC and ships them as plain

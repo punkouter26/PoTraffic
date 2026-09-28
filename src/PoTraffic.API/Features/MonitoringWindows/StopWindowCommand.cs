@@ -12,9 +12,9 @@ namespace PoTraffic.API.Features.MonitoringWindows;
 
 public sealed record StopWindowCommand(
     SessionId SessionId,
-    UserId UserId) : IRequest<bool>;
+    UserId UserId);
 
-public sealed class StopWindowCommandHandler : IRequestHandler<StopWindowCommand, bool>
+public sealed class StopWindowCommandHandler
 {
     private readonly TableStorageContext _db;
     private readonly IJobScheduler _scheduler;

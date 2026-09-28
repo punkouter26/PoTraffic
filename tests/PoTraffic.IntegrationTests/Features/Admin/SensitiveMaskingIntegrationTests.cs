@@ -24,8 +24,6 @@ public sealed class SensitiveMaskingIntegrationTests : BaseIntegrationTest
     [SkipUnlessAzuriteAvailable]
     public async Task GetConfiguration_SensitiveValues_AreMasked()
     {
-        await ApplyMigrationsAsync();
-
         // Arrange — seed a sensitive and a non-sensitive config entry via DB
         using (IServiceScope scope = GetServices().CreateScope())
         {

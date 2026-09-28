@@ -12,9 +12,9 @@ namespace PoTraffic.API.Features.Routes;
 
 public sealed record DeleteRouteCommand(
     RouteId RouteId,
-    UserId UserId) : IRequest<bool>;
+    UserId UserId);
 
-public sealed class DeleteRouteCommandHandler : IRequestHandler<DeleteRouteCommand, bool>
+public sealed class DeleteRouteCommandHandler
 {
     private readonly TableStorageContext _db;
     private readonly IJobScheduler _scheduler;

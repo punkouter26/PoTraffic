@@ -25,11 +25,11 @@ internal static class PollHandlerTestHelper
     /// </param>
     public static ExecutePollCommandHandler Create(
         TableStorageContext db,
-        ITrafficProviderFactory providerFactory,
+        ITrafficProvider provider,
         ILogger<ExecutePollCommandHandler>? logger = null,
         IWeatherProvider? weather = null) =>
         new(db,
-            providerFactory,
+            provider,
             weather ?? new NoWeatherProvider(),
             new FeatureFlags(UseMockProviders: true, EnableWeather: weather is not null),
             AlertTestHelper.NoOp(db),

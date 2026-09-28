@@ -61,11 +61,11 @@ public static class TestingEndpoints
     /// </summary>
     private static async Task<IResult> ExecutePoll(
         [FromBody] ExecutePollRequest request,
-        ISender sender,
+        ExecutePollCommandHandler handler,
         ILogger<LogCategory> logger,
         CancellationToken ct)
     {
-        bool recorded = await sender.Send(new ExecutePollCommand(request.RouteId), ct);
+        bool recorded = await handler.Handle(new ExecutePollCommand(request.RouteId), ct);
         logger.LogInformation("[E2E] Poll for route {RouteId} recorded={Recorded}.", request.RouteId, recorded);
         return Results.Ok(new ExecutePollResponse(recorded));
     }
@@ -140,7 +140,7 @@ public static class TestingEndpoints
     private static async Task<IResult> SeedRoute(
         [FromBody] SeedRouteRequest request,
         TableStorageContext db,
-        ITrafficProviderFactory providerFactory,
+        ITrafficProvider provider,
         ILogger<LogCategory> logger,
         CancellationToken ct)
     {
@@ -162,7 +162,6 @@ public static class TestingEndpoints
             return Results.Ok(new SeedRouteResponse(existing.Id, existing.OriginAddress, existing.DestinationAddress));
         }
 
-        ITrafficProvider provider = providerFactory.GetProvider((RouteProvider)request.Provider);
         string? originCoordinates = await provider.GeocodeAsync(request.OriginAddress, ct);
         string? destinationCoordinates = await provider.GeocodeAsync(request.DestinationAddress, ct);
         if (originCoordinates is null || destinationCoordinates is null)

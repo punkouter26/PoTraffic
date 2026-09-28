@@ -4,8 +4,7 @@ using PoTraffic.Shared.DTOs.History;
 
 namespace PoTraffic.API.Features.History;
 
-public sealed record GetVolatilityHeatmapQuery(RouteId RouteId, UserId UserId)
-    : IRequest<VolatilityHeatmapDto>;
+public sealed record GetVolatilityHeatmapQuery(RouteId RouteId, UserId UserId);
 
 /// <summary>
 /// Aggregates a route's whole history into a day-of-week × quarter-hour grid (#5), so
@@ -21,7 +20,6 @@ public sealed record GetVolatilityHeatmapQuery(RouteId RouteId, UserId UserId)
 /// </para>
 /// </summary>
 public sealed class GetVolatilityHeatmapQueryHandler(TableStorageContext db)
-    : IRequestHandler<GetVolatilityHeatmapQuery, VolatilityHeatmapDto>
 {
     public Task<VolatilityHeatmapDto> Handle(GetVolatilityHeatmapQuery query, CancellationToken ct)
     {

@@ -6,9 +6,9 @@ using PoTraffic.Shared.DTOs.Admin;
 namespace PoTraffic.API.Features.Admin;
 
 // Query pattern — read system configuration; sensitive values masked per FR-026
-public sealed record GetSystemConfigurationQuery : IRequest<IReadOnlyList<SystemConfigDto>>;
+public sealed record GetSystemConfigurationQuery;
 
-public sealed class GetSystemConfigurationHandler : IRequestHandler<GetSystemConfigurationQuery, IReadOnlyList<SystemConfigDto>>
+public sealed class GetSystemConfigurationHandler
 {
     private readonly TableStorageContext _db;
 

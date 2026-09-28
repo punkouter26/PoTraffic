@@ -29,7 +29,7 @@ public static class GuestAuthExtensions
         // GUEST login bypass: Development (manual bypass button) + Testing (automated tests).
         app.MapPost("/api/auth/guest-login", async (
             HttpContext httpContext,
-            ISender sender,
+            GuestLoginCommandHandler handler,
             IWebHostEnvironment env) =>
         {
             if (!env.IsEnvironment("Testing") && !env.IsDevelopment())
@@ -37,7 +37,7 @@ public static class GuestAuthExtensions
                 return Results.NotFound();
             }
 
-            GuestLoginResult result = await sender.Send(new GuestLoginCommand());
+            GuestLoginResult result = await handler.Handle(new GuestLoginCommand(), CancellationToken.None);
             if (!result.IsSuccess || result.User is null)
                 return Results.BadRequest(new { error = result.ErrorCode });
 
@@ -54,7 +54,7 @@ public static class GuestAuthExtensions
     }
 }
 
-public sealed record GuestLoginCommand : IRequest<GuestLoginResult>;
+public sealed record GuestLoginCommand;
 
 public sealed record GuestLoginResult(
     bool IsSuccess,
@@ -63,7 +63,7 @@ public sealed record GuestLoginResult(
 
 public sealed class GuestLoginCommandHandler(
     TableStorageContext db,
-    ILogger<GuestLoginCommandHandler> logger) : IRequestHandler<GuestLoginCommand, GuestLoginResult>
+    ILogger<GuestLoginCommandHandler> logger)
 {
     public async Task<GuestLoginResult> Handle(GuestLoginCommand command, CancellationToken ct)
     {

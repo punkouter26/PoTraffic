@@ -21,7 +21,6 @@ public sealed class AdminAuthorizationIntegrationTests : BaseIntegrationTest
     [SkipUnlessAzuriteAvailable]
     public async Task AdminEndpoint_WithCommuterSession_Returns403()
     {
-        await ApplyMigrationsAsync();
         HttpClient client = CreateClient();
 
         // Establish a commuter cookie session via the Testing-only /e2e/dev-login endpoint (FR-022)
@@ -40,7 +39,6 @@ public sealed class AdminAuthorizationIntegrationTests : BaseIntegrationTest
     [SkipUnlessAzuriteAvailable]
     public async Task AdminEndpoint_WithAdministratorSession_Returns200()
     {
-        await ApplyMigrationsAsync();
         HttpClient client = CreateClient();
 
         // Establish an admin cookie session via the Testing-only /e2e/dev-login endpoint
@@ -59,7 +57,6 @@ public sealed class AdminAuthorizationIntegrationTests : BaseIntegrationTest
     [SkipUnlessAzuriteAvailable]
     public async Task AdminEndpoint_WithoutSession_Returns401()
     {
-        await ApplyMigrationsAsync();
         HttpClient client = CreateClient();
 
         HttpResponseMessage response = await client.GetAsync("/api/admin/users");

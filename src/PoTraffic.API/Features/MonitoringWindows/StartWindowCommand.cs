@@ -19,7 +19,7 @@ namespace PoTraffic.API.Features.MonitoringWindows;
 
 public sealed record StartWindowCommand(
     WindowId WindowId,
-    UserId UserId) : IRequest<StartWindowResult>;
+    UserId UserId);
 
 public sealed record StartWindowResult(
     bool IsSuccess,
@@ -27,7 +27,7 @@ public sealed record StartWindowResult(
     int QuotaRemaining,
     SessionId? SessionId);
 
-public sealed class StartWindowCommandHandler : IRequestHandler<StartWindowCommand, StartWindowResult>
+public sealed class StartWindowCommandHandler
 {
     // Per-route single-flight gate. The store is a process singleton with no compound-operation
     // isolation, so without this two concurrent Starts (double-click / client retry) can both

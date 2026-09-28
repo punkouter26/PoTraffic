@@ -6,9 +6,9 @@ using PoTraffic.Shared.Enums;
 namespace PoTraffic.API.Features.Admin;
 
 // Query pattern — read-only admin user list with today's usage
-public sealed record GetUsersQuery : IRequest<IReadOnlyList<UserDailyUsageDto>>;
+public sealed record GetUsersQuery;
 
-public sealed class GetUsersHandler : IRequestHandler<GetUsersQuery, IReadOnlyList<UserDailyUsageDto>>
+public sealed class GetUsersHandler
 {
     private readonly TableStorageContext _db;
 
@@ -36,7 +36,7 @@ public sealed class GetUsersHandler : IRequestHandler<GetUsersQuery, IReadOnlyLi
             .GroupBy(p => p.RouteId)
             .ToDictionary(g => g.Key, g => g.ToList());
 
-        PollCostRates rates = PollCostRates.Load(_db);
+        decimal perPoll = PollCostRates.PerPoll(_db);
 
         return users.Select(u =>
         {
@@ -53,7 +53,7 @@ public sealed class GetUsersHandler : IRequestHandler<GetUsersQuery, IReadOnlyLi
                     int pollCount = grp
                         .SelectMany(r => pollsByRoute.TryGetValue(r.Id, out var p) ? p : [])
                         .Count();
-                    return new ProviderBreakdownDto(grp.Key, pollCount, (double)(pollCount * rates.For(grp.Key)));
+                    return new ProviderBreakdownDto(grp.Key, pollCount, (double)(pollCount * perPoll));
                 })
                 .ToList();
 

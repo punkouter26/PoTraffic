@@ -32,13 +32,13 @@ public static class WindowsEndpoints
     private static async Task<IResult> GetWindows(
         RouteId routeId,
         HttpContext context,
-        ISender sender)
+        GetWindowsQueryHandler handler)
     {
         UserId? userId = ExtractUserId(context.User);
         if (userId is null) return Results.Unauthorized();
 
         IReadOnlyList<MonitoringWindowDto>? windows =
-            await sender.Send(new GetWindowsQuery(routeId, userId.Value));
+            await handler.Handle(new GetWindowsQuery(routeId, userId.Value), context.RequestAborted);
 
         return windows is null
             ? Results.NotFound()
@@ -49,7 +49,7 @@ public static class WindowsEndpoints
     private static async Task<IResult> CreateWindow(
         RouteId routeId,
         HttpContext context,
-        ISender sender,
+        CreateWindowCommandHandler handler,
         [FromBody] CreateWindowRequest request)
     {
         UserId? userId = ExtractUserId(context.User);
@@ -61,8 +61,8 @@ public static class WindowsEndpoints
         if (!TimeOnly.TryParse(request.EndTime, out TimeOnly end))
             return Results.BadRequest(new { error = "INVALID_END_TIME" });
 
-        CreateWindowResult result = await sender.Send(
-            new CreateWindowCommand(routeId, userId.Value, start, end, request.DaysOfWeekMask, request.TimeZoneId));
+        CreateWindowResult result = await handler.Handle(
+            new CreateWindowCommand(routeId, userId.Value, start, end, request.DaysOfWeekMask, request.TimeZoneId), CancellationToken.None);
 
         return result.IsSuccess
             ? Results.Created($"/api/routes/{routeId}/windows/{result.WindowId}", new { windowId = result.WindowId })
@@ -79,12 +79,12 @@ public static class WindowsEndpoints
         RouteId routeId,
         WindowId windowId,
         HttpContext context,
-        ISender sender)
+        DeleteWindowCommandHandler handler)
     {
         UserId? userId = ExtractUserId(context.User);
         if (userId is null) return Results.Unauthorized();
 
-        bool deleted = await sender.Send(new DeleteWindowCommand(windowId, userId.Value));
+        bool deleted = await handler.Handle(new DeleteWindowCommand(windowId, userId.Value), CancellationToken.None);
         return deleted ? Results.NoContent() : Results.NotFound();
     }
 
@@ -93,12 +93,12 @@ public static class WindowsEndpoints
         RouteId routeId,
         WindowId windowId,
         HttpContext context,
-        ISender sender)
+        StartWindowCommandHandler handler)
     {
         UserId? userId = ExtractUserId(context.User);
         if (userId is null) return Results.Unauthorized();
 
-        StartWindowResult result = await sender.Send(new StartWindowCommand(windowId, userId.Value));
+        StartWindowResult result = await handler.Handle(new StartWindowCommand(windowId, userId.Value), CancellationToken.None);
 
         if (!result.IsSuccess)
         {
@@ -122,13 +122,13 @@ public static class WindowsEndpoints
         RouteId routeId,
         WindowId windowId,
         HttpContext context,
-        ISender sender,
+        StopWindowCommandHandler handler,
         [FromBody] StopWindowRequest request)
     {
         UserId? userId = ExtractUserId(context.User);
         if (userId is null) return Results.Unauthorized();
 
-        bool stopped = await sender.Send(new StopWindowCommand(request.SessionId, userId.Value));
+        bool stopped = await handler.Handle(new StopWindowCommand(request.SessionId, userId.Value), CancellationToken.None);
         return stopped ? Results.NoContent() : Results.NotFound();
     }
 }

@@ -14,8 +14,7 @@ namespace PoTraffic.API.Features.Routes;
 /// from UTC, so the generated commute lands on the user's morning rather than on UTC's —
 /// the server has no other way to know, and a demo that shows a 3am commute reads as broken.
 /// </summary>
-public sealed record CreateSampleRouteCommand(UserId UserId, int UtcOffsetMinutes)
-    : IRequest<RouteDto>;
+public sealed record CreateSampleRouteCommand(UserId UserId, int UtcOffsetMinutes);
 
 public sealed class CreateSampleRouteValidator : AbstractValidator<CreateSampleRouteCommand>
 {
@@ -44,7 +43,6 @@ public sealed class CreateSampleRouteValidator : AbstractValidator<CreateSampleR
 public sealed class CreateSampleRouteCommandHandler(
     TableStorageContext db,
     ILogger<CreateSampleRouteCommandHandler> logger)
-    : IRequestHandler<CreateSampleRouteCommand, RouteDto>
 {
     // A real Santa Monica → Downtown LA commute: ~24km, and congested enough in the morning
     // that the generated history has something to say.
@@ -62,8 +60,12 @@ public sealed class CreateSampleRouteCommandHandler(
     private const double FreeFlowSeconds = 22 * 60;
     private const int BaseDistanceMetres = 24_000;
 
+    private static readonly CreateSampleRouteValidator Validator = new();
+
     public async Task<RouteDto> Handle(CreateSampleRouteCommand cmd, CancellationToken ct)
     {
+        await Validator.ValidateAndThrowAsync(cmd, ct);
+
         // Idempotent: the dashboard offers this from an empty state that a double-tap can
         // easily submit twice, and two demo routes is a worse outcome than a 200 with the
         // one that already exists.

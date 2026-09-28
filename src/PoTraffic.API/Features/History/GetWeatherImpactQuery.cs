@@ -7,8 +7,7 @@ using PoTraffic.Shared.DTOs.History;
 
 namespace PoTraffic.API.Features.History;
 
-public sealed record GetWeatherImpactQuery(RouteId RouteId, UserId UserId)
-    : IRequest<WeatherImpactResponse>;
+public sealed record GetWeatherImpactQuery(RouteId RouteId, UserId UserId);
 
 /// <summary>
 /// Answers "what does rain actually cost me on this route".
@@ -18,7 +17,7 @@ public sealed record GetWeatherImpactQuery(RouteId RouteId, UserId UserId)
 /// Weather is not evenly distributed across the clock, so if a route's rainy samples happen
 /// to cluster at 08:15 and its clear samples at 06:45, the naive comparison reports the
 /// morning peak as the cost of rain. Every sample is therefore scored against the mean of
-/// its own 15-minute slot (local time, the same bucketing <see cref="GetBaselineQuery"/> uses), and the
+/// its own 15-minute slot (local time), and the
 /// conditions are compared on those deltas. What survives is the part of the difference the
 /// time of day does not already explain.
 /// </para>
@@ -29,7 +28,6 @@ public sealed record GetWeatherImpactQuery(RouteId RouteId, UserId UserId)
 /// </para>
 /// </summary>
 public sealed class GetWeatherImpactQueryHandler(TableStorageContext db)
-    : IRequestHandler<GetWeatherImpactQuery, WeatherImpactResponse>
 {
     public Task<WeatherImpactResponse> Handle(GetWeatherImpactQuery query, CancellationToken ct)
     {

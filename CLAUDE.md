@@ -9,7 +9,7 @@ commit to `master`, do not create branches unless asked, and do not push unasked
 ## What this is
 
 PoTraffic measures commute-route volatility. It records travel-time samples on a schedule
-(Google Maps / TomTom), builds per-route/time-slot baselines, and flags congestion and
+(Google Maps), builds per-route/time-slot baselines, and flags congestion and
 reroute anomalies. Blazor WebAssembly client + ASP.NET Core minimal API on .NET 10, hosted
 together as one App Service app (the API serves the WASM client — CORS is intentionally
 never configured).
@@ -29,7 +29,7 @@ dotnet build                   # TreatWarningsAsErrors=true — a warning is a b
 | `https://localhost:5001/health/json` | machine-readable dependency status |
 | `https://localhost:5001/health/ready` | hydration complete? |
 | `https://localhost:5001/scalar/v1` | Scalar API reference (Development only) |
-| `https://localhost:5001/diag` | hidden diagnostics page |
+| `https://localhost:5001/diag/keyvault` | admin-only JSON: did a vault secret resolve? |
 
 ### Tests
 
@@ -56,11 +56,10 @@ overrides the E2E target.
 
 ## Architecture
 
-### Projects (three, not the six the README claims)
+### Projects
 
 `src/PoTraffic.API` (host + all server logic), `src/PoTraffic.Client` (Blazor WASM),
-`src/PoTraffic.Shared` (DTOs, enums, strongly-typed IDs — referenced by both). The README's
-"Domain / Application / Infrastructure" layout and its MediatR mention are stale.
+`src/PoTraffic.Shared` (DTOs, enums, strongly-typed IDs — referenced by both).
 
 Tests are `PoTraffic.UnitTests`, `PoTraffic.IntegrationTests` and `PoTraffic.E2ETests`, each
 named for the tier it holds. The E2E project splits `Api/` (live HTTP) from `Ui/` (Playwright),
@@ -70,7 +69,7 @@ and namespaces follow the folders.
 
 Server features live under `src/PoTraffic.API/Features/<Name>/`: one `*Endpoints.cs` that
 maps a `MapGroup`, plus one file per operation holding the command/query record, its
-`AbstractValidator`, and its handler together. Entities live in the slice that owns them
+`AbstractValidator` (if it has input to check), and its handler together. Entities live in the slice that owns them
 (`Features/Routes/Route.cs`, `Features/Auth/User.cs`). Do not add root-level `Services/`,
 `Repositories/`, or `DTOs/` folders. Client features mirror this under
 `src/PoTraffic.Client/Features/<Name>/`.
@@ -80,14 +79,15 @@ nothing about the domain (`PtIcon`, `PageHeader`, `UndoBar`); anything that know
 route is belongs to its feature slice; `Pages/` holds the app-shell routes that belong to
 no feature (`/`, `/not-found`, `/access-denied`, `/health`).
 
-### Dispatch
+### Handlers
 
-`Infrastructure/Dispatch/Dispatcher.cs` is an in-house MediatR replacement: `ISender.Send`
-resolves every `IValidator<TRequest>`, runs them first, throws `ValidationException` on
-failure (mapped to 422 by `GlobalExceptionHandler`), then invokes the single
-`IRequestHandler<TRequest,TResponse>`. Handlers are auto-registered by assembly scan, so a
-new slice needs no DI wiring. Validation is therefore always pre-handler — never
-re-validate inside a handler.
+Handlers are plain classes. Endpoints and jobs take the concrete handler as a parameter and
+call `Handle(request, ct)` directly — there is no mediator. `Program.cs` registers every
+`*Handler` class under `Features/` by assembly scan, so a new slice needs no DI wiring. A
+handler with a validator runs it first (`Validator.ValidateAndThrowAsync`, a static
+instance); the resulting `ValidationException` maps to 422 in `GlobalExceptionHandler`.
+Read endpoints pass `RequestAborted`; writes pass `CancellationToken.None` so a closed tab
+cannot cancel a billed provider call mid-write.
 
 ### Persistence — the part most likely to surprise you
 
@@ -133,9 +133,9 @@ self-perpetuating chain, not a fixed timer.
 
 ### Traffic providers
 
-`ITrafficProvider` implementations are registered as **keyed** services under `RouteProvider`
-enum values and reached through `ITrafficProviderFactory`. When `Features:UseMockProviders`
-is true (or the environment is `Testing`), both keys resolve to `MockTrafficProvider`. Live
+Google Maps is the one traffic provider: handlers inject `ITrafficProvider` directly. When
+`Features:UseMockProviders` is true (or the environment is `Testing`) it resolves to
+`MockTrafficProvider`. TomTom is used only for incident text on alerts (`IIncidentProvider`). Live
 clients are wired to the named resilience pipeline in `ResiliencePipelineExtensions`.
 
 ### Program.cs ordering constraints

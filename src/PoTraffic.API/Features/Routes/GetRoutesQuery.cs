@@ -11,9 +11,9 @@ namespace PoTraffic.API.Features.Routes;
 public sealed record GetRoutesQuery(
     UserId UserId,
     int Page,
-    int PageSize) : IRequest<PagedResult<RouteDto>>;
+    int PageSize);
 
-public sealed class GetRoutesQueryHandler(TableStorageContext db) : IRequestHandler<GetRoutesQuery, PagedResult<RouteDto>>
+public sealed class GetRoutesQueryHandler(TableStorageContext db)
 {
     public async Task<PagedResult<RouteDto>> Handle(GetRoutesQuery q, CancellationToken ct)
     {

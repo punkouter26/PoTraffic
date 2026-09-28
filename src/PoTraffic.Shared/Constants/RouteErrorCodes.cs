@@ -22,20 +22,4 @@ public static class RouteErrorCodes
 
     /// <summary>The target route/window does not exist or is not owned by the caller.</summary>
     public const string NotFound = "NOT_FOUND";
-
-    /// <summary>
-    /// The operation would bill a real traffic-provider call against the sample route,
-    /// whose history is synthetic. Demo routes are for reading, not measuring.
-    /// </summary>
-    public const string DemoRoute = "DEMO_ROUTE";
-}
-
-/// <summary>
-/// Thrown by an <c>ITrafficProvider</c> when geocoding cannot proceed because the
-/// provider is not configured (e.g. missing API key). Distinct from an
-/// unresolvable address, which is signalled by a null geocode result.
-/// </summary>
-public sealed class GeocodingConfigurationException : Exception
-{
-    public GeocodingConfigurationException(string message) : base(message) { }
 }

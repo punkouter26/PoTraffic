@@ -29,7 +29,7 @@ public sealed record CreateRouteCommand(
     string StartTime = "07:00",
     string EndTime = "09:00",
     byte DaysOfWeekMask = 0x1F,
-    string? TimeZoneId = null) : IRequest<CreateRouteResult>;
+    string? TimeZoneId = null);
 
 public sealed record CreateRouteResult(
     bool IsSuccess,
@@ -80,13 +80,14 @@ public sealed class CreateRouteValidator : AbstractValidator<CreateRouteCommand>
 
 public sealed class CreateRouteCommandHandler(
     TableStorageContext db,
-    ITrafficProviderFactory providerFactory,
-    ILogger<CreateRouteCommandHandler> logger) : IRequestHandler<CreateRouteCommand, CreateRouteResult>
+    ITrafficProvider provider,
+    ILogger<CreateRouteCommandHandler> logger)
 {
+    private static readonly CreateRouteValidator Validator = new();
+
     public async Task<CreateRouteResult> Handle(CreateRouteCommand cmd, CancellationToken ct)
     {
-        // Strategy pattern — select provider via factory (resolves keyed DI lookup)
-        ITrafficProvider provider = providerFactory.GetProvider(cmd.Provider);
+        await Validator.ValidateAndThrowAsync(cmd, ct);
 
         // A GeocodingConfigurationException (server misconfiguration, e.g. a missing Maps key)
         // is deliberately NOT caught here — GlobalExceptionHandler maps it to the same 422 +

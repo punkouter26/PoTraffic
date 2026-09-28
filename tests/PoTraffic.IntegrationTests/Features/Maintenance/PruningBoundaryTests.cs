@@ -1,4 +1,3 @@
-using PoTraffic.API.Infrastructure.Dispatch;
 using Microsoft.Extensions.DependencyInjection;
 using PoTraffic.API.Features.Maintenance;
 using PoTraffic.API.Infrastructure.Storage;
@@ -37,14 +36,13 @@ public sealed class PruningBoundaryTests : BaseIntegrationTest
     public async Task PruneCommand_SoftDeletesRecordsBeyond90Days_PreservesAt90DayBoundary()
     {
         // Arrange — ensure migrations are applied and access DI services
-        await ApplyMigrationsAsync();
 
         _ = CreateClient(); // warm up host
 
         // Access services via the test application's DI container
         using IServiceScope scope = GetServices().CreateScope();
         TableStorageContext db = scope.ServiceProvider.GetRequiredService<TableStorageContext>();
-        ISender sender = scope.ServiceProvider.GetRequiredService<ISender>();
+        PruneOldPollRecordsCommandHandler handler = scope.ServiceProvider.GetRequiredService<PruneOldPollRecordsCommandHandler>();
 
         DateTime now = DateTime.UtcNow;
 
@@ -120,7 +118,7 @@ public sealed class PruningBoundaryTests : BaseIntegrationTest
         await db.SaveChangesAsync();
 
         // Act
-        await sender.Send(new PruneOldPollRecordsCommand());
+        await handler.Handle(new PruneOldPollRecordsCommand(), CancellationToken.None);
 
         // Assert — 91-day record must be hard-deleted
         PollRecord? reloadedBeyond = db.PollRecords.FirstOrDefault(r => r.Id == beyond.Id);

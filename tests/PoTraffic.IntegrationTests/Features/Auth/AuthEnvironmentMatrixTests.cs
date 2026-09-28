@@ -18,7 +18,6 @@ public sealed class TestingAuthMatrixTests : BaseIntegrationTest
     [SkipUnlessAzuriteAvailable]
     public async Task Testing_GuestBypass_IsEnabled_AndWorks()
     {
-        await ApplyMigrationsAsync();
         HttpClient client = CreateClient();
 
         JsonElement providers = await client.GetFromJsonAsync<JsonElement>("/api/auth/providers");
@@ -38,7 +37,6 @@ public sealed class DevelopmentAuthMatrixTests : BaseIntegrationTest
     [SkipUnlessAzuriteAvailable]
     public async Task Development_Offers_MicrosoftAndGuest_AndGuestSessionIsAccepted()
     {
-        await ApplyMigrationsAsync();
         HttpClient client = CreateClient();
 
         JsonElement providers = await client.GetFromJsonAsync<JsonElement>("/api/auth/providers");
@@ -60,7 +58,6 @@ public sealed class ProductionAuthMatrixTests : BaseIntegrationTest
     [SkipUnlessAzuriteAvailable]
     public async Task Production_Is_MicrosoftOnly_GuestEndpointAbsent()
     {
-        await ApplyMigrationsAsync();
         HttpClient client = CreateClient();
 
         JsonElement providers = await client.GetFromJsonAsync<JsonElement>("/api/auth/providers");

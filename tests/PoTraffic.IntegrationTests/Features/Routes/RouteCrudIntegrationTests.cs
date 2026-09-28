@@ -16,7 +16,6 @@ public sealed class RouteCrudIntegrationTests : BaseIntegrationTest
     [SkipUnlessAzuriteAvailable]
     public async Task RouteCrud_CreateGetDelete_FullLifecycle()
     {
-        await ApplyMigrationsAsync();
         HttpClient client = CreateClient();
 
         // Arrange — guest login creates a real user row to satisfy FK constraints

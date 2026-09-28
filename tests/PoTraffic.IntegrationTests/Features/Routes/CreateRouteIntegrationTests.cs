@@ -27,7 +27,6 @@ public sealed class CreateRouteIntegrationTests : BaseIntegrationTest
     [SkipUnlessAzuriteAvailable]
     public async Task PostRoutes_CreatesRouteRow()
     {
-        await ApplyMigrationsAsync();
         HttpClient client = CreateClient();
 
         // Arrange — real user via guest login
@@ -66,7 +65,6 @@ public sealed class CreateRouteIntegrationTests : BaseIntegrationTest
     [SkipUnlessAzuriteAvailable]
     public async Task PostRoutesWindows_CreatesMonitoringWindowRow()
     {
-        await ApplyMigrationsAsync();
         HttpClient client = CreateClient();
 
         // Arrange — real user + create route (note: CreateRouteCommand defaults to 07:00-09:00 window)

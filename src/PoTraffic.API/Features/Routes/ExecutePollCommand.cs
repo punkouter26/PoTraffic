@@ -15,16 +15,16 @@ using PoTraffic.Shared.Enums;
 
 namespace PoTraffic.API.Features.Routes;
 
-public sealed record ExecutePollCommand(RouteId RouteId) : IRequest<bool>;
+public sealed record ExecutePollCommand(RouteId RouteId);
 
 public sealed class ExecutePollCommandHandler(
     TableStorageContext db,
-    ITrafficProviderFactory providerFactory,
+    ITrafficProvider provider,
     IWeatherProvider weatherProvider,
     Config.FeatureFlags featureFlags,
     Alerts.AlertEvaluator alertEvaluator,
     IHolidayCalendar holidays,
-    ILogger<ExecutePollCommandHandler> logger) : IRequestHandler<ExecutePollCommand, bool>
+    ILogger<ExecutePollCommandHandler> logger)
 {
     /// <summary>Two polls closer together than this are treated as the same logical poll
     /// (a re-executed job after a crash/requeue); the second is suppressed. Well below the
@@ -72,14 +72,12 @@ public sealed class ExecutePollCommandHandler(
             return false;
         }
 
-        // 3. Resolve provider via factory (resolves keyed DI lookup)
-        ITrafficProvider provider = providerFactory.GetProvider((RouteProvider)route.Provider);
 
         TravelResult? travelResult;
 
         try
         {
-            // 4. Call provider — catch all exceptions; scheduler must not retry on provider errors
+            // 3. Call provider — catch all exceptions; scheduler must not retry on provider errors
             travelResult = await provider.GetTravelTimeAsync(
                 route.OriginCoordinates,
                 route.DestinationCoordinates,
@@ -133,7 +131,7 @@ public sealed class ExecutePollCommandHandler(
             }
         }
 
-        // 5. Create PollRecord
+        // 4. Create PollRecord
         var record = new PollRecord
         {
             Id = PollRecordId.New(),
@@ -148,7 +146,7 @@ public sealed class ExecutePollCommandHandler(
             PrecipitationMm = weather?.PrecipitationMm
         };
 
-        // 6. Reroute detection. Only the single most recent prior record is needed alongside
+        // 5. Reroute detection. Only the single most recent prior record is needed alongside
         // the median, so this takes a linear MaxBy rather than sorting the whole session.
         List<PollRecord> priorRecords = [.. db.PollRecords
             .Where(p => p.SessionId == session.Id)];
@@ -175,15 +173,15 @@ public sealed class ExecutePollCommandHandler(
 
         db.Add(record);
 
-        // 7. Update session statistics
+        // 6. Update session statistics
         session.LastPollAt = record.PolledAt;
         session.PollCount += 1;
         session.FirstPollAt ??= record.PolledAt;
 
-        // 8. Save
+        // 7. Save
         await db.SaveChangesAsync(ct);
 
-        // 9. Proactive alert evaluation (#1) — never let it break the poll chain.
+        // 8. Proactive alert evaluation (#1) — never let it break the poll chain.
         try
         {
             await alertEvaluator.EvaluateAsync(route, record, session, ct);

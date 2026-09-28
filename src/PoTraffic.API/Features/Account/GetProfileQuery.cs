@@ -5,9 +5,9 @@ using PoTraffic.Shared.DTOs.Account;
 
 namespace PoTraffic.API.Features.Account;
 
-public sealed record GetProfileQuery(UserId UserId) : IRequest<ProfileDto?>;
+public sealed record GetProfileQuery(UserId UserId);
 
-public sealed class GetProfileHandler : IRequestHandler<GetProfileQuery, ProfileDto?>
+public sealed class GetProfileHandler
 {
     private readonly TableStorageContext _db;
 

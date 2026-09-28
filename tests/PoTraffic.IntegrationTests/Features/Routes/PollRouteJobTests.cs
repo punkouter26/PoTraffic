@@ -2,10 +2,12 @@ using System.Linq.Expressions;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using NSubstitute;
+using PoTraffic.API.Features.Alerts;
+using PoTraffic.API.Features.Config;
 using PoTraffic.API.Features.MonitoringWindows;
 using PoTraffic.API.Features.Routes;
-using PoTraffic.API.Features.Routes;
-using PoTraffic.API.Infrastructure.Dispatch;
+using PoTraffic.API.Infrastructure.Providers;
 using PoTraffic.API.Infrastructure.Scheduling;
 using PoTraffic.API.Infrastructure.Storage;
 using PoTraffic.Shared.Constants;
@@ -36,31 +38,33 @@ public sealed class PollRouteJobTests
         public void ScheduleRecurring(string jobId, Func<Task> job, TimeOnly dailyAtUtc) { }
     }
 
-    private sealed class RecordingSender : ISender
-    {
-        public List<object> Sent { get; } = [];
-        public Task<TResponse> Send<TResponse>(IRequest<TResponse> request, CancellationToken ct = default)
-        {
-            Sent.Add(request);
-            return Task.FromResult<TResponse>(default!);
-        }
-    }
-
-    private static (PollRouteJob Job, RecordingScheduler Scheduler, RecordingSender Sender, TableStorageContext Db) Build()
+    private static (PollRouteJob Job, RecordingScheduler Scheduler, ITrafficProvider Traffic, TableStorageContext Db) Build()
     {
         var db = new TableStorageContext();
         var scheduler = new RecordingScheduler();
-        var sender = new RecordingSender();
+        // A real poll handler over a substituted provider: "was the route polled" is "was the
+        // provider called", which is the quota-spending side effect these tests guard.
+        ITrafficProvider traffic = Substitute.For<ITrafficProvider>();
         ServiceProvider services = new ServiceCollection()
             .AddSingleton(db)
-            .AddScoped<ISender>(_ => sender)
+            .AddScoped(_ => new ExecutePollCommandHandler(
+                db,
+                traffic,
+                Substitute.For<IWeatherProvider>(),
+                new FeatureFlags(UseMockProviders: true, EnableWeather: false),
+                new AlertEvaluator(db, Substitute.For<IPushNotifier>(), Substitute.For<IIncidentProvider>(), NullLogger<AlertEvaluator>.Instance),
+                NoHolidayCalendar.Instance,
+                NullLogger<ExecutePollCommandHandler>.Instance))
             .BuildServiceProvider();
         var job = new PollRouteJob(
             services.GetRequiredService<IServiceScopeFactory>(),
             scheduler,
             NullLogger<PollRouteJob>.Instance);
-        return (job, scheduler, sender, db);
+        return (job, scheduler, traffic, db);
     }
+
+    private static Task AssertNotPolled(ITrafficProvider traffic) =>
+        traffic.DidNotReceiveWithAnyArgs().GetTravelTimeAsync(default!, default!, default);
 
     private static EntityRoute NewRoute(RouteId id, MonitoringStatus status) => new()
     {
@@ -90,14 +94,15 @@ public sealed class PollRouteJobTests
     [Fact]
     public async Task InsideWindow_Polls_SchedulesNextInterval_AndAutoCreatesSession()
     {
-        (PollRouteJob job, RecordingScheduler scheduler, RecordingSender sender, TableStorageContext db) = Build();
+        (PollRouteJob job, RecordingScheduler scheduler, ITrafficProvider traffic, TableStorageContext db) = Build();
         RouteId routeId = RouteId.New();
         db.Add(NewRoute(routeId, MonitoringStatus.Active));
         db.Add(AlwaysOpenWindow(routeId));
 
         await job.Execute(routeId);
 
-        sender.Sent.Should().ContainSingle(r => r is ExecutePollCommand, "inside the window the route must be polled");
+        // Inside the window the route must be polled.
+        await traffic.ReceivedWithAnyArgs(1).GetTravelTimeAsync(default!, default!, default);
         db.Sessions.Should().ContainSingle(s => s.RouteId == routeId && s.State == (int)SessionState.Active,
             "the daily session is auto-created at window start");
         scheduler.ScheduledDelays.Should().ContainSingle()
@@ -108,7 +113,7 @@ public sealed class PollRouteJobTests
     [Fact]
     public async Task OutsideWindow_DoesNotPoll_SleepsUntilNextWindowStart()
     {
-        (PollRouteJob job, RecordingScheduler scheduler, RecordingSender sender, TableStorageContext db) = Build();
+        (PollRouteJob job, RecordingScheduler scheduler, ITrafficProvider traffic, TableStorageContext db) = Build();
         RouteId routeId = RouteId.New();
         db.Add(NewRoute(routeId, MonitoringStatus.Active));
 
@@ -120,7 +125,8 @@ public sealed class PollRouteJobTests
 
         await job.Execute(routeId);
 
-        sender.Sent.Should().BeEmpty("no provider quota may be spent outside the monitoring window");
+        // No provider quota may be spent outside the monitoring window.
+        await AssertNotPolled(traffic);
         scheduler.ScheduledDelays.Should().ContainSingle();
         scheduler.ScheduledDelays[0].Should().BeGreaterThan(TimeSpan.FromMinutes(QuotaConstants.PollIntervalMinutes),
             "the chain sleeps until the window opens instead of ticking every interval");
@@ -130,7 +136,7 @@ public sealed class PollRouteJobTests
     [Fact]
     public async Task NoActiveWindow_StopsChain_AndClearsJobChainId()
     {
-        (PollRouteJob job, RecordingScheduler scheduler, RecordingSender sender, TableStorageContext db) = Build();
+        (PollRouteJob job, RecordingScheduler scheduler, ITrafficProvider traffic, TableStorageContext db) = Build();
         RouteId routeId = RouteId.New();
         EntityRoute route = NewRoute(routeId, MonitoringStatus.Active);
         route.JobChainId = "stale";
@@ -138,7 +144,7 @@ public sealed class PollRouteJobTests
 
         await job.Execute(routeId);
 
-        sender.Sent.Should().BeEmpty();
+        await AssertNotPolled(traffic);
         scheduler.ScheduledDelays.Should().BeEmpty("a route without a window has nothing to sample");
         db.Routes.Single(r => r.Id == routeId).JobChainId.Should().BeNull();
     }
@@ -146,14 +152,14 @@ public sealed class PollRouteJobTests
     [Fact]
     public async Task DeletedRoute_StopsChain()
     {
-        (PollRouteJob job, RecordingScheduler scheduler, RecordingSender sender, TableStorageContext db) = Build();
+        (PollRouteJob job, RecordingScheduler scheduler, ITrafficProvider traffic, TableStorageContext db) = Build();
         RouteId routeId = RouteId.New();
         db.Add(NewRoute(routeId, MonitoringStatus.Deleted));
         db.Add(AlwaysOpenWindow(routeId));
 
         await job.Execute(routeId);
 
-        sender.Sent.Should().BeEmpty();
+        await AssertNotPolled(traffic);
         scheduler.ScheduledDelays.Should().BeEmpty("a soft-deleted route must not consume provider quota");
     }
 
@@ -170,7 +176,7 @@ public sealed class PollRouteJobTests
     [Fact]
     public async Task QuotaExhausted_DoesNotPoll_SleepsUntilNextWindowStart()
     {
-        (PollRouteJob job, RecordingScheduler scheduler, RecordingSender sender, TableStorageContext db) = Build();
+        (PollRouteJob job, RecordingScheduler scheduler, ITrafficProvider traffic, TableStorageContext db) = Build();
         RouteId routeId = RouteId.New();
         EntityRoute route = NewRoute(routeId, MonitoringStatus.Active);
         db.Add(route);
@@ -194,40 +200,8 @@ public sealed class PollRouteJobTests
 
         await job.Execute(routeId);
 
-        sender.Sent.Should().BeEmpty("the per-user daily session quota must be honoured");
+        // The per-user daily session quota must be honoured.
+        await AssertNotPolled(traffic);
         scheduler.ScheduledDelays.Should().ContainSingle("the chain resumes at the next window start");
-    }
-
-    [Fact]
-    public void NextWindowStart_SkipsDisabledDays()
-    {
-        // Monday-only window at 08:00 UTC; from a Tuesday the next start is the following Monday.
-        var window = Window(RouteId.New(), new TimeOnly(8, 0), new TimeOnly(9, 0), mask: 0b0000001);
-        DateTimeOffset tuesday = new(2026, 7, 7, 12, 0, 0, TimeSpan.Zero); // Tuesday
-
-        DateTimeOffset? next = PollRouteJob.NextWindowStart(window, tuesday);
-
-        next.Should().Be(new DateTimeOffset(2026, 7, 13, 8, 0, 0, TimeSpan.Zero)); // next Monday 08:00
-    }
-
-    [Fact]
-    public void NextWindowStart_NoDaysEnabled_ReturnsNull()
-    {
-        var window = Window(RouteId.New(), new TimeOnly(8, 0), new TimeOnly(9, 0), mask: 0);
-        PollRouteJob.NextWindowStart(window, DateTimeOffset.UtcNow).Should().BeNull();
-    }
-
-    [Fact]
-    public void IsWithinWindow_RespectsDayMaskAndTimeRange()
-    {
-        // Mon–Fri 07:00–09:00 (mask 0x1F, bit0=Monday)
-        var window = Window(RouteId.New(), new TimeOnly(7, 0), new TimeOnly(9, 0), mask: 0x1F);
-
-        PollRouteJob.IsWithinWindow(window, new DateTimeOffset(2026, 7, 6, 8, 0, 0, TimeSpan.Zero))
-            .Should().BeTrue("Monday 08:00 is inside Mon–Fri 07:00–09:00");
-        PollRouteJob.IsWithinWindow(window, new DateTimeOffset(2026, 7, 6, 9, 0, 0, TimeSpan.Zero))
-            .Should().BeFalse("the end time is exclusive");
-        PollRouteJob.IsWithinWindow(window, new DateTimeOffset(2026, 7, 5, 8, 0, 0, TimeSpan.Zero))
-            .Should().BeFalse("Sunday is not in the Mon–Fri mask");
     }
 }

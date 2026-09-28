@@ -59,6 +59,24 @@ public static class UserTime
         db.Polls.Where(p => p.RouteId == routeId && p.HolidayName == null);
 
     /// <summary>
+    /// The route's usual samples in local time, narrowed to <paramref name="dayOfWeek"/> — or
+    /// every day when that weekday is still too sparse to stand on its own (<c>FellBack</c>).
+    /// Shared by the best-departure card and the departure plan so they rest on the same samples.
+    /// </summary>
+    public static (List<(DateTimeOffset Local, int Seconds)> Polls, bool FellBack) LocalPollsForDay(
+        this TableStorageContext db, RouteId routeId, TimeZoneInfo zone, string dayOfWeek)
+    {
+        List<(DateTimeOffset Local, int Seconds)> all = db.UsualPolls(routeId)
+            .Select(p => (p.PolledAt.ToLocal(zone), p.TravelDurationSeconds))
+            .ToList();
+        List<(DateTimeOffset Local, int Seconds)> day = Enum.TryParse(dayOfWeek, ignoreCase: true, out DayOfWeek dow)
+            ? all.Where(p => p.Local.DayOfWeek == dow).ToList()
+            : all;
+        bool fellBack = day.Count < QuotaConstants.BaselineMinSessionCount;
+        return (fellBack ? all : day, fellBack);
+    }
+
+    /// <summary>
     /// ISO country for holiday lookups, from the user's locale region (en-US → US).
     /// ponytail: locale is a proxy for where the commute is; reverse-geocode the route origin if
     /// users with a mismatched locale show up.

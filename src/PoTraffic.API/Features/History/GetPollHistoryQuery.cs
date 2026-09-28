@@ -12,10 +12,9 @@ public sealed record GetPollHistoryQuery(
     UserId UserId,
     int Page,
     int PageSize,
-    DateTime? SinceUtc = null) : IRequest<PagedResult<PollRecordDto>>;
+    DateTime? SinceUtc = null);
 
 public sealed class GetPollHistoryQueryHandler
-    : IRequestHandler<GetPollHistoryQuery, PagedResult<PollRecordDto>>
 {
     private readonly TableStorageContext _db;
 

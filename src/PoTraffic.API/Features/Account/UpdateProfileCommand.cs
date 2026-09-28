@@ -7,7 +7,7 @@ using PoTraffic.Shared.DTOs.Account;
 
 namespace PoTraffic.API.Features.Account;
 
-public sealed record UpdateProfileCommand(UserId UserId, string Locale) : IRequest<ProfileDto?>;
+public sealed record UpdateProfileCommand(UserId UserId, string Locale);
 
 public sealed class UpdateProfileValidator : AbstractValidator<UpdateProfileCommand>
 {
@@ -22,14 +22,18 @@ public sealed class UpdateProfileValidator : AbstractValidator<UpdateProfileComm
     }
 }
 
-public sealed class UpdateProfileHandler : IRequestHandler<UpdateProfileCommand, ProfileDto?>
+public sealed class UpdateProfileHandler
 {
     private readonly TableStorageContext _db;
 
     public UpdateProfileHandler(TableStorageContext db) => _db = db;
 
+    private static readonly UpdateProfileValidator Validator = new();
+
     public async Task<ProfileDto?> Handle(UpdateProfileCommand command, CancellationToken ct)
     {
+        await Validator.ValidateAndThrowAsync(command, ct);
+
         User? user = _db.Users
             .FirstOrDefault(u => u.Id == command.UserId);
 

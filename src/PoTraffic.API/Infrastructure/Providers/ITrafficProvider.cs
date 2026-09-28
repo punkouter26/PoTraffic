@@ -40,3 +40,10 @@ public sealed record TravelResult(
     int DurationSeconds,
     int DistanceMetres,
     string? RawJson);
+
+/// <summary>
+/// Thrown by an <see cref="ITrafficProvider"/> when geocoding cannot proceed because the
+/// provider is not configured (e.g. missing API key). Distinct from an
+/// unresolvable address, which is signalled by a null geocode result.
+/// </summary>
+public sealed class GeocodingConfigurationException(string message) : Exception(message);

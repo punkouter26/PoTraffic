@@ -6,10 +6,9 @@ using PoTraffic.Shared.DTOs.Routes;
 namespace PoTraffic.API.Features.MonitoringWindows;
 
 /// <summary>Efficient direct query for a route's windows — avoids loading all user routes.</summary>
-public sealed record GetWindowsQuery(RouteId RouteId, UserId UserId) : IRequest<IReadOnlyList<MonitoringWindowDto>?>;
+public sealed record GetWindowsQuery(RouteId RouteId, UserId UserId);
 
 public sealed class GetWindowsQueryHandler(TableStorageContext db)
-    : IRequestHandler<GetWindowsQuery, IReadOnlyList<MonitoringWindowDto>?>
 {
     public async Task<IReadOnlyList<MonitoringWindowDto>?> Handle(GetWindowsQuery q, CancellationToken ct)
     {

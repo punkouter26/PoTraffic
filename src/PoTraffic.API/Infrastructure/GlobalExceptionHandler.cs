@@ -1,6 +1,7 @@
 using System.Net;
 using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics;
+using PoTraffic.API.Infrastructure.Providers;
 
 namespace PoTraffic.API.Infrastructure;
 

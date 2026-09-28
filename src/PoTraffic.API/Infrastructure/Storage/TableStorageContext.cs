@@ -531,8 +531,7 @@ public sealed class TableStorageContext
                     });
                 }
             }
-            Ensure(PollCostRates.GoogleMapsKey, "0.005", "Cost per poll - Google Maps", false);
-            Ensure(PollCostRates.TomTomKey, "0.004", "Cost per poll - TomTom", false);
+            Ensure(PollCostRates.GoogleMapsKey, PollCostRates.GoogleMapsDefault.ToString(System.Globalization.CultureInfo.InvariantCulture), "Cost per poll - Google Maps", false);
             Ensure("quota.daily.default", "10", "Default daily session quota per user", false);
         }
     }

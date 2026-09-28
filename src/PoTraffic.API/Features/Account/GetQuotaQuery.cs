@@ -5,9 +5,9 @@ using PoTraffic.Shared.Enums;
 
 namespace PoTraffic.API.Features.Account;
 
-public sealed record GetQuotaQuery(UserId UserId) : IRequest<QuotaDto?>;
+public sealed record GetQuotaQuery(UserId UserId);
 
-public sealed class GetQuotaHandler : IRequestHandler<GetQuotaQuery, QuotaDto?>
+public sealed class GetQuotaHandler
 {
     private readonly TableStorageContext _db;
 
@@ -55,26 +55,11 @@ public sealed class GetQuotaHandler : IRequestHandler<GetQuotaQuery, QuotaDto?>
         // Reset time = midnight UTC next day
         DateTimeOffset resetsAt = dayEnd;
 
-        // Cost transparency (#8): today's provider spend, priced per-poll by each route's
-        // provider (rates live in SystemConfiguration). Monthly projection extrapolates today.
-        PollCostRates rates = PollCostRates.Load(_db, googleMapsFallback: 0.005m, tomTomFallback: 0.004m);
-
-        // One pass over the poll table — a per-route Count() would rescan the whole
-        // (global) poll list once per route the user owns.
-        Dictionary<RouteId, int> pollsByRoute = _db.Polls
-            .Where(p => billableRouteIds.Contains(p.RouteId)
-                        && DateOnly.FromDateTime(p.PolledAt.UtcDateTime) == today)
-            .GroupBy(p => p.RouteId)
-            .ToDictionary(g => g.Key, g => g.Count());
-
-        int pollsToday = 0;
-        decimal costToday = 0m;
-        foreach (EntityRoute route in _db.Routes.Where(r => billableRouteIds.Contains(r.Id)))
-        {
-            if (!pollsByRoute.TryGetValue(route.Id, out int polls)) continue;
-            pollsToday += polls;
-            costToday += polls * rates.For((RouteProvider)route.Provider);
-        }
+        // Cost transparency (#8): today's provider spend at the per-poll rate in
+        // SystemConfiguration. Monthly projection extrapolates today.
+        int pollsToday = _db.Polls.Count(p => billableRouteIds.Contains(p.RouteId)
+                                              && DateOnly.FromDateTime(p.PolledAt.UtcDateTime) == today);
+        decimal costToday = pollsToday * PollCostRates.PerPoll(_db);
 
         return new QuotaDto(
             DailyLimit: dailyLimit,

@@ -1,5 +1,4 @@
 using PoTraffic.API.Platform;
-using FluentValidation;
 using Microsoft.AspNetCore.HttpOverrides;
 using PoTraffic.API.Features.Account;
 using PoTraffic.API.Features.Admin;
@@ -63,9 +62,15 @@ try
     builder.Services.AddAlertServices();
     builder.Services.AddPlacesServices();
 
-    // Request dispatch (validation-first, see Infrastructure/Dispatch) + FluentValidation.
-    builder.Services.AddDispatcher(typeof(Program).Assembly);
-    builder.Services.AddValidatorsFromAssembly(typeof(Program).Assembly);
+    // Feature handlers are plain classes injected straight into endpoints and jobs; each
+    // validates its own command, so a ValidationException still maps to 422.
+    foreach (Type handler in typeof(Program).Assembly.GetTypes().Where(t =>
+        t is { IsClass: true, IsAbstract: false }
+        && t.Name.EndsWith("Handler", StringComparison.Ordinal)
+        && t.Namespace?.StartsWith("PoTraffic.API.Features", StringComparison.Ordinal) == true))
+    {
+        builder.Services.AddScoped(handler);
+    }
 
     // Hybrid cache (L1 in-proc, optional distributed L2). HTTP resilience pipelines are
     // registered per-client via ResiliencePipelineExtensions.AddResilienceHandler(name).

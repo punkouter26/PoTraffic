@@ -9,7 +9,7 @@ namespace PoTraffic.API.Features.Account;
 /// counted rather than exported, because their keys are delivery credentials, not data
 /// about the user.
 /// </summary>
-public sealed record ExportAccountQuery(UserId UserId) : IRequest<AccountExport?>;
+public sealed record ExportAccountQuery(UserId UserId);
 
 public sealed record AccountExport(
     DateTimeOffset ExportedAt,
@@ -21,7 +21,7 @@ public sealed record AccountExport(
     List<Alert> Alerts,
     int PushSubscriptionCount);
 
-public sealed class ExportAccountHandler(TableStorageContext db) : IRequestHandler<ExportAccountQuery, AccountExport?>
+public sealed class ExportAccountHandler(TableStorageContext db)
 {
     public Task<AccountExport?> Handle(ExportAccountQuery query, CancellationToken ct)
     {

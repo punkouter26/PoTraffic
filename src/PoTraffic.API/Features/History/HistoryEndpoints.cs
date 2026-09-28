@@ -25,62 +25,50 @@ public static class HistoryEndpoints
         // GET /api/routes/{routeId}/poll-history?page=1&pageSize=20&sinceUtc=2026-04-04T00:00:00Z
         group.MapGet("/poll-history", async (
             RouteId routeId,
-            ISender sender,
+            GetPollHistoryQueryHandler handler,
             HttpContext ctx,
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = 50,
             [FromQuery] DateTime? sinceUtc = null) =>
         {
             UserId userId = ctx.User.GetUserId();
-            var result = await sender.Send(
-                new GetPollHistoryQuery(routeId, userId, page, pageSize, sinceUtc));
-            return ConditionalJson.Ok(ctx, result);
-        });
-
-        // GET /api/routes/{routeId}/baseline?dayOfWeek=Monday
-        group.MapGet("/baseline", async (
-            RouteId routeId,
-            ISender sender,
-            HttpContext ctx,
-            [FromQuery] string dayOfWeek = "Monday") =>
-        {
-            UserId userId = ctx.User.GetUserId();
-            var result = await sender.Send(new GetBaselineQuery(routeId, userId, dayOfWeek));
+            var result = await handler.Handle(
+                new GetPollHistoryQuery(routeId, userId, page, pageSize, sinceUtc), ctx.RequestAborted);
             return ConditionalJson.Ok(ctx, result);
         });
 
         // GET /api/routes/{routeId}/sessions
         group.MapGet("/sessions", async (
             RouteId routeId,
-            ISender sender,
+            GetSessionsQueryHandler handler,
             HttpContext ctx) =>
         {
             UserId userId = ctx.User.GetUserId();
-            var result = await sender.Send(new GetSessionsQuery(routeId, userId));
+            var result = await handler.Handle(new GetSessionsQuery(routeId, userId), ctx.RequestAborted);
             return ConditionalJson.Ok(ctx, result);
         });
 
         // GET /api/routes/{routeId}/optimal-departure?dayOfWeek=Monday
         group.MapGet("/optimal-departure", async (
             RouteId routeId,
-            ISender sender,
+            GetOptimalDepartureQueryHandler handler,
             HttpContext ctx,
             [FromQuery] string dayOfWeek = "Monday") =>
         {
             UserId userId = ctx.User.GetUserId();
-            var result = await sender.Send(new GetOptimalDepartureQuery(routeId, userId, dayOfWeek));
+            var result = await handler.Handle(new GetOptimalDepartureQuery(routeId, userId, dayOfWeek), ctx.RequestAborted);
             return result is null ? Results.NoContent() : ConditionalJson.Ok(ctx, result);
         });
 
         // GET /api/routes/{routeId}/departure-plan?dayOfWeek=Monday — leave-by for the arrive-by target
         group.MapGet("/departure-plan", async (
             RouteId routeId,
-            ISender sender,
+            GetDeparturePlanQueryHandler handler,
             HttpContext ctx,
             [FromQuery] string dayOfWeek = "Monday") =>
         {
             UserId userId = ctx.User.GetUserId();
-            DeparturePlanDto? plan = await sender.Send(new GetDeparturePlanQuery(routeId, userId, dayOfWeek));
+            DeparturePlanDto? plan = await handler.Handle(new GetDeparturePlanQuery(routeId, userId, dayOfWeek), ctx.RequestAborted);
             return plan is null ? Results.NoContent() : ConditionalJson.Ok(ctx, plan);
         });
 
@@ -91,54 +79,56 @@ public static class HistoryEndpoints
         // GET /api/routes/{routeId}/heatmap — day-of-week × hour congestion grid (#5)
         group.MapGet("/heatmap", async (
             RouteId routeId,
-            ISender sender,
+            GetVolatilityHeatmapQueryHandler handler,
             HttpContext ctx) =>
         {
             UserId userId = ctx.User.GetUserId();
-            var result = await sender.Send(new GetVolatilityHeatmapQuery(routeId, userId));
+            var result = await handler.Handle(new GetVolatilityHeatmapQuery(routeId, userId), ctx.RequestAborted);
             return ConditionalJson.Ok(ctx, result);
         });
 
         // GET /api/routes/{routeId}/weather-impact — what each condition costs this route
         group.MapGet("/weather-impact", async (
             RouteId routeId,
-            ISender sender,
+            GetWeatherImpactQueryHandler handler,
             HttpContext ctx) =>
         {
             UserId userId = ctx.User.GetUserId();
-            var result = await sender.Send(new GetWeatherImpactQuery(routeId, userId));
+            var result = await handler.Handle(new GetWeatherImpactQuery(routeId, userId), ctx.RequestAborted);
             return ConditionalJson.Ok(ctx, result);
         });
 
         // GET /api/routes/{routeId} — single route (drives the return-trip link, #3)
         group.MapGet("", async (
             RouteId routeId,
-            ISender sender,
+            GetRouteByIdQueryHandler handler,
             HttpContext ctx) =>
         {
             UserId userId = ctx.User.GetUserId();
-            RouteDto? route = await sender.Send(new GetRouteByIdQuery(routeId, userId));
+            RouteDto? route = await handler.Handle(new GetRouteByIdQuery(routeId, userId), ctx.RequestAborted);
             return route is null ? Results.NotFound() : ConditionalJson.Ok(ctx, route);
         });
 
         // GET /api/routes/{routeId}/departure.ics?dayOfWeek=Monday — calendar reminder (#2)
         group.MapGet("/departure.ics", async (
             RouteId routeId,
-            ISender sender,
+            GetRouteByIdQueryHandler routes,
+            GetOptimalDepartureQueryHandler optimalDeparture,
+            GetDeparturePlanQueryHandler departurePlan,
             TableStorageContext db,
             HttpContext ctx,
             [FromQuery] string dayOfWeek = "Monday") =>
         {
             UserId userId = ctx.User.GetUserId();
-            RouteDto? route = await sender.Send(new GetRouteByIdQuery(routeId, userId));
+            RouteDto? route = await routes.Handle(new GetRouteByIdQuery(routeId, userId), ctx.RequestAborted);
             if (route is null) return Results.NotFound();
 
-            var optimal = await sender.Send(new GetOptimalDepartureQuery(routeId, userId, dayOfWeek));
+            var optimal = await optimalDeparture.Handle(new GetOptimalDepartureQuery(routeId, userId, dayOfWeek), ctx.RequestAborted);
             if (optimal is null) return Results.NoContent();
 
             // With an arrive-by target the reminder is the planned leave-by, not the
             // fastest slot: that is the time the user actually acts on.
-            DeparturePlanDto? plan = await sender.Send(new GetDeparturePlanQuery(routeId, userId, dayOfWeek));
+            DeparturePlanDto? plan = await departurePlan.Handle(new GetDeparturePlanQuery(routeId, userId, dayOfWeek), ctx.RequestAborted);
             if (plan is { LeaveBy: { } leaveBy, WorstCaseSeconds: { } worst })
             {
                 TimeOnly t = TimeOnly.ParseExact(leaveBy, "HH:mm");

@@ -5,9 +5,9 @@ using PoTraffic.API.Infrastructure.Storage;
 namespace PoTraffic.API.Features.Account;
 
 // FR-031: GDPR Art. 17 — hard delete all user data on request
-public sealed record DeleteAccountCommand(UserId UserId) : IRequest<bool>;
+public sealed record DeleteAccountCommand(UserId UserId);
 
-public sealed class DeleteAccountCommandHandler : IRequestHandler<DeleteAccountCommand, bool>
+public sealed class DeleteAccountCommandHandler
 {
     private readonly TableStorageContext _db;
 

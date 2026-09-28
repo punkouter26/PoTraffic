@@ -2,7 +2,6 @@ namespace PoTraffic.API.Features.Auth;
 
 public sealed class ExternalAuthConfiguration
 {
-    public ProviderOptions Google { get; init; } = new();
     public ProviderOptions Microsoft { get; init; } = new();
 
     public sealed class ProviderOptions

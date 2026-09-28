@@ -147,8 +147,7 @@ public sealed class RerouteAccuracyTests
                 .GetTravelTimeAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
                 .Returns(new TravelResult(300, currentDistance, "{}"));
 
-            ITrafficProviderFactory providerFactory = TestDoubles.ProviderFactory(mockProvider);
-            var handler = PoTraffic.UnitTests.Helpers.PollHandlerTestHelper.Create(db, providerFactory);
+            var handler = PoTraffic.UnitTests.Helpers.PollHandlerTestHelper.Create(db, mockProvider);
 
             await handler.Handle(new ExecutePollCommand(routeId), CancellationToken.None);
 

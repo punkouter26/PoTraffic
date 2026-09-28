@@ -23,7 +23,7 @@ public sealed class GetOptimalDepartureHandlerTests
     [Fact]
     public async Task GetOptimalDeparture_ReturnsLongestContiguousWindowNearMinimum()
     {
-        // Arrange — handler uses slot data from GetBaselineQuery internally.
+        // Arrange — handler uses slot data from per-slot poll internally.
         // Since we can't seed raw SQL projection results in InMemory, we test the handler
         // via a known baseline simulation. The handler logic finds the minimum mean duration slot
         // and returns the contiguous run within 5% of that minimum.

@@ -7,10 +7,9 @@ namespace PoTraffic.API.Features.Routes;
 /// Fetches a single route by ID, verifying ownership in a single DB round-trip.
 /// Replaces the inefficient pattern of loading all user routes then filtering in memory.
 /// </summary>
-public sealed record GetRouteByIdQuery(RouteId RouteId, UserId UserId) : IRequest<RouteDto?>;
+public sealed record GetRouteByIdQuery(RouteId RouteId, UserId UserId);
 
 public sealed class GetRouteByIdQueryHandler(TableStorageContext db)
-    : IRequestHandler<GetRouteByIdQuery, RouteDto?>
 {
     public async Task<RouteDto?> Handle(GetRouteByIdQuery q, CancellationToken ct)
     {

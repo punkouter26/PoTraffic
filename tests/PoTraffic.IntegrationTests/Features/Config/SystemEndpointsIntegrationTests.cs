@@ -18,5 +18,5 @@ public sealed class SystemEndpointsIntegrationTests : BaseIntegrationTest
         flags!.UseMockProviders.Should().BeTrue();
     }
 
-    private sealed record FeatureFlagsResponse(bool TripleTestEnabled, bool UseMockProviders);
+    private sealed record FeatureFlagsResponse(bool UseMockProviders);
 }

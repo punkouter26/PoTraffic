@@ -77,10 +77,10 @@ public sealed class PollRouteJob
             {
                 if (await EnsureActiveSessionAsync(db, route, now))
                 {
-                    ISender sender = scope.ServiceProvider.GetRequiredService<ISender>();
+                    ExecutePollCommandHandler poll = scope.ServiceProvider.GetRequiredService<ExecutePollCommandHandler>();
                     try
                     {
-                        await sender.Send(new ExecutePollCommand(routeId));
+                        await poll.Handle(new ExecutePollCommand(routeId), CancellationToken.None);
                     }
                     catch (Exception ex)
                     {

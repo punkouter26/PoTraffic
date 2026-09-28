@@ -18,7 +18,6 @@ public sealed class DeleteAccountIntegrationTests : BaseIntegrationTest
     [SkipUnlessAzuriteAvailable]
     public async Task DeleteAccount_Returns204_AndRemovesUserFromDatabase()
     {
-        await ApplyMigrationsAsync();
         HttpClient client = CreateClient();
 
         // Arrange — guest login creates a fresh real user row
@@ -46,7 +45,6 @@ public sealed class DeleteAccountIntegrationTests : BaseIntegrationTest
     [SkipUnlessAzuriteAvailable]
     public async Task DeleteAccount_WhenCalledTwice_Returns404OnSecondCall()
     {
-        await ApplyMigrationsAsync();
         HttpClient client = CreateClient();
 
         // Arrange — guest login + authenticate

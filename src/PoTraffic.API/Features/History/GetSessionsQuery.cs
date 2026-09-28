@@ -6,10 +6,9 @@ namespace PoTraffic.API.Features.History;
 
 public sealed record GetSessionsQuery(
     RouteId RouteId,
-    UserId UserId) : IRequest<IReadOnlyList<SessionDto>>;
+    UserId UserId);
 
 public sealed class GetSessionsQueryHandler
-    : IRequestHandler<GetSessionsQuery, IReadOnlyList<SessionDto>>
 {
     private readonly TableStorageContext _db;
 

@@ -13,10 +13,9 @@ namespace PoTraffic.API.Features.Maintenance;
 /// storage overhead with no behavioural value. Hard-delete keeps the table small and
 /// removes the IsDeleted filter from every read query.
 /// </summary>
-public sealed record PruneOldPollRecordsCommand : IRequest<int>;
+public sealed record PruneOldPollRecordsCommand;
 
 public sealed class PruneOldPollRecordsCommandHandler
-    : IRequestHandler<PruneOldPollRecordsCommand, int>
 {
     private const int RetentionDays = 90;
 
@@ -51,21 +50,8 @@ public sealed class PruneOldPollRecordsCommandHandler
     }
 }
 
-/// <summary>
-/// Thin dispatch wrapper invoked by the background job scheduler.
-/// Resolved via DI scope.
-/// </summary>
-public sealed class PruneOldPollRecordsJob
+/// <summary>Entry point the background job scheduler resolves from a DI scope.</summary>
+public sealed class PruneOldPollRecordsJob(PruneOldPollRecordsCommandHandler handler)
 {
-    private readonly ISender _sender;
-
-    public PruneOldPollRecordsJob(ISender sender)
-    {
-        _sender = sender;
-    }
-
-    public async Task ExecuteAsync()
-    {
-        await _sender.Send(new PruneOldPollRecordsCommand());
-    }
+    public Task ExecuteAsync() => handler.Handle(new PruneOldPollRecordsCommand(), CancellationToken.None);
 }

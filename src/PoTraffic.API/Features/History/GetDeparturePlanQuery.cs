@@ -4,8 +4,7 @@ using PoTraffic.Shared.DTOs.History;
 
 namespace PoTraffic.API.Features.History;
 
-public sealed record GetDeparturePlanQuery(RouteId RouteId, UserId UserId, string DayOfWeek)
-    : IRequest<DeparturePlanDto?>;
+public sealed record GetDeparturePlanQuery(RouteId RouteId, UserId UserId, string DayOfWeek);
 
 /// <summary>
 /// Turns a route's arrive-by target into a departure time the user can trust.
@@ -19,7 +18,6 @@ public sealed record GetDeparturePlanQuery(RouteId RouteId, UserId UserId, strin
 /// </para>
 /// </summary>
 public sealed class GetDeparturePlanQueryHandler(TableStorageContext db)
-    : IRequestHandler<GetDeparturePlanQuery, DeparturePlanDto?>
 {
     /// <summary>Departures considered: this far back from the target arrival.</summary>
     internal const int SearchWindowMinutes = 180;
@@ -32,18 +30,11 @@ public sealed class GetDeparturePlanQueryHandler(TableStorageContext db)
             return Task.FromResult<DeparturePlanDto?>(null);
 
         TimeZoneInfo zone = db.ZoneFor(query.UserId);
-        List<(DateTimeOffset Local, int Seconds)> all = db.UsualPolls(route.Id)
-            .Select(p => (p.PolledAt.ToLocal(zone), p.TravelDurationSeconds))
-            .ToList();
-
-        bool daySpecific = Enum.TryParse(query.DayOfWeek, ignoreCase: true, out DayOfWeek dow);
-        List<(DateTimeOffset Local, int Seconds)> day = daySpecific
-            ? all.Where(p => p.Local.DayOfWeek == dow).ToList()
-            : all;
-        bool fellBack = day.Count < QuotaConstants.BaselineMinSessionCount;
+        (List<(DateTimeOffset Local, int Seconds)> source, bool fellBack) =
+            db.LocalPollsForDay(route.Id, zone, query.DayOfWeek);
 
         Plan? plan = Build(
-            (fellBack ? all : day).Select(p => (p.Local.Hour * 60 + p.Local.Minute, p.Seconds)),
+            source.Select(p => (p.Local.Hour * 60 + p.Local.Minute, p.Seconds)),
             arriveBy.Hour * 60 + arriveBy.Minute);
 
         string arriveText = arriveBy.ToString("HH:mm");

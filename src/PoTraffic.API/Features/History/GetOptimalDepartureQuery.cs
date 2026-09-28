@@ -12,10 +12,9 @@ namespace PoTraffic.API.Features.History;
 public sealed record GetOptimalDepartureQuery(
     RouteId RouteId,
     UserId UserId,
-    string DayOfWeek) : IRequest<OptimalDepartureDto?>;
+    string DayOfWeek);
 
 public sealed class GetOptimalDepartureQueryHandler
-    : IRequestHandler<GetOptimalDepartureQuery, OptimalDepartureDto?>
 {
     private readonly TableStorageContext _db;
     private readonly ILogger<GetOptimalDepartureQueryHandler> _logger;
@@ -36,18 +35,11 @@ public sealed class GetOptimalDepartureQueryHandler
 
         // Weekday and time of day are the user's local ones (see UserTime).
         TimeZoneInfo zone = _db.ZoneFor(query.UserId);
-        List<(DateTimeOffset Local, int Seconds)> allPolls = _db.UsualPolls(query.RouteId)
-            .Select(p => (p.PolledAt.ToLocal(zone), p.TravelDurationSeconds))
-            .ToList();
 
         // Day-of-week specific (#4), with an all-days fallback when the requested weekday
         // is still sparse so the "best time to leave" card isn't blank on new routes.
-        bool daySpecific = Enum.TryParse(query.DayOfWeek, ignoreCase: true, out DayOfWeek dow);
-        List<(DateTimeOffset Local, int Seconds)> dayPolls = daySpecific
-            ? allPolls.Where(p => p.Local.DayOfWeek == dow).ToList()
-            : allPolls;
-        bool fellBack = dayPolls.Count < QuotaConstants.BaselineMinSessionCount;
-        List<(DateTimeOffset Local, int Seconds)> source = fellBack ? allPolls : dayPolls;
+        (List<(DateTimeOffset Local, int Seconds)> source, bool fellBack) =
+            _db.LocalPollsForDay(query.RouteId, zone, query.DayOfWeek);
 
         // Group polls by 5-minute bucket (post-refactor; was SQL STDEV in EF era).
         var buckets = source

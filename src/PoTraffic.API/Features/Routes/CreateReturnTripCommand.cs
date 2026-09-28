@@ -11,13 +11,11 @@ namespace PoTraffic.API.Features.Routes;
 /// sets its own schedule (evening commutes rarely mirror the morning window). Idempotent:
 /// if a return trip already exists it is returned unchanged.
 /// </summary>
-public sealed record CreateReturnTripCommand(RouteId RouteId, UserId UserId)
-    : IRequest<CreateRouteResult>;
+public sealed record CreateReturnTripCommand(RouteId RouteId, UserId UserId);
 
 public sealed class CreateReturnTripCommandHandler(
     Infrastructure.Storage.TableStorageContext db,
     ILogger<CreateReturnTripCommandHandler> logger)
-    : IRequestHandler<CreateReturnTripCommand, CreateRouteResult>
 {
     public async Task<CreateRouteResult> Handle(CreateReturnTripCommand cmd, CancellationToken ct)
     {

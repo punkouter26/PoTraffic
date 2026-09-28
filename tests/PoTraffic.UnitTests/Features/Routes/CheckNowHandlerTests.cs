@@ -51,7 +51,7 @@ public sealed class CheckNowHandlerTests
             .GetTravelTimeAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(new TravelResult(600, 10_000, "{}"));
 
-        var handler = new CheckNowCommandHandler(db, TestDoubles.ProviderFactory(mockProvider),
+        var handler = new CheckNowCommandHandler(db, mockProvider,
             NullLogger<CheckNowCommandHandler>.Instance);
 
         // Act
@@ -75,7 +75,7 @@ public sealed class CheckNowHandlerTests
         TableStorageContext db = TestDoubles.CreateDb();
 
         ITrafficProvider mockProvider = Substitute.For<ITrafficProvider>();
-        var handler = new CheckNowCommandHandler(db, TestDoubles.ProviderFactory(mockProvider),
+        var handler = new CheckNowCommandHandler(db, mockProvider,
             NullLogger<CheckNowCommandHandler>.Instance);
 
         // Act — route does not exist
@@ -115,7 +115,7 @@ public sealed class CheckNowHandlerTests
             .GetTravelTimeAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns((TravelResult?)null);
 
-        var handler = new CheckNowCommandHandler(db, TestDoubles.ProviderFactory(mockProvider),
+        var handler = new CheckNowCommandHandler(db, mockProvider,
             NullLogger<CheckNowCommandHandler>.Instance);
 
         // Act
@@ -150,7 +150,7 @@ public sealed class CheckNowHandlerTests
         await db.SaveChangesAsync();
 
         ITrafficProvider mockProvider = Substitute.For<ITrafficProvider>();
-        var handler = new CheckNowCommandHandler(db, TestDoubles.ProviderFactory(mockProvider),
+        var handler = new CheckNowCommandHandler(db, mockProvider,
             NullLogger<CheckNowCommandHandler>.Instance);
 
         // Act — different user ID supplied

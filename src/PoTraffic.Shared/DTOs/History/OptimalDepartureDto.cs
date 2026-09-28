@@ -9,8 +9,7 @@ namespace PoTraffic.Shared.DTOs.History;
 /// recommendation from four samples and one from four hundred should not look identical.
 /// </param>
 /// <param name="DayOfWeekSpecific">
-/// False when the requested weekday was too sparse and all days were used instead, matching
-/// <see cref="BaselineResponse.DayOfWeekSpecific"/>.
+/// False when the requested weekday was too sparse and all days were used instead.
 /// </param>
 public sealed record OptimalDepartureDto(
     string DayOfWeek,

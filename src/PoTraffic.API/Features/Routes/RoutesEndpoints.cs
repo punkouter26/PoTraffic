@@ -37,15 +37,15 @@ public static class RoutesEndpoints
         group.MapGet("{routeId:guid}/path", GetRoutePath);
         // Arrive-by target behind the departure plan; null body value clears it.
         group.MapPut("{routeId:guid}/arrive-by", async (
-            RouteId routeId, HttpContext ctx, ISender sender, [FromBody] SetArriveByRequest body) =>
+            RouteId routeId, HttpContext ctx, SetArriveByHandler handler, [FromBody] SetArriveByRequest body) =>
         {
-            bool found = await sender.Send(new SetArriveByCommand(routeId, ctx.User.GetUserId(), body.ArriveBy));
+            bool found = await handler.Handle(new SetArriveByCommand(routeId, ctx.User.GetUserId(), body.ArriveBy), CancellationToken.None);
             return found ? Results.NoContent() : Results.NotFound();
         });
         group.MapPut("{routeId:guid}/name", async (
-            RouteId routeId, HttpContext ctx, ISender sender, [FromBody] SetRouteNameRequest body) =>
+            RouteId routeId, HttpContext ctx, SetRouteNameHandler handler, [FromBody] SetRouteNameRequest body) =>
         {
-            bool found = await sender.Send(new SetRouteNameCommand(routeId, ctx.User.GetUserId(), body.Name));
+            bool found = await handler.Handle(new SetRouteNameCommand(routeId, ctx.User.GetUserId(), body.Name), CancellationToken.None);
             return found ? Results.NoContent() : Results.NotFound();
         });
         return app;
@@ -57,15 +57,15 @@ public static class RoutesEndpoints
     // POST /api/routes/sample
     private static async Task<IResult> CreateSampleRoute(
         HttpContext context,
-        ISender sender,
+        CreateSampleRouteCommandHandler handler,
         ILogger<LogCategory> logger,
         [FromBody] CreateSampleRouteRequest? request = null)
     {
         UserId? userId = ExtractUserId(context.User, logger);
         if (userId is null) return Results.Unauthorized();
 
-        RouteDto route = await sender.Send(
-            new CreateSampleRouteCommand(userId.Value, request?.UtcOffsetMinutes ?? 0));
+        RouteDto route = await handler.Handle(
+            new CreateSampleRouteCommand(userId.Value, request?.UtcOffsetMinutes ?? 0), CancellationToken.None);
 
         return Results.Ok(route);
     }
@@ -73,7 +73,7 @@ public static class RoutesEndpoints
     // GET /api/routes?page=1&pageSize=20
     private static async Task<IResult> GetRoutes(
         HttpContext context,
-        ISender sender,
+        GetRoutesQueryHandler handler,
         ILogger<LogCategory> logger,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
@@ -81,8 +81,8 @@ public static class RoutesEndpoints
         UserId? userId = ExtractUserId(context.User, logger);
         if (userId is null) return Results.Unauthorized();
 
-        PagedResult<RouteDto> result = await sender.Send(
-            new GetRoutesQuery(userId.Value, page, pageSize));
+        PagedResult<RouteDto> result = await handler.Handle(
+            new GetRoutesQuery(userId.Value, page, pageSize), context.RequestAborted);
 
         return Results.Ok(result);
     }
@@ -90,14 +90,14 @@ public static class RoutesEndpoints
     // POST /api/routes
     private static async Task<IResult> CreateRoute(
         HttpContext context,
-        ISender sender,
+        CreateRouteCommandHandler handler,
         ILogger<LogCategory> logger,
         [FromBody] CreateRouteRequest request)
     {
         UserId? userId = ExtractUserId(context.User, logger);
         if (userId is null) return Results.Unauthorized();
 
-        CreateRouteResult result = await sender.Send(
+        CreateRouteResult result = await handler.Handle(
             new CreateRouteCommand(
                 userId.Value,
                 request.OriginAddress,
@@ -106,7 +106,7 @@ public static class RoutesEndpoints
                 request.StartTime,
                 request.EndTime,
                 request.DaysOfWeekMask,
-                request.TimeZoneId));
+                request.TimeZoneId), CancellationToken.None);
 
         return result.IsSuccess
             ? Results.Created($"/api/routes/{result.Route!.Id}", result.Route)
@@ -117,13 +117,13 @@ public static class RoutesEndpoints
     private static async Task<IResult> GetRoutePath(
         RouteId routeId,
         HttpContext context,
-        ISender sender,
+        GetRoutePathQueryHandler handler,
         ILogger<LogCategory> logger)
     {
         UserId? userId = ExtractUserId(context.User, logger);
         if (userId is null) return Results.Unauthorized();
 
-        RoutePathDto? path = await sender.Send(new GetRoutePathQuery(routeId, userId.Value));
+        RoutePathDto? path = await handler.Handle(new GetRoutePathQuery(routeId, userId.Value), context.RequestAborted);
         return path is null ? Results.NotFound() : Results.Ok(path);
     }
 
@@ -131,12 +131,12 @@ public static class RoutesEndpoints
     private static async Task<IResult> DeleteRoute(
         RouteId routeId,
         HttpContext context,
-        ISender sender)
+        DeleteRouteCommandHandler handler)
     {
         UserId? userId = ExtractUserId(context.User);
         if (userId is null) return Results.Unauthorized();
 
-        bool deleted = await sender.Send(new DeleteRouteCommand(routeId, userId.Value));
+        bool deleted = await handler.Handle(new DeleteRouteCommand(routeId, userId.Value), CancellationToken.None);
         return deleted ? Results.NoContent() : Results.NotFound();
     }
 
@@ -144,13 +144,13 @@ public static class RoutesEndpoints
     private static async Task<IResult> CreateReturnTrip(
         RouteId routeId,
         HttpContext context,
-        ISender sender,
+        CreateReturnTripCommandHandler handler,
         ILogger<LogCategory> logger)
     {
         UserId? userId = ExtractUserId(context.User, logger);
         if (userId is null) return Results.Unauthorized();
 
-        CreateRouteResult result = await sender.Send(new CreateReturnTripCommand(routeId, userId.Value));
+        CreateRouteResult result = await handler.Handle(new CreateReturnTripCommand(routeId, userId.Value), CancellationToken.None);
         return result.IsSuccess
             ? Results.Created($"/api/routes/{result.Route!.Id}", result.Route)
             : result.ErrorCode == RouteErrorCodes.NotFound
@@ -162,13 +162,13 @@ public static class RoutesEndpoints
     private static async Task<IResult> CheckNow(
         RouteId routeId,
         HttpContext context,
-        ISender sender,
+        CheckNowCommandHandler handler,
         ILogger<LogCategory> logger)
     {
         UserId? userId = ExtractUserId(context.User, logger);
         if (userId is null) return Results.Unauthorized();
 
-        CheckNowResult result = await sender.Send(new CheckNowCommand(routeId, userId.Value));
+        CheckNowResult result = await handler.Handle(new CheckNowCommand(routeId, userId.Value), CancellationToken.None);
 
         if (result.IsSuccess)
             return Results.Ok(new

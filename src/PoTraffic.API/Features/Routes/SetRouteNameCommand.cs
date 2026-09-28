@@ -4,7 +4,7 @@ using PoTraffic.API.Infrastructure.Storage;
 namespace PoTraffic.API.Features.Routes;
 
 /// <summary>Names a route; blank clears the name.</summary>
-public sealed record SetRouteNameCommand(RouteId RouteId, UserId UserId, string? Name) : IRequest<bool>;
+public sealed record SetRouteNameCommand(RouteId RouteId, UserId UserId, string? Name);
 
 public sealed record SetRouteNameRequest(string? Name);
 
@@ -16,10 +16,14 @@ public sealed class SetRouteNameValidator : AbstractValidator<SetRouteNameComman
         RuleFor(c => c.Name).MaximumLength(MaxLength);
 }
 
-public sealed class SetRouteNameHandler(TableStorageContext db) : IRequestHandler<SetRouteNameCommand, bool>
+public sealed class SetRouteNameHandler(TableStorageContext db)
 {
+    private static readonly SetRouteNameValidator Validator = new();
+
     public async Task<bool> Handle(SetRouteNameCommand cmd, CancellationToken ct)
     {
+        await Validator.ValidateAndThrowAsync(cmd, ct);
+
         EntityRoute? route = db.GetOwnedRoute(cmd.RouteId, cmd.UserId, excludeDeleted: true);
         if (route is null)
             return false;

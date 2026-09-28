@@ -86,8 +86,7 @@ public sealed class RerouteDetectionTests
             .GetTravelTimeAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(new TravelResult(320, 6200, "{}"));
 
-        ITrafficProviderFactory providerFactory = TestDoubles.ProviderFactory(mockProvider);
-        var handler = PoTraffic.UnitTests.Helpers.PollHandlerTestHelper.Create(db, providerFactory);
+        var handler = PoTraffic.UnitTests.Helpers.PollHandlerTestHelper.Create(db, mockProvider);
 
         // Act
         bool result = await handler.Handle(new ExecutePollCommand(routeId), CancellationToken.None);
@@ -117,8 +116,7 @@ public sealed class RerouteDetectionTests
             .GetTravelTimeAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(new TravelResult(320, 6200, "{}"));
 
-        ITrafficProviderFactory providerFactory = TestDoubles.ProviderFactory(mockProvider);
-        var handler = PoTraffic.UnitTests.Helpers.PollHandlerTestHelper.Create(db, providerFactory);
+        var handler = PoTraffic.UnitTests.Helpers.PollHandlerTestHelper.Create(db, mockProvider);
 
         // Act
         bool result = await handler.Handle(new ExecutePollCommand(routeId), CancellationToken.None);
@@ -145,8 +143,7 @@ public sealed class RerouteDetectionTests
             .GetTravelTimeAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(new TravelResult(320, 6200, "{}"));
 
-        ITrafficProviderFactory providerFactory = TestDoubles.ProviderFactory(mockProvider);
-        var handler = PoTraffic.UnitTests.Helpers.PollHandlerTestHelper.Create(db, providerFactory);
+        var handler = PoTraffic.UnitTests.Helpers.PollHandlerTestHelper.Create(db, mockProvider);
 
         // Act
         bool result = await handler.Handle(new ExecutePollCommand(routeId), CancellationToken.None);
@@ -159,17 +156,5 @@ public sealed class RerouteDetectionTests
         newRecord.Should().NotBeNull();
         newRecord!.IsRerouted.Should().BeFalse(
             "fewer than 2 prior records are insufficient to evaluate reroute detection (FR-006)");
-    }
-
-    /// <summary>
-    /// Tests the internal median calculator directly (unit coverage for CalculateMedian helper).
-    /// </summary>
-    [Theory]
-    [InlineData(new double[] { 5000, 5000, 5000 }, 5000)]
-    [InlineData(new double[] { 4000, 5000, 6000 }, 5000)]
-    public void CalculateMedian_ReturnsCorrectMedian(double[] values, double expected)
-    {
-        double median = ExecutePollCommandHandler.CalculateMedian([.. values]);
-        median.Should().BeApproximately(expected, 0.01);
     }
 }

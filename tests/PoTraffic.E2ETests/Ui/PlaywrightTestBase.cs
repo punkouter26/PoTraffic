@@ -28,7 +28,7 @@ public abstract class PlaywrightTestBase : IAsyncLifetime
 
         // CI/CD rule #5 + UPDATE: launch Chrome headed by default on dev workstations.
         // On CI, set E2E_HEADED=0 to keep the runner headless.
-        BrowserTypeLaunchOptions launchOptions = ViewportsTheory.ResolveLaunchOptions();
+        BrowserTypeLaunchOptions launchOptions = BrowserLaunch.ResolveLaunchOptions();
         bool isHeaded = launchOptions.Headless == false; // bool? -> explicit non-headless
         if (isHeaded && string.IsNullOrEmpty(launchOptions.ExecutablePath))
             launchOptions.ExecutablePath = FindCachedChromiumExecutable();

@@ -7,9 +7,9 @@ namespace PoTraffic.API.Features.MonitoringWindows;
 
 public sealed record DeleteWindowCommand(
     WindowId WindowId,
-    UserId UserId) : IRequest<bool>;
+    UserId UserId);
 
-public sealed class DeleteWindowCommandHandler : IRequestHandler<DeleteWindowCommand, bool>
+public sealed class DeleteWindowCommandHandler
 {
     private readonly TableStorageContext _db;
     private readonly ILogger<DeleteWindowCommandHandler> _logger;

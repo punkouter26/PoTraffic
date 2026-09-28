@@ -45,11 +45,9 @@ public sealed class RouteCreationSchedulingApiScenarios
     private static readonly string DestinationAddress =
         $"{DestinationAddressBase} #{Guid.NewGuid():N}";
 
-    [Fact]
+    [ApiSkipUnlessReady]
     public async Task CreateRouteAndStartMonitoring_RecordsPollAgainstActiveSession()
     {
-        await ApiSkipUnlessReadyAttribute.ThrowUnlessReadyAsync();
-
         // ── Arrange: GUEST session ────────────────────────────────────────
         (HttpClient client, string _) = await ApiSessionFactory.CreateGuestSessionAsync();
 
@@ -85,11 +83,9 @@ public sealed class RouteCreationSchedulingApiScenarios
         }
     }
 
-    [Fact]
+    [ApiSkipUnlessReady]
     public async Task HealthCheck_SchedulerEntryIsHealthy_WhenLiveApiRunning()
     {
-        await ApiSkipUnlessReadyAttribute.ThrowUnlessReadyAsync();
-
         using HttpClient client = ApiSessionFactory.CreateAnonymous();
         HttpResponseMessage response = await client.GetAsync("/health/json");
         response.EnsureSuccessStatusCode();

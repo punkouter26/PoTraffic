@@ -17,7 +17,7 @@ public sealed record CreateWindowCommand(
     TimeOnly StartTime,
     TimeOnly EndTime,
     byte DaysOfWeekMask,
-    string? TimeZoneId = null) : IRequest<CreateWindowResult>;
+    string? TimeZoneId = null);
 
 public sealed record CreateWindowResult(
     bool IsSuccess,
@@ -43,7 +43,7 @@ public sealed class CreateWindowValidator : AbstractValidator<CreateWindowComman
     }
 }
 
-public sealed class CreateWindowCommandHandler : IRequestHandler<CreateWindowCommand, CreateWindowResult>
+public sealed class CreateWindowCommandHandler
 {
     private readonly TableStorageContext _db;
     private readonly ILogger<CreateWindowCommandHandler> _logger;
@@ -56,8 +56,12 @@ public sealed class CreateWindowCommandHandler : IRequestHandler<CreateWindowCom
         _logger = logger;
     }
 
+    private static readonly CreateWindowValidator Validator = new();
+
     public async Task<CreateWindowResult> Handle(CreateWindowCommand cmd, CancellationToken ct)
     {
+        await Validator.ValidateAndThrowAsync(cmd, ct);
+
         // Verify route ownership
         if (!_db.OwnsRoute(cmd.RouteId, cmd.UserId, excludeDeleted: true))
             return new CreateWindowResult(false, RouteErrorCodes.NotFound, null);

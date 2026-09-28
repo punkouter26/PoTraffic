@@ -7,7 +7,6 @@ global using PoTraffic.API.Features.Routes;
 global using PoTraffic.API.Features.MonitoringWindows;
 global using PoTraffic.API.Features.Config;
 
-global using PoTraffic.API.Infrastructure.Dispatch;
 
 global using PoTraffic.Shared.Constants;
 global using PoTraffic.Shared.Ids;

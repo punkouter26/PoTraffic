@@ -10,7 +10,7 @@ namespace PoTraffic.API.Features.Routes;
 /// </summary>
 public sealed record CheckNowCommand(
     RouteId RouteId,
-    UserId UserId) : IRequest<CheckNowResult>;
+    UserId UserId);
 
 public sealed record CheckNowResult(
     bool IsSuccess,
@@ -18,11 +18,11 @@ public sealed record CheckNowResult(
     int? DistanceMetres,
     string? ErrorCode);
 
-// Command pattern — encapsulates transient provider call as a discrete dispatcher command
+// Runs one provider call on demand, outside the scheduled poll chain.
 public sealed class CheckNowCommandHandler(
     TableStorageContext db,
-    ITrafficProviderFactory providerFactory,
-    ILogger<CheckNowCommandHandler> logger) : IRequestHandler<CheckNowCommand, CheckNowResult>
+    ITrafficProvider provider,
+    ILogger<CheckNowCommandHandler> logger)
 {
     public async Task<CheckNowResult> Handle(CheckNowCommand command, CancellationToken ct)
     {
@@ -31,7 +31,6 @@ public sealed class CheckNowCommandHandler(
         if (route is null)
             return new CheckNowResult(false, null, null, RouteErrorCodes.NotFound);
 
-        ITrafficProvider provider = providerFactory.GetProvider((RouteProvider)route.Provider);
         TravelResult? travel = await provider.GetTravelTimeAsync(
             route.OriginCoordinates!, route.DestinationCoordinates!, ct);
 

@@ -12,12 +12,12 @@ namespace PoTraffic.API.Features.Routes;
 /// Everything the route map needs: the road shape, and how the newest sample compares
 /// to what this route normally does on this weekday at this time of day.
 /// </summary>
-public sealed record GetRoutePathQuery(RouteId RouteId, UserId UserId) : IRequest<RoutePathDto?>;
+public sealed record GetRoutePathQuery(RouteId RouteId, UserId UserId);
 
 public sealed class GetRoutePathQueryHandler(
     TableStorageContext db,
-    ITrafficProviderFactory providerFactory,
-    ILogger<GetRoutePathQueryHandler> logger) : IRequestHandler<GetRoutePathQuery, RoutePathDto?>
+    ITrafficProvider provider,
+    ILogger<GetRoutePathQueryHandler> logger)
 {
     /// <summary>
     /// How far above (or below) the route's own typical duration each colour band starts.
@@ -79,7 +79,6 @@ public sealed class GetRoutePathQueryHandler(
         if (route.PathUnavailableAt is not null)
             return null;
 
-        ITrafficProvider provider = providerFactory.GetProvider((RouteProvider)route.Provider);
         RouteGeometry? geometry = await provider.GetRouteGeometryAsync(
             route.OriginCoordinates, route.DestinationCoordinates, ct);
 

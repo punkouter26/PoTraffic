@@ -2,7 +2,6 @@
 using System;
 using System.Net.Http;
 using System.Threading;
-using System.Threading.Tasks;
 using Xunit;
 
 namespace PoTraffic.E2ETests.Api;
@@ -43,36 +42,5 @@ public sealed class ApiSkipUnlessReadyAttribute : FactAttribute
             }
         }
         return null;
-    }
-
-    /// <summary>
-    /// Eagerly probes the live API and throws if not reachable, so xunit skips
-    /// the test cleanly without retrying the probe inside each assertion.
-    /// </summary>
-    public static async Task ThrowUnlessReadyAsync()
-    {
-        string? baseUrl = null;
-        Exception? lastError = null;
-        foreach (string candidate in CandidatePorts)
-        {
-            try
-            {
-                using var probe = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
-                using var resp = await probe.GetAsync(new Uri(new Uri(candidate), "/health/json"));
-                if (resp.IsSuccessStatusCode)
-                {
-                    baseUrl = candidate;
-                    break;
-                }
-            }
-            catch (Exception ex)
-            {
-                lastError = ex;
-            }
-        }
-
-        if (baseUrl is null)
-            throw new InvalidOperationException(
-                $"PoTraffic.API /health/json unreachable on {string.Join(", ", CandidatePorts)}: {lastError?.Message ?? "no response"}");
     }
 }

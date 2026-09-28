@@ -13,9 +13,9 @@ namespace PoTraffic.API.Features.Admin;
 /// timestamped series (<see cref="RecentVolatilityPointDto"/>), bucketed every five
 /// minutes from now backwards. Used to drive the time-series chart on the Admin tab.
 /// </summary>
-public sealed record GetRecentVolatilityQuery(int Hours) : IRequest<IReadOnlyList<RecentVolatilityPointDto>>;
+public sealed record GetRecentVolatilityQuery(int Hours);
 
-public sealed class GetRecentVolatilityHandler : IRequestHandler<GetRecentVolatilityQuery, IReadOnlyList<RecentVolatilityPointDto>>
+public sealed class GetRecentVolatilityHandler
 {
     private readonly TableStorageContext _db;
     private readonly ILogger<GetRecentVolatilityHandler> _logger;

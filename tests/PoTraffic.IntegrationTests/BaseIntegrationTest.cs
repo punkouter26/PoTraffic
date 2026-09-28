@@ -1,4 +1,3 @@
-using System.Linq.Expressions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
@@ -6,11 +5,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using PoTraffic.API.Features.Auth;
 using PoTraffic.API.Infrastructure.Providers;
-using PoTraffic.API.Infrastructure.Scheduling;
-using PoTraffic.API.Infrastructure.Security;
 using PoTraffic.IntegrationTests.Helpers;
 using PoTraffic.IntegrationTests.Infrastructure;
-using PoTraffic.Shared.Enums;
 using PoTraffic.API.Infrastructure.Storage;
 
 namespace PoTraffic.IntegrationTests;
@@ -36,7 +32,6 @@ public abstract class BaseIntegrationTest : IAsyncLifetime
     public async Task InitializeAsync()
     {
         // Suppress Azure Key Vault loading regardless of ASPNETCORE_ENVIRONMENT.
-        Environment.SetEnvironmentVariable("AzureKeyVault__VaultUri", string.Empty);
         Environment.SetEnvironmentVariable("KeyVault__Uri", string.Empty);
 
         // CI/CD rule #3 — lifecycle-managed Testcontainers. The container is
@@ -73,19 +68,11 @@ public abstract class BaseIntegrationTest : IAsyncLifetime
 
                 builder.ConfigureServices(services =>
                 {
-                    services.AddKeyedScoped<ITrafficProvider, FakeTrafficProvider>(RouteProvider.GoogleMaps);
-                    services.AddKeyedScoped<ITrafficProvider, FakeTrafficProvider>(RouteProvider.TomTom);
+                    services.AddScoped<ITrafficProvider, FakeTrafficProvider>();
 
-                    // CI/CD rule #4 — strip real Microsoft OAuth network traffic.
-                    // 1) Replace the MicrosoftExternalIdentityProvider with an in-process fake.
-                    // 2) Strip the HttpClient<MicrosoftExternalIdentityProvider>() primary handler
-                    //    by registering the MockExternalAuthDelegatingHandler ahead of it.
+                    // Strip real Microsoft OAuth network traffic with an in-process fake.
                     services.RemoveAll<MicrosoftExternalIdentityProvider>();
                     services.AddScoped<IExternalIdentityProvider>(_ => new FakeExternalIdentityProvider("microsoft"));
-
-                    // Register a no-op IJobScheduler for handlers that depend on it
-                    // (BackgroundSchedulerService is skipped in Testing env)
-                    services.AddSingleton<IJobScheduler>(new NoOpJobScheduler());
                 });
 
                 ConfigureHost(builder);
@@ -99,7 +86,6 @@ public abstract class BaseIntegrationTest : IAsyncLifetime
     {
         _factory?.Dispose();
 
-        Environment.SetEnvironmentVariable("AzureKeyVault__VaultUri", null);
         Environment.SetEnvironmentVariable("KeyVault__Uri", null);
 
         return Task.CompletedTask;
@@ -161,23 +147,4 @@ public abstract class BaseIntegrationTest : IAsyncLifetime
 
         return _factory.Services.GetRequiredService<TableStorageContext>();
     }
-
-    /// <summary>
-    /// No-op — the in-memory <see cref="TableStorageContext"/> does not require schema migrations.
-    /// Kept so existing integration tests compile without change.
-    /// </summary>
-    protected Task ApplyMigrationsAsync() => Task.CompletedTask;
-}
-
-/// <summary>
-/// No-op IJobScheduler for integration tests. Handlers that inject IJobScheduler
-/// (e.g. job handlers) can resolve without requiring a running Azurite instance.
-/// </summary>
-internal sealed class NoOpJobScheduler : IJobScheduler
-{
-    public string Enqueue(Expression<Func<Task>> job) => "noop-enqueue";
-    public string Schedule(Expression<Func<Task>> job, TimeSpan delay) => "noop-schedule";
-    public void Cancel(string jobId) { }
-    public int CancelPendingPollJobsForRoute(RouteId routeId) => 0;
-    public void ScheduleRecurring(string jobId, Func<Task> job, TimeOnly dailyAtUtc) { }
 }

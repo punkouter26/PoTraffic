@@ -17,7 +17,6 @@ public sealed class AuthIntegrationTests : BaseIntegrationTest
     [SkipUnlessAzuriteAvailable]
     public async Task GuestLogin_EstablishesCookieSession_MeAndLogoutWork()
     {
-        await ApplyMigrationsAsync();
         HttpClient client = CreateClient();
 
         // Act 1 — Guest login creates a real User row and sets the session cookie.
@@ -56,7 +55,6 @@ public sealed class AuthIntegrationTests : BaseIntegrationTest
     [SkipUnlessAzuriteAvailable]
     public async Task ExternalMicrosoftLogin_StartAndCallback_SignsInAndRedirectsToReturnUrl()
     {
-        await ApplyMigrationsAsync();
         // Use a no-redirect client so we can inspect the 302 Location header directly.
         HttpClient client = CreateClientNoRedirect();
 
@@ -86,7 +84,6 @@ public sealed class AuthIntegrationTests : BaseIntegrationTest
     [SkipUnlessAzuriteAvailable]
     public async Task ExternalCallback_WithInvalidState_RedirectsToLoginWithError()
     {
-        await ApplyMigrationsAsync();
         HttpClient client = CreateClientNoRedirect();
 
         HttpResponseMessage callbackResponse = await client.GetAsync(

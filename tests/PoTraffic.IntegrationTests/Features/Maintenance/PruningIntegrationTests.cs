@@ -1,4 +1,3 @@
-using PoTraffic.API.Infrastructure.Dispatch;
 using Microsoft.Extensions.DependencyInjection;
 using PoTraffic.API.Features.Maintenance;
 using PoTraffic.API.Infrastructure.Storage;
@@ -9,7 +8,7 @@ using PoTraffic.IntegrationTests.Helpers;
 namespace PoTraffic.IntegrationTests.Features.Maintenance;
 
 /// <summary>
-/// Integration tests for <see cref="PruneOldPollRecordsJobHandler"/>.
+/// Integration tests for <see cref="PruneOldPollRecordsCommandHandler"/>.
 /// FR-020: soft-delete only records with PolledAt &lt; today - 90 days.
 /// </summary>
 public sealed class PruningIntegrationTests : BaseIntegrationTest
@@ -17,12 +16,11 @@ public sealed class PruningIntegrationTests : BaseIntegrationTest
     [SkipUnlessAzuriteAvailable]
     public async Task PruneJob_DeletesOldRecords_LeavesRecentRecordsUntouched()
     {
-        await ApplyMigrationsAsync();
         _ = CreateClient();
 
         using IServiceScope scope = GetServices().CreateScope();
         TableStorageContext db = scope.ServiceProvider.GetRequiredService<TableStorageContext>();
-        ISender sender = scope.ServiceProvider.GetRequiredService<ISender>();
+        PruneOldPollRecordsCommandHandler handler = scope.ServiceProvider.GetRequiredService<PruneOldPollRecordsCommandHandler>();
 
         DateTime now = DateTime.UtcNow;
 
@@ -86,7 +84,7 @@ public sealed class PruningIntegrationTests : BaseIntegrationTest
         await db.SaveChangesAsync();
 
         // Act
-        await sender.Send(new PruneOldPollRecordsCommand());
+        await handler.Handle(new PruneOldPollRecordsCommand(), CancellationToken.None);
 
         // Assert — old records should be hard-deleted
         foreach (PollRecord old in oldRecords)

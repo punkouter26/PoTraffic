@@ -3,7 +3,6 @@
 //   • GET /health (liveness + readiness)
 //   • GET /diag/keyvault (MASKED Key Vault secret retrieval — proves identity wiring
 //     and never returns the raw secret value to the caller)
-// Consolidated into the Config slice so all /diag* + /api/system diagnostics live together.
 
 using Microsoft.AspNetCore.Mvc;
 
@@ -11,10 +10,6 @@ namespace PoTraffic.API.Features.Config;
 
 public static class DiagnosticsEndpoints
 {
-    /// <summary>Key-name fragments that mark a configuration value as secret.</summary>
-    private static readonly string[] SensitiveKeyFragments =
-        ["Key", "Secret", "Password", "Token", "ConnectionString", "ApiKey", "Credential"];
-
     public static void MapDiagnosticsEndpoints(this IEndpointRouteBuilder app)
     {
         // Every /diag* surface is admin-only and returns JSON. Rendering diagnostics as
@@ -25,46 +20,6 @@ public static class DiagnosticsEndpoints
         // /diag/keyvault — only when ?secret= is supplied AND caller is admin
         // (otherwise just lists the secret NAMES the identity can see).
         group.MapGet("/keyvault", HandleKeyVaultDiag);
-
-        // /diag/config — flattened IConfiguration with every secret-looking value masked.
-        group.MapGet("/config", HandleConfigDiag);
-    }
-
-    /// <summary>
-    /// Lists the resolved configuration so a misconfigured deployment can be diagnosed
-    /// without shell access. Values whose key looks sensitive are masked and never
-    /// returned in full (Rule 3 — "/diag must strictly mask secret values").
-    /// </summary>
-    private static IResult HandleConfigDiag(
-        [FromServices] IConfiguration configuration,
-        [FromServices] IWebHostEnvironment environment)
-    {
-        List<DiagConfigEntry> entries = [];
-        foreach (IConfigurationSection section in configuration.GetChildren())
-        {
-            foreach (IConfigurationSection key in section.GetChildren())
-            {
-                // Match on the FULL path, not just the leaf. "ConnectionStrings:TableStorage"
-                // is a secret even though the leaf ("TableStorage") looks innocuous — testing
-                // the leaf alone would publish every connection string in the file.
-                string path = $"{section.Key}:{key.Key}";
-                bool isSensitive = Array.Exists(
-                    SensitiveKeyFragments,
-                    fragment => path.Contains(fragment, StringComparison.OrdinalIgnoreCase));
-
-                entries.Add(new DiagConfigEntry(
-                    Path: path,
-                    Value: isSensitive ? Mask(key.Value) : key.Value ?? "(empty)",
-                    IsSensitive: isSensitive));
-            }
-        }
-
-        return Results.Ok(new
-        {
-            environment = environment.EnvironmentName,
-            applicationName = environment.ApplicationName,
-            entries = entries.OrderBy(e => e.Path).ToList(),
-        });
     }
 
     /// <summary>
@@ -103,8 +58,7 @@ public static class DiagnosticsEndpoints
             string? value = configuration[secret];
             payload["requestedSecret"] = secret;
             payload["found"] = !string.IsNullOrEmpty(value);
-            // Length bucket only — Mask() is the same rule /diag/config applies, so no
-            // characters of a secret can escape through either surface.
+            // Length bucket only; no characters of a secret escape.
             payload["masked"] = Mask(value);
         }
 
@@ -119,5 +73,3 @@ public static class DiagnosticsEndpoints
     }
 }
 
-/// <summary>One flattened configuration entry, with its value already masked if sensitive.</summary>
-internal sealed record DiagConfigEntry(string Path, string Value, bool IsSensitive);
