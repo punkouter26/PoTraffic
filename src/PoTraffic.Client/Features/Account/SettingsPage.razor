@@ -27,6 +27,7 @@
         <a href="#settings-notifications">Notifications</a>
         <a href="#settings-install">Install</a>
         <a href="#settings-limits">Limits &amp; cost</a>
+        <a href="#settings-data">Your data</a>
         <a href="#settings-delete" class="pt-settings-index-danger">Delete account</a>
     </nav>
 
@@ -312,6 +313,18 @@
                         </RadzenText>
                     </RadzenStack>
                 }
+    </section>
+
+    <section class="pt-settings-section" id="settings-data">
+        <RadzenText TextStyle="TextStyle.H3" class="pt-mb-2 pt-section-heading">Your data</RadzenText>
+        <RadzenText TextStyle="TextStyle.Caption" class="pt-mb-3 pt-settings-meta">
+            Everything PoTraffic stores about you — routes, schedules, every recorded trip and
+            alert — as one JSON file.
+        </RadzenText>
+        @* A full navigation, not fetch: the server answers with an attachment, so the browser
+           saves the file and the page stays where it is. *@
+        <RadzenButton Text="Download my data" Icon="download" ButtonStyle="ButtonStyle.Light"
+                      Click="@(() => Nav.NavigateTo("/api/account/export", forceLoad: true))" />
     </section>
 
     <section class="pt-settings-section pt-settings-danger" id="settings-delete">

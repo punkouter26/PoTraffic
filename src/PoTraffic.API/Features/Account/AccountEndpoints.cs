@@ -61,6 +61,19 @@ public static class AccountEndpoints
         .Produces<QuotaDto>()
         .Produces(StatusCodes.Status404NotFound);
 
+        // GDPR Art. 20 — download everything stored about the caller as one JSON file
+        grp.MapGet("/export", async (ClaimsPrincipal user, ISender sender, CancellationToken ct) =>
+        {
+            AccountExport? export = await sender.Send(new ExportAccountQuery(user.GetUserId()), ct);
+            return export is null
+                ? Results.NotFound()
+                : Results.File(
+                    System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(export, ExportJson),
+                    "application/json",
+                    $"potraffic-export-{DateTime.UtcNow:yyyy-MM-dd}.json");
+        })
+        .WithName("ExportAccount");
+
         // FR-031: GDPR Art. 17 — self-service account deletion
         grp.MapDelete("/", async (ClaimsPrincipal user, ISender sender, CancellationToken ct) =>
         {
@@ -74,5 +87,8 @@ public static class AccountEndpoints
 
         return app;
     }
+
+    private static readonly System.Text.Json.JsonSerializerOptions ExportJson =
+        new(System.Text.Json.JsonSerializerDefaults.Web) { WriteIndented = true };
 
 }

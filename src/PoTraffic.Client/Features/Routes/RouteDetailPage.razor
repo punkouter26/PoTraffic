@@ -252,7 +252,7 @@ else
                 <span class="pt-trend-selection-time">@selected.PolledAtDateTime.ToString("HH:mm:ss")</span>
                 <span class="pt-trend-selection-value">@(selected.TravelDurationSeconds / 60) min</span>
                 <span class="pt-trend-selection-meta">
-                    @($"{selected.DistanceMetres * 0.000621371:F1} mi")
+                    @TextFormatting.Distance(selected.DistanceMetres)
                     @if (selected.IsRerouted)
                     {
                         <span class="pt-trend-selection-flag">rerouted</span>

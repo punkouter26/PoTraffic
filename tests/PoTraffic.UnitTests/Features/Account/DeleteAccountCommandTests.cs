@@ -43,6 +43,7 @@ public sealed class DeleteAccountCommandTests
         // Assert
         result.Should().BeTrue("user existed and was deleted");
         (db.Users.FirstOrDefault(x => x.Id == userId)).Should().BeNull("user row must be hard-deleted (FR-031)");
+        db.Routes.Any(r => r.UserId == userId).Should().BeFalse("the user's routes go with the account");
     }
 
     [Fact]

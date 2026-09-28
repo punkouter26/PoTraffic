@@ -17,6 +17,19 @@ namespace PoTraffic.Client.Infrastructure;
 public static class TextFormatting
 {
     /// <summary>
+    /// A distance in the units the user's roads are signed in: miles where the browser's
+    /// region drives in miles (US, UK, Liberia, Myanmar), kilometres everywhere else.
+    /// </summary>
+    public static string Distance(int metres)
+    {
+        string name = System.Globalization.CultureInfo.CurrentCulture.Name;
+        string region = name.Length > 3 ? name[^2..] : string.Empty;
+        return region is "US" or "GB" or "LR" or "MM"
+            ? $"{metres * 0.000621371:F1} mi"
+            : $"{metres / 1000.0:F1} km";
+    }
+
+    /// <summary>
     /// Title-cases a street name, preserving all-caps abbreviations and the
     /// natural casing of common suffixes (Street, Avenue, Boulevard, …).
     /// Null/whitespace inputs pass through.

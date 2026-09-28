@@ -58,6 +58,7 @@ try
     builder.Services.AddScoped<PollRouteJob>();
     builder.Services.AddScoped<PruneOldPollRecordsJob>();
     builder.Services.AddSecurityServices(builder.Configuration, builder.Environment);
+    builder.Services.AddPoTrafficRateLimiting(builder.Environment);
     builder.Services.AddTrafficProviders(builder.Configuration, builder.Environment);
     builder.Services.AddAlertServices();
     builder.Services.AddPlacesServices();
@@ -121,6 +122,8 @@ try
 
     app.UseAuthentication();
     app.UseAuthorization();
+    // After auth so limits partition by user rather than by the shared proxy IP.
+    app.UseRateLimiter();
 
     // Pushes UserId + Environment onto every Serilog/OTel log event across all sinks.
     app.UseMiddleware<LogContextEnrichmentMiddleware>();

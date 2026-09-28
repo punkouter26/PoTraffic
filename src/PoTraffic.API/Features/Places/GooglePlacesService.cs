@@ -70,6 +70,7 @@ public static class PlacesServiceExtensions
                 string? q, GooglePlacesService places, CancellationToken ct) =>
                 Results.Ok(await places.AutocompleteAsync(q, ct)))
             .RequireAuthorization("ProductionMicrosoftAuth")
+            .RequireRateLimiting(PoTraffic.API.Infrastructure.Security.RateLimitingExtensions.Autocomplete)
             .WithTags("Places");
         return app;
     }

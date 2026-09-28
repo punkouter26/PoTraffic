@@ -178,7 +178,7 @@
                     Severity = NotificationSeverity.Info,
                     Summary = "Google Maps live probe",
                     Detail = data is not null
-                        ? $"{data.DurationSeconds / 60} min · {data.DistanceMetres / 1000.0:F1} km"
+                        ? $"{data.DurationSeconds / 60} min · {TextFormatting.Distance(data.DistanceMetres)}"
                         : "Live travel time retrieved",
                     Duration = 6000
                 });

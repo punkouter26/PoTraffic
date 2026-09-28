@@ -26,12 +26,13 @@ public static class RoutesEndpoints
             .WithTags("Routes");
 
         group.MapGet("", GetRoutes);
-        group.MapPost("", CreateRoute);
+        // Each of these spends paid provider calls (geocoding / directions).
+        group.MapPost("", CreateRoute).RequireRateLimiting(PoTraffic.API.Infrastructure.Security.RateLimitingExtensions.ProviderCalls);
         // Sample route with synthetic history, for an account that has nothing to show yet (#10)
         group.MapPost("sample", CreateSampleRoute);
         group.MapDelete("{routeId:guid}", DeleteRoute);
-        group.MapPost("{routeId:guid}/check-now", CheckNow);
-        group.MapPost("{routeId:guid}/return-trip", CreateReturnTrip);
+        group.MapPost("{routeId:guid}/check-now", CheckNow).RequireRateLimiting(PoTraffic.API.Infrastructure.Security.RateLimitingExtensions.ProviderCalls);
+        group.MapPost("{routeId:guid}/return-trip", CreateReturnTrip).RequireRateLimiting(PoTraffic.API.Infrastructure.Security.RateLimitingExtensions.ProviderCalls);
         // Road shape + how today compares, for the map on the route detail page.
         group.MapGet("{routeId:guid}/path", GetRoutePath);
         // Arrive-by target behind the departure plan; null body value clears it.
