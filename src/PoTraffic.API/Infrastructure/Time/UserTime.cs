@@ -52,6 +52,21 @@ public static class UserTime
     }
 
     /// <summary>
+    /// The route's samples that describe a usual day: everything except public holidays,
+    /// whose empty roads would otherwise drag every baseline down.
+    /// </summary>
+    public static IEnumerable<PollRecord> UsualPolls(this TableStorageContext db, RouteId routeId) =>
+        db.Polls.Where(p => p.RouteId == routeId && p.HolidayName == null);
+
+    /// <summary>
+    /// ISO country for holiday lookups, from the user's locale region (en-US → US).
+    /// ponytail: locale is a proxy for where the commute is; reverse-geocode the route origin if
+    /// users with a mismatched locale show up.
+    /// </summary>
+    public static string? CountryFor(this TableStorageContext db, UserId userId) =>
+        TryGetRegion(db.Users.FirstOrDefault(u => u.Id == userId)?.Locale ?? string.Empty);
+
+    /// <summary>
     /// Travel times of the route's samples that fell in the same local weekday and
     /// quarter-hour as <paramref name="instant"/>, filtered by <paramref name="include"/>.
     /// Shared by the congestion alert and the map colour so the two can never disagree
@@ -66,9 +81,7 @@ public static class UserTime
     {
         DateTimeOffset local = instant.ToLocal(zone);
         int quarter = QuarterOfDay(local);
-        return db.Polls
-            .Where(p => p.RouteId == routeId)
-            .AsEnumerable()
+        return db.UsualPolls(routeId)
             .Where(include)
             .Where(p =>
             {

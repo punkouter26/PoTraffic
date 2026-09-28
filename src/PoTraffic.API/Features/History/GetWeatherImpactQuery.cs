@@ -36,7 +36,7 @@ public sealed class GetWeatherImpactQueryHandler(TableStorageContext db)
         if (!db.OwnsRoute(query.RouteId, query.UserId))
             return Task.FromResult(Empty(query.RouteId));
 
-        List<PollRecord> polls = [.. db.Polls.Where(p => p.RouteId == query.RouteId)];
+        List<PollRecord> polls = [.. db.UsualPolls(query.RouteId)];
         if (polls.Count == 0)
             return Task.FromResult(Empty(query.RouteId));
 

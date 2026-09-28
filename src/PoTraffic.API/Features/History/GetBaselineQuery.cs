@@ -37,9 +37,7 @@ public sealed class GetBaselineQueryHandler
         // Baseline is day-of-week specific (#4): a Friday baseline reflects only Friday
         // history. Weekday and slot are the user's local ones (see UserTime).
         TimeZoneInfo zone = _db.ZoneFor(query.UserId);
-        List<(DateTimeOffset Local, int Seconds)> allPolls = _db.Polls
-            .Where(p => p.RouteId == query.RouteId)
-            .AsEnumerable()
+        List<(DateTimeOffset Local, int Seconds)> allPolls = _db.UsualPolls(query.RouteId)
             .Select(p => (p.PolledAt.ToLocal(zone), p.TravelDurationSeconds))
             .ToList();
 

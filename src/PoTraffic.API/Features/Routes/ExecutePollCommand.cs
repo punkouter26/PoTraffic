@@ -1,4 +1,5 @@
 using PoTraffic.API.Infrastructure.Storage;
+using PoTraffic.API.Infrastructure.Time;
 
 using Microsoft.Extensions.DependencyInjection;
 
@@ -22,6 +23,7 @@ public sealed class ExecutePollCommandHandler(
     IWeatherProvider weatherProvider,
     Config.FeatureFlags featureFlags,
     Alerts.AlertEvaluator alertEvaluator,
+    IHolidayCalendar holidays,
     ILogger<ExecutePollCommandHandler> logger) : IRequestHandler<ExecutePollCommand, bool>
 {
     /// <summary>Two polls closer together than this are treated as the same logical poll
@@ -114,13 +116,31 @@ public sealed class ExecutePollCommandHandler(
             }
         }
 
+        // 4c. Public holiday? Tagged so the day's samples stay out of every "usual" statistic.
+        // Non-fatal like weather: an unknown holiday costs one skewed sample, not the poll.
+        DateTimeOffset polledAt = DateTimeOffset.UtcNow;
+        string? holiday = null;
+        if (db.CountryFor(route.UserId) is { } country)
+        {
+            try
+            {
+                DateOnly localDate = DateOnly.FromDateTime(polledAt.ToLocal(db.ZoneFor(route.UserId)).DateTime);
+                holiday = await holidays.HolidayOnAsync(country, localDate, ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogWarning(ex, "ExecutePollCommand: holiday lookup failed for route {RouteId}", cmd.RouteId);
+            }
+        }
+
         // 5. Create PollRecord
         var record = new PollRecord
         {
             Id = PollRecordId.New(),
             RouteId = cmd.RouteId,
             SessionId = session.Id,
-            PolledAt = DateTimeOffset.UtcNow,
+            PolledAt = polledAt,
+            HolidayName = holiday,
             TravelDurationSeconds = travelResult.DurationSeconds,
             DistanceMetres = travelResult.DistanceMetres,
             WeatherCondition = weather?.Condition,

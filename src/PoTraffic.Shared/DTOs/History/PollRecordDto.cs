@@ -9,7 +9,8 @@ public sealed record PollRecordDto(
     int TravelDurationSeconds,
     int DistanceMetres,
     RouteProvider Provider,
-    bool IsRerouted)
+    bool IsRerouted,
+    string? HolidayName = null)
 {
     // Radzen chart CategoryProperty requires DateTime, not DateTimeOffset
     public DateTime PolledAtDateTime => PolledAt.LocalDateTime;

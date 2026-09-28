@@ -20,6 +20,13 @@ public sealed class PollRecord
     /// </summary>
     public string? WeatherCondition { get; set; }
 
+    /// <summary>
+    /// The nationwide public holiday this sample fell on (user's country, local date), or null
+    /// on an ordinary day. Holiday samples are kept for the day's own chart but excluded from
+    /// every "usual" statistic — see <c>UserTime.UsualPolls</c>.
+    /// </summary>
+    public string? HolidayName { get; set; }
+
     /// <summary>Temperature in °C at the origin, or null alongside a null condition.</summary>
     public double? TemperatureC { get; set; }
 

@@ -162,6 +162,13 @@ else
             </label>
         </div>
 
+        @if (LatestPoll?.HolidayName is { } holiday)
+        {
+            <div class="pt-answer-meta">
+                Today is @holiday — its trips are shown here but don't count toward your usual times.
+            </div>
+        }
+
         @{ NextSampleInfo next = NextSample; }
         <div class="pt-answer-live">
             <span class="pt-status-dot @(next.Live ? "pt-status-dot-green" : "pt-status-dot-amber")"></span>

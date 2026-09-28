@@ -50,12 +50,15 @@ public static class ProviderExtensions
         if (flags.UseMockProviders)
         {
             services.AddScoped<IWeatherProvider, MockWeatherProvider>();
+            services.AddSingleton<IHolidayCalendar>(NoHolidayCalendar.Instance);
         }
         else
         {
             services.AddHttpClient<OpenMeteoWeatherProvider>()
                 .AddResilienceHandler(ResiliencePipelineExtensions.WeatherPipeline);
             services.AddScoped<IWeatherProvider>(sp => sp.GetRequiredService<OpenMeteoWeatherProvider>());
+            services.AddHttpClient<IHolidayCalendar, NagerHolidayCalendar>()
+                .AddResilienceHandler(ResiliencePipelineExtensions.WeatherPipeline);
         }
 
         return services;

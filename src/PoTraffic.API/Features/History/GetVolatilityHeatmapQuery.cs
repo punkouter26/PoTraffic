@@ -28,9 +28,7 @@ public sealed class GetVolatilityHeatmapQueryHandler(TableStorageContext db)
         if (!db.OwnsRoute(query.RouteId, query.UserId))
             return Task.FromResult(new VolatilityHeatmapDto(query.RouteId, 0, 0, TimeZoneInfo.Utc.Id, []));
 
-        List<PollRecord> polls = db.Polls
-            .Where(p => p.RouteId == query.RouteId)
-            .ToList();
+        List<PollRecord> polls = [.. db.UsualPolls(query.RouteId)];
 
         if (polls.Count == 0)
             return Task.FromResult(new VolatilityHeatmapDto(query.RouteId, 0, 0, TimeZoneInfo.Utc.Id, []));

@@ -32,9 +32,7 @@ public sealed class GetDeparturePlanQueryHandler(TableStorageContext db)
             return Task.FromResult<DeparturePlanDto?>(null);
 
         TimeZoneInfo zone = db.ZoneFor(query.UserId);
-        List<(DateTimeOffset Local, int Seconds)> all = db.Polls
-            .Where(p => p.RouteId == route.Id)
-            .AsEnumerable()
+        List<(DateTimeOffset Local, int Seconds)> all = db.UsualPolls(route.Id)
             .Select(p => (p.PolledAt.ToLocal(zone), p.TravelDurationSeconds))
             .ToList();
 

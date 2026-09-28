@@ -33,6 +33,7 @@ internal static class PollHandlerTestHelper
             weather ?? new NoWeatherProvider(),
             new FeatureFlags(UseMockProviders: true, EnableWeather: weather is not null),
             AlertTestHelper.NoOp(db),
+            NoHolidayCalendar.Instance,
             logger ?? NullLogger<ExecutePollCommandHandler>.Instance);
 
     /// <summary>Answers "no observation" — the same shape as a real provider outage.</summary>
