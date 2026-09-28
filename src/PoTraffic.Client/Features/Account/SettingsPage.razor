@@ -24,6 +24,7 @@
         <a href="#settings-profile">Profile</a>
         <a href="#settings-appearance">Appearance</a>
         <a href="#settings-effects">Effects &amp; sound</a>
+        <a href="#settings-notifications">Notifications</a>
         <a href="#settings-install">Install</a>
         <a href="#settings-limits">Limits &amp; cost</a>
         <a href="#settings-delete" class="pt-settings-index-danger">Delete account</a>
@@ -199,6 +200,38 @@
             </div>
 
         </RadzenStack>
+    </section>
+
+    <section class="pt-settings-section" id="settings-notifications">
+        <RadzenText TextStyle="TextStyle.H3" class="pt-mb-2 pt-section-heading">Notifications</RadzenText>
+        <RadzenText TextStyle="TextStyle.Caption" class="pt-mb-3 pt-settings-meta">
+            Get told on this device when traffic is heavier than usual, when your route is
+            rerouted, and when it's time to leave — even with the app closed.
+        </RadzenText>
+
+        @switch (_pushState)
+        {
+            case "unsupported":
+                <RadzenText TextStyle="TextStyle.Body2" class="pt-settings-meta">
+                    This browser can't receive notifications. On iPhone, install PoTraffic to
+                    your home screen first, then turn them on from the installed app.
+                </RadzenText>
+                break;
+            case "denied":
+                <RadzenText TextStyle="TextStyle.Body2" class="pt-settings-meta">
+                    Notifications are blocked for this site. Allow them in your browser's site
+                    settings, then come back here.
+                </RadzenText>
+                break;
+            case "subscribed":
+                <RadzenButton Text="Turn off notifications" Icon="notifications_off"
+                              ButtonStyle="ButtonStyle.Light" Click="DisablePushAsync" IsBusy="_pushBusy" />
+                break;
+            case "off":
+                <RadzenButton Text="Turn on notifications" Icon="notifications_active"
+                              ButtonStyle="ButtonStyle.Primary" Click="EnablePushAsync" IsBusy="_pushBusy" />
+                break;
+        }
     </section>
 
     <section class="pt-settings-section" id="settings-install">
@@ -378,6 +411,7 @@
     protected override async Task OnInitializedAsync()
     {
         Pwa.StateChanged += OnPwaStateChanged;
+        _pushState = await Pwa.GetPushStateAsync();
 
         try
         {
@@ -532,6 +566,56 @@
         bool PrefersReducedMotion);
 
     private async Task OnMotionChanged(MotionLevel level) => await Fx.SetMotionAsync(level);
+
+    private string? _pushState;
+    private bool _pushBusy;
+
+    private async Task EnablePushAsync()
+    {
+        _pushBusy = true;
+        try
+        {
+            PushKeyResponse? key = await Http.GetFromJsonAsync("/api/push/key", AppJsonContext.Default.PushKeyResponse);
+            string[]? sub = key is null ? null : await Pwa.SubscribePushAsync(key.PublicKey);
+            if (sub is [string endpoint, string p256dh, string auth])
+            {
+                HttpResponseMessage resp = await Http.PostAsJsonAsync("/api/push/subscriptions",
+                    new PushSubscriptionRequest(endpoint, p256dh, auth), AppJsonContext.Default.PushSubscriptionRequest);
+                if (!resp.IsSuccessStatusCode)
+                {
+                    await Pwa.UnsubscribePushAsync();
+                    NotificationService.Notify(NotificationSeverity.Error, "Notifications",
+                        "This browser's push service isn't supported.");
+                }
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or JSException)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Notifications", "Couldn't turn notifications on.");
+        }
+        finally
+        {
+            _pushState = await Pwa.GetPushStateAsync();
+            _pushBusy = false;
+        }
+    }
+
+    private async Task DisablePushAsync()
+    {
+        _pushBusy = true;
+        try
+        {
+            if (await Pwa.UnsubscribePushAsync() is { } endpoint)
+                await Http.PostAsJsonAsync("/api/push/unsubscribe",
+                    new PushUnsubscribeRequest(endpoint), AppJsonContext.Default.PushUnsubscribeRequest);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or JSException) { /* server prunes it on next send */ }
+        finally
+        {
+            _pushState = await Pwa.GetPushStateAsync();
+            _pushBusy = false;
+        }
+    }
 
     /// <summary>Shows the browser's own install dialog.</summary>
     private async Task InstallAsync()

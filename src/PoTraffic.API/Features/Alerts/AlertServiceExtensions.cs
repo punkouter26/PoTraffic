@@ -2,11 +2,13 @@ namespace PoTraffic.API.Features.Alerts;
 
 internal static class AlertServiceExtensions
 {
-    /// <summary>Registers the in-app proactive-alert pipeline. Web Push was removed — the
-    /// NotificationBell in the client now only displays alerts the user reads in-app.</summary>
+    /// <summary>Registers proactive alerts: the in-app notification centre plus Web Push to
+    /// every browser the user subscribed.</summary>
     internal static IServiceCollection AddAlertServices(this IServiceCollection services)
     {
         services.AddScoped<AlertEvaluator>();
+        services.AddSingleton<VapidKeys>();
+        services.AddHttpClient<IPushNotifier, WebPushNotifier>();
         return services;
     }
 }

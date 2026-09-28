@@ -49,6 +49,7 @@ public sealed class TableStorageContext
         [typeof(SystemConfiguration)] = new("SystemConfigurations", _ => "main", e => ((SystemConfiguration)e).Key, c => c._configs),
         // Alerts partition by user for efficient per-user reads.
         [typeof(Alert)] = new("Alerts", e => ((Alert)e).UserId.ToString(), e => ((Alert)e).Id.ToString(), c => c._alerts),
+        [typeof(UserPushSubscription)] = new("PushSubscriptions", e => ((UserPushSubscription)e).UserId.ToString(), e => ((UserPushSubscription)e).Id.ToString(), c => c._pushSubscriptions),
     };
 
     private static readonly JsonSerializerOptions JsonOpts = new(); // nav properties carry [JsonIgnore]
@@ -69,6 +70,7 @@ public sealed class TableStorageContext
     internal readonly List<PollRecord> _polls = new();
     internal readonly List<SystemConfiguration> _configs = new();
     internal readonly List<Alert> _alerts = new();
+    internal readonly List<UserPushSubscription> _pushSubscriptions = new();
 
     private readonly object _gate = new();
     private readonly ITableStore? _store;
@@ -134,6 +136,11 @@ public sealed class TableStorageContext
     public IQueryable<Alert> Alerts
     {
         get { lock (_gate) return _alerts.AsQueryable(); }
+    }
+
+    public IQueryable<UserPushSubscription> PushSubscriptions
+    {
+        get { lock (_gate) return _pushSubscriptions.AsQueryable(); }
     }
 
     // ── Legacy aliases (post-refactor) ──────────────────────────────────────

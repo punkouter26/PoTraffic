@@ -114,6 +114,24 @@ public readonly record struct PollRecordId(Guid Value) : IStronglyTypedId<PollRe
     }
 }
 
+/// <summary>Identifies a browser push subscription.</summary>
+[JsonConverter(typeof(StronglyTypedIdJsonConverter<PushSubscriptionId>))]
+public readonly record struct PushSubscriptionId(Guid Value) : IStronglyTypedId<PushSubscriptionId>, IParsable<PushSubscriptionId>
+{
+    public static PushSubscriptionId From(Guid value) => new(value);
+    public static PushSubscriptionId New() => new(Guid.NewGuid());
+    public override string ToString() => Value.ToString();
+
+    public static PushSubscriptionId Parse(string s, IFormatProvider? provider = null) => new(Guid.Parse(s));
+
+    public static bool TryParse(string? s, IFormatProvider? provider, out PushSubscriptionId result)
+    {
+        bool ok = Guid.TryParse(s, out Guid guid);
+        result = new(guid);
+        return ok;
+    }
+}
+
 /// <summary>Identifies an <c>Alert</c>.</summary>
 [JsonConverter(typeof(StronglyTypedIdJsonConverter<AlertId>))]
 public readonly record struct AlertId(Guid Value) : IStronglyTypedId<AlertId>, IParsable<AlertId>

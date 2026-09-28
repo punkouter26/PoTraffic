@@ -2,8 +2,8 @@ namespace PoTraffic.API.Features.Alerts;
 
 /// <summary>
 /// A proactive alert raised when a route's live travel time crosses its baseline + σ (#1).
-/// Persisted (partitioned by user) and surfaced in the in-app notification center; also
-/// pushed to any registered browser push subscriptions.
+/// Persisted (partitioned by user), surfaced in the in-app notification center, and sent as
+/// a Web Push to every browser the user subscribed (<see cref="IPushNotifier"/>).
 /// </summary>
 public sealed class Alert
 {

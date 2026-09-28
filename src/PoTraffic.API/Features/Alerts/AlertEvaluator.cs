@@ -15,7 +15,7 @@ namespace PoTraffic.API.Features.Alerts;
 /// De-duplicated per session so a congested commute produces one alert, not one per poll.
 /// Runs inside the poll's scope; push delivery failures never break polling.
 /// </summary>
-public sealed class AlertEvaluator(TableStorageContext db)
+public sealed class AlertEvaluator(TableStorageContext db, IPushNotifier push, ILogger<AlertEvaluator> logger)
 {
     public async Task EvaluateAsync(EntityRoute route, PollRecord record, MonitoringSession session, CancellationToken ct)
     {
@@ -47,7 +47,26 @@ public sealed class AlertEvaluator(TableStorageContext db)
         foreach (Alert a in raised)
             db.Add(a);
         await db.SaveChangesAsync(ct);
+
+        foreach (Alert a in raised)
+        {
+            try
+            {
+                await push.SendAsync(a.UserId, new PushPayload(
+                    a.Kind == "Reroute" ? "Route changed" : "Heavier traffic than usual",
+                    a.Message,
+                    $"/routes/{a.RouteId}",
+                    $"alert-{a.RouteId}"), AlertPushTtl, ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogWarning(ex, "Push delivery failed for alert {AlertId}", a.Id);
+            }
+        }
     }
+
+    /// <summary>A congestion warning an hour late is noise, so the push service may drop it after that.</summary>
+    private static readonly TimeSpan AlertPushTtl = TimeSpan.FromHours(1);
 
     private bool TryBuildCongestionAlert(EntityRoute route, PollRecord record, MonitoringSession session, out Alert? alert)
     {

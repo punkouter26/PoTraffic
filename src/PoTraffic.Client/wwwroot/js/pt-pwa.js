@@ -125,6 +125,43 @@
             }
         },
 
+        // ── Web Push ──────────────────────────────────────────────────────────
+        // Subscriptions hang off the same service worker registered above; its push
+        // handler shows the notification.
+
+        /** "unsupported" | "denied" | "subscribed" | "off" */
+        pushState: async function () {
+            if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window))
+                return "unsupported";
+            if (Notification.permission === "denied") return "denied";
+            const reg = await navigator.serviceWorker.getRegistration();
+            const sub = reg && await reg.pushManager.getSubscription();
+            return sub ? "subscribed" : "off";
+        },
+
+        /** Asks permission and subscribes. Resolves [endpoint, p256dh, auth], or null when declined. */
+        subscribePush: async function (vapidPublicKey) {
+            if ((await Notification.requestPermission()) !== "granted") return null;
+            const reg = await navigator.serviceWorker.ready;
+            const sub = await reg.pushManager.getSubscription() || await reg.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: base64UrlToBytes(vapidPublicKey),
+            });
+            const keys = sub.toJSON().keys;
+            // An array rather than an object: trim-safe to read back in .NET.
+            return [sub.endpoint, keys.p256dh, keys.auth];
+        },
+
+        /** Unsubscribes this browser. Resolves the endpoint that was dropped, or null. */
+        unsubscribePush: async function () {
+            const reg = await navigator.serviceWorker.getRegistration();
+            const sub = reg && await reg.pushManager.getSubscription();
+            if (!sub) return null;
+            const endpoint = sub.endpoint;
+            await sub.unsubscribe();
+            return endpoint;
+        },
+
         /** Applies a waiting update. The controllerchange handler above does the reload. */
         applyUpdate: function () {
             if (!waitingWorker) return;
@@ -134,6 +171,12 @@
             notify();
         },
     };
+
+    function base64UrlToBytes(value) {
+        const padded = value + "=".repeat((4 - value.length % 4) % 4);
+        const raw = atob(padded.replace(/-/g, "+").replace(/_/g, "/"));
+        return Uint8Array.from(raw, (c) => c.charCodeAt(0));
+    }
 
     register();
 })();

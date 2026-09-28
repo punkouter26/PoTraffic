@@ -103,6 +103,25 @@ public sealed class PwaService : IAsyncDisposable
         catch (JSDisconnectedException) { /* page tearing down */ }
     }
 
+    /// <summary>"unsupported", "denied", "subscribed" or "off" for this browser.</summary>
+    public async Task<string> GetPushStateAsync()
+    {
+        try { return await _js.InvokeAsync<string>("ptPwa.pushState"); }
+        catch (JSException) { return "unsupported"; }
+        catch (JSDisconnectedException) { return "unsupported"; }
+    }
+
+    /// <summary>
+    /// Asks for permission and subscribes this browser. Returns [endpoint, p256dh, auth],
+    /// or null when the user declined.
+    /// </summary>
+    public async Task<string[]?> SubscribePushAsync(string vapidPublicKey) =>
+        await _js.InvokeAsync<string[]?>("ptPwa.subscribePush", vapidPublicKey);
+
+    /// <summary>Unsubscribes this browser; returns the endpoint it had, or null.</summary>
+    public async Task<string?> UnsubscribePushAsync() =>
+        await _js.InvokeAsync<string?>("ptPwa.unsubscribePush");
+
     private async Task RefreshAsync()
     {
         try

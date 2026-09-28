@@ -184,3 +184,37 @@ async function trimCache(cache, limit) {
     if (keys.length <= limit) return;
     await Promise.all(keys.slice(0, keys.length - limit).map((k) => cache.delete(k)));
 }
+
+// ── Web Push ────────────────────────────────────────────────────────────────
+// Payload shape: PushPayload in PushNotifier.cs — { title, body, url, tag }.
+
+self.addEventListener("push", (event) => {
+    let data = {};
+    try { data = event.data ? event.data.json() : {}; }
+    catch { data = { body: event.data ? event.data.text() : "" }; }
+
+    event.waitUntil(self.registration.showNotification(data.title || "PoTraffic", {
+        body: data.body || "",
+        icon: "/icon-192.png",
+        badge: "/icon-192.png",
+        // Same tag replaces rather than stacks: one live nudge per route, not a pile.
+        tag: data.tag || "potraffic",
+        renotify: !!data.tag,
+        data: { url: data.url || "/dashboard" },
+    }));
+});
+
+self.addEventListener("notificationclick", (event) => {
+    event.notification.close();
+    const url = (event.notification.data && event.notification.data.url) || "/dashboard";
+    event.waitUntil((async () => {
+        const wins = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+        for (const w of wins) {
+            if ("focus" in w) {
+                await w.focus();
+                return w.navigate(url);
+            }
+        }
+        return self.clients.openWindow(url);
+    })());
+});
