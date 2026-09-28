@@ -41,6 +41,12 @@ public static class RoutesEndpoints
             bool found = await sender.Send(new SetArriveByCommand(routeId, ctx.User.GetUserId(), body.ArriveBy));
             return found ? Results.NoContent() : Results.NotFound();
         });
+        group.MapPut("{routeId:guid}/name", async (
+            RouteId routeId, HttpContext ctx, ISender sender, [FromBody] SetRouteNameRequest body) =>
+        {
+            bool found = await sender.Send(new SetRouteNameCommand(routeId, ctx.User.GetUserId(), body.Name));
+            return found ? Results.NoContent() : Results.NotFound();
+        });
         return app;
     }
 

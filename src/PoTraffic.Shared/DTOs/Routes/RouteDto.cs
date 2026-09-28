@@ -15,7 +15,8 @@ public sealed record RouteDto(
     IReadOnlyList<MonitoringWindowDto> Windows,
     RouteId? ReturnRouteId = null,
     bool IsSample = false,
-    string? ArriveBy = null);
+    string? ArriveBy = null,
+    string? Name = null);
 
 public sealed record MonitoringWindowDto(
     WindowId Id,

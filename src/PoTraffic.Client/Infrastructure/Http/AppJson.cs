@@ -20,6 +20,7 @@ public sealed record PushKeyResponse(string PublicKey);
 public sealed record PushSubscriptionRequest(string Endpoint, string P256dh, string Auth);
 public sealed record PushUnsubscribeRequest(string Endpoint);
 public sealed record SetArriveByRequest(string? ArriveBy);
+public sealed record SetRouteNameRequest(string? Name);
 public sealed record CreateSampleRouteRequest(int UtcOffsetMinutes);
 
 /// <summary>
@@ -89,6 +90,7 @@ public static class ClientCacheKeys
 [JsonSerializable(typeof(PushSubscriptionRequest))]
 [JsonSerializable(typeof(PushUnsubscribeRequest))]
 [JsonSerializable(typeof(SetArriveByRequest))]
+[JsonSerializable(typeof(SetRouteNameRequest))]
 [JsonSerializable(typeof(DeparturePlanDto))]
 [JsonSerializable(typeof(WeatherImpactResponse))]
 [JsonSerializable(typeof(CreateSampleRouteRequest))]

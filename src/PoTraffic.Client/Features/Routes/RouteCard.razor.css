@@ -3,3 +3,11 @@
 .pt-route-card-status {
     flex-shrink: 0;
 }
+
+.pt-route-card-name {
+    font-weight: var(--pt-weight-semibold);
+    color: var(--pt-fg-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

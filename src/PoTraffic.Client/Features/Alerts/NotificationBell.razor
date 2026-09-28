@@ -5,6 +5,7 @@
 @inject NavigationManager Nav
 @inject AuthenticationStateProvider AuthState
 @inject PageActivityMonitor Activity
+@inject PoTraffic.Client.Infrastructure.PwaService Pwa
 
 <AuthorizeView>
     <Authorized>
@@ -96,6 +97,7 @@
         {
             _alerts = alerts;
             _unreadCount = alerts.Count(a => !a.IsRead);
+            await Pwa.SetBadgeAsync(_unreadCount);
             await InvokeAsync(StateHasChanged);
         }
     }

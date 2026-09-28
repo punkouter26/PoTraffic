@@ -83,6 +83,8 @@ public sealed class AlertEvaluator(
                     LeaveNowKind => "Time to leave",
                     _ => "Heavier traffic than usual",
                 };
+                if (!string.IsNullOrEmpty(route.Name))
+                    title = $"{route.Name}: {title}";
                 await push.SendAsync(a.UserId, new PushPayload(
                     title, a.Message, $"/routes/{a.RouteId}", $"{a.Kind}-{a.RouteId}"), AlertPushTtl, ct);
             }

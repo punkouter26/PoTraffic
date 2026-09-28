@@ -35,6 +35,10 @@
 
     <div class="pt-route-card-body">
         <div class="pt-route-card-answer">
+            @if (!string.IsNullOrEmpty(Route.Name))
+            {
+                <div class="pt-route-card-name">@Route.Name</div>
+            }
             <div class="pt-route-card-route">
                 <span class="pt-route-addr-from">@_originStreet</span>
                 <PtIcon Name="arrow_right_alt" Size="sm" Class="pt-route-addr-arrow" />

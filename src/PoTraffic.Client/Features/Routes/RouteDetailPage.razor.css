@@ -370,3 +370,23 @@
     border-radius: var(--pt-radius-sm, 6px);
     padding: var(--pt-space-1) var(--pt-space-2);
 }
+
+.pt-route-name {
+    display: flex;
+    align-items: center;
+    gap: var(--pt-space-2);
+    margin: var(--pt-space-3) 0;
+    font-size: var(--pt-text-sm);
+    color: var(--pt-fg-secondary);
+}
+
+.pt-route-name input {
+    flex: 1;
+    min-width: 0;
+    font: inherit;
+    color: var(--pt-fg-primary);
+    background: var(--pt-bg-surface, transparent);
+    border: 1px solid var(--pt-border-subtle);
+    border-radius: var(--pt-radius-sm, 6px);
+    padding: var(--pt-space-1) var(--pt-space-2);
+}

@@ -162,6 +162,12 @@
             return endpoint;
         },
 
+        /** Unread count on the installed app's icon. Unsupported browsers ignore it. */
+        setBadge: function (count) {
+            if (!("setAppBadge" in navigator)) return;
+            (count > 0 ? navigator.setAppBadge(count) : navigator.clearAppBadge()).catch(function () { });
+        },
+
         /** Applies a waiting update. The controllerchange handler above does the reload. */
         applyUpdate: function () {
             if (!waitingWorker) return;

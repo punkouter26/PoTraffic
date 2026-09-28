@@ -196,6 +196,12 @@ else
        Return trip and the monitoring schedule. These used to sit under a
        "Settings & raw data" disclosure below three full-width cards, which put
        the only controls on the page two scrolls from the answer they act on. *@
+    <label class="pt-route-name">
+        <span>Name</span>
+        <input type="text" maxlength="60" placeholder="e.g. Home → Work"
+               value="@_route.Name" @onchange="OnNameChangedAsync" />
+    </label>
+
     <div class="pt-returntrip-bar">
         @* Both states go through the same call: the endpoint creates the reversed route and
            links it, or hands back the one already linked. Navigating straight to a stored
@@ -515,7 +521,7 @@ else
             _originStreet = TextFormatting.ToTitleCase(_route.OriginAddress.Split(',')[0]);
             _destStreet = TextFormatting.ToTitleCase(_route.DestinationAddress.Split(',')[0]);
             _thisLabel = _originStreet;
-            _pageTitle = $"{_originStreet} → {_destStreet}";
+            _pageTitle = _route.Name ?? $"{_originStreet} → {_destStreet}";
         }
         else
         {
@@ -597,6 +603,14 @@ else
         // job is to tell you when to leave.
         _announcedLevel = _path.TrafficLevel;
         return;
+    }
+
+    private async Task OnNameChangedAsync(ChangeEventArgs e)
+    {
+        HttpResponseMessage resp = await Http.PutAsJsonAsync($"/api/routes/{RouteId}/name",
+            new SetRouteNameRequest(e.Value as string), AppJsonContext.Default.SetRouteNameRequest);
+        if (resp.IsSuccessStatusCode)
+            await RefreshAsync();
     }
 
     /// <summary>Saves the arrive-by target (empty clears it) and reloads the plan.</summary>

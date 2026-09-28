@@ -103,6 +103,14 @@ public sealed class PwaService : IAsyncDisposable
         catch (JSDisconnectedException) { /* page tearing down */ }
     }
 
+    /// <summary>Shows <paramref name="count"/> on the installed app's icon (cleared at 0).</summary>
+    public async Task SetBadgeAsync(int count)
+    {
+        try { await _js.InvokeVoidAsync("ptPwa.setBadge", count); }
+        catch (JSException) { /* script not loaded */ }
+        catch (JSDisconnectedException) { /* page tearing down */ }
+    }
+
     /// <summary>"unsupported", "denied", "subscribed" or "off" for this browser.</summary>
     public async Task<string> GetPushStateAsync()
     {

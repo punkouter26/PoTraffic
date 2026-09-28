@@ -41,6 +41,9 @@ public sealed class Route
     /// </summary>
     public TimeOnly? ArriveBy { get; set; }
 
+    /// <summary>User's label ("Home → Work"); null shows the street names instead.</summary>
+    public string? Name { get; set; }
+
     /// <summary>
     /// The road shape between origin and destination, as a Google-encoded polyline.
     /// Fetched lazily the first time the route's map is opened and kept forever — the
