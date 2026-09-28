@@ -6,7 +6,6 @@
 @inherits PollingComponentBase
 @inject HttpClient Http
 @inject NavigationManager Nav
-@inject PoTraffic.Client.Infrastructure.FxService Fx
 
 @* ──────────────────────────────────────────────────────────────────────
    Route detail — the answer, the evidence, and everything else folded away.
@@ -17,65 +16,56 @@
    first answered the question the app exists to answer, and three of them
    answered "when is it bad?" in three different shapes.
 
-   Now: ANSWER (when to leave), EVIDENCE (one chart, one weekly grid), and a
-   single Details disclosure holding the settings and the raw records.
-
-   A status strip between the header and the answer makes it explicit when the
-   page is refreshing and when the next Google Maps probe is happening, so the
-   user can tell the difference between "no samples yet" and "the scheduler is
-   about to ask Google".
+   Now: ANSWER (when to leave), one SETTINGS card (arrive by, schedule, return
+   trip), and EVIDENCE (map, today's chart, the weekly grid). The header carries
+   the name, renameable in place, and one chip saying when the route was last
+   checked and when the next check is due.
    ────────────────────────────────────────────────────────────────────── *@
 
-<PageTitle>Route Detail — PoTraffic</PageTitle>
+<PageTitle>@_pageTitle — PoTraffic</PageTitle>
 
 @if (IsFirstLoad)
 {
-    <PtProgressLine AriaLabel="Loading route" />
+    <PtProgressLine AriaLabel="Loading commute" />
 }
 else
 {
     @* The page is reached by tapping a card, and had no way back but the browser's
-       own control — which a PWA in standalone display mode does not render. *@
-    @* The live probe state rides the header as chips. It used to own a full-width
-       strip between the header and the answer — three facts that never change shape
-       do not need a row of their own, and that row cost 60px of the first screen. *@
-    <PageHeader Title="@_pageTitle" BackHref="/dashboard" BackLabel="Commutes">
+       own control — which a PWA in standalone display mode does not render.
+       The title renames the route in place; the probe state rides the header. *@
+    <PageHeader Title="@_pageTitle" BackHref="/dashboard" BackLabel="Commutes"
+                TitleChanged="@(_route is null ? default : EventCallback.Factory.Create<string?>(this, OnNameChangedAsync))"
+                EditValue="@_route?.Name" EditPlaceholder="e.g. Home → Work">
         <Actions>
-            <RouteProbeStatus RouteId="RouteId"
-                              Compact="true"
-                              IsRefreshing="IsRefreshing"
-                              LastSuccessUtc="LastSuccessUtc"
-                              LatestProbe="LatestPoll"
-                              ProbesToday="_todayPolls.Count"
-                              Schedule="@_activeSession?.Schedule"
-                              OnProbeCompleted="@OnWindowSaved" />
+            @* Every chart below is generated data for a sample route. The chip says so
+               once, beside the title, where a three-line banner used to. *@
+            @if (_route?.IsSample == true)
+            {
+                <span class="pt-sample-chip" title="Generated history — never probed or counted against your quota">Sample data</span>
+            }
+            @if (_route is not null)
+            {
+                <RouteProbeStatus RouteId="RouteId"
+                                  LatestProbe="LatestPoll"
+                                  Session="_activeSession"
+                                  OnProbeCompleted="@OnWindowSaved" />
+            }
         </Actions>
     </PageHeader>
 
-    @if (IsOffline || IsStale)
+    <StaleBanner IsOffline="IsOffline" IsStale="IsStale" />
+
+    @if (_route is null && _notFound)
     {
-        <div class="pt-stale-banner pt-enter" role="status">
-            <PtIcon Name="@(IsOffline ? "wifi_off" : "cloud_off")" Size="sm" />
-            @(IsOffline ? "Offline — showing the last data received." :
-                          "Can't reach the server — retrying.")
+        <div class="pt-empty-state">
+            <PtIcon Name="explore_off" Size="xl" Class="pt-empty-state-icon" />
+            <div class="pt-empty-state-title">This commute doesn't exist</div>
+            <div class="pt-empty-state-text">It may have been deleted, or the link is wrong.</div>
+            <RadzenButton Text="Back to commutes" ButtonStyle="ButtonStyle.Light" Icon="arrow_back"
+                          Click="@(() => Nav.NavigateTo("/dashboard"))" />
         </div>
     }
-
-    @* Every chart below this is generated data. Saying so once, at the top, is the
-       difference between a demo and a fabrication. *@
-    @if (_route?.IsSample == true)
-    {
-        <div class="pt-sample-banner" role="note">
-            <PtIcon Name="science" Size="sm" />
-            <span>
-                This is a sample commute. Its history was generated to show what the app
-                looks like with a few weeks of data — nothing here was measured, and it is
-                never probed or counted against your quota.
-            </span>
-        </div>
-    }
-
-    @if (_route is null)
+    else if (_route is null)
     {
         @* Nothing ever loaded. Rendering the sections below in this state produced a
            route header with no addresses — a bare "→" — over the words "Still
@@ -83,13 +73,13 @@ else
            really a failed request. An empty answer is worse than no answer. *@
         <div class="pt-empty-state">
             <PtIcon Name="cloud_off" Size="xl" Class="pt-empty-state-icon" />
-            <div class="pt-empty-state-title">Couldn't load this route</div>
+            <div class="pt-empty-state-title">Couldn't load this commute</div>
             <div class="pt-empty-state-text">
                 @* Deliberately not "the server didn't respond": the same branch covers a
                    route that has since been deleted, where the server answered fine. *@
                 @(IsOffline
                     ? "You're offline. This page will fill in as soon as you're back."
-                    : "The request failed. Retrying automatically — the route may also have been deleted.")
+                    : "The request failed. Retrying automatically — the commute may also have been deleted.")
             </div>
             <RadzenButton Text="Retry now" ButtonStyle="ButtonStyle.Light" Icon="refresh"
                           Click="@RefreshAsync" />
@@ -98,69 +88,79 @@ else
     else
     {
 
-    @* ── THE ANSWER ────────────────────────────────────────────────────
-       Where the trip runs and how long it has taken today. The "leave by"
-       countdown and the confidence sentence moved out: the dashboard runs
-       the next-departure countdown in its hero, and the chart below shows
-       every sample without summarising trust into a one-line caveat. *@
-    @* Two columns past 1200px: everything ABOUT this route on the left — the answer
-       and every control that acts on it — and every piece of EVIDENCE on the right.
-       Below 1200px the grid collapses to the single column it always was. *@
+    @* Two columns past 1200px: the answer and every control that acts on it on the
+       left, every piece of EVIDENCE on the right. Below 1200px, one column. *@
     <div class="pt-route-two">
 
     <aside class="pt-route-side">
 
+    @* ── THE ANSWER ────────────────────────────────────────────────────
+       Leads with "Leave by" whenever there is a plan, because that is the question the
+       app exists to answer; the day's range of durations is the supporting line. The
+       arrive-by input lives here, beside the answer it produces — in the settings card
+       below it was a field users had to find before the page would say anything useful. *@
     <section class="pt-answer" aria-label="Route summary">
-        <div class="pt-answer-route">
-            <span class="pt-answer-from">@_originStreet</span>
-            <PtIcon Name="arrow_right_alt" Size="sm" Class="pt-answer-arrow" />
-            <span class="pt-answer-to">@_destStreet</span>
-        </div>
-
-        @if (_todayPolls.Count == 0)
+        @* The title already reads "Origin → Destination" unless the route is named. *@
+        @if (_route.Name is not null)
         {
-            <div class="pt-answer-headline pt-answer-pending">Still learning this route</div>
+            <div class="pt-answer-route">
+                <span class="pt-answer-from">@_originStreet</span>
+                <PtIcon Name="arrow_right_alt" Size="sm" Class="pt-answer-arrow" />
+                <span class="pt-answer-to">@_destStreet</span>
+            </div>
+        }
+
+        @if (_plan is { LeaveBy: { } leaveBy } plan)
+        {
+            <div class="pt-answer-headline">Leave by @LocalTimeFormatter.FormatWallClock(leaveBy)</div>
+            <div class="pt-answer-meta">
+                On time on @plan.OnTimePercent% of @plan.SampleCount recorded trips —
+                usually @(plan.TypicalSeconds / 60) min, up to @(plan.WorstCaseSeconds / 60) min.
+                @if (!plan.DayOfWeekSpecific)
+                {
+                    <span>Based on every day until today's history fills in.</span>
+                }
+            </div>
+        }
+        else if (_todayPolls.Count == 0)
+        {
+            <div class="pt-answer-headline pt-answer-pending">Still learning this commute</div>
             <div class="pt-answer-duration">@_pendingDetail</div>
         }
         else
         {
             <div class="pt-answer-headline">@_durationLabel</div>
+        }
+
+        @if (_plan is { LeaveBy: null })
+        {
             <div class="pt-answer-meta">
-                @_confidenceNote
-                <a class="pt-answer-ics" href="@_icsHref" download="departure.ics">Add to calendar</a>
+                Not enough trips in the three hours before @LocalTimeFormatter.FormatWallClock(_plan.ArriveBy)
+                to plan a departure yet — the monitoring window needs to cover when you'd leave.
             </div>
         }
 
-        @* The departure plan: what the page exists to answer once the user has said when
-           they need to arrive. A native time input — no picker component needed. *@
-        <div class="pt-answer-plan">
-            @if (_plan is { LeaveBy: { } leaveBy } plan)
+        @if (_todayPolls.Count > 0)
+        {
+            <div class="pt-answer-meta">
+                @if (_plan is { LeaveBy: not null })
+                {
+                    <span>@_durationLabel ·</span>
+                }
+                @_confidenceNote
+                <a class="pt-answer-ics pt-tap" href="@_icsHref" download="departure.ics">Add to calendar</a>
+            </div>
+        }
+
+        <label class="pt-answer-arrive">
+            <span class="pt-setting-label">Arrive by</span>
+            <input type="time" class="pt-setting-input" value="@_route.ArriveBy" @onchange="OnArriveByChangedAsync"
+                   aria-label="Time you need to arrive" />
+            @if (_plan is null)
             {
-                <div class="pt-answer-plan-headline">
-                    Leave by @LocalTimeFormatter.FormatWallClock(leaveBy)
-                </div>
-                <div class="pt-answer-meta">
-                    On time on @plan.OnTimePercent% of @plan.SampleCount recorded trips —
-                    usually @(plan.TypicalSeconds / 60) min, up to @(plan.WorstCaseSeconds / 60) min.
-                    @if (!plan.DayOfWeekSpecific)
-                    {
-                        <span>Based on every day until today's history fills in.</span>
-                    }
-                </div>
+                <span class="pt-answer-arrive-hint">to get a leave-by time</span>
             }
-            else if (_plan is not null)
-            {
-                <div class="pt-answer-meta">
-                    Not enough trips in the three hours before @LocalTimeFormatter.FormatWallClock(_plan.ArriveBy)
-                    to plan a departure yet — the monitoring window needs to cover when you'd leave.
-                </div>
-            }
-            <label class="pt-answer-arrive">
-                <span>Arrive by</span>
-                <input type="time" value="@_route.ArriveBy" @onchange="OnArriveByChangedAsync"
-                       aria-label="Time you need to arrive" />
-            </label>
-        </div>
+        </label>
 
         @if (LatestPoll?.HolidayName is { } holiday)
         {
@@ -168,59 +168,29 @@ else
                 Today is @holiday — its trips are shown here but don't count toward your usual times.
             </div>
         }
-
-        @{ NextSampleInfo next = NextSample; }
-        <div class="pt-answer-live">
-            <span class="pt-status-dot @(next.Live ? "pt-status-dot-green" : "pt-status-dot-amber")"></span>
-            @if (next.CountdownTargetUtc is { } target)
-            {
-                @* LiveCountdown's own text already starts "in …", so this label must
-                   not repeat the word — it rendered "Next sample in in 4:32". *@
-                <text>Next sample&nbsp;</text>
-                <LiveCountdown TargetUtc="target"
-                               PeriodHint="@TimeSpan.FromMinutes(_activeSession?.Schedule?.PollIntervalMinutes ?? 5)"
-                               DueText="moments" />
-            }
-            else if (_activeSession is null)
-            {
-                @next.Detail
-            }
-            else
-            {
-                @next.Detail
-            }
-        </div>
     </section>
 
-    @* ── THE CONTROLS ──────────────────────────────────────────────────
-       Return trip and the monitoring schedule. These used to sit under a
-       "Settings & raw data" disclosure below three full-width cards, which put
-       the only controls on the page two scrolls from the answer they act on. *@
-    <label class="pt-route-name">
-        <span>Name</span>
-        <input type="text" maxlength="60" placeholder="e.g. Home → Work"
-               value="@_route.Name" @onchange="OnNameChangedAsync" />
-    </label>
+    @* ── THE CONTROLS ────────────────────────────────────────────────────
+       Schedule and return trip. Not for the sample: it is never probed, so a schedule
+       form on it offers something that would do nothing, and a reversed copy of
+       generated data would be a second fake route. *@
+    @if (!_route.IsSample)
+    {
+        <RadzenCard class="pt-route-settings">
+            <WindowConfigPanel RouteId="RouteId" Window="_activeWindow" Session="_activeSession" OnSaved="OnWindowSaved" />
 
-    <div class="pt-returntrip-bar">
-        @* Both states go through the same call: the endpoint creates the reversed route and
-           links it, or hands back the one already linked. Navigating straight to a stored
-           ReturnRouteId could open a route that had since been deleted. *@
-        @if (_route.ReturnRouteId is not null)
-        {
-            <span class="pt-returntrip-label">Return trip linked</span>
-            <RadzenButton Text="View return trip" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small"
-                          Click="CreateReturnTripAsync" IsBusy="_creatingReturn" />
-        }
-        else
-        {
-            <span class="pt-returntrip-label">Also track the trip home?</span>
-            <RadzenButton Text="Track return trip" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small"
-                          Click="CreateReturnTripAsync" IsBusy="_creatingReturn" />
-        }
-    </div>
-
-    <WindowConfigPanel RouteId="RouteId" OnSaved="OnWindowSaved" />
+            @* Both states go through the same call: the endpoint creates the reversed route and
+               links it, or hands back the one already linked. Navigating straight to a stored
+               ReturnRouteId could open a route that had since been deleted. *@
+            <div class="pt-setting-row">
+                <span class="pt-setting-label">Return trip</span>
+                <span class="pt-setting-value">@(_route.ReturnRouteId is not null ? "Linked" : "Not tracked")</span>
+                <RadzenButton Text="@(_route.ReturnRouteId is not null ? "View" : "Track return trip")"
+                              ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small"
+                              Click="CreateReturnTripAsync" IsBusy="_creatingReturn" />
+            </div>
+        </RadzenCard>
+    }
 
     </aside>
 
@@ -306,12 +276,11 @@ else
         _trendPoints = [];
         _trendLabels = [];
         _selectedPoll = null;
-        _optimalDeparture = null;
         _plan = null;
         _activeSession = null;
+        _activeWindow = null;
         LatestPoll = null;
-        _announcedLevel = null;
-        _pageTitle = "Route";
+        _pageTitle = "Commute";
         _originStreet = string.Empty;
         _destStreet = string.Empty;
     }
@@ -324,19 +293,14 @@ else
     private double[] _trendPoints = [];
     private string[] _trendLabels = [];
     private PollRecordDto? _selectedPoll;
-    private OptimalDepartureDto? _optimalDeparture;
     private DeparturePlanDto? _plan;
     private VolatilityHeatmapDto? _heatmap;
     private RoutePathDto? _path;
 
-    /// <summary>
-    /// The verdict the last render reacted to. The page refreshes every few seconds;
-    /// without this the app would sing the same result over and over.
-    /// </summary>
-    private string? _announcedLevel;
-
     private RouteDto? _route;
+    private bool _notFound;
     private SessionDto? _activeSession;
+    private MonitoringWindowDto? _activeWindow;
     private bool _creatingReturn;
     private string _icsHref = string.Empty;
 
@@ -347,14 +311,13 @@ else
     private string _durationLabel = string.Empty;
     private string _confidenceNote = string.Empty;
     private string _pendingDetail = string.Empty;
-    private string _thisLabel = "This route";
     /// <summary>
     /// Heading for the page. Two fallbacks: "Route" until the route lands so the
     /// header has something to render during the first paint, and "Route not
     /// found" once we've tried and the server said no — the bare "Route" was
     /// misleading on its own when the rest of the page is an empty state.
     /// </summary>
-    private string _pageTitle = "Route";
+    private string _pageTitle = "Commute";
 
     /// <summary>
     /// The heatmap aggregates the route's entire history, so a single new sample can
@@ -377,60 +340,8 @@ else
     // per render, and re-sorting up to 300 records each time is pure waste.
     private PollRecordDto? LatestPoll { get; set; }
 
-    /// <param name="Detail">Supporting line under the headline.</param>
-    /// <param name="Live">Whether the window is currently sampling.</param>
-    /// <param name="CountdownTargetUtc">
-    /// When set, the line is rendered as a self-ticking countdown to this instant.
-    /// </param>
-    private readonly record struct NextSampleInfo(
-        string Detail,
-        bool Live,
-        DateTimeOffset? CountdownTargetUtc = null);
-
-    // When the next traffic sample is expected. Every schedule decision — is the window
-    // open, when does it reopen, what cadence is in force — comes from the server on
-    // SessionDto.Schedule. The client only formats it.
-    private NextSampleInfo NextSample
-    {
-        get
-        {
-            if (_activeSession is not { State: SessionState.Active } session)
-                return new NextSampleInfo("Waiting for the next scheduled window", Live: false);
-
-            if (session.Schedule is not { } schedule)
-                return new NextSampleInfo("No polling days scheduled", Live: false);
-
-            // Distinguish "session active but window not open now" from "waiting for the
-            // next poll tick". On a Mon–Fri schedule viewed Saturday the next poll is days
-            // away, not "within 5 min".
-            if (!schedule.WindowIsOpenNow)
-            {
-                if (schedule.NextWindowOpenUtc is not { } nextOpen)
-                    return new NextSampleInfo("No polling days scheduled", Live: false);
-
-                DateTime openLocal = nextOpen.ToLocalTime().DateTime;
-                string when = openLocal.Date == DateTime.Now.Date ? "today" : openLocal.ToString("ddd");
-                return new NextSampleInfo($"Next sample {when} at {openLocal:HH:mm}", Live: false);
-            }
-
-            if (schedule.NextPollExpectedUtc is not { } nextPoll)
-            {
-                return new NextSampleInfo(
-                    $"First sample expected within {schedule.PollIntervalMinutes} min", Live: true);
-            }
-
-            // Hand the instant to LiveCountdown rather than formatting a remaining-minutes
-            // string here: this getter only runs on the page's refresh, so a string computed
-            // now would sit frozen for the next fifteen seconds.
-            return new NextSampleInfo(string.Empty, Live: true, CountdownTargetUtc: nextPoll);
-        }
-    }
-
     // Observer pattern — PollingComponentBase handles the timer loop
     protected override TimeSpan PollingInterval => TimeSpan.FromSeconds(15);
-
-    private static string RouteLabel(RouteDto route) =>
-        $"{route.OriginAddress.Split(',')[0].Trim()} → {route.DestinationAddress.Split(',')[0].Trim()}";
 
     private async Task OnWindowSaved()
     {
@@ -482,16 +393,15 @@ else
             Http.GetFromJsonAsync($"/api/routes/{RouteId}/sessions", AppJsonContext.Default.ListSessionDto);
         Task<PagedResult<PollRecordDto>?> historyTask =
             Http.GetFromJsonAsync($"/api/routes/{RouteId}/poll-history?page=1&pageSize=300&sinceUtc={sinceUtc}", AppJsonContext.Default.PagedResultPollRecordDto);
-        Task<OptimalDepartureDto?> optimalTask = GetOptionalAsync(
-            $"/api/routes/{RouteId}/optimal-departure?dayOfWeek={dayOfWeek}", AppJsonContext.Default.OptimalDepartureDto);
         Task<DeparturePlanDto?> planTask = GetOptionalAsync(
             $"/api/routes/{RouteId}/departure-plan?dayOfWeek={dayOfWeek}", AppJsonContext.Default.DeparturePlanDto);
 
         // The road shape is fetched from the provider once per route and stored, so this
         // rides the normal refresh cadence: after the first call the server is only
         // re-deciding the colour, which is exactly what should follow a new sample.
+        // 404 when the route's coordinates can't be parsed — RouteMap has an empty state for that.
         Task<RoutePathDto?> pathTask =
-            Http.GetFromJsonAsync($"/api/routes/{RouteId}/path", AppJsonContext.Default.RoutePathDto);
+            GetOptionalAsync($"/api/routes/{RouteId}/path", AppJsonContext.Default.RoutePathDto);
 
         // The weekly grid rides along with the fan-out, but only when the copy in hand
         // has aged out — see HeatmapMaxAge.
@@ -507,10 +417,9 @@ else
             ? Http.GetFromJsonAsync($"/api/routes/{RouteId}/weather-impact", AppJsonContext.Default.WeatherImpactResponse)
             : Task.FromResult(_weatherImpact);
 
-        await Task.WhenAll(routeTask, sessionsTask, historyTask, optimalTask, planTask, heatmapTask, pathTask, weatherTask);
+        await Task.WhenAll(routeTask, sessionsTask, historyTask, planTask, heatmapTask, pathTask, weatherTask);
 
         _path = await pathTask;
-        await AnnounceVerdictAsync();
 
         _route = await routeTask;
         if (_route is not null)
@@ -520,16 +429,16 @@ else
             // street, regardless of how the address was first entered.
             _originStreet = TextFormatting.ToTitleCase(_route.OriginAddress.Split(',')[0]);
             _destStreet = TextFormatting.ToTitleCase(_route.DestinationAddress.Split(',')[0]);
-            _thisLabel = _originStreet;
             _pageTitle = _route.Name ?? $"{_originStreet} → {_destStreet}";
+            _activeWindow = _route.Windows.FirstOrDefault(w => w.IsActive);
         }
         else
         {
             // The route genuinely doesn't exist (or isn't ours). "Route" on its
             // own reads as a real heading next to the empty state, not as a
             // loading placeholder, so swap to something that pairs with the
-            // "Couldn't load this route" copy below.
-            _pageTitle = "Route not found";
+            // "Couldn't load this commute" copy below.
+            _pageTitle = "Commute not found";
         }
 
         // Today's active monitoring session — carries the server-computed poll schedule.
@@ -553,7 +462,6 @@ else
                 _selectedPoll = null;
         }
 
-        _optimalDeparture = await optimalTask;
         _plan = await planTask;
         BuildAnswer();
 
@@ -566,6 +474,33 @@ else
             _weatherFetchedAt = DateTimeOffset.UtcNow;
     }
 
+    private async Task OnNameChangedAsync(string? name)
+    {
+        try
+        {
+            HttpResponseMessage resp = await Http.PutAsJsonAsync($"/api/routes/{RouteId}/name",
+                new SetRouteNameRequest(name), AppJsonContext.Default.SetRouteNameRequest);
+            if (resp.IsSuccessStatusCode)
+                await RefreshAsync();
+        }
+        catch (HttpRequestException) { /* offline — the header keeps the saved name */ }
+    }
+
+    /// <summary>Saves the arrive-by target (empty clears it) and reloads the plan.</summary>
+    private async Task OnArriveByChangedAsync(ChangeEventArgs e)
+    {
+        // Browsers hand back "HH:mm", or "HH:mm:ss" when a step below a minute is set.
+        string? value = e.Value is string { Length: >= 5 } s ? s[..5] : null;
+        try
+        {
+            HttpResponseMessage resp = await Http.PutAsJsonAsync($"/api/routes/{RouteId}/arrive-by",
+                new SetArriveByRequest(value), AppJsonContext.Default.SetArriveByRequest);
+            if (resp.IsSuccessStatusCode)
+                await RefreshAsync();
+        }
+        catch (HttpRequestException) { /* offline — the next refresh restores the saved value */ }
+    }
+
     /// <summary>
     /// Reads the departure recommendation, treating "there isn't one yet" as a value
     /// rather than an error.
@@ -575,7 +510,7 @@ else
     /// GetFromJsonAsync counts 204 as success and then throws parsing the empty body,
     /// and because this page deliberately lets load failures propagate (so a genuinely
     /// down endpoint produces backoff and the stale banner), that exception took the
-    /// whole page down: a brand-new route showed "Couldn't load this route — the route
+    /// whole page down: a brand-new route showed "Couldn't load this commute — the route
     /// may also have been deleted" from the moment it was created. The page already
     /// has the right words for this state a few lines below ("Still learning this
     /// route"); it simply never got to render them.
@@ -583,53 +518,12 @@ else
     /// The dashboard calls the same endpoint inside a try/catch, which is why the
     /// cards were unaffected and the bug only appeared one tap deeper.
     /// </summary>
-    /// <summary>
-    /// Reacts to a NEW verdict: sets the app-wide mood (which retunes the background
-    /// wash, the map's flow speed and the ambient drone), sings the result, and throws
-    /// confetti when the commute came back better than usual.
-    ///
-    /// <para>Guarded on a change of verdict, not on every load. This page refreshes on
-    /// a timer, and an app that plays a chime every fifteen seconds gets muted within
-    /// the minute.</para>
-    /// </summary>
-    private async Task AnnounceVerdictAsync()
-    {
-        if (_path is null)
-            return;
-
-        // Track the verdict so a change is still detectable by anything that wants it.
-        // The chime, the confetti and the WebGL mood wash that used to fire here are gone
-        // with the ambience layer: ~40KB of JS and a synthesised cue set, on a page whose
-        // job is to tell you when to leave.
-        _announcedLevel = _path.TrafficLevel;
-        return;
-    }
-
-    private async Task OnNameChangedAsync(ChangeEventArgs e)
-    {
-        HttpResponseMessage resp = await Http.PutAsJsonAsync($"/api/routes/{RouteId}/name",
-            new SetRouteNameRequest(e.Value as string), AppJsonContext.Default.SetRouteNameRequest);
-        if (resp.IsSuccessStatusCode)
-            await RefreshAsync();
-    }
-
-    /// <summary>Saves the arrive-by target (empty clears it) and reloads the plan.</summary>
-    private async Task OnArriveByChangedAsync(ChangeEventArgs e)
-    {
-        // Browsers hand back "HH:mm", or "HH:mm:ss" when a step below a minute is set.
-        string? value = e.Value is string { Length: >= 5 } s ? s[..5] : null;
-        HttpResponseMessage resp = await Http.PutAsJsonAsync($"/api/routes/{RouteId}/arrive-by",
-            new SetArriveByRequest(value), AppJsonContext.Default.SetArriveByRequest);
-        if (resp.IsSuccessStatusCode)
-            await RefreshAsync();
-    }
-
     private async Task<T?> GetOptionalAsync<T>(string url, System.Text.Json.Serialization.Metadata.JsonTypeInfo<T> typeInfo)
         where T : class
     {
         HttpResponseMessage response = await Http.GetAsync(url);
 
-        if (response.StatusCode == System.Net.HttpStatusCode.NoContent)
+        if (response.StatusCode is System.Net.HttpStatusCode.NoContent or System.Net.HttpStatusCode.NotFound)
             return null;
 
         // Anything else that isn't success SHOULD still propagate — that is the
@@ -653,9 +547,10 @@ else
     private async Task<RouteDto?> LoadRouteAsync()
     {
         HttpResponseMessage response = await Http.GetAsync($"/api/routes/{RouteId}");
-        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        _notFound = response.StatusCode == System.Net.HttpStatusCode.NotFound;
+        if (_notFound)
         {
-            _pageTitle = "Route not found";
+            _pageTitle = "Commute not found";
             return null;
         }
         response.EnsureSuccessStatusCode();
@@ -663,12 +558,8 @@ else
     }
 
     /// <summary>
-    /// Formats the answer card. The answer card holds two facts: where the trip
-    /// runs (origin → destination) and how long it has taken today — the fastest
-    /// and slowest of the live samples we already have on file. The "leave by"
-    /// countdown and the confidence sentence moved out: the dashboard already
-    /// runs the next-departure countdown in its hero, and the chart below shows
-    /// every sample without summarising trust into a one-line caveat.
+    /// Formats the answer card's duration line: the fastest and slowest of today's
+    /// samples. It is the headline only until an arrive-by target yields a plan.
     /// </summary>
     private void BuildAnswer()
     {

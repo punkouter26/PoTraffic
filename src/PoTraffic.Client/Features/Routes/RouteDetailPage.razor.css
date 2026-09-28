@@ -27,8 +27,9 @@
    as one column on exactly the screens this layout exists for. .content is the
    app's root query container, and it is the width that actually decides whether
    two columns fit. 62rem is where 21rem + a readable evidence column stop
-   fighting each other. */
-@container pt-content (min-width: 62rem) {
+   fighting each other — lowered from 62rem so a 1024px laptop (a 61rem column)
+   gets the two columns instead of a single three-screen stack. */
+@container pt-content (min-width: 56rem) {
     .pt-route-two {
         /* 21rem holds the answer headline on one line and keeps
            WindowConfigPanel's two time pickers side by side. */
@@ -168,124 +169,32 @@
     font-weight: var(--pt-weight-semibold);
     text-decoration: none;
     white-space: nowrap;
+    /* 17px of caption text is below the 24px minimum target; the padding makes up the rest. */
+    display: inline-block;
+    padding-block: var(--pt-space-1);
 }
 
-.pt-answer-ics:hover { text-decoration: underline; }
-
-.pt-answer-live {
+/* The arrive-by input, under the answer it drives. */
+.pt-answer-arrive {
     display: flex;
     align-items: center;
-    gap: var(--pt-space-2);
-    margin-top: var(--pt-space-2);
-    padding-top: var(--pt-space-2);
+    flex-wrap: wrap;
+    gap: var(--pt-space-2) var(--pt-space-3);
+    margin-top: var(--pt-space-3);
+    padding-top: var(--pt-space-3);
     border-top: 1px solid var(--pt-border-subtle);
-    font-size: var(--pt-text-xs);
-    color: var(--pt-fg-tertiary);
-    font-variant-numeric: tabular-nums;
 }
 
-/* When the route is paused, the "Not monitoring — start it in Settings below"
-   line becomes a button. Visual language matches a ghost link: same font-size
-   and colour as the surrounding line so the page doesn't suddenly spring a
-   brand-coloured control into the answer block, but the chevron gives the
-   affordance away. */
-
-.pt-callout-action {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--pt-space-1);
-    background: transparent;
-    border: 0;
-    padding: 0;
-    font: inherit;
-    color: var(--pt-color-brand-600);
-    cursor: pointer;
-    text-decoration: underline;
-    text-underline-offset: 0.2em;
-    text-decoration-thickness: 1px;
-    transition: color var(--pt-dur-fast) var(--pt-ease);
-}
-
-.pt-callout-action:hover,
-.pt-callout-action:focus-visible {
-    color: var(--pt-color-brand-700);
-    outline: none;
-}
-
-.pt-callout-action-icon {
-    font-size: 0.9em;
-}
-
-/* ── Evidence ───────────────────────────────────────────────────────────── */
-.pt-evidence-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--pt-space-3);
-    margin-bottom: var(--pt-space-3);
-    flex-wrap: wrap;
-}
-
-/* Comparison, folded in from what used to be its own page with its own pickers.
-   One picker, on the chart it modifies. This styled a bare <select> before; the
-   control is a RadzenDropDown now, so the surface, border and focus ring come
-   from the Radzen theme (which pt-tokens.css already maps to the brand) and all
-   that is left to say is how wide it may get. */
-.pt-compare-select {
-    max-width: 16rem;
-    min-width: 11rem;
-}
-
-.pt-compare-legend {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--pt-space-3);
-    margin-bottom: var(--pt-space-2);
-    font-size: var(--pt-text-xs);
-    color: var(--pt-fg-secondary);
-}
-
-.pt-compare-legend-item {
-    display: flex;
-    align-items: center;
-    gap: var(--pt-space-2);
+.pt-answer-arrive .pt-setting-label {
     min-width: 0;
 }
 
-/* Keys mirror pt-chart.js: series A is brand, series B is warning-amber.
-   Changing one without the other decouples the legend from the lines. */
-.pt-compare-key {
-    border-radius: var(--pt-radius-full);
-    display: inline-block;
-    height: 3px;
-    width: 1.5rem;
-    flex-shrink: 0;
+.pt-answer-arrive-hint {
+    font-size: var(--pt-text-xs);
+    color: var(--pt-fg-tertiary);
 }
 
-.pt-compare-key-a { background: var(--pt-color-brand-500); }
-.pt-compare-key-b { background: var(--pt-color-warning); }
-
-.pt-compare-verdict-inline {
-    color: var(--pt-fg-primary);
-    font-weight: var(--pt-weight-semibold);
-}
-
-/* ── Return-trip control (left column, under the answer) ───────────────── */
-.pt-returntrip-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--pt-space-3);
-    padding: var(--pt-space-2) var(--pt-space-4);
-    border-radius: var(--pt-radius-md);
-    background: var(--pt-bg-tint);
-}
-
-.pt-returntrip-label {
-    font-size: var(--pt-text-sm);
-    color: var(--pt-fg-secondary);
-}
+.pt-answer-ics:hover { text-decoration: underline; }
 
 /* ── Sample clicked on the trend chart ──────────────────────────────────── */
 .pt-trend-selection {
@@ -351,42 +260,4 @@
     font-weight: var(--pt-weight-bold);
     color: var(--pt-fg-primary);
     font-variant-numeric: tabular-nums;
-}
-
-.pt-answer-arrive {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--pt-space-2);
-    margin-top: var(--pt-space-2);
-    font-size: var(--pt-text-sm);
-    color: var(--pt-fg-secondary);
-}
-
-.pt-answer-arrive input {
-    font: inherit;
-    color: var(--pt-fg-primary);
-    background: var(--pt-bg-surface, transparent);
-    border: 1px solid var(--pt-border-subtle);
-    border-radius: var(--pt-radius-sm, 6px);
-    padding: var(--pt-space-1) var(--pt-space-2);
-}
-
-.pt-route-name {
-    display: flex;
-    align-items: center;
-    gap: var(--pt-space-2);
-    margin: var(--pt-space-3) 0;
-    font-size: var(--pt-text-sm);
-    color: var(--pt-fg-secondary);
-}
-
-.pt-route-name input {
-    flex: 1;
-    min-width: 0;
-    font: inherit;
-    color: var(--pt-fg-primary);
-    background: var(--pt-bg-surface, transparent);
-    border: 1px solid var(--pt-border-subtle);
-    border-radius: var(--pt-radius-sm, 6px);
-    padding: var(--pt-space-1) var(--pt-space-2);
 }

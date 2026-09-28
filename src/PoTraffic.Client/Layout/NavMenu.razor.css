@@ -92,18 +92,6 @@
     min-width: 0;
 }
 
-/* On mobile the bottom-nav already covers Commutes / Add / Account —
-   rendering the same destinations again in the top bar crowds the header
-   into two collapsible icons and one avatar pill with no useful order.
-   Hide the centre row entirely below 640px; the right-hand user chip
-   remains because Sign out has no other home on phone.
-   Account settings is reached from the bottom-nav action sheet. */
-@media (max-width: 640px) {
-    .app-shell-actions {
-        display: none;
-    }
-}
-
 .app-shell-user {
     display: flex;
     align-items: center;
@@ -147,7 +135,8 @@
     line-height: 1;
     transition: background var(--pt-dur-fast) var(--pt-ease),
                 border-color var(--pt-dur-fast) var(--pt-ease);
-    max-width: 16rem;
+    /* Wide enough for "GUEST12345678 LOGGED IN" (Rule 6) — 16rem cut it to "LOGGE…". */
+    max-width: 22rem;
 }
 
 .pt-user-chip-btn:hover {
@@ -177,7 +166,7 @@
 }
 
 .pt-user-caret {
-    font-size: 0.7rem;
+    font-size: var(--pt-text-xs);
     opacity: 0.6;
 }
 
@@ -243,12 +232,6 @@
 /* The dropdown items' icon colours are in app.css — see the note there. A rule
    ending on .pt-icon cannot be scoped. */
 
-/* The admin destinations only appear in this menu at the width where the centre
-   nav is gone. Above it they would be a second copy of links already in the bar. */
-@media (min-width: 641px) {
-    .pt-dropdown-mobile-only { display: none; }
-}
-
 .pt-dropdown-item:hover {
     /* Was --pt-color-neutral-100: a raw palette step, so the hover stayed pale
        grey on the dark dropdown surface. The tint washes with the theme. */
@@ -269,23 +252,22 @@
     margin: var(--pt-space-1) 0;
 }
 
-/* ── Mock-data banner (top notice, full width) ── */
+/* ── Mock-data chip (centre of the bar) ── */
 
 .pt-mock-banner {
+    display: inline-flex;
     align-items: center;
-    background: linear-gradient(90deg,
-        var(--pt-color-warning) 0%,
-        color-mix(in oklab, var(--pt-color-warning) 70%, var(--pt-color-neutral-900)) 100%);
-    /* Near-black on amber rather than the #422006 literal — the same reading at
-       any warning hue, and it clears AA against both ends of the gradient. */
+    gap: var(--pt-space-1);
+    background: var(--pt-color-warning);
+    /* Near-black on amber — clears AA at any warning hue. */
     color: color-mix(in oklab, var(--pt-color-warning) 12%, #000);
-    display: flex;
-    gap: var(--pt-space-2);
-    justify-content: center;
-    padding: var(--pt-space-2) var(--pt-space-4);
+    padding: var(--pt-space-1) var(--pt-space-3);
+    border-radius: var(--pt-radius-full);
     font-weight: var(--pt-weight-bold);
     font-size: var(--pt-text-xs);
-    letter-spacing: 0.06em;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
 }
 
 /* ── Mobile portrait (≤640px): keep grid but compress padding ── */
@@ -301,11 +283,10 @@
         font-size: var(--pt-text-base);
     }
 
-    /* The centre links have nowhere to go on a phone: the brand and the user chip
-       already claim the bar, and the links were overlapping the wordmark. The
-       bottom nav carries these destinations at this width. */
+    /* The centre slot holds only the mock chip (signed in) or a lone Sign In link;
+       left-aligned beside the wordmark so neither crowds the bell. */
     .app-shell-actions {
-        display: none;
+        justify-content: flex-start;
     }
 
     /* NAV CONSOLIDATION. The chip's dropdown offered Account settings, System

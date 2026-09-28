@@ -13,7 +13,7 @@
 
 @using PoTraffic.Shared.Constants
 
-<PageTitle>Dashboard — PoTraffic</PageTitle>
+<PageTitle>Commutes — PoTraffic</PageTitle>
 
 @* The page now leads with a heading like every other route. It carries the
    Add Route action, which used to hang off the right of the status bar — a
@@ -22,30 +22,14 @@
 <PageHeader Title="Your commutes"
             Subtitle="@_subtitle">
     <Actions>
-        <RadzenButton Text="Add commute" Icon="add" ButtonStyle="ButtonStyle.Primary"
+        <RadzenButton Text="Add commute" Icon="add" ButtonStyle="ButtonStyle.Primary" class="pt-hide-phone"
                       Click="@(() => Nav.NavigateTo("/routes/create"))" />
     </Actions>
 </PageHeader>
 
-@* The bar used to report five things: active-route count, connectivity, a quota
-   ring, today's provider spend and the reset time. Four of those are operator
-   telemetry — they say nothing about when to leave — and they now live in
-   Settings, where someone looking for them will look. What remains is the one
-   fact that changes how much to trust the numbers below: whether they're live.
-
-   It renders only when the news is bad. A permanent green "Live" chip on a
-   healthy app is a row of pixels that never changes and therefore never gets
-   read; the heading's subtitle carries that state instead. *@
-@if (IsOffline || IsStale)
-{
-    <div class="pt-status-bar" role="status">
-        <span class="pt-status-item pt-status-offline">
-            <PtIcon Name="@(IsOffline ? "wifi_off" : "cloud_off")" Size="sm" />
-            @(IsOffline ? "Offline — showing the last data received"
-                        : "Can't reach the server — retrying")
-        </span>
-    </div>
-}
+@* Connectivity is the one status fact that changes how far to trust the cards, and it
+   shows only when the news is bad; quota and spend live in Settings. *@
+<StaleBanner IsOffline="IsOffline" IsStale="IsStale" />
 
 @if (_quotaConsumed >= QuotaConstants.DefaultDailyQuota - 2)
 {
@@ -59,7 +43,7 @@
     @* TASK #9: Skeleton placeholders avoid layout flash while routes load.
        Shown only when there is genuinely nothing to draw — a cached snapshot
        or a background refresh must never blank a populated dashboard. *@
-    <div class="pt-skeleton-stack" aria-busy="true" aria-label="Loading routes">
+    <div class="pt-skeleton-stack" aria-busy="true" aria-label="Loading commutes">
         @for (int i = 0; i < 3; i++)
         {
             <div class="pt-skeleton-card">
@@ -76,7 +60,7 @@ else if (VisibleRoutes.Count == 0 && !_hydrated)
        Showing "No routes yet" here would tell a user their routes had vanished. *@
     <div class="pt-empty-state">
         <PtIcon Name="cloud_off" Size="xl" Class="pt-empty-state-icon" />
-        <div class="pt-empty-state-title">Couldn't load your routes</div>
+        <div class="pt-empty-state-title">Couldn't load your commutes</div>
         <div class="pt-empty-state-text">
             @(IsOffline ? "You're offline. We'll refresh as soon as you're back."
                         : "The server didn't respond. Retrying automatically.")
@@ -89,7 +73,7 @@ else if (VisibleRoutes.Count == 0)
 {
     <div class="pt-empty-state">
         <PtIcon Name="route" Size="xl" Class="pt-empty-state-icon" />
-        <div class="pt-empty-state-title">No routes yet</div>
+        <div class="pt-empty-state-title">No commutes yet</div>
         <div class="pt-empty-state-text">
             @* The previous copy said "Tap the + button below" — fine on a phone,
                where the bottom-nav's FAB is in view, but on desktop the bottom
@@ -157,9 +141,6 @@ else
     private Dictionary<RouteId, DeparturePlanDto> _plans = [];
     private Dictionary<RouteId, List<PollRecordDto>> _recentPolls = [];
     private int _quotaConsumed;
-    private int _pollsToday;
-    private decimal _estimatedCostToday;
-    private decimal _projectedMonthlyCost;
     private bool _hydrated;
     private bool _creatingSample;
     private string? _sampleError;
@@ -273,9 +254,6 @@ else
         if (quota is not null)
         {
             _quotaConsumed = quota.UsedToday;
-            _pollsToday = quota.PollsToday;
-            _estimatedCostToday = quota.EstimatedCostTodayUsd;
-            _projectedMonthlyCost = quota.ProjectedMonthlyCostUsd;
         }
 
         // UI-2/UI-12: Load optimal departure + 24h trend for each route. Every route's
@@ -298,7 +276,10 @@ else
                 // routes the noise was real: every 60 s the WASM client logged
                 // requestFailed / pageError and forwarded a row to
                 // /api/diag/client-error.
-                bool isMonitored = route.Windows.Any(w => w.IsActive);
+                // The sample route is Paused by design yet carries a full generated
+                // history — skipping it left its card saying "No samples yet" while its
+                // own page showed a week of data.
+                bool isMonitored = route.IsSample || route.Windows.Any(w => w.IsActive);
 
                 Task<OptimalDepartureDto?>? optimalTask = isMonitored
                     ? Http.GetFromJsonAsync(
@@ -376,9 +357,6 @@ else
         if (snapshot.Quota is { } quota)
         {
             _quotaConsumed = quota.UsedToday;
-            _pollsToday = quota.PollsToday;
-            _estimatedCostToday = quota.EstimatedCostTodayUsd;
-            _projectedMonthlyCost = quota.ProjectedMonthlyCostUsd;
         }
 
         _hydrated = true;

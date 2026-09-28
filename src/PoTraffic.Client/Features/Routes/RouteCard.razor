@@ -25,9 +25,10 @@
 @* The swipe wrapper that used to sit around this card is folded in: it was a second
    component whose whole job was to attach gestures and forward them to the two public
    methods below. One card, one set of actions, one place they are triggered from. *@
+@* No "Check Now" / "Delete" panels behind the card: pt-gestures.js fires on touch end
+   without dragging the card, so nothing ever revealed them — unstyled, they printed as
+   two loose lines above every card and inflated its height. *@
 <div class="pt-swipe-wrap @(_pendingDelete ? "pending-delete" : "")" @ref="_cardElement">
-    <div class="pt-swipe-action pt-swipe-action-left" aria-hidden="true"><span>Check Now</span></div>
-    <div class="pt-swipe-action pt-swipe-action-right" aria-hidden="true"><span>Delete</span></div>
 
 <div class="pt-route-card @AmbientClass" role="button" tabindex="0"
      aria-label="@AriaLabel"
@@ -71,26 +72,30 @@
         {
             <TrendSparkline Polls="RecentPolls" />
         }
+
+        @* The swipe gestures' equivalents for a pointer or a Tab key — swipes "simply don't
+           fire on desktop". On the card's own row rather than a row of their own, and
+           hidden until hover or focus where there is a cursor. stopPropagation keeps them
+           from also opening the card. *@
+        <div class="pt-route-card-actions" @onclick:stopPropagation="true" @onkeydown:stopPropagation="true">
+            <RadzenButton Icon="radar" ButtonStyle="ButtonStyle.Light"
+                          Size="ButtonSize.Small" Click="@CheckNowAsync" IsBusy="_checking"
+                          title="@($"Check {_originStreet} to {_destStreet} now")"
+                          aria-label="@($"Check {_originStreet} to {_destStreet} now")" />
+            <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Light"
+                          Size="ButtonSize.Small" Click="@ScheduleDelete"
+                          title="@($"Delete {_originStreet} to {_destStreet}")"
+                          aria-label="@($"Delete {_originStreet} to {_destStreet}")" />
+        </div>
     </div>
 
-    @* Only one state worth flagging: monitoring is paused. *@
-    @if (Route.MonitoringStatus != MonitoringStatus.Active)
+    @* Only one state worth flagging: monitoring is paused. The sample is never probed,
+       so "Paused" on it is noise next to its Sample chip. *@
+    @if (Route.MonitoringStatus != MonitoringStatus.Active && !Route.IsSample)
     {
         <span class="pt-route-flag pt-route-flag-paused">Paused</span>
     }
 
-    @* These two actions used to exist only as swipe gestures, which "simply don't fire on
-       desktop" — so Check Now and Delete were unreachable there entirely, and unreachable
-       by keyboard everywhere. The gestures still work; these are the equivalents that a
-       pointer or a Tab key can find. stopPropagation keeps them from also opening the card. *@
-    <div class="pt-route-card-actions" @onclick:stopPropagation="true" @onkeydown:stopPropagation="true">
-        <RadzenButton Text="Check now" Icon="radar" ButtonStyle="ButtonStyle.Light"
-                      Size="ButtonSize.ExtraSmall" Click="@CheckNowAsync"
-                      title="@($"Check {_originStreet} to {_destStreet} right now")" />
-        <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Light"
-                      Size="ButtonSize.ExtraSmall" Click="@ScheduleDelete"
-                      title="@($"Delete {_originStreet} to {_destStreet}")" />
-    </div>
 </div>
 </div>
 
@@ -116,15 +121,16 @@
 
     private string AriaLabel =>
         $"{_originStreet} to {_destStreet}. " +
-        (OptimalDeparture is not null ? _durationLabel : "Still learning this route.");
+        (OptimalDeparture is not null ? _durationLabel : "Still learning this commute.");
 
     // Ambient colour: green once the route can actually answer the question,
     // amber while it is still learning, slate when it isn't collecting at all.
-    private string AmbientClass => Route.MonitoringStatus switch
+    // The sample counts as collecting: it has history, it just never probes.
+    private string AmbientClass => (Route.MonitoringStatus == MonitoringStatus.Active || Route.IsSample) switch
     {
-        MonitoringStatus.Active when OptimalDeparture is not null => "pt-ambient-green",
-        MonitoringStatus.Active => "pt-ambient-amber",
-        _ => "pt-ambient-slate"
+        true when OptimalDeparture is not null => "pt-ambient-green",
+        true => "pt-ambient-amber",
+        false => "pt-ambient-slate"
     };
 
     protected override void OnInitialized()
@@ -226,39 +232,18 @@
         }
     }
 
-    /// <summary>
-    /// Runs a live poll. Reachable from the card's own button and from a swipe-left,
-    /// which are the same call — the one action that spends money should not have two
-    /// implementations that can drift.
-    /// </summary>
+    private bool _checking;
+
+    /// <summary>Runs a live check. The card's button and a swipe-left are the same call.</summary>
     public async Task CheckNowAsync()
     {
-        HttpResponseMessage resp = await Http.PostAsync($"/api/routes/{Route.Id}/check-now", null);
-        if (resp.IsSuccessStatusCode)
+        _checking = true;
+        try
         {
-            CheckNowResponse? data = await resp.Content.ReadFromJsonAsync(AppJsonContext.Default.CheckNowResponse);
-            NotificationService.Notify(new NotificationMessage
-            {
-                Severity = NotificationSeverity.Info,
-                Summary = "Right now",
-                Detail = data is not null
-                    ? $"{data.DurationSeconds / 60} min"
-                    : "Live travel time retrieved",
-                Duration = 6000
-            });
-            await OnRefresh.InvokeAsync();
-            return;
+            if (await CheckNow.RunAsync(Http, NotificationService, Route.Id.Value))
+                await OnRefresh.InvokeAsync();
         }
-
-        NotificationService.Notify(new NotificationMessage
-        {
-            Severity = NotificationSeverity.Error,
-            Summary = "Couldn't check now",
-            Detail = resp.StatusCode == System.Net.HttpStatusCode.ServiceUnavailable
-                ? "Traffic provider unavailable — try again later."
-                : $"Request failed ({(int)resp.StatusCode}).",
-            Duration = 5000
-        });
+        finally { _checking = false; }
     }
 
     /// <summary>
@@ -281,7 +266,7 @@
                 {
                     Severity = NotificationSeverity.Error,
                     Summary = "Delete failed",
-                    Detail = "The route has been restored.",
+                    Detail = "The commute has been restored.",
                     Duration = 5000
                 });
                 return Task.CompletedTask;

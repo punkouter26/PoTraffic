@@ -1,5 +1,4 @@
 @using Microsoft.AspNetCore.Components.Authorization
-@using PoTraffic.Client.Infrastructure.Auth
 @using System.Net.Http.Json
 @implements IDisposable
 @inject AuthenticationStateProvider AuthStateProvider
@@ -10,21 +9,21 @@
     @* ── Left: Branding ─────────────────────────────────────────────────── *@
     <a class="app-shell-brand" href="dashboard">PoTraffic</a>
 
-    @* ── Center: Actions (auth-gated) ──────────────────────────────────── *@
+    @* ── Center: only "Sign In" when signed out. Signed in, the app has one destination
+       and the brand already links to it; Admin lives in the menu, the one piece of
+       chrome that survives every width, instead of being shown twice. *@
     <nav class="app-shell-actions" aria-label="Primary">
-        @if (_isAuthenticated)
+        @* Mock mode rides the bar as a chip. It was a full-width strip under the header that
+           appeared only once /api/system/features answered — pushing every page down after
+           first paint (CLS ~0.06 on phones) and costing two lines of a phone screen. *@
+        @if (_useMockProviders)
         {
-            <NavLink class="app-nav-link" href="dashboard" Match="NavLinkMatch.All">
-                <PtIcon Name="dashboard" Size="sm" />Dashboard
-            </NavLink>
-            @if (_isAdmin)
-            {
-                <NavLink class="app-nav-link" href="admin">
-                    <PtIcon Name="admin_panel_settings" Size="sm" />Admin
-                </NavLink>
-            }
+            <span class="pt-mock-banner" role="status"
+                  title="API responses are deterministic; do not use for production routing.">
+                <PtIcon Name="science" Size="sm" />Mock data
+            </span>
         }
-        else if (_authResolved)
+        @if (_authResolved && !_id.IsAuthenticated)
         {
             <NavLink class="app-nav-link" href="login" Match="NavLinkMatch.All">Sign In</NavLink>
         }
@@ -32,21 +31,13 @@
 
     @* ── Right: User chip / logout ──────────────────────────────────────── *@
     <div class="app-shell-user">
-        @if (_isAuthenticated)
+        @if (_id.IsAuthenticated)
         {
             <PoTraffic.Client.Features.Alerts.NotificationBell />
-            <button class="pt-user-chip-btn" @onclick="ToggleUserMenu" type="button" aria-haspopup="menu" aria-expanded="@_menuOpen" title="@_displayLabel">
-                <span class="pt-user-avatar">@_initials</span>
-                <span class="pt-user-chip-label">
-                    @if (_isGuest)
-                    {
-                        <text>@_displayLabel LOGGED IN</text>
-                    }
-                    else
-                    {
-                        <text>@_displayLabel</text>
-                    }
-                </span>
+            <button class="pt-user-chip-btn" @onclick="ToggleUserMenu" type="button" aria-haspopup="menu" aria-expanded="@_menuOpen" title="@_id.Label">
+                <span class="pt-user-avatar">@_id.Initials</span>
+                @* Rule 6: guest sessions read "GUEST12345678 LOGGED IN". *@
+                <span class="pt-user-chip-label">@(_id.IsGuest ? $"{_id.Label} LOGGED IN" : _id.Label)</span>
                 <PtIcon Name="expand_more" Size="sm" Class="pt-user-caret" />
             </button>
             @if (_menuOpen)
@@ -54,28 +45,14 @@
                 <div class="pt-user-dropdown" @onclick:stopPropagation="true" role="menu">
                     <div class="pt-user-dropdown-header">
                         <div class="pt-user-dropdown-label">Signed in as</div>
-                        <div class="pt-user-dropdown-email">@_displayLabel</div>
+                        <div class="pt-user-dropdown-email">@_id.Label</div>
                     </div>
-                    <a class="pt-dropdown-item" href="/account/settings" role="menuitem">
-                        <PtIcon Name="settings" Size="sm" />Account settings
-                    </a>
-
-                    <div class="pt-dropdown-divider" role="separator"></div>
-                    <a class="pt-dropdown-item" href="/health" role="menuitem">
-                        <PtIcon Name="health_and_safety" Size="sm" />System status
-                    </a>
-
-                    @* The menu is the one piece of chrome that survives every width, so
-                       admin destinations live here too and are marked mobile-only so
-                       they don't duplicate the top bar on desktop. *@
-                    @if (_isAdmin)
+                    @foreach (AccountMenu.Link link in AccountMenu.Links(_id.IsAdmin))
                     {
-                        <div class="pt-dropdown-divider pt-dropdown-mobile-only" role="separator"></div>
-                        <a class="pt-dropdown-item pt-dropdown-mobile-only" href="/admin" role="menuitem">
-                            <PtIcon Name="admin_panel_settings" Size="sm" />Admin
+                        <a class="pt-dropdown-item" href="@link.Href" role="menuitem">
+                            <PtIcon Name="@link.Icon" Size="sm" />@link.Label
                         </a>
                     }
-
                     <div class="pt-dropdown-divider" role="separator"></div>
                     <button class="pt-dropdown-item danger" @onclick="LogoutAsync" type="button" role="menuitem">
                         <PtIcon Name="logout" Size="sm" />Sign out
@@ -85,15 +62,6 @@
         }
     </div>
 </header>
-
-@* ── Top notice banner: only when the API is running in mock mode ─────── *@
-@if (_useMockProviders)
-{
-    <div class="pt-mock-banner" role="status" aria-live="polite">
-        <PtIcon Name="science" Size="sm" />
-        Using mock data — API responses are deterministic; do not use for production routing.
-    </div>
-}
 
 @if (_menuOpen)
 {
@@ -108,12 +76,7 @@
 @code {
     private bool _menuOpen;
     private bool _authResolved;   // false until the first auth state comes back — avoids a "Sign In" flash for logged-in users
-    private bool _isAuthenticated;
-    private bool _isAdmin;
-    private bool _isGuest;
-    private string _email = string.Empty;
-    private string _displayLabel = string.Empty;
-    private string _initials = "?";
+    private AccountMenu.Identity _id = AccountMenu.Describe(new System.Security.Claims.ClaimsPrincipal());
     private bool _useMockProviders;
 
     protected override async Task OnInitializedAsync()
@@ -128,7 +91,13 @@
     }
 
     private void CloseMenuOnNavigate(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
-        => _menuOpen = false;
+    {
+        if (!_menuOpen)
+            return;
+        _menuOpen = false;
+        // Nothing else re-renders this component on navigation (it takes no parameters).
+        _ = InvokeAsync(StateHasChanged);
+    }
 
     private void ToggleUserMenu() => _menuOpen = !_menuOpen;
     private void CloseUserMenu() => _menuOpen = false;
@@ -154,52 +123,16 @@
 
     private void UpdateUserState(AuthenticationState authState)
     {
-        var user = authState.User;
         _authResolved = true;
-        _isAuthenticated = user.Identity?.IsAuthenticated == true;
-        _isAdmin = _isAuthenticated &&
-            (user.IsInRole("Administrator") ||
-             user.Claims.Any(c => c.Type is "role" or System.Security.Claims.ClaimTypes.Role && c.Value == "Administrator"));
-        _isGuest = _isAuthenticated && (
-            user.IsInRole("Guest") ||
-            user.Claims.Any(c => c.Type is "role" or System.Security.Claims.ClaimTypes.Role && c.Value == "Guest"));
-
-        if (_isAuthenticated)
-        {
-            _email = user.FindFirst("email")?.Value
-                ?? user.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value
-                ?? user.Identity?.Name
-                ?? "User";
-
-            // Rule 6: display "GUEST12345678 LOGGED IN" for guest sessions. The address shape
-            // is owned by GuestAccountConstants, not restated here.
-            if (_isGuest && GuestAccountConstants.IsGuestEmail(_email))
-            {
-                _displayLabel = GuestAccountConstants.ToDisplayLabel(_email);
-                _initials = "G";
-            }
-            else
-            {
-                _displayLabel = _email;
-                _initials = _email[0].ToString().ToUpperInvariant();
-            }
-        }
-        else
-        {
+        _id = AccountMenu.Describe(authState.User);
+        if (!_id.IsAuthenticated)
             _menuOpen = false;
-            _email = string.Empty;
-            _displayLabel = string.Empty;
-            _isGuest = false;
-            _initials = "?";
-        }
     }
 
     private async Task LogoutAsync()
     {
         _menuOpen = false;
-        if (AuthStateProvider is CookieAuthenticationStateProvider cookieProvider)
-            await cookieProvider.LogoutAsync();
-        Nav.NavigateTo("/login", forceLoad: true);
+        await AccountMenu.SignOutAsync(AuthStateProvider, Nav);
     }
 
     public void Dispose()
@@ -207,5 +140,4 @@
         AuthStateProvider.AuthenticationStateChanged -= HandleAuthStateChanged;
         Nav.LocationChanged -= CloseMenuOnNavigate;
     }
-
 }

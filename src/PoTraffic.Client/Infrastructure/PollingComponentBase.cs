@@ -257,6 +257,10 @@ public abstract class PollingComponentBase : ComponentBase, IAsyncDisposable
         Activity.Resumed -= OnResumedAsync;
         Activity.Suspended -= OnSuspended;
 
+        // Blazor calls only DisposeAsync on a component that has both, so a subclass's
+        // `@implements IDisposable` (the dashboard's Pending.Changed unsubscribe) never ran.
+        (this as IDisposable)?.Dispose();
+
         await _cts.CancelAsync();
         _resume.TrySetResult(); // release the loop if it is parked on the resume gate
 

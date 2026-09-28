@@ -1,232 +1,116 @@
 @* ──────────────────────────────────────────────────────────────────────
-   RouteProbeStatus — the at-a-glance "is this page alive?" panel.
+   RouteProbeStatus — "when was this route last checked, and when is the next one?"
 
-   Three signals in one row:
-     1. Refresh state — is the page currently reloading data? (pulsing dot)
-     2. Last probe — when was Google Maps last hit for this route?
-     3. Probe cadence — adaptive interval and "probes today" count.
-
-   The polling loop and the probe scheduler are two different cadences:
-     • Polling = page-side, every 15s, never touches Google Maps.
-     • Probing = server-side, every PollIntervalMinutes (5 base, 15 when stable),
-       each one hits Google Maps and writes a PollRecord.
-
-   "Last probe" comes from the most recent PollRecord on this route. "Probes today"
-   counts PollRecord rows in the today-only page state already loaded by the parent.
+   One chip and one button in the route page's header. This used to be three
+   chips (page refresh state, last probe, cadence + count) plus a separate
+   "Next sample in…" row in the answer block and a "N polls recorded today"
+   alert in the schedule panel: the same two facts, four times. The page's own
+   15-second refresh is not something a commuter acts on, so it is not shown.
    ────────────────────────────────────────────────────────────────────── *@
 
+@using PoTraffic.Shared.Enums
 @inject HttpClient Http
 @inject NotificationService NotificationService
-@inject PoTraffic.Client.Infrastructure.FxService Fx
-@implements IDisposable
 
-@* Compact renders the same three signals as header chips instead of a strip of its
-   own. Same content, same order, no card — the route page puts them in the
-   PageHeader's action slot so the fold is not spent on a status row. *@
-<div class="@(Compact ? "pt-probe-chips" : "pt-probe-status")" aria-label="Route probe status">
-    @* Signal 1: refresh-in-flight *@
-    <span class="pt-probe-cell pt-probe-cell-refresh">
-        @if (IsRefreshing)
-        {
-            <span class="pt-probe-dot pt-probe-dot-pulse" aria-hidden="true"></span>
-            <span class="pt-probe-label">Refreshing…</span>
-        }
-        else
-        {
-            <span class="pt-probe-dot @(LastSuccessLocal is null ? "pt-probe-dot-amber" : "pt-probe-dot-green")"
-                  aria-hidden="true"></span>
-            <span class="pt-probe-label">
-                @(LastSuccessLocal is null
-                    ? "Waiting for first sync"
-                    : $"Synced {FormatAgo(LastSuccessLocal.Value)}")
-            </span>
-        }
-    </span>
-
-    @* Signal 2: last Google Maps probe *@
-    <span class="pt-probe-cell pt-probe-cell-lastprobe">
-        @if (LatestProbe is null)
-        {
-            <PtIcon Name="radar" Size="sm" Class="pt-probe-icon" />
-            <span class="pt-probe-label">No probe yet — scheduler will run it on the next tick</span>
-        }
-        else
-        {
-            <PtIcon Name="radar" Size="sm" Class="pt-probe-icon" />
-            <span class="pt-probe-label">
-                @(Compact ? "Probe" : "Last Google Maps probe")
-                <strong>@LatestProbe.PolledAtDateTime.ToString("HH:mm:ss")</strong>
-                @if (Compact)
-                {
-                    <span class="pt-probe-sep">·</span>
-                    <text>@FormatAgo(LatestProbe.PolledAtDateTime)</text>
-                }
-                else
-                {
-                    <text>(@FormatAgo(LatestProbe.PolledAtDateTime))</text>
-                }
-            </span>
-        }
-    </span>
-
-    @* Signal 3: cadence & today count *@
-    <span class="pt-probe-cell pt-probe-cell-cadence">
-        <PtIcon Name="schedule" Size="sm" Class="pt-probe-icon" />
+<div class="pt-probe-chips" aria-label="Route probe status">
+    @{ NextSampleInfo next = NextSample; }
+    <span class="pt-probe-cell">
+        <span class="pt-probe-dot @(next.Live ? "pt-probe-dot-green" : "pt-probe-dot-amber")" aria-hidden="true"></span>
         <span class="pt-probe-label">
-            @if (Schedule is { } s)
+            @(LatestProbe is null ? "Not checked yet" : $"Checked {FormatAgo(LatestProbe.PolledAtDateTime)}")
+            <span class="pt-probe-sep">·</span>
+            @if (next.CountdownTargetUtc is { } target)
             {
-                <text>@(Compact ? "Adaptive" : "Adaptive cadence") <strong>@s.PollIntervalMinutes min</strong></text>
+                @* LiveCountdown's own text already starts "in …". *@
+                <text>next&nbsp;</text>
+                <LiveCountdown TargetUtc="target"
+                               PeriodHint="@TimeSpan.FromMinutes(Session?.Schedule?.PollIntervalMinutes ?? 5)"
+                               DueText="moments" />
             }
             else
             {
-                <text>No schedule</text>
-            }
-            @if (ProbesToday > 0)
-            {
-                <span class="pt-probe-sep">·</span>
-                @if (Compact)
-                {
-                    <text><strong>@ProbesToday</strong> today</text>
-                }
-                else
-                {
-                    <text><strong>@ProbesToday</strong> probe@(ProbesToday == 1 ? "" : "s") today</text>
-                }
+                @next.Detail
             }
         </span>
     </span>
 
-    @* Probe-now button: the only user-initiated way to spend money on this route. *@
-    <div class="pt-probe-actions">
-        <RadzenButton Text="@(_probingNow ? "Probing Google Maps…" : "Probe now")"
-                      Icon="@(_probingNow ? "progress_activity" : "radar")"
-                      ButtonStyle="ButtonStyle.Light"
-                      Size="ButtonSize.Small"
-                      Disabled="_probingNow"
-                      IsBusy="_probingNow"
-                      Click="@ProbeNowAsync" />
-    </div>
+    @* The only user-initiated way to spend money on this route. *@
+    <RadzenButton Text="Check now" Icon="radar" ButtonStyle="ButtonStyle.Light" aria-label="Check now"
+                  Size="ButtonSize.Small" IsBusy="_checking" Click="@CheckNowAsync" />
 </div>
 
 @code {
-    /// <summary>Route this status belongs to. Drives the probe-now POST.</summary>
+    /// <summary>Route this status belongs to. Drives the check-now POST.</summary>
     [Parameter, EditorRequired] public Guid RouteId { get; set; }
 
-    /// <summary>
-    /// Render as header chips rather than a full-width strip. Same three signals and
-    /// the same probe-now button; only the container and a few label words change.
-    /// </summary>
-    [Parameter] public bool Compact { get; set; }
-
-    /// <summary>The polling loop's "I'm refreshing" state — pulses a dot while true.</summary>
-    [Parameter] public bool IsRefreshing { get; set; }
-
-    /// <summary>Last successful data fetch, local time. Drives the synced-ago label.</summary>
-    [Parameter] public DateTimeOffset? LastSuccessUtc { get; set; }
-
-    /// <summary>Most recent PollRecord — its time is the last Google Maps hit.</summary>
+    /// <summary>Most recent PollRecord — its time is the last provider hit.</summary>
     [Parameter] public PollRecordDto? LatestProbe { get; set; }
 
-    /// <summary>How many probes today (already on the parent's paged history).</summary>
-    [Parameter] public int ProbesToday { get; set; }
+    /// <summary>Today's active session; carries the server-computed poll schedule.</summary>
+    [Parameter] public SessionDto? Session { get; set; }
 
-    /// <summary>Server-computed poll schedule (cadence, window state, next ETA).</summary>
-    [Parameter] public PollScheduleDto? Schedule { get; set; }
-
-    /// <summary>Fired after a successful probe so the parent can refresh from the wire.</summary>
+    /// <summary>Fired after a successful check so the parent can refresh from the wire.</summary>
     [Parameter] public EventCallback OnProbeCompleted { get; set; }
 
-    private bool _probingNow;
-    private System.Timers.Timer? _ticker;
+    private bool _checking;
 
-    private DateTime? LastSuccessLocal => LastSuccessUtc?.ToLocalTime().DateTime;
-
-    protected override void OnInitialized()
+    private async Task CheckNowAsync()
     {
-        // 1-second tick so the "X minutes ago" labels stay live without the parent
-        // having to re-render this component on every refresh.
-        _ticker = new System.Timers.Timer(TimeSpan.FromSeconds(1).TotalMilliseconds);
-        _ticker.Elapsed += async (_, _) =>
+        _checking = true;
+        try
         {
-            try { await InvokeAsync(StateHasChanged); }
-            catch (ObjectDisposedException) { _ticker?.Dispose(); }
-        };
-        _ticker.AutoReset = true;
-        _ticker.Start();
+            if (await CheckNow.RunAsync(Http, NotificationService, RouteId))
+                await OnProbeCompleted.InvokeAsync();
+        }
+        finally { _checking = false; }
+    }
+
+    /// <param name="Detail">Text when there is no countdown to run.</param>
+    /// <param name="Live">Whether the window is currently sampling.</param>
+    /// <param name="CountdownTargetUtc">When set, rendered as a self-ticking countdown.</param>
+    private readonly record struct NextSampleInfo(
+        string Detail,
+        bool Live,
+        DateTimeOffset? CountdownTargetUtc = null);
+
+    // Every schedule decision — is the window open, when does it reopen, what cadence is
+    // in force — comes from the server on SessionDto.Schedule. The client only formats it.
+    private NextSampleInfo NextSample
+    {
+        get
+        {
+            if (Session is not { State: SessionState.Active } session)
+                return new NextSampleInfo("waiting for the next window", Live: false);
+
+            if (session.Schedule is not { } schedule)
+                return new NextSampleInfo("no polling days scheduled", Live: false);
+
+            // A Mon–Fri schedule viewed Saturday is days away, not "within 5 min".
+            if (!schedule.WindowIsOpenNow)
+            {
+                if (schedule.NextWindowOpenUtc is not { } nextOpen)
+                    return new NextSampleInfo("no polling days scheduled", Live: false);
+
+                DateTime openLocal = nextOpen.ToLocalTime().DateTime;
+                string when = openLocal.Date == DateTime.Now.Date ? "today" : openLocal.ToString("ddd");
+                return new NextSampleInfo($"next {when} {openLocal:HH:mm}", Live: false);
+            }
+
+            if (schedule.NextPollExpectedUtc is not { } nextPoll)
+                return new NextSampleInfo($"next within {schedule.PollIntervalMinutes} min", Live: true);
+
+            return new NextSampleInfo(string.Empty, Live: true, CountdownTargetUtc: nextPoll);
+        }
     }
 
     /// <summary>
-    /// Hit the existing POST /api/routes/{routeId}/check-now endpoint. It calls Google
-    /// Maps synchronously and returns the new travel time without persisting it as a
-    /// scheduled poll — it's the same surface the dashboard's swipe gesture uses.
+    /// Minute resolution: the parent re-renders this every 15 seconds, so a seconds count
+    /// would sit frozen between refreshes.
     /// </summary>
-    private async Task ProbeNowAsync()
-    {
-        if (_probingNow) return;
-        _probingNow = true;
-
-        try
-        {
-            HttpResponseMessage resp = await Http.PostAsync($"api/routes/{RouteId}/check-now", null);
-            if (resp.IsSuccessStatusCode)
-            {
-                CheckNowResponse? data = await resp.Content
-                    .ReadFromJsonAsync(AppJsonContext.Default.CheckNowResponse);
-
-                NotificationService.Notify(new NotificationMessage
-                {
-                    Severity = NotificationSeverity.Info,
-                    Summary = "Google Maps live probe",
-                    Detail = data is not null
-                        ? $"{data.DurationSeconds / 60} min · {TextFormatting.Distance(data.DistanceMetres)}"
-                        : "Live travel time retrieved",
-                    Duration = 6000
-                });
-                await OnProbeCompleted.InvokeAsync();
-            }
-            else
-            {
-                NotificationService.Notify(new NotificationMessage
-                {
-                    Severity = NotificationSeverity.Error,
-                    Summary = "Probe failed",
-                    Detail = resp.StatusCode == System.Net.HttpStatusCode.ServiceUnavailable
-                        ? "Google Maps unavailable — try again in a moment."
-                        : $"Request failed ({(int)resp.StatusCode}).",
-                    Duration = 5000
-                });
-            }
-        }
-        catch (Exception ex)
-        {
-            NotificationService.Notify(new NotificationMessage
-            {
-                Severity = NotificationSeverity.Error,
-                Summary = "Probe failed",
-                Detail = ex.Message,
-                Duration = 5000
-            });
-        }
-        finally
-        {
-            _probingNow = false;
-        }
-    }
-
-    public void Dispose()
-    {
-        _ticker?.Stop();
-        _ticker?.Dispose();
-        _ticker = null;
-    }
-
-    /// <summary>"just now" / "23s ago" / "4 min ago" / "2 h ago" / "yesterday 16:42".
-    /// Pure formatting — never renders "UTC" or any zone label.</summary>
     private static string FormatAgo(DateTime whenLocal)
     {
         TimeSpan ago = DateTime.Now - whenLocal;
-        if (ago < TimeSpan.FromSeconds(5)) return "just now";
-        if (ago < TimeSpan.FromMinutes(1)) return $"{(int)ago.TotalSeconds}s ago";
+        if (ago < TimeSpan.FromMinutes(1)) return "just now";
         if (ago < TimeSpan.FromHours(1)) return $"{(int)ago.TotalMinutes} min ago";
         if (ago < TimeSpan.FromHours(6)) return $"{(int)ago.TotalHours} h ago";
         return whenLocal.ToString("MMM d, HH:mm");

@@ -1,41 +1,20 @@
-/* ── CreateRoutePage — scoped styles (replaces inline style="" attributes) ── */
+/* ── CreateRoutePage — scoped styles ── */
 
+/* Wide enough for start, end and the seven days to share one row. The schedule
+   fields and .pt-field-error style themselves (ScheduleFields.razor.css, app.css). */
 .pt-create-route-card {
-    max-width: 35rem;
+    max-width: 40rem;
     margin-inline: auto;
 }
 
-/* Day-of-week selector. This used to be ~50 lines styling seven hand-built
-   <label> pills, each with a visually-hidden checkbox inside, plus their own
-   hover, selected and :focus-within rules — all of which RadzenSelectBar
-   already provides. What is left is the wrap: seven items in one nowrap flex
-   row overflow a phone. */
-.pt-day-toggles {
-    flex-wrap: wrap;
+.pt-create-arrive {
+    display: flex;
+    align-items: center;
+    gap: var(--pt-space-3);
+    margin-bottom: var(--pt-space-3);
 }
 
-/* Muted helper hint shown under the address fields. */
-.pt-field-hint {
-    display: block;
-    margin: 0 0 var(--pt-space-3);
+.pt-create-optional {
+    font-weight: var(--pt-weight-regular);
     color: var(--pt-fg-tertiary);
-    font-size: var(--pt-text-xs);
-}
-
-/* Field-level validation message; replaces the hint in place so the row height
-   doesn't jump when a field goes invalid. */
-.pt-field-error {
-    display: block;
-    margin: 0 0 var(--pt-space-3);
-    color: var(--pt-color-danger-on-surface);
-    font-size: var(--pt-text-xs);
-    font-weight: var(--pt-weight-medium);
-}
-
-/* The two time pickers sit side by side when there is room and stack when there
-   isn't. They were a fixed flex row, which overflowed the card on a phone. */
-.pt-schedule-times {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
-    gap: var(--pt-space-4);
 }

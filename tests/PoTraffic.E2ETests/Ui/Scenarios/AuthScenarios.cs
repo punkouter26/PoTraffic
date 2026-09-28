@@ -66,9 +66,8 @@ public sealed class AuthScenarios : PlaywrightTestBase
         string headingText = await heading.InnerTextAsync();
         Assert.Contains("commutes", headingText, StringComparison.OrdinalIgnoreCase);
 
-        // The mock indicator is now a full-width banner in NavMenu (.pt-mock-banner) rather
-        // than a "USING MOCK DATA" chip — Testing always runs on mock providers, so it must
-        // be present and must say so in words the user can act on.
+        // The mock indicator is a "Mock data" chip in the NavMenu bar (.pt-mock-banner) —
+        // Testing always runs on mock providers, so it must be present and say so.
         Microsoft.Playwright.ILocator mockBanner = Page.Locator(".pt-mock-banner");
         await mockBanner.WaitForAsync(new() { Timeout = 15_000 });
         Assert.Contains("mock data", await mockBanner.InnerTextAsync(), StringComparison.OrdinalIgnoreCase);

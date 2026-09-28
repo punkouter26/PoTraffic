@@ -1,0 +1,120 @@
+@* ──────────────────────────────────────────────────────────────────────
+   The monitoring-window fields: start, end, and the days to probe.
+
+   New Route and the route page's schedule editor each had their own copy —
+   one a RadzenSelectBar with time-only pickers, the other seven checkboxes and
+   date-and-time pickers — and they disagreed about validity: the editor
+   rejected end-before-start, which the server accepts (a window may wrap
+   midnight). One component, one rule: the window must not be zero-length.
+
+   Must sit inside a RadzenTemplateForm; the validators bind to it.
+   ────────────────────────────────────────────────────────────────────── *@
+
+<div class="pt-schedule-fields">
+    <RadzenFormField Text="Start time">
+        <ChildContent>
+            <RadzenDatePicker Name="StartTime" TValue="DateTime?" Value="Start" ValueChanged="StartChanged"
+                              ShowTime="true" TimeOnly="true" DateFormat="HH:mm" aria-label="Start time" />
+        </ChildContent>
+        <Helper>
+            <RadzenRequiredValidator Component="StartTime" Text="Set a start time." />
+        </Helper>
+    </RadzenFormField>
+    <RadzenFormField Text="End time">
+        <ChildContent>
+            <RadzenDatePicker Name="EndTime" TValue="DateTime?" Value="End" ValueChanged="EndChanged"
+                              ShowTime="true" TimeOnly="true" DateFormat="HH:mm" aria-label="End time" />
+        </ChildContent>
+        <Helper>
+            <RadzenRequiredValidator Component="EndTime" Text="Set an end time." />
+            @* A zero-length window silently never fires, so it is caught here. *@
+            <RadzenCustomValidator Component="EndTime" Validator="@(() => EndDiffersFromStart(Start, End))"
+                                   Text="End time must be different from start time." />
+        </Helper>
+    </RadzenFormField>
+
+    <RadzenSelectBar TValue="IEnumerable<byte>" Value="Days" ValueChanged="DaysChanged"
+                     Multiple="true" Size="ButtonSize.Small"
+                     class="pt-day-toggles" aria-label="Probe on these days">
+        <Items>
+            @foreach ((string label, byte bit) in AllDays)
+            {
+                <RadzenSelectBarItem Value="@bit" Text="@label" />
+            }
+        </Items>
+    </RadzenSelectBar>
+</div>
+@if (DaysError is not null)
+{
+    <div class="pt-field-error" role="alert">@DaysError</div>
+}
+
+@code {
+    [Parameter] public DateTime? Start { get; set; }
+    [Parameter] public EventCallback<DateTime?> StartChanged { get; set; }
+    [Parameter] public DateTime? End { get; set; }
+    [Parameter] public EventCallback<DateTime?> EndChanged { get; set; }
+    [Parameter] public IEnumerable<byte> Days { get; set; } = WeekdayBits;
+    [Parameter] public EventCallback<IEnumerable<byte>> DaysChanged { get; set; }
+    [Parameter] public string? DaysError { get; set; }
+
+    internal static readonly (string Label, byte Bit)[] AllDays =
+    [
+        ("Mon", 0x01), ("Tue", 0x02), ("Wed", 0x04),
+        ("Thu", 0x08), ("Fri", 0x10), ("Sat", 0x20), ("Sun", 0x40)
+    ];
+
+    /// <summary>Monday–Friday, the default for a new window.</summary>
+    internal static readonly byte[] WeekdayBits = [0x01, 0x02, 0x04, 0x08, 0x10];
+
+    /// <summary>The wire format — the selected bits folded into one byte.</summary>
+    internal static byte ToMask(IEnumerable<byte> days) =>
+        days.Aggregate((byte)0, (acc, bit) => (byte)(acc | bit));
+
+    /// <summary>Day names as the API returns them ("Monday"…) back to select-bar bits.</summary>
+    internal static byte[] ToBits(IEnumerable<string> dayNames) =>
+        [.. AllDays.Where(d => dayNames.Any(n => n.StartsWith(d.Label, StringComparison.OrdinalIgnoreCase)))
+                   .Select(d => d.Bit)];
+
+    /// <summary>"Mon–Fri", "Every day", "Mon, Wed, Fri" — runs of three or more collapse.</summary>
+    internal static string DaysLabel(IEnumerable<string> dayNames)
+    {
+        byte[] bits = ToBits(dayNames);
+        if (bits.Length == 7) return "Every day";
+
+        List<string> parts = [];
+        int i = 0;
+        while (i < AllDays.Length)
+        {
+            if (!bits.Contains(AllDays[i].Bit)) { i++; continue; }
+            int j = i;
+            while (j + 1 < AllDays.Length && bits.Contains(AllDays[j + 1].Bit)) j++;
+            parts.Add(j - i >= 2 ? $"{AllDays[i].Label}–{AllDays[j].Label}"
+                                 : string.Join(", ", AllDays[i..(j + 1)].Select(d => d.Label)));
+            i = j + 1;
+        }
+        return string.Join(", ", parts);
+    }
+
+    /// <summary>
+    /// Only the time of day matters to the poller, and a window may wrap midnight
+    /// (21:00 → 03:00), so the only unusable window is a zero-length one.
+    /// </summary>
+    internal static bool EndDiffersFromStart(DateTime? start, DateTime? end) =>
+        start is null || end is null || TimeOnly.FromDateTime(end.Value) != TimeOnly.FromDateTime(start.Value);
+
+    /// <summary>Current local wall-clock truncated to the minute.</summary>
+    internal static DateTime LocalNowToMinute()
+    {
+        DateTime now = DateTime.Now;
+        return new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, 0, DateTimeKind.Unspecified);
+    }
+
+    // Times are sent as local wall-clock with the browser's zone (LocalZoneId). The server
+    // evaluates the window in that zone, so 07:00 Mon–Fri stays 07:00 Mon–Fri across DST.
+    internal static string ToHHmm(DateTime local) =>
+        local.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <summary>The browser's IANA zone (the WASM runtime sets it from Intl).</summary>
+    internal static string LocalZoneId => TimeZoneInfo.Local.Id;
+}

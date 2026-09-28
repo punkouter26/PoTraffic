@@ -3,16 +3,6 @@
 /* .pt-empty-state* moved to app.css — the compare page (#8) renders the same block,
    and scoped styles here would only reach the dashboard's copy of it. */
 
-/* Glass surface for the status bar — sits over the mesh background.
-   Padding and radius are app.css's (they scale with --pt-density); restating
-   them here only re-froze them at this file's higher specificity. */
-.pt-status-bar {
-    background: var(--pt-glass-bg-strong);
-    backdrop-filter: blur(var(--pt-glass-blur)) saturate(var(--pt-glass-saturate));
-    -webkit-backdrop-filter: blur(var(--pt-glass-blur)) saturate(var(--pt-glass-saturate));
-    border-color: var(--pt-glass-border);
-}
-
 /* The LAYOUT of .pt-route-cards is not here.
 
    It used to be: this file carried `display: flex; flex-direction: column`, and

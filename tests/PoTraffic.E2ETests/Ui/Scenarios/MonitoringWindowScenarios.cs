@@ -59,13 +59,11 @@ public sealed class MonitoringWindowScenarios : PlaywrightTestBase
             await loadingProgress.WaitForAsync(new() { State = WaitForSelectorState.Detached, Timeout = 60_000 });
         }
 
-        // Wait for the WindowConfigPanel fieldset to appear — actual text is "Monitoring Schedule"
-        ILocator fieldset = Page.Locator(".rz-fieldset", new() { HasText = "Monitoring Schedule" }).First;
+        // Wait for the WindowConfigPanel — the schedule row of the route page's settings card.
+        ILocator fieldset = Page.Locator(".pt-schedule").First;
         await fieldset.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 45_000 });
 
-        // When no window exists, the form renders directly with "Save Schedule" button.
-        // When editing an existing window, the button says "Save Changes".
-        // Use a broad selector — find ANY Save button on the page as fallback.
+        // With no window the form renders directly; with one, "Edit schedule" opens it.
         await OpenScheduleFormAsync(fieldset);
 
         // ── Set Start Time ────────────────────────────────────────────────────────
@@ -92,15 +90,13 @@ public sealed class MonitoringWindowScenarios : PlaywrightTestBase
         await Page.Keyboard.PressAsync("Enter");
         await Page.Keyboard.PressAsync("Tab");
 
-        // ── Verify days Mon–Fri are checked (default) ────────────────────────────
-        // Radzen 10.x RadzenCheckBox renders a native <input type="checkbox"> that reflects
-        // the bound value. Use Playwright's CSS :checked pseudo-class to count checked inputs.
-        // The fieldset has 7 day checkboxes; Mon–Fri (5) should be checked by default.
-        int checkedDays = await fieldset.Locator("input[type='checkbox']:checked").CountAsync();
-        Assert.True(checkedDays >= 5, $"Expected at least 5 days (Mon–Fri) checked by default, but found {checkedDays} checked.");
+        // ── Verify days Mon–Fri are selected (default) ───────────────────────────
+        // The days are a multi-select RadzenSelectBar (shared with New Route); a selected
+        // item is a button carrying rz-state-active. Mon–Fri (5) are on by default.
+        int checkedDays = await fieldset.Locator(".pt-day-toggles .rz-state-active").CountAsync();
+        Assert.True(checkedDays >= 5, $"Expected at least 5 days (Mon–Fri) selected by default, but found {checkedDays}.");
 
         // ── Click Save ────────────────────────────────────────────────────────────
-        // Re-locate the save button (it may be "Save Schedule" or "Save Changes" depending on state)
         ILocator actualSave = fieldset.GetByRole(AriaRole.Button, new() { Name = "Save" });
         await actualSave.ClickAsync();
 
@@ -108,7 +104,7 @@ public sealed class MonitoringWindowScenarios : PlaywrightTestBase
         // Give the API call time to complete (201 Created or 409 Conflict if window already exists)
         await Page.WaitForTimeoutAsync(2_000);
 
-        ILocator errorAlert = Page.Locator(".rz-alert-danger");
+        ILocator errorAlert = fieldset.Locator("[role='alert'], .rz-messages-error").First;
         bool errorVisible = await errorAlert.IsVisibleAsync();
         string alertText = errorVisible ? await errorAlert.InnerTextAsync() : string.Empty;
         Assert.False(errorVisible,
@@ -120,11 +116,14 @@ public sealed class MonitoringWindowScenarios : PlaywrightTestBase
     }
 
     /// <summary>
-    /// Validation path: submitting an end time that is before the start time shows an
-    /// inline validation error and does NOT navigate away from the route detail page.
+    /// Validation path: submitting an end time equal to the start time shows an inline
+    /// validation error and does NOT navigate away from the route detail page.
+    ///
+    /// <para>End-before-start is not an error: a window may wrap midnight (21:00 → 03:00),
+    /// and the server accepts it. Only a zero-length window is unusable.</para>
     /// </summary>
     [SkipUnlessE2EReady]
-    public async Task SetMonitoringWindow_EndBeforeStart_ShowsValidationError()
+    public async Task SetMonitoringWindow_EndEqualsStart_ShowsValidationError()
     {
         // ── Arrange ─────────────────────────────────────────────────────────────
         using HttpClient apiHttp = new() { BaseAddress = new Uri(BaseUrl) };
@@ -157,13 +156,13 @@ public sealed class MonitoringWindowScenarios : PlaywrightTestBase
             await loadingProgress.WaitForAsync(new() { State = WaitForSelectorState.Detached, Timeout = 60_000 });
         }
 
-        // Wait for the WindowConfigPanel fieldset to appear — actual text is "Monitoring Schedule"
-        ILocator fieldset = Page.Locator(".rz-fieldset", new() { HasText = "Monitoring Schedule" }).First;
+        // Wait for the WindowConfigPanel — the schedule row of the route page's settings card.
+        ILocator fieldset = Page.Locator(".pt-schedule").First;
         await fieldset.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 45_000 });
 
         await OpenScheduleFormAsync(fieldset);
 
-        // Set end time BEFORE start time
+        // Set end time EQUAL to start time
         ILocator startTimeInput = fieldset.Locator(".rz-form-field", new() { HasText = "Start Time" }).Locator("input").First;
 
         await startTimeInput.ClickAsync();
@@ -178,22 +177,19 @@ public sealed class MonitoringWindowScenarios : PlaywrightTestBase
         await endTimeInput.ClickAsync();
         await Page.Keyboard.PressAsync("Control+A");
         await Page.Keyboard.PressAsync("Backspace");
-        await Page.Keyboard.TypeAsync("07:00"); // end before start
+        await Page.Keyboard.TypeAsync("09:00"); // zero-length window
         await Page.Keyboard.PressAsync("Enter");
         await Page.Keyboard.PressAsync("Tab");
 
         // ── Click Save ────────────────────────────────────────────────────────────
-        // Button says "Save Schedule" (new) or "Save Changes" (editing existing)
         await fieldset.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
         await Page.WaitForTimeoutAsync(3_000);
 
         // ── Assert — inline error message is shown ────────────────────────────────
-        // Filter by the message rather than taking the first alert on the page: opening the
-        // edit form renders its own "Saving a new schedule replaces the current one" warning
-        // above the validation error, so .First matches the warning and never the failure
-        // this test is about.
-        ILocator errorAlert = Page
-            .Locator(".rz-alert, .rz-alert-danger, [role='alert']")
+        // The message comes from the end-time field's RadzenCustomValidator, which renders
+        // as .rz-messages-error. Filtered by text so nothing else in the panel can match.
+        ILocator errorAlert = fieldset
+            .Locator(".rz-messages-error, [role='alert']")
             .Filter(new() { HasTextString = "end time" })
             .First;
 
@@ -214,7 +210,7 @@ public sealed class MonitoringWindowScenarios : PlaywrightTestBase
     /// Leaves WindowConfigPanel showing its schedule form, whichever state it started in.
     ///
     /// <para>
-    /// The panel renders a read-only summary behind an "Edit Schedule" button when the route
+    /// The panel renders a one-line summary behind an "Edit schedule" button when the route
     /// already has a window, and the form directly when it does not. Route seeding is
     /// idempotent and Azurite persists between runs, so which of the two a test meets depends
     /// on whether an earlier run saved a schedule — waiting for Save without opening the form
@@ -223,15 +219,13 @@ public sealed class MonitoringWindowScenarios : PlaywrightTestBase
     /// </summary>
     private static async Task OpenScheduleFormAsync(ILocator fieldset)
     {
-        // The fieldset renders before its contents do — LoadingErrorCard holds the body while
-        // the windows request is in flight. Checking for the Edit button at that moment finds
-        // nothing, skips the click, and then waits out the clock on a Save button that the
-        // read-only view was never going to show. Wait for the panel to settle first: any
-        // button inside it means one of the two states has rendered.
+        // Wait for the panel to settle first: any button inside it means one of the two
+        // states has rendered. Checking for Edit before that would skip the click and then
+        // wait out the clock on a Save button the summary view was never going to show.
         await fieldset.Locator("button").First
             .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 30_000 });
 
-        ILocator editButton = fieldset.GetByRole(AriaRole.Button, new() { Name = "Edit Schedule" });
+        ILocator editButton = fieldset.GetByRole(AriaRole.Button, new() { Name = "Edit schedule" });
         if (await editButton.CountAsync() > 0 && await editButton.First.IsVisibleAsync())
         {
             await editButton.First.ClickAsync();

@@ -37,8 +37,10 @@ img, svg, video {
     height: auto;
 }
 
-/* Form controls do not inherit the page font by default. */
-button, input, select, textarea {
+/* Form controls do not inherit the page font by default. Radzen's icon buttons
+   (.rzi — toast/dialog close) are excluded: vendor.css sits in a cascade layer, so
+   this unlayered rule beat their icon font and "close" rendered as a word. */
+button:not(.rzi), input, select, textarea {
     font: inherit;
     color: inherit;
 }
@@ -61,7 +63,7 @@ p, .pt-pretty { text-wrap: pretty; }
    wrote. Without it every heading carries a few invisible pixels of half-leading
    and the 8px spacing grid never quite lands. Unsupported browsers ignore it. */
 @supports (text-box: trim-both cap alphabetic) {
-    h1, h2, h3, h4, .pt-page-title, .pt-departure-hero, .pt-answer-headline {
+    h1, h2, h3, h4, .pt-page-title, .pt-answer-headline {
         text-box: trim-both cap alphabetic;
     }
 }
@@ -110,7 +112,9 @@ a {
     container-name: pt-content;
 }
 
-@media (min-width: 640px) {
+/* The bottom nav owns ≤640px (max-width: 640px), so this starts at 641 — at exactly
+   640 both rules used to apply and the nav covered the last 64px of content. */
+@media (min-width: 641px) {
     .content {
         /* No bottom nav past the phone breakpoint — reclaim the reserve. */
         padding-bottom: var(--pt-space-8);
@@ -124,6 +128,11 @@ a {
         margin-inline: auto;
         padding-inline: var(--pt-space-6);
     }
+}
+
+/* Phone-only duplicates: the bottom nav's FAB already is "Add commute" at this width. */
+@media (max-width: 640px) {
+    .pt-hide-phone { display: none !important; }
 }
 
 .valid.modified:not([type=checkbox]) {
@@ -309,6 +318,8 @@ details[open] > summary .pt-collapsible-icon { transform: rotate(90deg); }
 .pt-p-4 { padding: var(--pt-space-4); }
 .pt-p-5 { padding: var(--pt-space-5); }
 .pt-p-6 { padding: var(--pt-space-6); }
+/* Card padding that gives back width on a phone: 16px there, 24px from ~530px up. */
+.pt-card-pad { padding: clamp(var(--pt-space-4), 4.5vw, var(--pt-space-6)); }
 
 .pt-w-100 { width: 100%; }
 
@@ -395,6 +406,12 @@ details[open] > summary .pt-collapsible-icon { transform: rotate(90deg); }
     border-radius: var(--pt-radius-md);
     transition: color var(--pt-dur-fast) var(--pt-ease);
     -webkit-tap-highlight-color: transparent;
+    /* The Account slot is a <button>: without these it kept the UA's grey fill and
+       2px border, and read as permanently selected. */
+    background: none;
+    border: 0;
+    font-family: inherit;
+    cursor: pointer;
 }
 
 .pt-bottom-nav-link:active { color: var(--pt-color-brand-on-surface); }
@@ -438,9 +455,13 @@ details[open] > summary .pt-collapsible-icon { transform: rotate(90deg); }
       than whatever --rz-primary resolves to per theme (brand-400 on dark would
       have put white text at about 2.5:1).
 ═══════════════════════════════════════════════════════════════ */
+/* One row, always. Wrapping split a segmented control into orphans — "Sat Sun" under
+   the weekdays, "Comfortable" under Compact/Normal — and the unselected orphans read
+   as plain text. Items share the row equally and shed padding instead. */
 .rz-selectbar {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    width: 100%;
 }
 
 .rz-selectbar .rz-button {
@@ -448,6 +469,17 @@ details[open] > summary .pt-collapsible-icon { transform: rotate(90deg); }
     align-items: center;
     justify-content: center;
     gap: var(--pt-space-2);
+    flex: 1 1 0;
+    min-width: 0;
+    padding-inline: var(--pt-space-2);
+    white-space: nowrap;
+}
+
+/* On a phone the label carries the meaning; the icon beside it is what gives. */
+@media (max-width: 640px) {
+    .rz-selectbar .rz-button:has(.rz-button-text) .rz-button-icon-left {
+        display: none;
+    }
 }
 
 .rz-selectbar .rz-button.rz-state-active {
@@ -457,61 +489,6 @@ details[open] > summary .pt-collapsible-icon { transform: rotate(90deg); }
 
 .rz-selectbar .rz-button.rz-state-active .rzi {
     color: inherit;
-}
-
-/* ═══════════════════════════════════════════════
-   C2: Compact Dashboard Status Bar
-═══════════════════════════════════════════════ */
-.pt-status-bar {
-    display: flex;
-    align-items: center;
-    gap: var(--pt-space-5);
-    padding: var(--pt-space-2) var(--pt-space-4);
-    background: var(--pt-bg-surface);
-    border-radius: var(--pt-radius-md);
-    border: 1px solid var(--pt-border-subtle);
-    box-shadow: var(--pt-elev-1);
-    margin-bottom: var(--pt-space-6);
-    flex-wrap: wrap;
-}
-
-.pt-status-dot {
-    width: 0.5rem;
-    height: 0.5rem;
-    border-radius: var(--pt-radius-full);
-    display: inline-block;
-    margin-right: var(--pt-space-1);
-    flex-shrink: 0;
-}
-
-.pt-status-dot-green { background: var(--pt-color-success); }
-.pt-status-dot-amber { background: var(--pt-color-warning); }
-.pt-status-dot-red   { background: var(--pt-color-danger); }
-
-/* Connectivity is a property of the whole bar, not of the one chip that
-   mentions it. :has() lets the container react to its own contents, so losing
-   the connection tints the entire strip instead of hiding the news in a corner
-   the eye has no reason to visit. */
-.pt-status-bar:has(.pt-status-offline) {
-    border-color: color-mix(in oklab, var(--pt-color-warning) 55%, var(--pt-border-subtle));
-    background: color-mix(in oklab, var(--pt-color-warning) 8%, var(--pt-bg-surface));
-}
-
-.pt-status-item {
-    font-size: var(--pt-text-sm);
-    font-weight: var(--pt-weight-medium);
-    color: var(--pt-fg-secondary);
-    display: flex;
-    align-items: center;
-    gap: var(--pt-space-1);
-    white-space: nowrap;
-}
-
-/* The bar's trailing-action slot. The dashboard's Add Route button used to live
-   here; it is in the page header now, where a primary action belongs and where
-   it does not disappear along with the bar whenever connectivity is fine. */
-.pt-status-bar-actions {
-    margin-left: auto;
 }
 
 /* ═══════════════════════════════════════════════
@@ -525,7 +502,9 @@ details[open] > summary .pt-collapsible-icon { transform: rotate(90deg); }
    query anywhere. */
 .pt-route-cards {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(22rem, 100%), 1fr));
+    /* auto-fill, not auto-fit: with one or two routes, auto-fit stretched a card
+       across the whole 1180px column — a single short row with 900px of air. */
+    grid-template-columns: repeat(auto-fill, minmax(min(22rem, 100%), 1fr));
     /* Stretch, not start. A route that has samples carries a sparkline and one
        that doesn't carries a line of text, so side-by-side cards used to differ
        in height by the whole height of the sparkline — two cards showing the
@@ -574,13 +553,6 @@ details[open] > summary .pt-collapsible-icon { transform: rotate(90deg); }
     }
 }
 
-/* The sample route wears its border the way its flag reads: dashed and
-   provisional, not one of your real commutes. */
-.pt-route-card:has(.pt-route-flag-demo) {
-    border-style: dashed;
-    border-left-style: solid;
-}
-
 /* The card navigates, so it behaves like the control it is. */
 .pt-route-card {
     cursor: pointer;
@@ -595,6 +567,14 @@ details[open] > summary .pt-collapsible-icon { transform: rotate(90deg); }
     z-index: 1;
     background: var(--pt-bg-surface);
 }
+/* Swipe-right / delete: the card slides out while the undo window is open. */
+.pt-swipe-wrap.pending-delete .pt-route-card {
+    /* A short nudge, not a full-width slide: 110% would widen the page mid-animation. */
+    transform: translateX(2rem);
+    opacity: 0;
+    transition: transform 400ms var(--pt-ease), opacity 400ms var(--pt-ease);
+}
+
 .pt-route-card:focus-visible {
     outline: 2px solid var(--pt-color-brand-on-surface);
     outline-offset: 2px;
@@ -624,7 +604,9 @@ details[open] > summary .pt-collapsible-icon { transform: rotate(90deg); }
     margin-top: 0;
 }
 
-/* Narrow column: the sparkline drops below the answer instead of squeezing it. */
+/* Narrow column: the sparkline drops below the answer instead of squeezing it,
+   and the street pair wraps rather than truncating both halves to "Santa Monica …
+   → 5th & Gr…" on a card with room to spare below. */
 @container pt-cards (width < 26rem) {
     .pt-route-card-body {
         flex-direction: column;
@@ -633,8 +615,15 @@ details[open] > summary .pt-collapsible-icon { transform: rotate(90deg); }
         padding: var(--pt-space-3) var(--pt-space-4);
     }
 
-    .pt-route-card-foot { padding-inline: var(--pt-space-4); }
-    .pt-departure-hero { font-size: var(--pt-text-lg); }
+    .pt-route-card-route { flex-wrap: wrap; row-gap: 0; }
+
+    .pt-route-addr-from,
+    .pt-route-addr-to { white-space: normal; }
+}
+
+/* The corner flag is out of flow; keep the text from running under it. */
+.pt-route-card:has(.pt-route-flag) .pt-route-card-answer {
+    padding-right: 4.5rem;
 }
 
 /* The route line — the street pair, biggest on the card. */
@@ -695,11 +684,6 @@ details[open] > summary .pt-collapsible-icon { transform: rotate(90deg); }
     border-radius: var(--pt-radius-full);
     line-height: 1;
     background: var(--pt-bg-surface);
-}
-
-.pt-route-flag-demo {
-    color: var(--pt-color-info);
-    border: 1px dashed var(--pt-color-info);
 }
 
 .pt-route-flag-paused {
@@ -826,11 +810,6 @@ details[open] > summary .pt-collapsible-icon { transform: rotate(90deg); }
    #6: Connectivity indicators. The polling base stands down while a tab is
    hidden or offline; these tell the user why the numbers stopped moving.
 ═══════════════════════════════════════════════ */
-.pt-status-offline {
-    color: var(--pt-color-warning);
-    font-weight: var(--pt-weight-medium);
-}
-
 .pt-stale-banner {
     align-items: center;
     background: var(--pt-bg-tint);
@@ -946,7 +925,9 @@ details[open] > summary .pt-collapsible-icon { transform: rotate(90deg); }
    page that uses them. The rule applies the font treatment; the level-bumping
    has already happened in the markup. */
 .pt-section-heading {
-    font-size: var(--pt-text-md);
+    /* Was var(--pt-text-md), which pt-tokens.css never defined — every card heading
+       silently fell back to 16px, the body size. */
+    font-size: var(--pt-text-lg);
     line-height: 1.3;
     font-weight: var(--pt-weight-semibold);
     color: var(--pt-color-fg);
@@ -955,59 +936,20 @@ details[open] > summary .pt-collapsible-icon { transform: rotate(90deg); }
 }
 
 /* ═══════════════════════════════════════════════
-   Route probe status strip
-   Lives between the page header and the answer card. Three cells in one row:
-     • refresh-in-flight pulse   • last Google Maps probe time   • cadence / count.
-   Designed to read at a glance without competing with the headline departure.
+   Route probe status — one chip in the route page header
 ══════════════════════════════════════════════ */
-.pt-probe-status {
-    display: flex;
-    align-items: center;
-    gap: var(--pt-space-4);
-    padding: var(--pt-space-2) var(--pt-space-4);
-    background: var(--pt-bg-surface);
-    border-radius: var(--pt-radius-md);
-    border: 1px solid var(--pt-border-subtle);
-    box-shadow: var(--pt-elev-1);
-    margin-bottom: var(--pt-space-6);
-    flex-wrap: wrap;
-}
-
 .pt-probe-cell {
     display: inline-flex;
     align-items: center;
     gap: var(--pt-space-2);
-    font-size: var(--pt-text-sm);
+    font-size: var(--pt-text-xs);
     color: var(--pt-fg-secondary);
-    min-width: 0;       /* allow flex-shrink so long "X min ago" wraps don't push the row off-screen */
-}
-
-.pt-probe-cell-refresh { flex: 0 0 auto; }
-
-.pt-probe-cell-lastprobe,
-.pt-probe-cell-cadence {
-    flex: 1 1 auto;
     min-width: 0;
-}
-
-.pt-probe-actions {
-    margin-left: auto;
-    flex: 0 0 auto;
-}
-
-.pt-probe-icon {
-    color: var(--pt-fg-tertiary);
-    flex-shrink: 0;
-}
-
-.pt-probe-label {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    font-variant-numeric: tabular-nums;
 }
 
 .pt-probe-sep {
-    margin: 0 var(--pt-space-2);
+    margin: 0 var(--pt-space-1);
     color: var(--pt-fg-tertiary);
 }
 
@@ -1021,25 +963,6 @@ details[open] > summary .pt-collapsible-icon { transform: rotate(90deg); }
 
 .pt-probe-dot-green { background: var(--pt-color-success); }
 .pt-probe-dot-amber { background: var(--pt-color-warning); }
-
-/* Pulse while a refresh is in flight — the same visual vocabulary as
-   progress_activity, so the two never appear together without it being obvious
-   which is which. */
-.pt-probe-dot-pulse {
-    background: var(--pt-color-brand-500);
-    animation: pt-probe-pulse 1.2s ease-in-out infinite;
-}
-
-@keyframes pt-probe-pulse {
-    0%, 100% { transform: scale(1);   opacity: 1; }
-    50%      { transform: scale(1.6); opacity: 0.35; }
-}
-
-/* Reduced-motion: drop the pulse animation, keep the static dot — the
-   "Refreshing…" text already conveys the state, the dot is decoration. */
-@media (prefers-reduced-motion: reduce) {
-    .pt-probe-dot-pulse { animation: none; }
-}
 
 /* ── Route map ────────────────────────────────────────────────────────────
    Leaflet ships its own stylesheet (lib/leaflet/leaflet.css), which is loaded
@@ -1058,7 +981,7 @@ details[open] > summary .pt-collapsible-icon { transform: rotate(90deg); }
     /* Leaflet measures the element, so the height must be a real length, never
        a percentage of an auto-height parent. Short on phones, taller once there
        is room, so the map never eats the whole first screen. */
-    height: 16rem;
+    height: min(16rem, 32vh);
     width: 100%;
 }
 
@@ -1257,6 +1180,12 @@ details[open] > summary .pt-collapsible-icon { transform: rotate(90deg); }
    prefers-contrast, so those users get flat surfaces automatically. */
 
 .app-header {
+    /* backdrop-filter makes this a stacking context, trapping the bar's z-index and
+       the account dropdown inside it — any later glass surface (the empty dashboard)
+       painted over the menu and swallowed its clicks. The layer lives here instead. */
+    position: sticky;
+    top: 0;
+    z-index: var(--pt-z-nav);
     background: var(--pt-glass-bg-strong);
     backdrop-filter: blur(var(--pt-glass-blur)) saturate(var(--pt-glass-saturate));
     -webkit-backdrop-filter: blur(var(--pt-glass-blur)) saturate(var(--pt-glass-saturate));
@@ -1351,20 +1280,6 @@ details[open] > summary .pt-collapsible-icon { transform: rotate(90deg); }
     padding: 0.1rem 0.45rem;
     text-transform: uppercase;
     white-space: nowrap;
-}
-
-.pt-sample-banner {
-    align-items: center;
-    background: var(--pt-bg-tint);
-    border: 1px solid var(--pt-border-subtle);
-    border-radius: var(--pt-radius-md);
-    color: var(--pt-fg-body);
-    display: flex;
-    font-size: var(--pt-text-sm);
-    gap: var(--pt-space-2);
-    line-height: var(--pt-leading-normal);
-    margin-bottom: var(--pt-space-3);
-    padding: var(--pt-space-3);
 }
 
 /* The empty state had one button and stacked naturally; with two it needs to wrap
@@ -1560,8 +1475,7 @@ details[open] > summary .pt-collapsible-icon { transform: rotate(90deg); }
     font-size: var(--pt-text-sm);
 }
 
-/* The probe signals as header chips: same three cells, no card, no row of its
-   own. Wraps onto a second line before it will squeeze the page title. */
+/* Wraps onto a second line before it will squeeze the page title. */
 .pt-probe-chips {
     display: flex;
     align-items: center;
@@ -1570,21 +1484,34 @@ details[open] > summary .pt-collapsible-icon { transform: rotate(90deg); }
     justify-content: flex-end;
 }
 
-.pt-probe-chips .pt-probe-cell {
-    font-size: var(--pt-text-xs);
-    color: var(--pt-fg-secondary);
+/* Phone header: the actions already have a row of their own under the title, and
+   they used to spend three more — sample chip, a two-line status sentence, then
+   "Check now" alone on a line. One row now: the status truncates, the button goes
+   icon-only (its aria-label keeps the name). */
+@container pt-page-header (width < 30rem) {
+    .pt-probe-chips {
+        flex: 1 1 auto;
+        flex-wrap: nowrap;
+        justify-content: space-between;
+        min-width: 0;
+        max-width: none;
+    }
+
+    .pt-probe-cell { overflow: hidden; }
+
+    .pt-probe-label {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .pt-probe-chips .rz-button .rz-button-text { display: none; }
 }
 
-/* In the strip the button is pushed to the far end by margin-left:auto. In the
-   header the chips are already right-aligned, so it just follows the last one. */
-.pt-probe-chips .pt-probe-actions {
-    margin-left: 0;
-}
-
-/* The header's action slot is the narrowest place these chips ever render, and
-   a wrapping "5 min ago" is worth more than a truncated one. */
-.pt-probe-chips .pt-probe-label {
-    white-space: normal;
+/* Radzen's time-picker trigger is a 20px square — under the 24px minimum target. */
+.rz-datepicker-trigger {
+    min-width: 1.75rem;
+    min-height: 1.75rem;
 }
 
 /* ═══════════════════════════════════════════════
@@ -1611,24 +1538,111 @@ details[open] > summary .pt-collapsible-icon { transform: rotate(90deg); }
    Route card actions
    ═══════════════════════════════════════════════ */
 
-/* Sits at the card's trailing edge, quiet until the card is hovered or something inside
-   it takes focus — but always in the tab order, because a control that only appears on
-   hover is a control a keyboard user does not have. */
+/* The last item on the card's own row, not a row of its own. Hidden until the card is
+   hovered or something inside it takes focus — but always in the tab order, because a
+   control that only appears on hover is a control a keyboard user does not have. */
 .pt-route-card-actions {
     display: flex;
     gap: var(--pt-space-1);
-    justify-content: flex-end;
-    margin-top: var(--pt-space-2);
-    opacity: 0.55;
+    flex: 0 0 auto;
+    align-self: center;
     transition: opacity var(--pt-dur-fast) var(--pt-ease);
 }
 
-.pt-route-card:hover .pt-route-card-actions,
-.pt-route-card-actions:focus-within {
-    opacity: 1;
+/* Icon-only, so the box is the whole target: 2rem clears the 24px minimum. */
+.pt-route-card-actions .rz-button {
+    min-width: 2rem;
+    min-height: 2rem;
 }
 
-@media (hover: none) {
-    /* No hover to reveal them on touch, where the swipe gestures are the primary path. */
-    .pt-route-card-actions { opacity: 1; }
+@container pt-cards (width < 26rem) {
+    .pt-route-card-actions { align-self: flex-end; }
+}
+
+/* Touch keeps them visible: there is no hover to reveal them, and swipe is not
+   discoverable enough to be the only way. */
+@media (hover: hover) {
+    .pt-route-card-actions { opacity: 0; }
+
+    .pt-route-card:hover .pt-route-card-actions,
+    .pt-route-card-actions:focus-within {
+        opacity: 1;
+    }
+
+    /* In the stacked (narrow) card the buttons took a row of their own — an empty
+       band at the bottom of every card while they were invisible. Overlay the
+       corner instead; the sparkline caption under them is left-aligned. */
+    @container pt-cards (width < 26rem) {
+        .pt-route-card-actions {
+            position: absolute;
+            right: var(--pt-space-3);
+            bottom: var(--pt-space-2);
+        }
+    }
+}
+
+/* A named route leads with its name; the street pair drops to a caption under it. */
+.pt-route-card-name + .pt-route-card-route {
+    font-size: var(--pt-text-sm);
+    font-weight: var(--pt-weight-regular);
+    color: var(--pt-fg-secondary);
+}
+
+/* ═══════════════════════════════════════════════
+   Settings rows — the route page's one settings card
+   ═══════════════════════════════════════════════ */
+
+/* Global rather than scoped: WindowConfigPanel renders rows into the same card. */
+.pt-route-settings {
+    display: flex;
+    flex-direction: column;
+    gap: var(--pt-space-2);
+    padding: var(--pt-space-3) var(--pt-space-4);
+}
+
+.pt-route-settings > * + * {
+    border-top: 1px solid var(--pt-border-subtle);
+    padding-top: var(--pt-space-2);
+}
+
+.pt-setting-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--pt-space-2);
+    min-height: 2rem;
+    font-size: var(--pt-text-sm);
+}
+
+.pt-setting-label {
+    min-width: 6rem;
+    font-size: var(--pt-text-xs);
+    font-weight: var(--pt-weight-semibold);
+    color: var(--pt-fg-tertiary);
+}
+
+.pt-setting-value {
+    flex: 1 1 auto;
+    min-width: 0;
+    color: var(--pt-fg-primary);
+    font-variant-numeric: tabular-nums;
+}
+
+.pt-setting-input {
+    font: inherit;
+    color: var(--pt-fg-primary);
+    background: var(--pt-bg-surface);
+    border: 1px solid var(--pt-border-subtle);
+    border-radius: var(--pt-radius-sm);
+    padding: var(--pt-space-1) var(--pt-space-2);
+}
+
+/* Field-level validation message. Global: the dashboard, New Route and the schedule
+   editor all use it, and a scoped copy only ever reached one of them. */
+.pt-field-error {
+    display: block;
+    margin: 0 0 var(--pt-space-3);
+    color: var(--pt-color-danger-on-surface);
+    font-size: var(--pt-text-xs);
+    font-weight: var(--pt-weight-medium);
 }

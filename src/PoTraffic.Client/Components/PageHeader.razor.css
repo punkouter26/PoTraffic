@@ -82,7 +82,39 @@
     .pt-page-header-actions {
         grid-column: 1 / -1;
         justify-self: stretch;
+        min-width: 0;
     }
 
     .pt-page-title { font-size: var(--pt-text-xl); }
+}
+
+/* ── Rename in place ───────────────────────────────────────────────────── */
+
+.pt-page-title-edit {
+    display: inline-flex;
+    vertical-align: middle;
+    margin-inline-start: var(--pt-space-1);
+    padding: var(--pt-space-1);
+    border: 0;
+    border-radius: var(--pt-radius-sm);
+    background: none;
+    color: var(--pt-fg-tertiary);
+    cursor: pointer;
+}
+
+.pt-page-title-edit:hover,
+.pt-page-title-edit:focus-visible {
+    color: var(--pt-fg-primary);
+    background: var(--pt-bg-tint);
+}
+
+.pt-page-title-input {
+    width: 100%;
+    font: inherit;
+    color: inherit;
+    letter-spacing: inherit;
+    background: var(--pt-bg-surface);
+    border: 1px solid var(--pt-border-subtle);
+    border-radius: var(--pt-radius-sm);
+    padding: 0 var(--pt-space-2);
 }

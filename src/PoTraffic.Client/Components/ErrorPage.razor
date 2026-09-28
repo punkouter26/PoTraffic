@@ -1,0 +1,16 @@
+@inject NavigationManager Nav
+
+@* The dead-end pages (not found, access denied): an icon, the page header and the one
+   way out. They were two copies of this with two stylesheets. *@
+<div class="pt-error-page">
+    <PtIcon Name="@Icon" Size="xl" Class="pt-error-page-icon" />
+    <PageHeader Title="@Title" Subtitle="@Subtitle" />
+    <RadzenButton Text="Back to dashboard" ButtonStyle="ButtonStyle.Primary" Icon="home"
+                  Click="@(() => Nav.NavigateTo("/dashboard"))" />
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Icon { get; set; } = default!;
+    [Parameter, EditorRequired] public string Title { get; set; } = default!;
+    [Parameter] public string? Subtitle { get; set; }
+}

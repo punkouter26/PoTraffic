@@ -57,17 +57,16 @@ public sealed class CheckNowScenarios : PlaywrightTestBase
         await Page.WaitForURLAsync($"{BaseUrl}/dashboard", new() { Timeout = 30_000 });
 
         // ── Navigate to the route's own page ─────────────────────────────────────
-        // There is no /routes page any more, and the dashboard card no longer carries
-        // action buttons — on a card, Check Now is a swipe gesture that does not fire on
-        // desktop. The user-initiated probe now lives on the route detail page as
-        // RouteProbeStatus's "Probe now" button, which is what this scenario exercises.
+        // There is no /routes page any more. The route page's header carries the
+        // "Check now" button (RouteProbeStatus); the dashboard card's icon button runs the
+        // same CheckNow.RunAsync call, so this one scenario covers both.
         await Page.GotoAsync($"{BaseUrl}/routes/{routeId}");
 
         await Page.Locator("h1.pt-page-title").WaitForAsync(new() { Timeout = 30_000 });
 
-        // ── Click "Probe now" ────────────────────────────────────────────────────
+        // ── Click "Check now" ────────────────────────────────────────────────────
         Microsoft.Playwright.ILocator probeButton =
-            Page.GetByRole(Microsoft.Playwright.AriaRole.Button, new() { Name = "Probe now" });
+            Page.GetByRole(Microsoft.Playwright.AriaRole.Button, new() { Name = "Check now" });
 
         try
         {
@@ -77,7 +76,7 @@ public sealed class CheckNowScenarios : PlaywrightTestBase
         {
             string diagnostics = string.Join("\n", consoleMessages.TakeLast(30));
             throw new InvalidOperationException(
-                $"'Probe now' did not appear on the route page within 20 s.\nURL: {Page.Url}\n" +
+                $"'Check now' did not appear on the route page within 20 s.\nURL: {Page.Url}\n" +
                 $"Console (last 30):\n{diagnostics}", ex);
         }
 
@@ -86,8 +85,8 @@ public sealed class CheckNowScenarios : PlaywrightTestBase
         // ── Assert — a RadzenNotification appears within 10 s ────────────────────
         // Radzen renders notifications inside .rz-notification-container items.
         // We accept:
-        //   • success:  summary "Google Maps live probe" + detail containing "min"
-        //   • provider error: summary "Probe failed"
+        //   • success:  summary "Right now" + detail containing "min"
+        //   • provider error: summary "Check failed"
         Microsoft.Playwright.ILocator notification = Page
             .Locator(".rz-notification, .rz-notification-item, .rz-growl-item")
             .First;
@@ -109,8 +108,8 @@ public sealed class CheckNowScenarios : PlaywrightTestBase
         // Must show either the travel-time summary or an explicit error heading —
         // a blank/silent response is the only unacceptable outcome (FR-016).
         bool hasExpectedContent =
-            notificationText.Contains("live probe", StringComparison.OrdinalIgnoreCase)
-            || notificationText.Contains("Probe failed", StringComparison.OrdinalIgnoreCase)
+            notificationText.Contains("Right now", StringComparison.OrdinalIgnoreCase)
+            || notificationText.Contains("Check failed", StringComparison.OrdinalIgnoreCase)
             || notificationText.Contains("min", StringComparison.OrdinalIgnoreCase);
 
         Assert.True(hasExpectedContent,

@@ -27,15 +27,15 @@
     position: absolute;
     top: -0.1rem;
     right: -0.1rem;
-    min-width: 1rem;
-    height: 1rem;
-    padding: 0 0.2rem;
+    min-width: 1.125rem;
+    height: 1.125rem;
+    padding: 0 0.25rem;
     border-radius: 999px;
     background: var(--pt-color-danger, var(--pt-color-danger));
     color: var(--pt-fg-on-brand);
-    font-size: 0.6rem;
+    font-size: var(--pt-text-xs);
     font-weight: 700;
-    line-height: 1rem;
+    line-height: 1.125rem;
     text-align: center;
 }
 
@@ -138,11 +138,11 @@
 }
 
 .pt-bell-msg {
-    font-size: 0.85rem;
+    font-size: var(--pt-text-sm);
     color: var(--pt-fg-primary);
 }
 
 .pt-bell-time {
-    font-size: 0.7rem;
+    font-size: var(--pt-text-xs);
     color: var(--pt-fg-secondary);
 }

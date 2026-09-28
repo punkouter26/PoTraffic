@@ -81,6 +81,10 @@ public sealed class CreateWindowCommandHandler : IRequestHandler<CreateWindowCom
             CreatedAt = DateTimeOffset.UtcNow
         };
 
+        // Add() only cascades parent → child, and route.Windows is otherwise linked only at
+        // hydration — without this the RouteDto never shows the new window until a restart,
+        // so an edited schedule vanished from the route page and the next save hit 409.
+        _db.Routes.First(r => r.Id == cmd.RouteId).Windows.Add(window);
         _db.Add(window);
         await _db.SaveChangesAsync(ct);
 

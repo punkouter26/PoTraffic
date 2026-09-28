@@ -12,6 +12,9 @@
    The back link is part of the header rather than each page's problem: Route
    Detail is reachable from a card tap and had no way back but the browser's
    own button, which a PWA in standalone display mode does not show.
+
+   With TitleChanged set, the title is renameable in place — the route page used
+   to spend a whole row of its side column on a "Name" text box.
    ────────────────────────────────────────────────────────────────────── *@
 
 <header class="pt-page-header">
@@ -25,15 +28,32 @@
             }
         </a>
     }
-
     <div class="pt-page-header-text">
-        <h1 class="pt-page-title">@Title</h1>
+        <h1 class="pt-page-title">
+            @if (_editing)
+            {
+                <input @ref="_input" class="pt-page-title-input" maxlength="60" aria-label="Name"
+                       placeholder="@EditPlaceholder" value="@EditValue"
+                       @onchange="SaveAsync" @onblur="() => _editing = false"
+                       @onkeydown="@(e => { if (e.Key == "Escape") _editing = false; })" />
+            }
+            else
+            {
+                @Title
+                @if (TitleChanged.HasDelegate)
+                {
+                    <button type="button" class="pt-page-title-edit" aria-label="Rename" title="Rename"
+                            @onclick="BeginEdit">
+                        <PtIcon Name="edit" Size="sm" />
+                    </button>
+                }
+            }
+        </h1>
         @if (Subtitle is not null)
         {
             <p class="pt-page-subtitle">@Subtitle</p>
         }
     </div>
-
     @if (Actions is not null)
     {
         <div class="pt-page-header-actions">@Actions</div>
@@ -42,7 +62,6 @@
 
 @code {
     [Parameter, EditorRequired] public string Title { get; set; } = default!;
-
     [Parameter] public string? Subtitle { get; set; }
 
     /// <summary>When set, renders a back affordance to this route ahead of the title.</summary>
@@ -53,4 +72,34 @@
 
     /// <summary>Trailing controls — buttons, pickers — right-aligned on the header row.</summary>
     [Parameter] public RenderFragment? Actions { get; set; }
+
+    /// <summary>Makes the title renameable. Receives the new text; empty means "clear it".</summary>
+    [Parameter] public EventCallback<string?> TitleChanged { get; set; }
+
+    /// <summary>What the rename box starts with — the stored name, not the fallback title.</summary>
+    [Parameter] public string? EditValue { get; set; }
+    [Parameter] public string? EditPlaceholder { get; set; }
+
+    private bool _editing;
+    private bool _focusNext;
+    private ElementReference _input;
+
+    private void BeginEdit() => _editing = _focusNext = true;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Once, on the render that swapped the heading for the box.
+        if (_focusNext)
+        {
+            _focusNext = false;
+            await _input.FocusAsync();
+        }
+    }
+
+    private async Task SaveAsync(ChangeEventArgs e)
+    {
+        _editing = false;
+        string? value = (e.Value as string)?.Trim();
+        await TitleChanged.InvokeAsync(string.IsNullOrEmpty(value) ? null : value);
+    }
 }

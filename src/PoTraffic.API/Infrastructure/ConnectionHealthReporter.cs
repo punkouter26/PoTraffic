@@ -5,9 +5,8 @@ using PoTraffic.Shared.DTOs.Admin;
 namespace PoTraffic.API.Infrastructure;
 
 /// <summary>
-/// Builds the per-dependency connection status list rendered by the <c>/health</c> Blazor
-/// page and returned by <c>/api/admin/connection-health</c>. Both surfaces share this one
-/// implementation so they can never drift.
+/// Builds the per-dependency connection status list served at <c>/health/connections</c>
+/// and rendered by the <c>/health</c> Blazor page.
 ///
 /// <para>
 /// Statuses only — never a secret value. "Configured / Not configured" is the most that is

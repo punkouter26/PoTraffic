@@ -1,0 +1,17 @@
+/* Centered, with a clear way back (no dead ends). */
+.pt-error-page {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    min-height: 60vh;
+    max-width: 32rem;
+    margin-inline: auto;
+    padding: var(--pt-space-8) var(--pt-space-4);
+    gap: var(--pt-space-2);
+}
+
+.pt-error-page ::deep .pt-error-page-icon {
+    color: var(--pt-fg-faint);
+}

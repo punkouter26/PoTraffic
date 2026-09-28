@@ -4,14 +4,5 @@
 
 <PageTitle>Page not found — PoTraffic</PageTitle>
 
-<div class="pt-notfound">
-    <PtIcon Name="explore_off" Size="xl" Class="pt-notfound-icon" />
-    <PageHeader Title="Page not found"
-                Subtitle="Sorry, the content you are looking for does not exist or may have moved." />
-    <RadzenButton Text="Back to dashboard" ButtonStyle="ButtonStyle.Primary" Icon="home"
-                  Click="@(() => Nav.NavigateTo("/dashboard"))" />
-</div>
-
-@code {
-    [Inject] private NavigationManager Nav { get; set; } = default!;
-}
+<ErrorPage Icon="explore_off" Title="Page not found"
+           Subtitle="Sorry, the content you are looking for does not exist or may have moved." />

@@ -1,284 +1,122 @@
-@using System.Net.Http.Json
 @using System.Text.Json
-@using PoTraffic.Client.Infrastructure
 @using PoTraffic.Shared.DTOs.Routes
 @using PoTraffic.Shared.DTOs.History
-@using PoTraffic.Shared.Enums
 @inject HttpClient Http
-@implements IDisposable
 
-<RadzenFieldset Text="Monitoring Schedule" class="pt-mb-3">
-    @* Loading + load-failure presentation comes from the shared scaffold every other
-       data surface uses (Health, AdminUsage, Diag), so this panel can't drift from them. *@
-    <LoadingErrorCard IsLoading="_loadingWindows" Error="@(string.IsNullOrEmpty(_loadError) ? null : _loadError)">
-    @if (_activeWindow is not null && !_editing)
+@* The route's monitoring schedule as one line of the route page's settings card, and
+   the shared editor when it is being changed.
+
+   The window and today's session come from the page, which already loads both on its
+   15-second refresh. This panel used to fetch them itself, on a second 15-second timer,
+   to render a "Monitoring active — N polls recorded today" alert that repeated the
+   header's status chip. *@
+<div class="pt-schedule">
+    @if (Window is not null && !_editing)
     {
-        @* Read-only view with Edit Schedule button — hides the delete-to-replace mechanic *@
-        <div class="pt-flex pt-items-center pt-gap-4 pt-mb-2">
-            <div>
-                <RadzenText TextStyle="TextStyle.Caption" class="pt-mb-0">Schedule</RadzenText>
-                <RadzenText>@string.Join(", ", _activeWindow.DaysOfWeek) · @FormatWindowTime(_activeWindow.StartTime) – @FormatWindowTime(_activeWindow.EndTime)</RadzenText>
-            </div>
-            <RadzenButton Text="Edit Schedule" Icon="edit" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small"
-                          Click="@StartEditing" />
-        </div>
-
-        @if (_activeSession is not null)
-        {
-            <RadzenAlert AlertStyle="AlertStyle.Success" ShowIcon="true" class="pt-mb-2">
-                Monitoring active — @_activeSession.PollCount poll(s) recorded today.
-                @if (_activeSession.LastPollAt.HasValue)
-                {
-                    <span> Last poll: @_activeSession.LastPollAt.Value.ToLocalTime().ToString("HH:mm:ss")</span>
-                }
-                @if (!TodayIsScheduled)
-                {
-                    <div class="pt-mt-1">Today (@DateTime.Now.DayOfWeek) is outside this schedule — polling resumes on the next scheduled day.</div>
-                }
-            </RadzenAlert>
-        }
-        @if (!string.IsNullOrEmpty(_error))
-        {
-            <RadzenAlert AlertStyle="AlertStyle.Danger" class="pt-mb-2">@_error</RadzenAlert>
-        }
-
-        <div class="pt-flex pt-gap-2">
-            @if (_activeSession is not null)
+        <div class="pt-setting-row">
+            <span class="pt-setting-label">Schedule</span>
+            <span class="pt-setting-value">
+                @ScheduleFields.DaysLabel(Window.DaysOfWeek) · @FormatWindowTime(Window.StartTime)–@FormatWindowTime(Window.EndTime)
+            </span>
+            <RadzenButton Text="Edit schedule" Icon="edit" ButtonStyle="ButtonStyle.Light"
+                          Size="ButtonSize.ExtraSmall" Click="@StartEditing" />
+            @if (Session is not null)
             {
-                <RadzenButton Text="Stop Monitoring" ButtonStyle="ButtonStyle.Warning" Icon="stop"
-                              Click="@StopMonitoringAsync" IsBusy="_saving" />
+                <RadzenButton Text="Stop" Icon="stop" ButtonStyle="ButtonStyle.Light"
+                              Size="ButtonSize.ExtraSmall" Click="@StopMonitoringAsync" IsBusy="_saving"
+                              title="Stop monitoring today" />
             }
         </div>
+        @if (_error is not null)
+        {
+            <div class="pt-field-error" role="alert">@_error</div>
+        }
     }
     else
     {
-        @* Create / Edit form — _editing=true means updating an existing window *@
-        @if (_editing)
-        {
-            <RadzenAlert AlertStyle="AlertStyle.Warning" ShowIcon="true" class="pt-mb-3">
-                Saving a new schedule replaces the current one. Today's session will be restarted.
-            </RadzenAlert>
-        }
+        <RadzenTemplateForm TItem="ScheduleForm" Data="@_form" Submit="@SaveWindowAsync">
+            <div class="pt-setting-label pt-mb-2">
+                @(_editing ? "Saving replaces the current schedule and restarts today's session." : "Schedule")
+            </div>
 
-        <RadzenText TextStyle="TextStyle.Caption" class="pt-mb-2">Days of week:</RadzenText>
-        <div class="pt-flex pt-wrap pt-gap-3 pt-mb-3">
-            @foreach ((string name, byte bit) in _days)
+            <ScheduleFields @bind-Start="_startTime" @bind-End="_endTime" @bind-Days="_days" />
+
+            @if (_error is not null)
             {
-                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.3rem">
-                    <RadzenCheckBox TValue="bool" Value="_selectedDays[name]"
-                                    Change="@(v => _selectedDays[name] = v)" />
-                    <RadzenText TextStyle="TextStyle.Body2" class="pt-wcp-day-label">@name</RadzenText>
-                </RadzenStack>
+                <div class="pt-field-error" role="alert">@_error</div>
             }
-        </div>
 
-        <div class="pt-flex pt-gap-4 pt-mb-3">
-            <RadzenFormField Text="Start Time" class="pt-mr-3">
-                <RadzenDatePicker @bind-Value="_startTime" ShowTime="true" DateFormat="HH:mm" />
-            </RadzenFormField>
-            <RadzenFormField Text="End Time">
-                <RadzenDatePicker @bind-Value="_endTime" ShowTime="true" DateFormat="HH:mm" />
-            </RadzenFormField>
-        </div>
-
-        @if (!string.IsNullOrEmpty(_error))
-        {
-            <RadzenAlert AlertStyle="AlertStyle.Danger" class="pt-mb-2">@_error</RadzenAlert>
-        }
-
-        <div class="pt-flex pt-gap-2">
-            <RadzenButton Text="@(_editing ? "Save Changes" : "Save Schedule")" ButtonStyle="ButtonStyle.Primary"
-                          Click="@SaveWindowAsync" IsBusy="_saving" />
-            @if (_editing)
-            {
-                <RadzenButton Text="Cancel" ButtonStyle="ButtonStyle.Light"
-                              Click="@CancelEditing" />
-            }
-        </div>
+            <div class="pt-flex pt-gap-2">
+                <RadzenButton ButtonType="ButtonType.Submit" Text="Save schedule" ButtonStyle="ButtonStyle.Primary"
+                              Size="ButtonSize.Small" IsBusy="_saving" />
+                @if (_editing)
+                {
+                    <RadzenButton Text="Cancel" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small"
+                                  Click="@(() => { _editing = false; _error = null; })" />
+                }
+            </div>
+        </RadzenTemplateForm>
     }
-    </LoadingErrorCard>
-</RadzenFieldset>
+</div>
 
 @code {
     [Parameter] public Guid RouteId { get; set; }
+
+    /// <summary>The route's active window, or null when it has none.</summary>
+    [Parameter] public MonitoringWindowDto? Window { get; set; }
+
+    /// <summary>Today's active session — Stop is offered only while there is one.</summary>
+    [Parameter] public SessionDto? Session { get; set; }
+
     [Parameter] public EventCallback OnSaved { get; set; }
 
-    private bool _loadingWindows = true;
+    /// <summary>RadzenTemplateForm needs a model; the fields bind to component state.</summary>
+    private sealed class ScheduleForm { }
+    private readonly ScheduleForm _form = new();
+
     private bool _saving;
     private bool _editing;
-    private Guid _loadedRouteId;   // guards against reloading on every parent re-render (the 15s dashboard poll)
-    private MonitoringWindowDto? _activeWindow;
-    private SessionDto? _activeSession;
+    private string? _error;
 
-    /// <summary>True when today's local day-of-week is one the active window polls on.
-    /// A Mon–Fri schedule viewed on Saturday is "active" (session running) but not scheduled,
-    /// which is why the poll count can sit at 0 all day. Uses local time because the
-    /// schedule is interpreted against the user's wall clock — at 11pm Eastern on a Monday,
-    /// <see cref="DateTime.UtcNow"/> reports Tuesday morning and would wrongly mark
-    /// the user as "outside the schedule".</summary>
-    private bool TodayIsScheduled =>
-        _activeWindow is not null && _activeWindow.DaysOfWeek.Contains(DateTime.Now.DayOfWeek.ToString());
-
-    private string _error = "";
-    private string _loadError = "";
-    private System.Timers.Timer? _sessionRefreshTimer;
-
-    protected override void OnAfterRender(bool firstRender)
-    {
-        if (firstRender)
-        {
-            // Refresh PollCount + LastPollAt every 15s so the "X poll(s) recorded today"
-            // banner stays current while the scheduler is actively polling. Cheap call,
-            // never blocks UI.
-            _sessionRefreshTimer = new System.Timers.Timer(TimeSpan.FromSeconds(15).TotalMilliseconds);
-            _sessionRefreshTimer.Elapsed += async (_, _) =>
-            {
-                if (_activeWindow is not null && !_editing)
-                {
-                    try { await RefreshSessionAsync(); }
-                    catch { /* swallow — periodic refresh only */ }
-                }
-            };
-            _sessionRefreshTimer.AutoReset = true;
-            _sessionRefreshTimer.Start();
-        }
-    }
-
-    private async Task RefreshSessionAsync()
-    {
-        if (_activeWindow is null) return;
-        var sessions = await Http.GetFromJsonAsync(
-            $"/api/routes/{RouteId}/sessions", AppJsonContext.Default.ListSessionDto);
-        DateOnly today = DateOnly.FromDateTime(DateTime.UtcNow.Date);
-        _activeSession = sessions?.FirstOrDefault(
-            s => s.State == SessionState.Active && s.SessionDate == today);
-        await InvokeAsync(StateHasChanged);
-    }
-
-    public void Dispose()
-    {
-        if (_sessionRefreshTimer is not null)
-        {
-            _sessionRefreshTimer.Stop();
-            _sessionRefreshTimer.Dispose();
-            _sessionRefreshTimer = null;
-        }
-    }
-
-    // Defaults for a new schedule: start = local time now, end = two hours later.
-    // Window times are sent as local wall-clock times with the browser's zone.
-    private DateTime? _startTime = Routes.CreateRoutePage.LocalNowToMinute();
-    private DateTime? _endTime = Routes.CreateRoutePage.LocalNowToMinute().AddHours(2);
+    // A new window defaults to "monitor from now": this minute through two hours later.
+    private DateTime? _startTime = ScheduleFields.LocalNowToMinute();
+    private DateTime? _endTime = ScheduleFields.LocalNowToMinute().AddHours(2);
+    private IEnumerable<byte> _days = ScheduleFields.WeekdayBits;
 
     /// <summary>
-    /// Formats a window time for display. A window with a zone holds wall-clock times
-    /// already; a legacy window (no zone) holds UTC and is converted to local time.
+    /// A window with a zone holds wall-clock times already; a legacy window (no zone)
+    /// holds UTC and is converted to local time.
     /// </summary>
     private string FormatWindowTime(string hhmm)
-        => _activeWindow?.TimeZoneId is null
+        => Window?.TimeZoneId is null
             ? LocalTimeFormatter.FormatUtcHHmmAsLocal(hhmm)
             : LocalTimeFormatter.FormatWallClock(hhmm);
-
-    private readonly (string name, byte bit)[] _days =
-    [
-        ("Mon", 0x01), ("Tue", 0x02), ("Wed", 0x04),
-        ("Thu", 0x08), ("Fri", 0x10), ("Sat", 0x20), ("Sun", 0x40)
-    ];
-
-    private readonly Dictionary<string, bool> _selectedDays = new()
-    {
-        ["Mon"] = true, ["Tue"] = true, ["Wed"] = true,
-        ["Thu"] = true, ["Fri"] = true, ["Sat"] = false, ["Sun"] = false
-    };
-
-    protected override async Task OnParametersSetAsync()
-    {
-        // Only (re)load when the route actually changes. The parent (RouteDetailPage) polls
-        // every 15s and re-renders, which re-invokes this on an unchanged RouteId — reloading
-        // there would flash the spinner and wipe any in-progress schedule edit.
-        if (RouteId == _loadedRouteId)
-            return;
-
-        _loadedRouteId = RouteId;
-        await LoadWindowAsync();
-    }
-
-    private async Task LoadWindowAsync()
-    {
-        _loadingWindows = true;
-        _error = "";
-        _loadError = "";
-        try
-        {
-            var windows = await Http.GetFromJsonAsync(
-                $"/api/routes/{RouteId}/windows", AppJsonContext.Default.ListMonitoringWindowDto);
-            _activeWindow = windows?.FirstOrDefault(w => w.IsActive);
-
-            _activeSession = null;
-            if (_activeWindow is not null)
-            {
-                var sessions = await Http.GetFromJsonAsync(
-                    $"/api/routes/{RouteId}/sessions", AppJsonContext.Default.ListSessionDto);
-                DateOnly today = DateOnly.FromDateTime(DateTime.UtcNow.Date);
-                _activeSession = sessions?.FirstOrDefault(
-                    s => s.State == SessionState.Active && s.SessionDate == today);
-            }
-        }
-        catch
-        {
-            _loadError = "Failed to load monitoring configuration. Please refresh the page.";
-        }
-        finally
-        {
-            _loadingWindows = false;
-        }
-    }
 
     private void StartEditing()
     {
         _editing = true;
-        _error = "";
-        // Default to "monitor from now" — start at the current local wall-clock minute,
-        // end two hours later. The existing window is replaced wholesale on save, so
-        // there's no value in re-populating its saved times here; the user is almost
-        // always opening this panel to start a fresh window starting right now.
-        _startTime = Routes.CreateRoutePage.LocalNowToMinute();
-        _endTime = Routes.CreateRoutePage.LocalNowToMinute().AddHours(2);
-
-        if (_activeWindow is not null)
-        {
-            // Carry over the day mask so the user doesn't have to re-pick Mon–Fri etc.
-            // each time. Time fields stay on the now/+2h defaults.
-            foreach (var (name, bit) in _days)
-                _selectedDays[name] = false;
-            foreach (string day in _activeWindow.DaysOfWeek)
-                if (_selectedDays.ContainsKey(day[..3]))
-                    _selectedDays[day[..3]] = true;
-        }
-    }
-
-    private void CancelEditing()
-    {
-        _editing = false;
-        _error = "";
+        _error = null;
+        // Times reset to now → +2h: the window is replaced wholesale, and the user is almost
+        // always here to watch from now. The day mask carries over.
+        _startTime = ScheduleFields.LocalNowToMinute();
+        _endTime = _startTime.Value.AddHours(2);
+        if (Window is not null)
+            _days = ScheduleFields.ToBits(Window.DaysOfWeek);
     }
 
     private async Task StopMonitoringAsync()
     {
-        if (_activeWindow is null || _activeSession is null) return;
+        if (Window is null || Session is null) return;
         _saving = true;
-        _error = "";
+        _error = null;
         try
         {
             HttpResponseMessage resp = await Http.PostAsJsonAsync(
-                $"/api/routes/{RouteId}/windows/{_activeWindow.Id}/stop",
-                new StopSessionRequest(_activeSession.Id), AppJsonContext.Default.StopSessionRequest);
+                $"/api/routes/{RouteId}/windows/{Window.Id}/stop",
+                new StopSessionRequest(Session.Id), AppJsonContext.Default.StopSessionRequest);
 
             if (resp.IsSuccessStatusCode)
-            {
-                await LoadWindowAsync();
                 await OnSaved.InvokeAsync();
-            }
             else
                 _error = "Failed to stop monitoring. Please try again.";
         }
@@ -288,76 +126,61 @@
 
     private async Task SaveWindowAsync()
     {
-        _error = "";
-
-        byte mask = 0;
-        foreach ((string name, byte bit) in _days)
-            if (_selectedDays[name]) mask |= bit;
-
+        _error = null;
+        byte mask = ScheduleFields.ToMask(_days);
         if (mask == 0) { _error = "Select at least one day."; return; }
-        if (_endTime <= _startTime) { _error = "End time must be after start time."; return; }
+        if (_startTime is null || _endTime is null || !ScheduleFields.EndDiffersFromStart(_startTime, _endTime))
+            return;
 
         _saving = true;
         try
         {
-            // C3/UX-7: Delete existing window first if editing — hide this mechanic from the user
-            if (_editing && _activeWindow is not null)
-            {
-                await Http.DeleteAsync($"/api/routes/{RouteId}/windows/{_activeWindow.Id}");
-            }
+            // Editing replaces the window: delete the old one first, out of the user's sight.
+            if (_editing && Window is not null)
+                await Http.DeleteAsync($"/api/routes/{RouteId}/windows/{Window.Id}");
 
             HttpResponseMessage resp = await Http.PostAsJsonAsync(
                 $"/api/routes/{RouteId}/windows",
                 new SaveWindowRequest(
-                    Routes.CreateRoutePage.ToHHmm(_startTime!.Value),
-                    Routes.CreateRoutePage.ToHHmm(_endTime!.Value),
+                    ScheduleFields.ToHHmm(_startTime.Value),
+                    ScheduleFields.ToHHmm(_endTime.Value),
                     mask,
-                    Routes.CreateRoutePage.LocalZoneId), AppJsonContext.Default.SaveWindowRequest);
+                    ScheduleFields.LocalZoneId), AppJsonContext.Default.SaveWindowRequest);
 
-            if (resp.IsSuccessStatusCode)
+            if (!resp.IsSuccessStatusCode)
             {
-                JsonElement body = await resp.Content.ReadFromJsonAsync(
-                    AppJsonContext.Default.JsonElement);
-                Guid windowId = Guid.Empty;
-                if (!body.TryGetProperty("windowId", out JsonElement windowIdElement) ||
-                    !windowIdElement.TryGetGuid(out Guid parsedWindowId))
-                {
-                    _error = "Schedule saved, but monitoring could not be initialized.";
-                    return;
-                }
-                windowId = parsedWindowId;
-
-                HttpResponseMessage startResp = await Http.PostAsync(
-                    $"/api/routes/{RouteId}/windows/{windowId}/start", null);
-                if (!startResp.IsSuccessStatusCode &&
-                    startResp.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
-                {
-                    _error = "Schedule saved, but daily monitoring quota is exhausted.";
-                    return;
-                }
-
-                if (!startResp.IsSuccessStatusCode)
-                {
-                    _error = "Schedule saved, but monitoring could not be initialized.";
-                    return;
-                }
-
-                _editing = false;
-                await LoadWindowAsync();
-                await OnSaved.InvokeAsync();
-            }
-            else
                 _error = await BuildSaveErrorMessageAsync(resp);
+                return;
+            }
+
+            JsonElement body = await resp.Content.ReadFromJsonAsync(AppJsonContext.Default.JsonElement);
+            if (!body.TryGetProperty("windowId", out JsonElement windowIdElement) ||
+                !windowIdElement.TryGetGuid(out Guid windowId))
+            {
+                _error = "Schedule saved, but monitoring could not be initialized.";
+                return;
+            }
+
+            HttpResponseMessage startResp = await Http.PostAsync(
+                $"/api/routes/{RouteId}/windows/{windowId}/start", null);
+            if (!startResp.IsSuccessStatusCode)
+            {
+                _error = startResp.StatusCode == System.Net.HttpStatusCode.TooManyRequests
+                    ? "Schedule saved, but daily monitoring quota is exhausted."
+                    : "Schedule saved, but monitoring could not be initialized.";
+                return;
+            }
+
+            _editing = false;
+            await OnSaved.InvokeAsync();
         }
         catch { _error = "Unable to connect. Please try again."; }
         finally { _saving = false; }
     }
 
     /// <summary>
-    /// Maps non-2xx POST /windows responses to a user-facing message. Without
-    /// this the panel just said "Failed to save schedule" regardless of cause,
-    /// which hid wrap-around-midnight-UTC rejections (422), already-active
-    /// windows (409), and auth issues (401/403) behind a single generic line.
+    /// Maps non-2xx POST /windows responses to a user-facing message, rather than one
+    /// generic line hiding 422s, 409s and auth issues alike.
     /// </summary>
     private static async Task<string> BuildSaveErrorMessageAsync(HttpResponseMessage resp)
     {
@@ -388,9 +211,9 @@
             System.Net.HttpStatusCode.UnprocessableEntity => serverMessage.Contains("Equal", StringComparison.OrdinalIgnoreCase)
                 ? "End time cannot equal start time."
                 : "The server rejected this schedule — check the times and selected days.",
-            System.Net.HttpStatusCode.Conflict => "A schedule is already active for this route. " +
+            System.Net.HttpStatusCode.Conflict => "A schedule is already active for this commute. " +
                                                   "Stop monitoring or refresh the page, then try again.",
-            System.Net.HttpStatusCode.NotFound => "This route no longer exists.",
+            System.Net.HttpStatusCode.NotFound => "This commute no longer exists.",
             System.Net.HttpStatusCode.Unauthorized => "You're signed out. Sign in and try again.",
             _ => "Failed to save schedule. Please try again."
         };

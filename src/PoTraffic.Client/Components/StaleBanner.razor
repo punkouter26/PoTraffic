@@ -1,0 +1,15 @@
+@* Why the numbers stopped moving. Rendered only when the news is bad: a permanent
+   green "Live" strip on a healthy app is a row of pixels nobody reads. The dashboard
+   and the route page each had their own copy with its own styling. *@
+@if (IsOffline || IsStale)
+{
+    <div class="pt-stale-banner pt-enter" role="status">
+        <PtIcon Name="@(IsOffline ? "wifi_off" : "cloud_off")" Size="sm" />
+        @(IsOffline ? "Offline — showing the last data received." : "Can't reach the server — retrying.")
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsOffline { get; set; }
+    [Parameter] public bool IsStale { get; set; }
+}

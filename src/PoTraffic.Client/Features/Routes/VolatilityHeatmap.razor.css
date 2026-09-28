@@ -4,7 +4,18 @@
    rules reads correctly in both the light and dark themes instead of needing a
    second palette under [data-theme="dark"]. */
 
+.pt-heatmap-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--pt-space-3);
+    margin-bottom: var(--pt-space-3);
+}
+
 .pt-heatmap-summary {
+    flex: 1 1 auto;
+    margin: 0;
+    font-size: var(--pt-text-sm);
     color: var(--pt-fg-secondary);
 }
 
@@ -22,23 +33,15 @@
     container-name: pt-heatmap;
 }
 
-/* Tight card: drop the per-cell number and let colour carry the reading. The
-   tooltip and the visually-hidden text still hold the full figures. */
-@container pt-heatmap (width < 26rem) {
-    .pt-heat-value { display: none; }
-
-    .pt-heat {
-        min-width: 1.5rem;
-        height: 1.4rem;
-    }
-
-    .pt-heatmap-hour { min-width: 1.5rem; font-size: 0.65rem; }
-}
-
+/* Auto layout at full width: a short commute's eight columns share the card
+   instead of huddling in its left half, while a long window still falls back to
+   its columns' minimum widths and scrolls. */
 .pt-heatmap {
     border-collapse: separate;
     border-spacing: 3px;
-    table-layout: fixed;
+    table-layout: auto;
+    width: 100%;
+    max-width: 60rem;
 }
 
 .pt-heatmap-hour,
@@ -58,6 +61,11 @@
     text-align: right;
     padding-right: var(--pt-space-2);
     white-space: nowrap;
+    /* Stays put when a long window scrolls sideways, so a row never loses its day. */
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: var(--pt-bg-surface);
 }
 
 .pt-heat {
@@ -202,4 +210,50 @@ td.pt-heat {
     position: absolute;
     white-space: nowrap;
     width: 1px;
+}
+
+/* Tight card: drop the per-cell number and let colour carry the reading. The
+   tooltip and the visually-hidden text still hold the full figures.
+
+   Only on-the-hour labels show, positioned out of flow so they overhang the
+   quarter columns beside them. A "07:15" label in every column set the column's
+   minimum width, and nine of them clipped the last two columns off a phone. The
+   quarter labels stay in the accessibility tree.
+
+   Last in the file on purpose: these override the base .pt-heat and
+   .pt-heatmap-hour rules at equal specificity, and when this block sat above
+   them the base min-widths won and the narrow sizes never applied. */
+@container pt-heatmap (width < 26rem) {
+    .pt-heat-value { display: none; }
+
+    .pt-heat {
+        min-width: 1.5rem;
+        height: 1.4rem;
+    }
+
+    .pt-heatmap-hour {
+        position: relative;
+        min-width: 1.5rem;
+        height: 1.25rem;
+    }
+
+    .pt-heatmap-hour > span {
+        position: absolute;
+        left: 0;
+        top: 0;
+        white-space: nowrap;
+    }
+
+    /* The last column has no neighbour to overhang — anchor its label right. */
+    .pt-heatmap-hour:last-child > span {
+        left: auto;
+        right: 0;
+    }
+
+    .pt-heatmap-hour:not(.pt-heatmap-hour-top) > span {
+        clip-path: inset(50%);
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+    }
 }

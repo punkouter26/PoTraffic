@@ -1,9 +1,5 @@
 /* ── RouteCard — scoped styles (replaces inline style="" attributes) ── */
 
-.pt-route-card-status {
-    flex-shrink: 0;
-}
-
 .pt-route-card-name {
     font-weight: var(--pt-weight-semibold);
     color: var(--pt-fg-primary);

@@ -1,0 +1,18 @@
+/* Start, end and days on one row when there is room; they wrap on a phone. */
+.pt-schedule-fields {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--pt-space-3);
+    margin-bottom: var(--pt-space-3);
+}
+
+.pt-schedule-fields ::deep .rz-form-field {
+    flex: 0 0 8.5rem;
+}
+
+/* The days take a row of their own, full width — app.css shares it out equally,
+   so seven labels fit a phone without wrapping. */
+.pt-schedule-fields ::deep .pt-day-toggles {
+    flex-basis: 100%;
+}
