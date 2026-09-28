@@ -1,7 +1,8 @@
 # PoTraffic - Empirical Commute Volatility Engine
 
 PoTraffic is a Blazor WebAssembly + ASP.NET Core application that measures
-commute route volatility using Google Maps and TomTom APIs. It records
+commute route volatility using Google Maps travel times (TomTom supplies
+traffic incidents only). It records
 travel-time samples on a schedule, computes route baselines, and flags
 congestion or reroute anomalies in real time.
 
@@ -10,7 +11,7 @@ congestion or reroute anomalies in real time.
 | Layer | Technology |
 |---|---|
 | Front-end | Blazor WebAssembly (.NET 10) + Radzen Blazor |
-| Back-end | ASP.NET Core Minimal API (.NET 10) + MediatR |
+| Back-end | ASP.NET Core Minimal API (.NET 10); feature-folder handlers called from minimal-API endpoints |
 | Persistence | Azure Table Storage, Azurite locally |
 | Background Jobs | Table Storage-backed scheduler |
 | Auth | Microsoft OAuth in dev/prod, Testing-only auth bypasses |
@@ -25,10 +26,7 @@ CORS is intentionally not configured.
 
 ```text
 src/
-  PoTraffic.Domain/          # Pure domain entities and value objects
-  PoTraffic.Application/     # Interfaces, contracts, validators
-  PoTraffic.Infrastructure/  # Azure, Table Storage, external providers
-  PoTraffic.API/             # ASP.NET Core host and vertical slices
+  PoTraffic.API/             # ASP.NET Core host, Features/ slices, Infrastructure/
   PoTraffic.Client/          # Blazor WASM front-end
   PoTraffic.Shared/          # DTOs shared by API and client
 tests/
@@ -58,8 +56,8 @@ The startup script starts Azurite, clears stale `dotnet` processes on ports
 |---|---|
 | `https://localhost:5001` | Hosted API + Blazor client |
 | `https://localhost:5001/scalar/v1` | Scalar API reference in Development |
-| `https://localhost:5001/health` | JSON health check |
-| `https://localhost:5001/diag` | Hidden diagnostics page |
+| `https://localhost:5001/health` | Health status page (JSON at `/health/json`) |
+| `https://localhost:5001/diag/keyvault` | Admin-only Key Vault diagnostics API |
 
 ## Running Tests
 

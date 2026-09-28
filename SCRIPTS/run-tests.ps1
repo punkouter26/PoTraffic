@@ -1,15 +1,15 @@
 # filepath: SCRIPTS/run-tests.ps1
 <#
 .SYNOPSIS
-    CI/CD rule #10 — Run all four test tiers (Unit, Integration, E2E API, E2E UI)
+    Run all four test tiers (Unit, Integration, E2E API, E2E UI)
     and produce a single HTML report at TestResults/test-report.html.
 
 .DESCRIPTION
-    Tier ratio enforced: 100 / 50 / 25 / 25.
-      • PoTraffic.UnitTests          → 100% (no I/O, FluentValidation, DTO mapping)
-      • PoTraffic.IntegrationTests              →  50% (WAF + Azurite via Testcontainers, IAsyncDisposable)
-      • PoTraffic.E2ETests/Api      →  25% (live HTTP)
-      • PoTraffic.E2ETests/Ui       →  25% (Playwright mobile + desktop landscape)
+    Tiers:
+      • PoTraffic.UnitTests          (no I/O)
+      • PoTraffic.IntegrationTests   (WAF + Azurite via Testcontainers)
+      • PoTraffic.E2ETests/Api       (live HTTP against a Testing host)
+      • PoTraffic.E2ETests/Ui        (Playwright mobile + desktop landscape)
 
     Azurite is owned by Testcontainers inside PoTraffic.IntegrationTests — explicitly torn
     down at the end of the run. E2E UI launches Chrome in headed mode by default
@@ -144,7 +144,8 @@ function Invoke-Tier {
     param(
         [string]$TierName,
         [string]$Project,
-        [string]$DisplayName
+        [string]$DisplayName,
+        [string]$Filter
     )
     Write-Host "`n=== $DisplayName ===" -ForegroundColor Cyan
     $trxDir = Join-Path $testResultsRoot $TierName
@@ -152,10 +153,9 @@ function Invoke-Tier {
 
     $start = Get-Date
     $trxFile = Join-Path $trxDir "$TierName.trx"
-    # Build the test project (and its dependents) to pick up the latest sources
-    $buildCmd = @('build', (Join-Path $root $Project), '--configuration', 'Debug', '-nologo')
-    & dotnet @buildCmd 2>&1 | Out-Null
+    # The solution was built once up front, so tests run --no-build.
     $cmd = @('test', (Join-Path $root $Project), '--no-build', '--logger', "trx;LogFileName=$TierName.trx", '--results-directory', $trxDir)
+    if ($Filter) { $cmd += @('--filter', $Filter) }
     $output = & dotnet @cmd 2>&1 | Out-String
     $end = Get-Date
     $exitCode = $LASTEXITCODE
@@ -236,10 +236,9 @@ function Render-HtmlReport {
     [void]$sb.AppendLine('.fail { background: #ffd9d9; color: #8b1d1d; }')
     [void]$sb.AppendLine('pre { background: #1e2433; color: #e4e8f1; padding: 12px; border-radius: 6px; overflow: auto; font-size: 12px; max-height: 200px; }')
     [void]$sb.AppendLine('details summary { cursor: pointer; color: #4a5876; font-size: 12px; padding: 4px 0; }')
-    [void]$sb.AppendLine('.ci-rules { background: #fff; border: 1px solid #d4dae5; border-radius: 8px; padding: 16px 24px; }')
     [void]$sb.AppendLine('</style></head><body>')
     [void]$sb.AppendLine('<h1>PoTraffic - Test Report</h1>')
-    [void]$sb.AppendLine("<div class='meta'>Generated $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') local - Total run time: $([math]::Round($TotalSeconds, 1)) s - Tier ratio: 100 / 50 / 25 / 25 (Unit / Integration / E2E API / E2E UI)</div>")
+    [void]$sb.AppendLine("<div class='meta'>Generated $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') local - Total run time: $([math]::Round($TotalSeconds, 1)) s</div>")
     [void]$sb.AppendLine("<div class='summary'>")
     [void]$sb.AppendLine("<div class='kpi'><span class='kpi-value'>$TotalTests</span><span class='kpi-label'>Total tests</span></div>")
     [void]$sb.AppendLine("<div class='kpi'><span class='kpi-value' style='color:#14692e'>$TotalPassed</span><span class='kpi-label'>Passed</span></div>")
@@ -254,33 +253,6 @@ function Render-HtmlReport {
         $safeLog = ConvertTo-HtmlSafe $e.logTail
         $details = "<details><summary>Show log tail</summary><pre>$safeLog</pre></details>"
         [void]$sb.AppendLine("<tr><td>$($e.displayName)</td><td><code>$($e.project)</code></td><td>$statusPill</td><td>$($e.counts.total)</td><td>$($e.counts.passed)</td><td>$($e.counts.failed)</td><td>$($e.counts.skipped)</td><td>$([math]::Round($e.durationSeconds, 1)) s</td><td>$details</td></tr>")
-    }
-    [void]$sb.AppendLine('</tbody></table>')
-    [void]$sb.AppendLine('<h2>CI/CD rules verified by this run</h2><div class="ci-rules"><ol>')
-    [void]$sb.AppendLine('<li><strong>Tiered execution</strong> - Unit / Integration / E2E API / E2E UI run as separate assemblies.</li>')
-    [void]$sb.AppendLine('<li><strong>Simplified CI/CD YAML</strong> - Build + deploy only; tests run via this script.</li>')
-    [void]$sb.AppendLine('<li><strong>Lifecycle-managed Testcontainers</strong> - Azurite started inside WebApplicationFactory and explicitly torn down.</li>')
-    [void]$sb.AppendLine('<li><strong>AI boundary mocked</strong> - Microsoft OAuth calls intercepted by MockExternalAuthDelegatingHandler in test hosts.</li>')
-    [void]$sb.AppendLine('<li><strong>Mobile + desktop viewport parity</strong> - Playwright runs against iPhone 14 mobile and desktop-landscape profiles.</li>')
-    [void]$sb.AppendLine('<li><strong>Identity and hub centralization</strong> - app-potraffic-* naming, kv-poshared, Managed Identity only.</li>')
-    [void]$sb.AppendLine('<li><strong>Telemetry budgets</strong> - CompositeRoutingSampler at 5%/1% in prod; 30-day storage lifecycle.</li>')
-    [void]$sb.AppendLine('<li><strong>Post-deploy smoke</strong> - <code>./SCRIPTS/post-deploy-smoke.ps1</code> checks /health, render tree, /diag.</li>')
-    [void]$sb.AppendLine('</ol></div>')
-    [void]$sb.AppendLine('<h2>Top 10 ideas - implementation status</h2><table><thead><tr><th>#</th><th>Idea</th><th>Status</th><th>Files touched</th></tr></thead><tbody>')
-    $ideas = @(
-        '1|Tiered test execution (100/50/25/25)|Implemented|tests/PoTraffic.UnitTests/*, tests/PoTraffic.IntegrationTests/*'
-        '2|Simplified CI/CD YAML|Implemented|.github/workflows/deploy.yml'
-        '3|Lifecycle-managed Testcontainers Azurite|Implemented|tests/PoTraffic.IntegrationTests/Integration/Infrastructure/AzuriteTestContainer.cs'
-        '4|Mock AI boundaries via DelegatingHandler|Implemented|src/PoTraffic.API/Infrastructure/Security/MockExternalAuthDelegatingHandler.cs'
-        '5|Mobile + desktop Playwright viewports|Implemented|tests/PoTraffic.E2ETests/Ui/Viewports.cs, ViewportsTheory.cs'
-        '6|Po naming + Managed Identity + PoShared|Implemented|infra/main.bicep'
-        '8|App Insights adaptive sampling + storage lifecycle|Implemented|src/PoTraffic.API/Infrastructure/Observability/*, infra/main.bicep'
-        '9|Post-deploy smoke (Playwright + /health + /diag)|Implemented|SCRIPTS/post-deploy-smoke.ps1, src/PoTraffic.API/Features/Diagnostics/*'
-        '10|Test-run HTML report|Implemented|SCRIPTS/run-tests.ps1'
-    )
-    foreach ($row in $ideas) {
-        $parts = $row -split '\|', 4
-        [void]$sb.AppendLine("<tr><td>$($parts[0])</td><td>$($parts[1])</td><td><span class='pill pass'>$($parts[2])</span></td><td><code>$($parts[3])</code></td></tr>")
     }
     [void]$sb.AppendLine('</tbody></table>')
     [void]$sb.AppendLine("<p class='meta'>Report path: $Path</p></body></html>")
@@ -305,7 +277,7 @@ if (-not $SkipBuild) {
     if ($LASTEXITCODE -ne 0) { throw 'Build failed.' }
 }
 
-# ── Tier 1: Unit (no I/O, FluentValidation, DTO mapping) ────────────────────
+# ── Tier 1: Unit (no I/O) ───────────────────────────────────────────────────
 if ($runUnit) {
     Invoke-Tier -TierName 'UnitTests' -DisplayName 'Unit (pure, no I/O)' `
         -Project 'tests/PoTraffic.UnitTests'
@@ -334,14 +306,14 @@ if ($runE2eApi -or $runE2eUi) {
 
         if ($runE2eApi) {
             Invoke-Tier -TierName 'E2EApiTests' -DisplayName 'E2E API (live HTTP)' `
-                -Project 'tests/PoTraffic.E2ETests'
+                -Project 'tests/PoTraffic.E2ETests' -Filter 'FullyQualifiedName~PoTraffic.E2ETests.Api.'
         }
         if ($runE2eUi) {
             Install-PlaywrightChromium
             # Headed Chrome by default on dev workstations
             if (-not $env:E2E_HEADED) { $env:E2E_HEADED = '1' }
             Invoke-Tier -TierName 'E2EUiTests' -DisplayName 'E2E UI (Playwright mobile + desktop landscape)' `
-                -Project 'tests/PoTraffic.E2ETests'
+                -Project 'tests/PoTraffic.E2ETests' -Filter 'FullyQualifiedName~PoTraffic.E2ETests.Ui.'
         }
     }
     finally {

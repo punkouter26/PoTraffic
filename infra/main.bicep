@@ -37,11 +37,8 @@ param keyVaultUri string = 'https://kv-poshared.vault.azure.net/'
 @description('Key Vault name, derived from URI, for role assignment scope.')
 param keyVaultName string = last(split(keyVaultUri, '/'))
 
-@description('Storage account for PoTraffic (table/queue/blob). Set to empty string to skip provisioning.')
-param storageAccountName string = 'stpotrafficprodwus2001'
-
-@description('Enable 30-day blob lifecycle policy on the PoTraffic storage account (CI/CD rule #8).')
-param enableStorageLifecycle bool = true
+@description('Existing storage account (same resource group) holding the PoTraffic tables. Referenced, not created.')
+param storageAccountName string = 'potrafficstorage'
 
 resource web 'Microsoft.Web/sites@2024-04-01' = {
   name: webAppName
@@ -72,16 +69,10 @@ resource web 'Microsoft.Web/sites@2024-04-01' = {
         { name: 'AZURE_CLIENT_ID', value: sharedIdentityClientId }
         // Deploy a pre-built artifact from CI — skip Oryx build-on-deploy.
         { name: 'SCM_DO_BUILD_DURING_DEPLOYMENT', value: 'false' }
-        // Surface the real startup exception instead of a generic 500.30.
-        // Stripped back to false once ops confirms healthy boots.
-        { name: 'ASPNETCORE_DETAILEDERRORS', value: 'true' }
-        // MEL/Sink verbosity — captures hydration, scheduler, and storage failures.
-        { name: 'Logging__LogLevel__Default', value: 'Information' }
-        { name: 'Logging__LogLevel__Microsoft__Hosting__Lifetime', value: 'Information' }
-        { name: 'Logging__LogLevel__PoTraffic', value: 'Debug' }
         // Force the managed-identity path explicitly (TableStorageExtensions
         // honors this and avoids DefaultAzureCredential ambiguity).
         { name: 'AzureTable__UseManagedIdentity', value: 'true' }
+        { name: 'AzureTable__AccountName', value: storageAccountName }
       ]
     }
   }
@@ -106,23 +97,9 @@ resource webKvSecretsUser 'Microsoft.Authorization/roleAssignments@2022-04-01' =
   }
 }
 
-// ── CI/CD rule #8 — Storage lifecycle: auto-delete after 30 days ────────────
-// Provisioned only if storageAccountName is non-empty AND enableStorageLifecycle.
-resource storage 'Microsoft.Storage/storageAccounts@2023-01-01' = if (!empty(storageAccountName)) {
+// ── Storage: the existing PoTraffic account (Tables only) ─────────────────
+resource storage 'Microsoft.Storage/storageAccounts@2023-01-01' existing = {
   name: storageAccountName
-  location: location
-  sku: {
-    name: 'Standard_LRS'
-  }
-  kind: 'StorageV2'
-  properties: {
-    minimumTlsVersion: 'TLS1_2'
-    supportsHttpsTrafficOnly: true
-    allowBlobPublicAccess: false
-    networkAcls: {
-      defaultAction: 'Allow'
-    }
-  }
 }
 
 // ── Storage role assignments (CI/CD rule #6 — Managed Identity only) ───────
@@ -143,7 +120,7 @@ var storageTableDataContributorRoleId = subscriptionResourceId(
   'Microsoft.Authorization/roleDefinitions',
   '0a9a7e1f-b9d0-4cc4-a60d-9918e0c33e7d')  // Storage Table Data Contributor
 
-resource saUserAssignedTableContrib 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(storageAccountName)) {
+resource saUserAssignedTableContrib 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(storage.id, sharedIdentityId, 'sttdc')
   scope: storage
   properties: {
@@ -153,45 +130,13 @@ resource saUserAssignedTableContrib 'Microsoft.Authorization/roleAssignments@202
   }
 }
 
-resource saSystemAssignedTableContrib 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(storageAccountName)) {
+resource saSystemAssignedTableContrib 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(storage.id, web.id, 'sttdc')
   scope: storage
   properties: {
     roleDefinitionId: storageTableDataContributorRoleId
     principalId:      web.identity.principalId
     principalType:    'ServicePrincipal'
-  }
-}
-
-// Management policy: archive after 30 days, then delete after 365 days (CI/CD rule #8).
-resource storageLifecycle 'Microsoft.Storage/storageAccounts/managementPolicies@2023-01-01' = if (!empty(storageAccountName) && enableStorageLifecycle) {
-  parent: storage
-  name: 'default'
-  properties: {
-    policy: {
-      rules: [
-        {
-          name: 'PoTrafficArchiveAfter30Days'
-          enabled: true
-          type: 'Lifecycle'
-          definition: {
-            actions: {
-              baseBlob: {
-                tierToArchive: {
-                  daysAfterModificationGreaterThan: 30
-                }
-                delete: {
-                  daysAfterModificationGreaterThan: 365
-                }
-              }
-            }
-            filters: {
-              blobTypes: [ 'blockBlob' ]
-            }
-          }
-        }
-      ]
-    }
   }
 }
 

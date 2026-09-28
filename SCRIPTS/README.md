@@ -1,6 +1,6 @@
 # SCRIPTS
 
-PowerShell / Python utility scripts for local development and CI. Run all scripts from the **repository root** unless noted otherwise.
+PowerShell utility scripts for local development and CI. Run all scripts from the **repository root** unless noted otherwise.
 
 ---
 
@@ -8,7 +8,7 @@ PowerShell / Python utility scripts for local development and CI. Run all script
 
 | File | Purpose |
 |------|---------|
-| `setup.ps1` | First-time setup: installs missing tools via `winget` (.NET SDK, Docker Desktop, Azure CLI), checks `az login`, verifies Key Vault access, and starts Azurite. (Rule 9) |
+| `setup.ps1` | First-time setup: checks for the .NET SDK, Docker Desktop and Azure CLI (printing `winget` install hints for anything missing), checks `az login` and Key Vault access, then restores and builds the solution. |
 | `start-dev.ps1` | Starts all local dependencies (Azurite via Docker) and then launches the PoTraffic API + Blazor client. Kills any existing `dotnet` processes on port 5000/5001 first. |
 | `stop-dev.ps1` | Stops and removes the local Docker containers (Azurite). |
 | `run-tests.ps1` | Runs all four tiers and writes `TestResults/test-report.html`. Integration owns an Azurite container via Testcontainers (needs Docker); the E2E tiers get a `Testing` host started and stopped for them on `http://localhost:5150`. |
@@ -27,9 +27,6 @@ PowerShell / Python utility scripts for local development and CI. Run all script
 ## Quick start (first checkout)
 
 ```powershell
-# 1. Start Azurite storage emulator
-docker compose up -d
-
-# 2. Run the app (kills any stale dotnet processes first)
+# Starts Azurite (docker compose) and runs the app, killing any stale dotnet processes first
 ./SCRIPTS/start-dev.ps1
 ```

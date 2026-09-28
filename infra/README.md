@@ -3,7 +3,9 @@
 `main.bicep` captures the **production App Service configuration** for `potraffic-api-win`
 so it is reproducible and drift-proof. The App Service Plan, shared user-assigned
 managed identity, and Key Vault live in the **PoShared** resource group and are
-referenced by ID (not created here).
+referenced by ID (not created here). The storage account `potrafficstorage` (Tables only)
+already exists in the **PoTraffic** resource group; the template references it and grants
+both the shared MI and the web app's system-assigned MI *Storage Table Data Contributor* on it.
 
 ## Apply
 
@@ -21,6 +23,7 @@ az deployment group create   -g PoTraffic -f infra/main.bicep -p @infra/main.par
 |---|---|---|
 | `KeyVault__Uri` | `https://kv-poshared.vault.azure.net/` | Config key is `KeyVault:Uri`. A misnamed `AzureKeyVault__VaultUri` silently disables Key Vault → prod fail-fast → 503. |
 | `AZURE_CLIENT_ID` | shared MI clientId | Makes `DefaultAzureCredential` use the shared `mi-poshared-containerapps` identity for Key Vault. |
+| `AzureTable__UseManagedIdentity` / `AzureTable__AccountName` | `true` / `potrafficstorage` | Table Storage via managed identity — no connection string. |
 | `ASPNETCORE_ENVIRONMENT` | `Production` | Prod hard-requires Key Vault secrets. |
 | `SCM_DO_BUILD_DURING_DEPLOYMENT` | `false` | CI deploys a pre-built artifact; skip Oryx build-on-deploy. |
 | `httpsOnly` / `minTlsVersion` / `ftpsState` | true / 1.2 / FtpsOnly | Security posture. |

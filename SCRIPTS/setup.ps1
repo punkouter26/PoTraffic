@@ -3,11 +3,10 @@
 #
 # Steps:
 #   1. Verify .NET 10 SDK is installed (per global.json).
-#   2. Verify Docker Desktop is installed and running.
+#   2. Verify Docker Desktop is installed and running (Azurite + Testcontainers).
 #   3. Verify Azure CLI is installed.
 #   4. Check `az login` status and remind the user to log in to access Key Vault.
-#   5. Verify Docker is ready for Testcontainers-backed integration tests.
-#   6. Restore + build the solution.
+#   5. Restore + build the solution.
 
 [CmdletBinding()]
 param()
@@ -26,7 +25,7 @@ function Ok($msg)  { Write-Host "  ✅ $msg" -ForegroundColor Green }
 function Warn($msg){ Write-Host "  ⚠️  $msg" -ForegroundColor Yellow }
 function Err($msg) { Write-Host "  ❌ $msg" -ForegroundColor Red }
 
-Step '1/6' 'Verifying .NET 10 SDK...'
+Step '1/5' 'Verifying .NET 10 SDK...'
 try {
     $dotnetVersion = (& dotnet --version 2>$null).Trim()
     if ($dotnetVersion -notmatch '^10\.') {
@@ -40,7 +39,7 @@ try {
     Warn 'Install via winget: winget install Microsoft.DotNet.SDK.10'
 }
 
-Step '2/6' 'Verifying Docker Desktop...'
+Step '2/5' 'Verifying Docker Desktop...'
 try {
     $dockerVersion = (& docker --version 2>$null).Trim()
     Ok $dockerVersion
@@ -55,7 +54,7 @@ try {
     Warn 'Install via winget: winget install Docker.DockerDesktop'
 }
 
-Step '3/6' 'Verifying Azure CLI...'
+Step '3/5' 'Verifying Azure CLI...'
 try {
     $azVersion = (& az --version 2>$null | Select-Object -First 1).Trim()
     Ok $azVersion
@@ -63,7 +62,7 @@ try {
     Warn 'Azure CLI not found. Install via winget: winget install Microsoft.AzureCLI'
 }
 
-Step '4/6' 'Checking `az login` status...'
+Step '4/5' 'Checking `az login` status...'
 try {
     $azAccount = (& az account show --query "name" -o tsv 2>$null).Trim()
     if ([string]::IsNullOrWhiteSpace($azAccount)) {
@@ -82,19 +81,7 @@ try {
     Warn 'az CLI not available — skipping auth check.'
 }
 
-Step '5/6' 'Verifying Docker for Testcontainers...'
-try {
-    & docker info *> $null
-    if ($LASTEXITCODE -eq 0) {
-        Ok 'Docker daemon is reachable. Integration tests will create Azurite through Testcontainers.'
-    } else {
-        Warn 'Docker daemon is not reachable. Start Docker Desktop before running integration or E2E tests.'
-    }
-} catch {
-    Warn 'Docker daemon is not reachable. Start Docker Desktop before running integration or E2E tests.'
-}
-
-Step '6/6' 'Restoring + building solution...'
+Step '5/5' 'Restoring + building solution...'
 try {
     & dotnet restore
     if ($LASTEXITCODE -ne 0) { throw 'restore failed' }
