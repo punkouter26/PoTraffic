@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using PoTraffic.API.Features.Alerts;
+using PoTraffic.API.Infrastructure.Providers;
 using PoTraffic.API.Infrastructure.Storage;
 
 namespace PoTraffic.UnitTests.Helpers;
@@ -10,5 +11,5 @@ namespace PoTraffic.UnitTests.Helpers;
 internal static class AlertTestHelper
 {
     public static AlertEvaluator NoOp(TableStorageContext db) =>
-        new(db, Substitute.For<IPushNotifier>(), NullLogger<AlertEvaluator>.Instance);
+        new(db, Substitute.For<IPushNotifier>(), Substitute.For<IIncidentProvider>(), NullLogger<AlertEvaluator>.Instance);
 }

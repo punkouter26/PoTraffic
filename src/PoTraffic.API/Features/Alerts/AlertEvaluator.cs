@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using PoTraffic.API.Features.Alerts;
 using PoTraffic.API.Features.MonitoringWindows;
 using PoTraffic.API.Features.Routes;
+using PoTraffic.API.Infrastructure.Providers;
 using PoTraffic.API.Infrastructure.Storage;
 using PoTraffic.API.Infrastructure.Time;
 using PoTraffic.Shared.Constants;
@@ -15,7 +16,11 @@ namespace PoTraffic.API.Features.Alerts;
 /// De-duplicated per session so a congested commute produces one alert, not one per poll.
 /// Runs inside the poll's scope; push delivery failures never break polling.
 /// </summary>
-public sealed class AlertEvaluator(TableStorageContext db, IPushNotifier push, ILogger<AlertEvaluator> logger)
+public sealed class AlertEvaluator(
+    TableStorageContext db,
+    IPushNotifier push,
+    IIncidentProvider incidents,
+    ILogger<AlertEvaluator> logger)
 {
     public async Task EvaluateAsync(EntityRoute route, PollRecord record, MonitoringSession session, CancellationToken ct)
     {
@@ -46,6 +51,23 @@ public sealed class AlertEvaluator(TableStorageContext db, IPushNotifier push, I
 
         if (raised.Count == 0)
             return;
+
+        // Say why, when we can: one incident lookup per alert-raising poll, never per poll.
+        if (raised.Any(a => a.Kind != LeaveNowKind) && !string.IsNullOrEmpty(route.PathPolyline))
+        {
+            try
+            {
+                if (await incidents.DescribeWorstOnPathAsync(route.PathPolyline, ct) is { } cause)
+                {
+                    foreach (Alert a in raised.Where(a => a.Kind != LeaveNowKind))
+                        a.Message += $" Likely cause: {cause}.";
+                }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogWarning(ex, "Incident lookup failed for route {RouteId}", route.Id);
+            }
+        }
 
         foreach (Alert a in raised)
             db.Add(a);

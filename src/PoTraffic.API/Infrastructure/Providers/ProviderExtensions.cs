@@ -36,6 +36,11 @@ public static class ProviderExtensions
             services.AddKeyedScoped<ITrafficProvider, TomTomTrafficProvider>(RouteProvider.TomTom);
         }
 
+        // Incident explanations for alerts. A no-op without TomTom:ApiKey, so it is safe to
+        // register unconditionally (mock mode included — no key, no calls).
+        services.AddHttpClient<IIncidentProvider, TomTomIncidentProvider>()
+            .AddResilienceHandler(ResiliencePipelineExtensions.TrafficPipeline);
+
         // Factory pattern — ITrafficProviderFactory hides IKeyedServiceProvider cast from handlers
         services.AddScoped<ITrafficProviderFactory, KeyedServiceTrafficProviderFactory>();
 
