@@ -19,6 +19,7 @@ public sealed record SetTimeZoneRequest(string TimeZoneId);
 public sealed record PushKeyResponse(string PublicKey);
 public sealed record PushSubscriptionRequest(string Endpoint, string P256dh, string Auth);
 public sealed record PushUnsubscribeRequest(string Endpoint);
+public sealed record SetArriveByRequest(string? ArriveBy);
 public sealed record CreateSampleRouteRequest(int UtcOffsetMinutes);
 
 /// <summary>
@@ -39,7 +40,8 @@ public sealed record DashboardSnapshot(
 public sealed record RouteInsight(
     RouteId RouteId,
     OptimalDepartureDto? OptimalDeparture,
-    List<PollRecordDto> RecentPolls);
+    List<PollRecordDto> RecentPolls,
+    DeparturePlanDto? Plan = null);
 
 /// <summary>Keys used with <see cref="PoTraffic.Client.Infrastructure.ClientCache"/>.</summary>
 public static class ClientCacheKeys
@@ -86,6 +88,8 @@ public static class ClientCacheKeys
 [JsonSerializable(typeof(PushKeyResponse))]
 [JsonSerializable(typeof(PushSubscriptionRequest))]
 [JsonSerializable(typeof(PushUnsubscribeRequest))]
+[JsonSerializable(typeof(SetArriveByRequest))]
+[JsonSerializable(typeof(DeparturePlanDto))]
 [JsonSerializable(typeof(WeatherImpactResponse))]
 [JsonSerializable(typeof(CreateSampleRouteRequest))]
 [JsonSerializable(typeof(DashboardSnapshot))]

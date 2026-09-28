@@ -48,7 +48,11 @@
                 }
             </div>
             <div class="pt-route-card-time">
-                @if (OptimalDeparture is not null)
+                @if (Plan is { LeaveBy: { } leaveBy })
+                {
+                    <span class="pt-route-card-time-value">Leave by @LocalTimeFormatter.FormatWallClock(leaveBy)</span>
+                }
+                else if (OptimalDeparture is not null)
                 {
                     <span class="pt-route-card-time-value">@_durationLabel</span>
                 }
@@ -89,6 +93,9 @@
 @code {
     [Parameter, EditorRequired] public RouteDto Route { get; set; } = default!;
     [Parameter] public OptimalDepartureDto? OptimalDeparture { get; set; }
+
+    /// <summary>Leave-by for the route's arrive-by target; null when none is set.</summary>
+    [Parameter] public DeparturePlanDto? Plan { get; set; }
     [Parameter] public IReadOnlyList<PollRecordDto> RecentPolls { get; set; } = [];
     [Parameter] public EventCallback OnDeleted { get; set; }
     [Parameter] public EventCallback OnRefresh { get; set; }

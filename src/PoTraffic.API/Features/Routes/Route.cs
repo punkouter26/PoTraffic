@@ -36,6 +36,12 @@ public sealed class Route
     public bool IsSample { get; set; }
 
     /// <summary>
+    /// Local time (user's zone) the user needs to be at the destination. Drives the
+    /// departure plan and the "leave now" nudge; null when the user hasn't set one.
+    /// </summary>
+    public TimeOnly? ArriveBy { get; set; }
+
+    /// <summary>
     /// The road shape between origin and destination, as a Google-encoded polyline.
     /// Fetched lazily the first time the route's map is opened and kept forever — the
     /// roads between two fixed addresses do not change between probes, so this is one

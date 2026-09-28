@@ -4,6 +4,7 @@ using PoTraffic.API.Infrastructure.Http;
 using PoTraffic.API.Infrastructure.Security;
 using PoTraffic.API.Infrastructure.Storage;
 using PoTraffic.API.Infrastructure.Time;
+using PoTraffic.Shared.DTOs.History;
 using PoTraffic.Shared.DTOs.Routes;
 
 namespace PoTraffic.API.Features.History;
@@ -71,6 +72,18 @@ public static class HistoryEndpoints
             return result is null ? Results.NoContent() : ConditionalJson.Ok(ctx, result);
         });
 
+        // GET /api/routes/{routeId}/departure-plan?dayOfWeek=Monday — leave-by for the arrive-by target
+        group.MapGet("/departure-plan", async (
+            RouteId routeId,
+            ISender sender,
+            HttpContext ctx,
+            [FromQuery] string dayOfWeek = "Monday") =>
+        {
+            UserId userId = ctx.User.GetUserId();
+            DeparturePlanDto? plan = await sender.Send(new GetDeparturePlanQuery(routeId, userId, dayOfWeek));
+            return plan is null ? Results.NoContent() : ConditionalJson.Ok(ctx, plan);
+        });
+
         // The weekday-comparison endpoint was removed with the bar chart it fed. It and
         // the heatmap were two renderings of the same aggregate, and the grid says
         // everything the bars said, per hour rather than per day.
@@ -122,6 +135,15 @@ public static class HistoryEndpoints
 
             var optimal = await sender.Send(new GetOptimalDepartureQuery(routeId, userId, dayOfWeek));
             if (optimal is null) return Results.NoContent();
+
+            // With an arrive-by target the reminder is the planned leave-by, not the
+            // fastest slot: that is the time the user actually acts on.
+            DeparturePlanDto? plan = await sender.Send(new GetDeparturePlanQuery(routeId, userId, dayOfWeek));
+            if (plan is { LeaveBy: { } leaveBy, WorstCaseSeconds: { } worst })
+            {
+                TimeOnly t = TimeOnly.ParseExact(leaveBy, "HH:mm");
+                optimal = optimal with { TimeSlotBucket = t.Hour * 60 + t.Minute, PredictedDurationSeconds = worst };
+            }
 
             string ics = DepartureCalendar.Build(routeId, route.DestinationAddress, optimal, db.ZoneFor(userId));
             return Results.File(System.Text.Encoding.UTF8.GetBytes(ics), "text/calendar", "departure.ics");

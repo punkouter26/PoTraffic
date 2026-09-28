@@ -139,6 +139,7 @@ else
             <div role="listitem" @key="route.Id">
                 <RouteCard Route="route"
                            OptimalDeparture="@(_optimalDepartures.GetValueOrDefault(route.Id))"
+                           Plan="@(_plans.GetValueOrDefault(route.Id))"
                            RecentPolls="@(_recentPolls.GetValueOrDefault(route.Id, []))"
                            OnDeleted="@RefreshAsync"
                            OnRefresh="@RefreshAsync" />
@@ -153,6 +154,7 @@ else
 
     private List<RouteDto> _routes = [];
     private Dictionary<RouteId, OptimalDepartureDto> _optimalDepartures = [];
+    private Dictionary<RouteId, DeparturePlanDto> _plans = [];
     private Dictionary<RouteId, List<PollRecordDto>> _recentPolls = [];
     private int _quotaConsumed;
     private int _pollsToday;
@@ -281,6 +283,7 @@ else
         // them in a loop made the refresh cost the SUM of 2×N latencies every 60s.
         // Per-route failures stay non-fatal.
         Dictionary<RouteId, OptimalDepartureDto> departures = [];
+        Dictionary<RouteId, DeparturePlanDto> plans = [];
         Dictionary<RouteId, List<PollRecordDto>> polls = [];
         string sinceUtc = Uri.EscapeDataString(DateTime.UtcNow.AddHours(-24).ToString("o"));
 
@@ -307,11 +310,23 @@ else
                         $"/api/routes/{route.Id}/poll-history?page=1&pageSize=60&sinceUtc={sinceUtc}", AppJsonContext.Default.PagedResultPollRecordDto)
                     : null;
 
+                // Only routes with an arrive-by target have a plan; the rest would all 204.
+                Task<HttpResponseMessage>? planTask = isMonitored && route.ArriveBy is not null
+                    ? Http.GetAsync($"/api/routes/{route.Id}/departure-plan?dayOfWeek={dayOfWeek}")
+                    : null;
+
                 if (optimalTask is not null)
                 {
                     OptimalDepartureDto? optimal = await optimalTask;
                     if (optimal is not null)
                         departures[route.Id] = optimal;
+                }
+
+                if (planTask is not null
+                    && await planTask is { StatusCode: System.Net.HttpStatusCode.OK } planResp
+                    && await planResp.Content.ReadFromJsonAsync(AppJsonContext.Default.DeparturePlanDto) is { } plan)
+                {
+                    plans[route.Id] = plan;
                 }
 
                 if (historyTask is not null)
@@ -330,6 +345,7 @@ else
         // Swapped in wholesale rather than cleared up front: clearing first would blank
         // every card for the duration of the fan-out.
         _optimalDepartures = departures;
+        _plans = plans;
         _recentPolls = polls;
         _hydrated = true;
         RecomputeVisible();
@@ -350,6 +366,9 @@ else
         _optimalDepartures = snapshot.Insights
             .Where(i => i.OptimalDeparture is not null)
             .ToDictionary(i => i.RouteId, i => i.OptimalDeparture!);
+        _plans = snapshot.Insights
+            .Where(i => i.Plan is not null)
+            .ToDictionary(i => i.RouteId, i => i.Plan!);
         _recentPolls = snapshot.Insights
             .Where(i => i.RecentPolls.Count > 0)
             .ToDictionary(i => i.RouteId, i => i.RecentPolls);
@@ -373,7 +392,8 @@ else
         List<RouteInsight> insights = [.. _routes.Select(r => new RouteInsight(
             r.Id,
             _optimalDepartures.GetValueOrDefault(r.Id),
-            _recentPolls.GetValueOrDefault(r.Id, [])))];
+            _recentPolls.GetValueOrDefault(r.Id, []),
+            _plans.GetValueOrDefault(r.Id)))];
 
         await Cache.SetAsync(
             ClientCacheKeys.Dashboard,

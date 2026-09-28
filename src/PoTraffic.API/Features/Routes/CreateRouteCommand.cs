@@ -156,5 +156,6 @@ public sealed class CreateRouteCommandHandler(
         r.CreatedAt,
         r.Windows.Select(w => w.ToDto()).ToList(),
         r.ReturnRouteId,
-        r.IsSample);
+        r.IsSample,
+        r.ArriveBy?.ToString("HH:mm"));
 }

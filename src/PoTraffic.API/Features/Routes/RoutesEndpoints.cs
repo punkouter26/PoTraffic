@@ -34,6 +34,13 @@ public static class RoutesEndpoints
         group.MapPost("{routeId:guid}/return-trip", CreateReturnTrip);
         // Road shape + how today compares, for the map on the route detail page.
         group.MapGet("{routeId:guid}/path", GetRoutePath);
+        // Arrive-by target behind the departure plan; null body value clears it.
+        group.MapPut("{routeId:guid}/arrive-by", async (
+            RouteId routeId, HttpContext ctx, ISender sender, [FromBody] SetArriveByRequest body) =>
+        {
+            bool found = await sender.Send(new SetArriveByCommand(routeId, ctx.User.GetUserId(), body.ArriveBy));
+            return found ? Results.NoContent() : Results.NotFound();
+        });
         return app;
     }
 

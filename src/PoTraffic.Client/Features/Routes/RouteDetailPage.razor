@@ -131,6 +131,37 @@ else
             </div>
         }
 
+        @* The departure plan: what the page exists to answer once the user has said when
+           they need to arrive. A native time input — no picker component needed. *@
+        <div class="pt-answer-plan">
+            @if (_plan is { LeaveBy: { } leaveBy } plan)
+            {
+                <div class="pt-answer-plan-headline">
+                    Leave by @LocalTimeFormatter.FormatWallClock(leaveBy)
+                </div>
+                <div class="pt-answer-meta">
+                    On time on @plan.OnTimePercent% of @plan.SampleCount recorded trips —
+                    usually @(plan.TypicalSeconds / 60) min, up to @(plan.WorstCaseSeconds / 60) min.
+                    @if (!plan.DayOfWeekSpecific)
+                    {
+                        <span>Based on every day until today's history fills in.</span>
+                    }
+                </div>
+            }
+            else if (_plan is not null)
+            {
+                <div class="pt-answer-meta">
+                    Not enough trips in the three hours before @LocalTimeFormatter.FormatWallClock(_plan.ArriveBy)
+                    to plan a departure yet — the monitoring window needs to cover when you'd leave.
+                </div>
+            }
+            <label class="pt-answer-arrive">
+                <span>Arrive by</span>
+                <input type="time" value="@_route.ArriveBy" @onchange="OnArriveByChangedAsync"
+                       aria-label="Time you need to arrive" />
+            </label>
+        </div>
+
         @{ NextSampleInfo next = NextSample; }
         <div class="pt-answer-live">
             <span class="pt-status-dot @(next.Live ? "pt-status-dot-green" : "pt-status-dot-amber")"></span>
@@ -263,6 +294,7 @@ else
         _trendLabels = [];
         _selectedPoll = null;
         _optimalDeparture = null;
+        _plan = null;
         _activeSession = null;
         LatestPoll = null;
         _announcedLevel = null;
@@ -280,6 +312,7 @@ else
     private string[] _trendLabels = [];
     private PollRecordDto? _selectedPoll;
     private OptimalDepartureDto? _optimalDeparture;
+    private DeparturePlanDto? _plan;
     private VolatilityHeatmapDto? _heatmap;
     private RoutePathDto? _path;
 
@@ -436,7 +469,10 @@ else
             Http.GetFromJsonAsync($"/api/routes/{RouteId}/sessions", AppJsonContext.Default.ListSessionDto);
         Task<PagedResult<PollRecordDto>?> historyTask =
             Http.GetFromJsonAsync($"/api/routes/{RouteId}/poll-history?page=1&pageSize=300&sinceUtc={sinceUtc}", AppJsonContext.Default.PagedResultPollRecordDto);
-        Task<OptimalDepartureDto?> optimalTask = GetOptimalDepartureAsync(dayOfWeek);
+        Task<OptimalDepartureDto?> optimalTask = GetOptionalAsync(
+            $"/api/routes/{RouteId}/optimal-departure?dayOfWeek={dayOfWeek}", AppJsonContext.Default.OptimalDepartureDto);
+        Task<DeparturePlanDto?> planTask = GetOptionalAsync(
+            $"/api/routes/{RouteId}/departure-plan?dayOfWeek={dayOfWeek}", AppJsonContext.Default.DeparturePlanDto);
 
         // The road shape is fetched from the provider once per route and stored, so this
         // rides the normal refresh cadence: after the first call the server is only
@@ -458,7 +494,7 @@ else
             ? Http.GetFromJsonAsync($"/api/routes/{RouteId}/weather-impact", AppJsonContext.Default.WeatherImpactResponse)
             : Task.FromResult(_weatherImpact);
 
-        await Task.WhenAll(routeTask, sessionsTask, historyTask, optimalTask, heatmapTask, pathTask, weatherTask);
+        await Task.WhenAll(routeTask, sessionsTask, historyTask, optimalTask, planTask, heatmapTask, pathTask, weatherTask);
 
         _path = await pathTask;
         await AnnounceVerdictAsync();
@@ -505,6 +541,7 @@ else
         }
 
         _optimalDeparture = await optimalTask;
+        _plan = await planTask;
         BuildAnswer();
 
         _heatmap = await heatmapTask;
@@ -555,10 +592,21 @@ else
         return;
     }
 
-    private async Task<OptimalDepartureDto?> GetOptimalDepartureAsync(string dayOfWeek)
+    /// <summary>Saves the arrive-by target (empty clears it) and reloads the plan.</summary>
+    private async Task OnArriveByChangedAsync(ChangeEventArgs e)
     {
-        HttpResponseMessage response = await Http.GetAsync(
-            $"/api/routes/{RouteId}/optimal-departure?dayOfWeek={dayOfWeek}");
+        // Browsers hand back "HH:mm", or "HH:mm:ss" when a step below a minute is set.
+        string? value = e.Value is string { Length: >= 5 } s ? s[..5] : null;
+        HttpResponseMessage resp = await Http.PutAsJsonAsync($"/api/routes/{RouteId}/arrive-by",
+            new SetArriveByRequest(value), AppJsonContext.Default.SetArriveByRequest);
+        if (resp.IsSuccessStatusCode)
+            await RefreshAsync();
+    }
+
+    private async Task<T?> GetOptionalAsync<T>(string url, System.Text.Json.Serialization.Metadata.JsonTypeInfo<T> typeInfo)
+        where T : class
+    {
+        HttpResponseMessage response = await Http.GetAsync(url);
 
         if (response.StatusCode == System.Net.HttpStatusCode.NoContent)
             return null;
@@ -570,7 +618,7 @@ else
         if (response.Content.Headers.ContentLength is 0)
             return null;
 
-        return await response.Content.ReadFromJsonAsync(AppJsonContext.Default.OptimalDepartureDto);
+        return await response.Content.ReadFromJsonAsync(typeInfo);
     }
 
     /// <summary>

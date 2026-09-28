@@ -338,3 +338,35 @@
 .pt-trend-selection-clear:hover {
     color: var(--pt-fg-body);
 }
+
+/* The departure plan: leave-by headline over the arrive-by input. */
+.pt-answer-plan {
+    margin-top: var(--pt-space-3);
+    padding-top: var(--pt-space-3);
+    border-top: 1px solid var(--pt-border-subtle);
+}
+
+.pt-answer-plan-headline {
+    font-size: var(--pt-text-xl);
+    font-weight: var(--pt-weight-bold);
+    color: var(--pt-fg-primary);
+    font-variant-numeric: tabular-nums;
+}
+
+.pt-answer-arrive {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--pt-space-2);
+    margin-top: var(--pt-space-2);
+    font-size: var(--pt-text-sm);
+    color: var(--pt-fg-secondary);
+}
+
+.pt-answer-arrive input {
+    font: inherit;
+    color: var(--pt-fg-primary);
+    background: var(--pt-bg-surface, transparent);
+    border: 1px solid var(--pt-border-subtle);
+    border-radius: var(--pt-radius-sm, 6px);
+    padding: var(--pt-space-1) var(--pt-space-2);
+}

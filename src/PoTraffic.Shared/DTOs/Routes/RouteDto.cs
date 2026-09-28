@@ -14,7 +14,8 @@ public sealed record RouteDto(
     DateTimeOffset CreatedAt,
     IReadOnlyList<MonitoringWindowDto> Windows,
     RouteId? ReturnRouteId = null,
-    bool IsSample = false);
+    bool IsSample = false,
+    string? ArriveBy = null);
 
 public sealed record MonitoringWindowDto(
     WindowId Id,
