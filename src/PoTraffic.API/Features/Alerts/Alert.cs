@@ -12,7 +12,7 @@ public sealed class Alert
     public RouteId RouteId { get; set; }
     public SessionId? SessionId { get; set; }
 
-    /// <summary>"Congestion" (over baseline + σ), "Reroute", or "LeaveNow" (arrive-by nudge).</summary>
+    /// <summary>"Congestion" (over baseline + σ), "Reroute", "LeaveNow" (arrive-by nudge) or "Digest" (weekly summary).</summary>
     public string Kind { get; set; } = "Congestion";
     public string Message { get; set; } = string.Empty;
     public int TravelSeconds { get; set; }

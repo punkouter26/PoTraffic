@@ -7,6 +7,7 @@ internal static class AlertServiceExtensions
     internal static IServiceCollection AddAlertServices(this IServiceCollection services)
     {
         services.AddScoped<AlertEvaluator>();
+        services.AddScoped<WeeklyDigestJob>();
         services.AddSingleton<VapidKeys>();
         services.AddHttpClient<IPushNotifier, WebPushNotifier>();
         return services;

@@ -118,5 +118,21 @@ internal static class StartupTasksExtensions
         {
             log.LogError(ex, "Recurring job registration failed — nightly poll-record pruning will not run.");
         }
+
+        try
+        {
+            scheduler?.ScheduleRecurring(
+                "weekly-digest",
+                async () =>
+                {
+                    using AsyncServiceScope jobScope = app.Services.CreateAsyncScope();
+                    await jobScope.ServiceProvider.GetRequiredService<Features.Alerts.WeeklyDigestJob>().ExecuteAsync();
+                },
+                new TimeOnly(12, 0)); // daily 12:00 UTC; the job acts on Mondays only
+        }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Recurring job registration failed — the weekly digest will not be sent.");
+        }
     }
 }
