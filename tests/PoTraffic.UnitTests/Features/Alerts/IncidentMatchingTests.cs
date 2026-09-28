@@ -26,7 +26,7 @@ public sealed class IncidentMatchingTests
         { "incidents": [
           { "geometry": { "type": "Point", "coordinates": [-122.30, 47.65] },
             "properties": { "magnitudeOfDelay": 4, "delay": 1800, "events": [{ "description": "Road closed" }] } },
-          { "geometry": { "type": "LineString", "coordinates": [[-122.3301, 47.64], [-122.3301, 47.645]] },
+          { "geometry": { "type": "LineString", "coordinates": [[-122.3301, 47.64], [-122.3310, 47.645]] },
             "properties": { "magnitudeOfDelay": 3, "delay": 720, "roadNumbers": ["I-5"], "from": "Exit 164",
                             "events": [{ "description": "Stationary traffic" }] } },
           { "geometry": { "type": "Point", "coordinates": [-122.33, 47.66] },
