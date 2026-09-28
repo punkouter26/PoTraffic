@@ -14,7 +14,8 @@ public sealed record ProvidersResponse(List<string> Providers, bool GuestEnabled
 public sealed record FeatureFlags(bool UseMockProviders, bool EnableWeather);
 public sealed record CheckNowResponse(int DurationSeconds, int DistanceMetres);
 public sealed record StopSessionRequest(SessionId SessionId);
-public sealed record SaveWindowRequest(string StartTime, string EndTime, byte DaysOfWeekMask);
+public sealed record SaveWindowRequest(string StartTime, string EndTime, byte DaysOfWeekMask, string? TimeZoneId);
+public sealed record SetTimeZoneRequest(string TimeZoneId);
 public sealed record CreateSampleRouteRequest(int UtcOffsetMinutes);
 
 /// <summary>
@@ -78,6 +79,7 @@ public static class ClientCacheKeys
 [JsonSerializable(typeof(AlertDto))]
 [JsonSerializable(typeof(StopSessionRequest))]
 [JsonSerializable(typeof(SaveWindowRequest))]
+[JsonSerializable(typeof(SetTimeZoneRequest))]
 [JsonSerializable(typeof(WeatherImpactResponse))]
 [JsonSerializable(typeof(CreateSampleRouteRequest))]
 [JsonSerializable(typeof(DashboardSnapshot))]

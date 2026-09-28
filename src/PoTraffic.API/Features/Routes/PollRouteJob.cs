@@ -3,13 +3,14 @@ using Microsoft.Extensions.Logging;
 using PoTraffic.API.Features.MonitoringWindows;
 using PoTraffic.API.Infrastructure.Scheduling;
 using PoTraffic.API.Infrastructure.Storage;
+using PoTraffic.API.Infrastructure.Time;
 using PoTraffic.Shared.Constants;
 using PoTraffic.Shared.Enums;
 
 namespace PoTraffic.API.Features.Routes;
 
 // Chain of Responsibility pattern — each job enqueues its own successor to maintain the polling chain.
-// Polls are gated to the route's active MonitoringWindow (UTC): inside the window the chain
+// Polls are gated to the route's active MonitoringWindow (in its zone): inside the window the chain
 // samples every PollIntervalMinutes; outside it the chain sleeps until the next window start.
 public sealed class PollRouteJob
 {
@@ -228,30 +229,34 @@ public sealed class PollRouteJob
             : TimeSpan.FromMinutes(QuotaConstants.PollIntervalMinutes);
     }
 
-    /// <summary>Window times are UTC; mask bit 0 = Monday … bit 6 = Sunday.
-    /// Supports wrap-around midnight UTC: when EndTime &lt; StartTime the window
+    /// <summary>Window times and days are wall-clock in <see cref="MonitoringWindow.Zone"/>
+    /// (UTC for legacy windows); mask bit 0 = Monday … bit 6 = Sunday.
+    /// Supports wrap-around midnight: when EndTime &lt; StartTime the window
     /// is active from StartTime through midnight and from midnight through EndTime.</summary>
     internal static bool IsWithinWindow(MonitoringWindow window, DateTimeOffset nowUtc)
     {
-        if (!IsDayEnabled(window.DaysOfWeekMask, nowUtc.UtcDateTime.DayOfWeek))
+        DateTime local = TimeZoneInfo.ConvertTime(nowUtc, window.Zone).DateTime;
+        if (!IsDayEnabled(window.DaysOfWeekMask, local.DayOfWeek))
             return false;
 
-        TimeOnly time = TimeOnly.FromDateTime(nowUtc.UtcDateTime);
+        TimeOnly time = TimeOnly.FromDateTime(local);
         return window.EndTime > window.StartTime
             ? time >= window.StartTime && time < window.EndTime   // same-day window
-            : time >= window.StartTime || time < window.EndTime;  // wraps midnight UTC
+            : time >= window.StartTime || time < window.EndTime;  // wraps midnight
     }
 
     /// <summary>Next UTC instant the window opens after <paramref name="nowUtc"/>; null when no days are enabled.</summary>
     internal static DateTimeOffset? NextWindowStart(MonitoringWindow window, DateTimeOffset nowUtc)
     {
+        TimeZoneInfo zone = window.Zone;
+        DateTime localToday = TimeZoneInfo.ConvertTime(nowUtc, zone).Date;
         for (int i = 0; i <= 7; i++)
         {
-            DateTime day = nowUtc.UtcDateTime.Date.AddDays(i);
+            DateTime day = localToday.AddDays(i);
             if (!IsDayEnabled(window.DaysOfWeekMask, day.DayOfWeek))
                 continue;
 
-            DateTimeOffset start = new(day.Add(window.StartTime.ToTimeSpan()), TimeSpan.Zero);
+            DateTimeOffset start = UserTime.ToUtc(day.Add(window.StartTime.ToTimeSpan()), zone);
             if (start > nowUtc)
                 return start;
         }

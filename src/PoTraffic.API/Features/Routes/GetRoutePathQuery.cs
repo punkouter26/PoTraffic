@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using PoTraffic.API.Infrastructure.Providers;
 using PoTraffic.API.Infrastructure.Storage;
+using PoTraffic.API.Infrastructure.Time;
 using PoTraffic.Shared.Constants;
 using PoTraffic.Shared.DTOs.Routes;
 using PoTraffic.Shared.Enums;
@@ -99,16 +100,8 @@ public sealed class GetRoutePathQueryHandler(
         if (newest is null)
             return (null, null, null);
 
-        DayOfWeek dow = newest.PolledAt.DayOfWeek;
-        int bucket = (newest.PolledAt.Hour * 4) + (newest.PolledAt.Minute / 15);
-
-        List<int> history = db.Polls
-            .Where(p => p.RouteId == route.Id
-                && p.Id != newest.Id
-                && p.PolledAt.DayOfWeek == dow
-                && (p.PolledAt.Hour * 4) + (p.PolledAt.Minute / 15) == bucket)
-            .Select(p => p.TravelDurationSeconds)
-            .ToList();
+        List<int> history = db.SameSlotDurations(
+            route.Id, newest.PolledAt, db.ZoneFor(route.UserId), p => p.Id != newest.Id);
 
         int? typical = history.Count >= QuotaConstants.BaselineMinSessionCount
             ? (int)Math.Round(history.Average())

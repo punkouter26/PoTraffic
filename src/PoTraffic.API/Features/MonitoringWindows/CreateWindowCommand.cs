@@ -1,3 +1,4 @@
+using PoTraffic.API.Infrastructure.Time;
 using FluentValidation;
 using PoTraffic.API.Infrastructure.Storage;
 
@@ -15,7 +16,8 @@ public sealed record CreateWindowCommand(
     UserId UserId,
     TimeOnly StartTime,
     TimeOnly EndTime,
-    byte DaysOfWeekMask) : IRequest<CreateWindowResult>;
+    byte DaysOfWeekMask,
+    string? TimeZoneId = null) : IRequest<CreateWindowResult>;
 
 public sealed record CreateWindowResult(
     bool IsSuccess,
@@ -26,18 +28,18 @@ public sealed class CreateWindowValidator : AbstractValidator<CreateWindowComman
 {
     public CreateWindowValidator()
     {
-        // The client converts local wall-clock times to UTC before submitting
-        // (CreateRoutePage.ToUtcHHmm). For Eastern-time users picking e.g.
-        // 09:21–21:21 local, the UTC conversion produces 13:21–01:21 — a
-        // window that spans midnight UTC. Allow EndTime <= StartTime (wrap-around)
-        // and only reject the degenerate EndTime == StartTime case, which would
-        // produce zero polling slots.
+        // A window may wrap midnight (22:00–02:00 local, or a legacy window the client
+        // converted to UTC). Allow EndTime < StartTime and only reject the degenerate
+        // EndTime == StartTime case, which would produce zero polling slots.
         RuleFor(x => x.EndTime)
             .NotEqual(x => x.StartTime)
             .WithMessage("EndTime must be different from StartTime.");
         RuleFor(x => x.DaysOfWeekMask)
             .GreaterThan((byte)0)
             .WithMessage("At least one day must be selected.");
+        RuleFor(x => x.TimeZoneId)
+            .Must(z => z is null || UserTime.TryFindZone(z) is not null)
+            .WithMessage("Unknown time zone.");
     }
 }
 
@@ -74,6 +76,7 @@ public sealed class CreateWindowCommandHandler : IRequestHandler<CreateWindowCom
             StartTime = cmd.StartTime,
             EndTime = cmd.EndTime,
             DaysOfWeekMask = cmd.DaysOfWeekMask,
+            TimeZoneId = cmd.TimeZoneId,
             IsActive = true,
             CreatedAt = DateTimeOffset.UtcNow
         };

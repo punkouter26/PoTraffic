@@ -1,3 +1,4 @@
+using PoTraffic.API.Infrastructure.Time;
 using FluentValidation;
 using PoTraffic.API.Infrastructure.Logging;
 using PoTraffic.API.Infrastructure.Storage;
@@ -27,7 +28,8 @@ public sealed record CreateRouteCommand(
     RouteProvider Provider,
     string StartTime = "07:00",
     string EndTime = "09:00",
-    byte DaysOfWeekMask = 0x1F) : IRequest<CreateRouteResult>;
+    byte DaysOfWeekMask = 0x1F,
+    string? TimeZoneId = null) : IRequest<CreateRouteResult>;
 
 public sealed record CreateRouteResult(
     bool IsSuccess,
@@ -44,6 +46,9 @@ public sealed class CreateRouteValidator : AbstractValidator<CreateRouteCommand>
         RuleFor(x => x.OriginAddress).NotEmpty().MaximumLength(ValidationConstants.AddressMaxLength);
         RuleFor(x => x.DestinationAddress).NotEmpty().MaximumLength(ValidationConstants.AddressMaxLength);
         RuleFor(x => x.Provider).IsInEnum();
+        RuleFor(x => x.TimeZoneId)
+            .Must(z => z is null || UserTime.TryFindZone(z) is not null)
+            .WithMessage("Unknown time zone.");
 
         // Two gates: the regex enforces the canonical HH:mm shape, and TryParse rejects
         // shapes that pass the regex but aren't real times (e.g. "99:99") — which the
@@ -54,10 +59,9 @@ public sealed class CreateRouteValidator : AbstractValidator<CreateRouteCommand>
         RuleFor(x => x.EndTime).NotEmpty()
             .Matches(TimePattern).WithMessage("End time must be in HH:mm format.")
             .Must(t => TimeOnly.TryParse(t, out _)).WithMessage("End time must be a valid time of day.");
-        // Times are UTC on the wire, so a perfectly ordinary local window (e.g. 15:00–21:00
-        // EDT) lands as 19:00–01:00 UTC and wraps midnight. PollRouteJob.IsWithinWindow
-        // already evaluates a wrapped window correctly, and CreateWindowCommand already
-        // accepts one, so only the degenerate zero-length window is rejected here.
+        // A window may wrap midnight (22:00–02:00, or a legacy UTC window such as 15:00–21:00
+        // EDT stored as 19:00–01:00). PollRouteJob.IsWithinWindow evaluates a wrapped window
+        // correctly, so only the degenerate zero-length window is rejected here.
         RuleFor(x => x.EndTime)
             .Must((cmd, endTime) =>
             {
@@ -125,6 +129,7 @@ public sealed class CreateRouteCommandHandler(
             StartTime = TimeOnly.Parse(cmd.StartTime),
             EndTime = TimeOnly.Parse(cmd.EndTime),
             DaysOfWeekMask = cmd.DaysOfWeekMask,
+            TimeZoneId = cmd.TimeZoneId,
             IsActive = true,
             CreatedAt = DateTimeOffset.UtcNow
         });

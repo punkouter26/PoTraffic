@@ -7,6 +7,13 @@ public sealed class User
     public UserId Id { get; set; }
     public string Email { get; set; } = string.Empty;
     public string Locale { get; set; } = string.Empty;
+
+    /// <summary>
+    /// IANA zone the browser reports (e.g. <c>America/Los_Angeles</c>), synced on every app
+    /// load. Per-slot statistics bucket in this zone; null until the first sync, when the
+    /// zone is guessed from <see cref="Locale"/> (see <c>UserTime.ZoneFor</c>).
+    /// </summary>
+    public string? TimeZoneId { get; set; }
     public bool IsGdprDeleteRequested { get; set; }
     public bool IsEmailVerified { get; set; }
 

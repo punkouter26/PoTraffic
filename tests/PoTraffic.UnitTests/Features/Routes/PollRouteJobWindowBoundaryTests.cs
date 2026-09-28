@@ -213,4 +213,39 @@ public sealed class PollRouteJobWindowBoundaryTests
         DateTimeOffset now = new(2026, 7, 1, 12, 0, 0, TimeSpan.Zero);
         NextStart(window, now).Should().BeNull("no enabled days → polling chain must stop");
     }
+
+    private static MonitoringWindow PacificWeekdayEvening() => new()
+    {
+        Id = WindowId.New(),
+        RouteId = RouteId.New(),
+        DaysOfWeekMask = Weekdays,
+        StartTime = new TimeOnly(16, 0),
+        EndTime = new TimeOnly(19, 0),
+        TimeZoneId = "America/Los_Angeles",
+        IsActive = true,
+        CreatedAt = DateTimeOffset.UtcNow
+    };
+
+    [Theory]
+    // Friday 17:00 PDT is Saturday 00:00 UTC — still Friday on the user's clock.
+    [InlineData("2026-07-11T00:00:00Z", true,  "Friday 17:00 PDT is inside a Mon–Fri window")]
+    // Sunday 17:00 PDT is Monday 00:00 UTC — still Sunday on the user's clock.
+    [InlineData("2026-07-13T00:00:00Z", false, "Sunday 17:00 PDT is outside a Mon–Fri window")]
+    // Winter: 16:30 PST is 00:30 UTC; the window must not drift an hour with DST.
+    [InlineData("2026-12-02T00:30:00Z", true,  "Tuesday 16:30 PST is inside")]
+    public void IsWithinWindow_WithZone_UsesTheUsersWeekdayAndWallClock(string nowIso, bool expected, string because)
+    {
+        IsWithin(PacificWeekdayEvening(), DateTimeOffset.Parse(nowIso)).Should().Be(expected, because);
+    }
+
+    [Fact]
+    public void NextWindowStart_WithZone_StaysAtLocalStartAcrossDst()
+    {
+        // Friday 30 Oct 2026, after the window; US clocks fall back Sunday 1 Nov.
+        DateTimeOffset now = new(2026, 10, 31, 3, 0, 0, TimeSpan.Zero);
+        DateTimeOffset? next = NextStart(PacificWeekdayEvening(), now);
+
+        // Monday 2 Nov 16:00 PST = 00:00 UTC Tuesday (it was 23:00 UTC under PDT).
+        next.Should().Be(new DateTimeOffset(2026, 11, 3, 0, 0, 0, TimeSpan.Zero));
+    }
 }

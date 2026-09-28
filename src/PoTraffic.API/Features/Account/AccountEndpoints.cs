@@ -38,7 +38,20 @@ public static class AccountEndpoints
         .Produces<ProfileDto>()
         .Produces(StatusCodes.Status404NotFound);
 
-        grp.MapGet("/quota", async (ClaimsPrincipal user, ISender sender, CancellationToken ct) =>
+        grp.MapPut("/timezone", async (
+            ClaimsPrincipal user,
+            [FromBody] SetTimeZoneRequest body,
+            ISender sender,
+            CancellationToken ct) =>
+        {
+            bool found = await sender.Send(new SetTimeZoneCommand(user.GetUserId(), body.TimeZoneId), ct);
+            return found ? Results.NoContent() : Results.NotFound();
+        })
+        .WithName("SetTimeZone")
+        .Produces(StatusCodes.Status204NoContent)
+        .Produces(StatusCodes.Status404NotFound);
+
+        grp.MapGet("/quota",async (ClaimsPrincipal user, ISender sender, CancellationToken ct) =>
         {
             UserId userId = user.GetUserId();
             QuotaDto? quota = await sender.Send(new GetQuotaQuery(userId), ct);

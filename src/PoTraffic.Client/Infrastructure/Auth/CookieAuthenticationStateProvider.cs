@@ -32,6 +32,15 @@ public sealed class CookieAuthenticationStateProvider(HttpClient http, ClientCac
             // would serve the previous account's routes to whoever signs in next.
             cache.UseScope(me.UserId.ToString());
 
+            // Tell the server which zone this browser is in, once per app load: every
+            // per-slot statistic buckets in it. Fire-and-forget — the server only writes
+            // when it changed, and a failure just leaves the previous zone in place.
+            if (!_zoneReported)
+            {
+                _zoneReported = true;
+                _ = ReportTimeZoneAsync();
+            }
+
             ClaimsIdentity identity = new(
             [
                 new Claim(ClaimTypes.NameIdentifier, me.UserId.ToString()),
@@ -48,6 +57,18 @@ public sealed class CookieAuthenticationStateProvider(HttpClient http, ClientCac
         {
             return Anonymous();
         }
+    }
+
+    private bool _zoneReported;
+
+    private async Task ReportTimeZoneAsync()
+    {
+        try
+        {
+            using HttpResponseMessage _ = await http.PutAsJsonAsync("/api/account/timezone",
+                new SetTimeZoneRequest(TimeZoneInfo.Local.Id), AppJsonContext.Default.SetTimeZoneRequest);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException) { }
     }
 
     /// <summary>Signs out server-side and reverts to an anonymous identity. Best-effort:
@@ -67,6 +88,7 @@ public sealed class CookieAuthenticationStateProvider(HttpClient http, ClientCac
         // Cached snapshots and cached API responses outlive the cookie, so signing out
         // has to take them with it.
         await cache.ClearAllAsync();
+        _zoneReported = false;
 
         NotifyAuthenticationStateChanged(Task.FromResult(Anonymous()));
     }

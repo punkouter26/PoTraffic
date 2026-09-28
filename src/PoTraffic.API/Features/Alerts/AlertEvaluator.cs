@@ -3,6 +3,7 @@ using PoTraffic.API.Features.Alerts;
 using PoTraffic.API.Features.MonitoringWindows;
 using PoTraffic.API.Features.Routes;
 using PoTraffic.API.Infrastructure.Storage;
+using PoTraffic.API.Infrastructure.Time;
 using PoTraffic.Shared.Constants;
 using PoTraffic.Shared.DTOs.Alerts;
 
@@ -10,7 +11,7 @@ namespace PoTraffic.API.Features.Alerts;
 
 /// <summary>
 /// Raises a proactive alert (#1) when a freshly-recorded poll crosses the route's baseline
-/// for the same UTC day-of-week and 15-minute slot (mean + σ), or when a reroute is detected.
+/// for the same local day-of-week and 15-minute slot (mean + σ), or when a reroute is detected.
 /// De-duplicated per session so a congested commute produces one alert, not one per poll.
 /// Runs inside the poll's scope; push delivery failures never break polling.
 /// </summary>
@@ -51,16 +52,9 @@ public sealed class AlertEvaluator(TableStorageContext db)
     private bool TryBuildCongestionAlert(EntityRoute route, PollRecord record, MonitoringSession session, out Alert? alert)
     {
         alert = null;
-        DayOfWeek dow = record.PolledAt.DayOfWeek;
-        int bucket = (record.PolledAt.Hour * 4) + (record.PolledAt.Minute / 15);
-
         // Baseline from prior sessions only (exclude this session so a spike isn't compared to itself).
-        List<int> hist = db.Polls
-            .Where(p => p.RouteId == route.Id && p.SessionId != session.Id
-                && p.PolledAt.DayOfWeek == dow
-                && (p.PolledAt.Hour * 4) + (p.PolledAt.Minute / 15) == bucket)
-            .Select(p => p.TravelDurationSeconds)
-            .ToList();
+        List<int> hist = db.SameSlotDurations(
+            route.Id, record.PolledAt, db.ZoneFor(route.UserId), p => p.SessionId != session.Id);
 
         if (hist.Count < QuotaConstants.BaselineMinSessionCount)
             return false;

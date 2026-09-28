@@ -150,17 +150,15 @@
         return new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, 0, DateTimeKind.Unspecified);
     }
 
-    // The form shows wall-clock local time (HH:mm on screen matches the user's clock).
-    // The server's PollRouteJob interprets the wire HH:mm as UTC, so we convert
-    // local → UTC on submit. Without this, a 15:01 local window is stored as
-    // 15:01 UTC = 11:01 EDT-4 and never matches the user's wall-clock window.
-    internal static string ToUtcHHmm(DateTime local)
-    {
-        DateTime utc = local.Kind == DateTimeKind.Utc
-            ? local
-            : TimeZoneInfo.ConvertTimeToUtc(local, TimeZoneInfo.Local);
-        return utc.ToString("HH:mm");
-    }
+    // The form shows wall-clock local time and the window is sent that way, together with
+    // the browser's zone (LocalZoneId). The server evaluates the window in that zone, so
+    // 07:00 Mon–Fri stays 07:00 Mon–Fri across DST and on the user's own weekdays —
+    // converting to UTC here shifted both.
+    internal static string ToHHmm(DateTime local) =>
+        local.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <summary>The browser's IANA zone (the WASM runtime sets it from Intl).</summary>
+    internal static string LocalZoneId => TimeZoneInfo.Local.Id;
     private string _error = "";
     private bool _loading;
     private readonly int _provider = (int)RouteProvider.GoogleMaps;
@@ -214,9 +212,10 @@
                 _origin,
                 _destination,
                 (RouteProvider)_provider,
-                ToUtcHHmm(_startTime!.Value),
-                ToUtcHHmm(_endTime!.Value),
-                DayMask), AppJsonContext.Default.CreateRouteRequest);
+                ToHHmm(_startTime!.Value),
+                ToHHmm(_endTime!.Value),
+                DayMask,
+                LocalZoneId), AppJsonContext.Default.CreateRouteRequest);
 
             if (!createResp.IsSuccessStatusCode)
             {

@@ -91,7 +91,8 @@ public static class RoutesEndpoints
                 request.Provider,
                 request.StartTime,
                 request.EndTime,
-                request.DaysOfWeekMask));
+                request.DaysOfWeekMask,
+                request.TimeZoneId));
 
         return result.IsSuccess
             ? Results.Created($"/api/routes/{result.Route!.Id}", result.Route)

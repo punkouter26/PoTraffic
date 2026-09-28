@@ -1,13 +1,13 @@
 using System.Globalization;
 using System.Reflection;
 using FluentAssertions;
-using PoTraffic.API.Features.History;
+using PoTraffic.API.Infrastructure.Time;
 using Xunit;
 
 namespace PoTraffic.UnitTests.Features.History;
 
 /// <summary>
-/// Verifies the locale → TimeZoneInfo resolution inside GetVolatilityHeatmapQueryHandler.
+/// Verifies the locale → TimeZoneInfo fallback in UserTime (used until the browser reports a zone).
 /// Named for what it covers rather than for the handler: the handler's own behaviour is
 /// tested in GetVolatilityHeatmapHandlerTests, and two files one character apart, both
 /// claiming the same subject, is how the heatmap's bucketing change went unnoticed here.
@@ -17,7 +17,7 @@ namespace PoTraffic.UnitTests.Features.History;
 public sealed class GetVolatilityHeatmapLocaleZoneTests
 {
     private static readonly MethodInfo ResolveMethod =
-        typeof(GetVolatilityHeatmapQueryHandler).GetMethod(
+        typeof(UserTime).GetMethod(
             "ResolveUserZone",
             BindingFlags.Static | BindingFlags.NonPublic)!;
 

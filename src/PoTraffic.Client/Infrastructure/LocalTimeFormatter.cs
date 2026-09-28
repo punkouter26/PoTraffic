@@ -4,11 +4,11 @@ using System.Globalization;
 namespace PoTraffic.Client.Infrastructure;
 
 /// <summary>
-/// Converts server-side UTC time strings into the user's local-time string for display.
+/// Formats window times for display.
 ///
-/// The server stores <c>TimeOnly</c> values in UTC (see PollRouteJob.IsWithinWindow,
-/// MonitoringWindow.ToDto) and the wire DTOs carry them as opaque <c>"HH:mm"</c>
-/// strings. Rendering those verbatim would show e.g. "13:40 – 01:40" to an Eastern
+/// Windows created before zones were captured store <c>TimeOnly</c> values in UTC (see
+/// PollRouteJob.IsWithinWindow, MonitoringWindow.ToDto) and the wire DTOs carry them as
+/// opaque <c>"HH:mm"</c> strings; newer windows carry their zone and wall-clock times. Rendering those verbatim would show e.g. "13:40 – 01:40" to an Eastern
 /// user who picked 9:40 AM – 9:40 PM. Every display layer should route through this
 /// helper so the round-trip stays consistent and unit-testable.
 /// </summary>
@@ -34,4 +34,13 @@ public static class LocalTimeFormatter
         DateTime local = TimeZoneInfo.ConvertTimeFromUtc(utc, localZone ?? TimeZoneInfo.Local);
         return local.ToString("h:mm tt", CultureInfo.CurrentCulture);
     }
+
+    /// <summary>
+    /// Format a wall-clock "HH:mm" (a window stored with its zone) as "h:mm tt" with no
+    /// conversion. Empty / unparseable input is returned unchanged.
+    /// </summary>
+    public static string FormatWallClock(string hhmm) =>
+        TimeOnly.TryParse(hhmm, CultureInfo.InvariantCulture, out TimeOnly t)
+            ? t.ToString("h:mm tt", CultureInfo.CurrentCulture)
+            : hhmm;
 }

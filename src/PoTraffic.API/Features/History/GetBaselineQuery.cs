@@ -1,4 +1,5 @@
 using PoTraffic.API.Infrastructure.Storage;
+using PoTraffic.API.Infrastructure.Time;
 
 using Microsoft.Extensions.Logging;
 
@@ -33,28 +34,31 @@ public sealed class GetBaselineQueryHandler
         if (!_db.OwnsRoute(query.RouteId, query.UserId))
             return Task.FromResult(new BaselineResponse(query.RouteId, query.DayOfWeek, 0, [], true));
 
-        List<PollRecord> allPolls = _db.Polls
+        // Baseline is day-of-week specific (#4): a Friday baseline reflects only Friday
+        // history. Weekday and slot are the user's local ones (see UserTime).
+        TimeZoneInfo zone = _db.ZoneFor(query.UserId);
+        List<(DateTimeOffset Local, int Seconds)> allPolls = _db.Polls
             .Where(p => p.RouteId == query.RouteId)
+            .AsEnumerable()
+            .Select(p => (p.PolledAt.ToLocal(zone), p.TravelDurationSeconds))
             .ToList();
 
-        // Baseline is now day-of-week specific (#4): a Friday baseline reflects only
-        // Friday history. Times/day-of-week are UTC, matching the polling model.
         bool daySpecific = Enum.TryParse(query.DayOfWeek, ignoreCase: true, out DayOfWeek dow);
-        List<PollRecord> dayPolls = daySpecific
-            ? allPolls.Where(p => p.PolledAt.DayOfWeek == dow).ToList()
+        List<(DateTimeOffset Local, int Seconds)> dayPolls = daySpecific
+            ? allPolls.Where(p => p.Local.DayOfWeek == dow).ToList()
             : allPolls;
 
         // Fall back to all days when this weekday hasn't accumulated enough samples yet,
         // so a new route still renders a usable baseline instead of a blank chart.
         bool fellBack = dayPolls.Count < QuotaConstants.BaselineMinSessionCount
             && allPolls.Count > dayPolls.Count;
-        List<PollRecord> source = fellBack ? allPolls : dayPolls;
+        List<(DateTimeOffset Local, int Seconds)> source = fellBack ? allPolls : dayPolls;
 
         var slots = source
-            .GroupBy(p => (p.PolledAt.Hour * 4) + (p.PolledAt.Minute / 15))
+            .GroupBy(p => UserTime.QuarterOfDay(p.Local))
             .Select(g =>
             {
-                var durations = g.Select(p => (double)p.TravelDurationSeconds).ToList();
+                var durations = g.Select(p => (double)p.Seconds).ToList();
                 double mean = durations.Average();
                 double stddev = durations.Count > 1
                     ? Math.Sqrt(durations.Sum(d => Math.Pow(d - mean, 2)) / (durations.Count - 1))

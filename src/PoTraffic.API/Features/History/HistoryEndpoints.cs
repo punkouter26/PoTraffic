@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Mvc;
 using PoTraffic.API.Features.Routes;
 using PoTraffic.API.Infrastructure.Http;
 using PoTraffic.API.Infrastructure.Security;
+using PoTraffic.API.Infrastructure.Storage;
+using PoTraffic.API.Infrastructure.Time;
 using PoTraffic.Shared.DTOs.Routes;
 
 namespace PoTraffic.API.Features.History;
@@ -110,6 +112,7 @@ public static class HistoryEndpoints
         group.MapGet("/departure.ics", async (
             RouteId routeId,
             ISender sender,
+            TableStorageContext db,
             HttpContext ctx,
             [FromQuery] string dayOfWeek = "Monday") =>
         {
@@ -120,7 +123,7 @@ public static class HistoryEndpoints
             var optimal = await sender.Send(new GetOptimalDepartureQuery(routeId, userId, dayOfWeek));
             if (optimal is null) return Results.NoContent();
 
-            string ics = DepartureCalendar.Build(routeId, route.DestinationAddress, optimal);
+            string ics = DepartureCalendar.Build(routeId, route.DestinationAddress, optimal, db.ZoneFor(userId));
             return Results.File(System.Text.Encoding.UTF8.GetBytes(ics), "text/calendar", "departure.ics");
         });
 

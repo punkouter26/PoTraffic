@@ -1,6 +1,7 @@
 using PoTraffic.API.Features.Routes;
 using PoTraffic.API.Infrastructure.Providers;
 using PoTraffic.API.Infrastructure.Storage;
+using PoTraffic.API.Infrastructure.Time;
 using PoTraffic.Shared.Constants;
 using PoTraffic.Shared.DTOs.History;
 
@@ -17,7 +18,7 @@ public sealed record GetWeatherImpactQuery(RouteId RouteId, UserId UserId)
 /// Weather is not evenly distributed across the clock, so if a route's rainy samples happen
 /// to cluster at 08:15 and its clear samples at 06:45, the naive comparison reports the
 /// morning peak as the cost of rain. Every sample is therefore scored against the mean of
-/// its own 15-minute slot (the same bucketing <see cref="GetBaselineQuery"/> uses), and the
+/// its own 15-minute slot (local time, the same bucketing <see cref="GetBaselineQuery"/> uses), and the
 /// conditions are compared on those deltas. What survives is the part of the difference the
 /// time of day does not already explain.
 /// </para>
@@ -38,6 +39,9 @@ public sealed class GetWeatherImpactQueryHandler(TableStorageContext db)
         List<PollRecord> polls = [.. db.Polls.Where(p => p.RouteId == query.RouteId)];
         if (polls.Count == 0)
             return Task.FromResult(Empty(query.RouteId));
+
+        TimeZoneInfo zone = db.ZoneFor(query.UserId);
+        int SlotOf(PollRecord p) => UserTime.QuarterOfDay(p.PolledAt.ToLocal(zone));
 
         // Slot baselines come from every sample, weather-tagged or not: the more history
         // backing a slot's mean, the less a handful of rainy samples can drag the very
@@ -79,9 +83,6 @@ public sealed class GetWeatherImpactQueryHandler(TableStorageContext db)
             MinimumSamples: QuotaConstants.WeatherImpactMinSamples,
             Slices: slices));
     }
-
-    /// <summary>15-minute bucket of the UTC day, matching <see cref="GetBaselineQuery"/>.</summary>
-    private static int SlotOf(PollRecord p) => (p.PolledAt.Hour * 4) + (p.PolledAt.Minute / 15);
 
     private static WeatherImpactResponse Empty(RouteId routeId) =>
         new(routeId, 0, 0, QuotaConstants.WeatherImpactMinSamples, []);

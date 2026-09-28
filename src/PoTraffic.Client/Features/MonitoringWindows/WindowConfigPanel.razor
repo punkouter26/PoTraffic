@@ -17,7 +17,7 @@
         <div class="pt-flex pt-items-center pt-gap-4 pt-mb-2">
             <div>
                 <RadzenText TextStyle="TextStyle.Caption" class="pt-mb-0">Schedule</RadzenText>
-                <RadzenText>@string.Join(", ", _activeWindow.DaysOfWeek) · @FormatUtcHHmmAsLocal(_activeWindow.StartTime) – @FormatUtcHHmmAsLocal(_activeWindow.EndTime)</RadzenText>
+                <RadzenText>@string.Join(", ", _activeWindow.DaysOfWeek) · @FormatWindowTime(_activeWindow.StartTime) – @FormatWindowTime(_activeWindow.EndTime)</RadzenText>
             </div>
             <RadzenButton Text="Edit Schedule" Icon="edit" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small"
                           Click="@StartEditing" />
@@ -166,26 +166,18 @@
     }
 
     // Defaults for a new schedule: start = local time now, end = two hours later.
-    // Window times are stored/interpreted server-side as UTC (see PollRouteJob),
-    // but we display defaults in local time so they match the user's wall clock.
-    // Editing an existing window overwrites these in LoadWindowAsync.
+    // Window times are sent as local wall-clock times with the browser's zone.
     private DateTime? _startTime = Routes.CreateRoutePage.LocalNowToMinute();
     private DateTime? _endTime = Routes.CreateRoutePage.LocalNowToMinute().AddHours(2);
 
-    /// <summary>Convert local wall-clock <paramref name="local"/> to UTC and return "HH:mm".
-    /// Delegates to <see cref="Routes.CreateRoutePage.ToUtcHHmm"/> so behavior is consistent.</summary>
-    private static string ToUtcHHmm(DateTime local) => Routes.CreateRoutePage.ToUtcHHmm(local);
-
     /// <summary>
-    /// Convert a UTC "HH:mm" wire string (as carried by <see cref="MonitoringWindowDto"/>)
-    /// back to local time for display. The server stores <see cref="TimeOnly"/> values
-    /// in UTC and the DTO formats them with <c>HH:mm</c> — to the user those would render
-    /// as e.g. "13:40 – 01:40" instead of the "9:40 AM – 9:40 PM" they actually picked.
-    /// Wrap-around midnight UTC (end &lt; start) still displays correctly because each
-    /// side is converted independently.
+    /// Formats a window time for display. A window with a zone holds wall-clock times
+    /// already; a legacy window (no zone) holds UTC and is converted to local time.
     /// </summary>
-    private static string FormatUtcHHmmAsLocal(string utcHHmm)
-        => LocalTimeFormatter.FormatUtcHHmmAsLocal(utcHHmm);
+    private string FormatWindowTime(string hhmm)
+        => _activeWindow?.TimeZoneId is null
+            ? LocalTimeFormatter.FormatUtcHHmmAsLocal(hhmm)
+            : LocalTimeFormatter.FormatWallClock(hhmm);
 
     private readonly (string name, byte bit)[] _days =
     [
@@ -317,9 +309,10 @@
             HttpResponseMessage resp = await Http.PostAsJsonAsync(
                 $"/api/routes/{RouteId}/windows",
                 new SaveWindowRequest(
-                    ToUtcHHmm(_startTime!.Value),
-                    ToUtcHHmm(_endTime!.Value),
-                    mask), AppJsonContext.Default.SaveWindowRequest);
+                    Routes.CreateRoutePage.ToHHmm(_startTime!.Value),
+                    Routes.CreateRoutePage.ToHHmm(_endTime!.Value),
+                    mask,
+                    Routes.CreateRoutePage.LocalZoneId), AppJsonContext.Default.SaveWindowRequest);
 
             if (resp.IsSuccessStatusCode)
             {

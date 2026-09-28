@@ -8,4 +8,5 @@ public sealed record CreateRouteRequest(
     RouteProvider Provider,
     string StartTime = "07:00",
     string EndTime = "09:00",
-    byte DaysOfWeekMask = 0x1F);  // 0x1F = Mon–Fri
+    byte DaysOfWeekMask = 0x1F,   // 0x1F = Mon–Fri
+    string? TimeZoneId = null);   // zone StartTime/EndTime are wall-clock in; null = UTC

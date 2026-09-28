@@ -21,7 +21,8 @@ public sealed record MonitoringWindowDto(
     string StartTime,
     string EndTime,
     IReadOnlyList<string> DaysOfWeek,
-    bool IsActive);
+    bool IsActive,
+    string? TimeZoneId = null);
 
 public sealed record PagedResult<T>(
     int Page,

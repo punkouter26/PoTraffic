@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using PoTraffic.API.Infrastructure.Time;
 using PoTraffic.Shared.DTOs.Routes;
 
 namespace PoTraffic.API.Features.MonitoringWindows;
@@ -16,6 +17,16 @@ public sealed class MonitoringWindow
     public bool IsActive { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
 
+    /// <summary>
+    /// Zone whose wall clock <see cref="StartTime"/>, <see cref="EndTime"/> and the day mask
+    /// are in, so a 07:00 Mon–Fri window stays 07:00 Mon–Fri across DST. Null for windows
+    /// created before zones were captured: their times were converted to UTC by the client.
+    /// </summary>
+    public string? TimeZoneId { get; set; }
+
+    [JsonIgnore]
+    public TimeZoneInfo Zone => UserTime.TryFindZone(TimeZoneId) ?? TimeZoneInfo.Utc;
+
     [JsonIgnore]
     public EntityRoute Route { get; set; } = null!;
 
@@ -28,7 +39,8 @@ public sealed class MonitoringWindow
         StartTime.ToString("HH:mm"),
         EndTime.ToString("HH:mm"),
         DecodeDaysOfWeek(DaysOfWeekMask),
-        IsActive);
+        IsActive,
+        TimeZoneId);
 
     /// <summary>Expands the <see cref="DaysOfWeekMask"/> bitfield into day names (bit 0 = Monday).</summary>
     public static IReadOnlyList<string> DecodeDaysOfWeek(byte mask)
