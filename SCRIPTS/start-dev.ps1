@@ -9,7 +9,7 @@ $ErrorActionPreference = 'Stop'
 
 Write-Host "`n=== PoTraffic Dev Startup ===" -ForegroundColor Cyan
 
-# 1. Kill any dotnet processes already bound to 5000 or 5001
+# 1. Kill any dotnet / PoTraffic.API (apphost) processes already bound to 5000 or 5001
 foreach ($port in @(5000, 5001)) {
     $pids = (netstat -ano 2>$null |
         Select-String ":$port\s" |
@@ -20,7 +20,7 @@ foreach ($port in @(5000, 5001)) {
     foreach ($p in $pids) {
         try {
             $proc = Get-Process -Id $p -ErrorAction SilentlyContinue
-            if ($proc -and $proc.Name -like '*dotnet*') {
+            if ($proc -and ($proc.Name -like '*dotnet*' -or $proc.Name -eq 'PoTraffic.API')) {
                 Write-Host "  Stopping stale dotnet process PID $p on port $port" -ForegroundColor Yellow
                 Stop-Process -Id $p -Force
             }
