@@ -83,8 +83,13 @@
    the theme — an inverted Microsoft button is an off-brand Microsoft button.
 
    The !important flags these carried are gone: Radzen now lives in the `vendor`
-   cascade layer, so an ordinary declaration here already outranks it. */
-.auth-social-btn {
+   cascade layer, so an ordinary declaration here already outranks it.
+
+   ::deep because the buttons are RadzenButtons in LoginPage: the <button> is
+   Radzen's markup and never carries this layout's scope attribute, so the bare
+   `.auth-social-btn[b-…]` this used to compile to matched nothing. ::deep anchors
+   the scope on this layout's own wrapper instead. */
+::deep .auth-social-btn {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -97,7 +102,7 @@
     box-shadow: 0 1px 2px rgb(15 23 42 / 0.05);
 }
 
-.auth-social-btn:hover {
+::deep .auth-social-btn:hover {
     background: #f9fafb;
     border-color: #9ca3af;
 }

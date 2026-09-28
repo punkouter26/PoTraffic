@@ -2,7 +2,7 @@
    Glass surface with central FAB for the primary "Add Route" action.
    The third slot is a "Menu" / "Account" button that opens a bottom-sheet
    action sheet with the catch-all destinations — matching the desktop
-   avatar-menu's options (settings, status, sign out) — so the two surfaces
+   avatar-menu's options (settings, sign out) — so the two surfaces
    agree on what "Account" means. */
 
 .pt-bottom-nav {

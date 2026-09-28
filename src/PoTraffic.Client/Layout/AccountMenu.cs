@@ -22,7 +22,6 @@ public static class AccountMenu
         List<Link> links =
         [
             new("/account/settings", "settings", "Account settings"),
-            new("/health", "health_and_safety", "System status"),
         ];
         if (isAdmin)
             links.Add(new("/admin", "admin_panel_settings", "Admin"));

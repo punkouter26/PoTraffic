@@ -55,8 +55,8 @@ html, body {
 
 /* Headings shouldn't end on a lonely word; body copy shouldn't end on a lonely
    line. Both are one declaration each and degrade to nothing where unsupported. */
-h1, h2, h3, h4, .pt-balance { text-wrap: balance; }
-p, .pt-pretty { text-wrap: pretty; }
+h1, h2, h3, h4 { text-wrap: balance; }
+p { text-wrap: pretty; }
 
 /* Trim the font's built-in leading above the cap height and below the baseline,
    so a heading's visual gap to what follows equals the margin you actually
@@ -70,7 +70,7 @@ p, .pt-pretty { text-wrap: pretty; }
 
 /* Numbers that change in place — countdowns, durations, costs — must not
    reflow their neighbours as digits swap width. */
-.pt-tabular, time, output { font-variant-numeric: tabular-nums; }
+time, output { font-variant-numeric: tabular-nums; }
 
 /* Inputs that grow with their content instead of scrolling a fixed box.
    Scoped to the app's own controls: Radzen sizes its own inputs. */
@@ -225,15 +225,6 @@ code {
    project or in Radzen, so they were a second vocabulary for colours that
    already have names.
 ═══════════════════════════════════════════════════════════════ */
-/* The disclosure chevron. Both the `.open` class (PollHistoryTable's own bool)
-   and the native `[open]` on <details> (route detail) drive the same rotation,
-   and both live here rather than in a scoped sheet: the chevron is a <PtIcon>,
-   so a scoped rule would compile its last compound to `.pt-collapsible-icon[b-…]`
-   and never match the child component's span. */
-.pt-collapsible-icon { display: inline-block; transition: transform var(--pt-dur-base) var(--pt-ease); }
-.pt-collapsible-icon.open,
-details[open] > summary .pt-collapsible-icon { transform: rotate(90deg); }
-
 /* ═══════════════════════════════════════════════════════════════
    Icons. One system: Material Symbols, loaded once in index.html and used
    through <PtIcon>. Emoji were the third icon system in the app (after this
@@ -300,23 +291,15 @@ details[open] > summary .pt-collapsible-icon { transform: rotate(90deg); }
 
    Same names, same scale positions, density-aware values.
 ═══════════════════════════════════════════════════════════════ */
-.pt-mt-1 { margin-top: var(--pt-space-1); }
 .pt-mt-2 { margin-top: var(--pt-space-2); }
 .pt-mt-3 { margin-top: var(--pt-space-3); }
-.pt-mt-4 { margin-top: var(--pt-space-4); }
-.pt-mt-6 { margin-top: var(--pt-space-6); }
 
 .pt-mb-0 { margin-bottom: 0; }
 .pt-mb-1 { margin-bottom: var(--pt-space-1); }
 .pt-mb-2 { margin-bottom: var(--pt-space-2); }
 .pt-mb-3 { margin-bottom: var(--pt-space-3); }
 .pt-mb-4 { margin-bottom: var(--pt-space-4); }
-.pt-mb-6 { margin-bottom: var(--pt-space-6); }
 
-.pt-p-2 { padding: var(--pt-space-2); }
-.pt-p-3 { padding: var(--pt-space-3); }
-.pt-p-4 { padding: var(--pt-space-4); }
-.pt-p-5 { padding: var(--pt-space-5); }
 .pt-p-6 { padding: var(--pt-space-6); }
 /* Card padding that gives back width on a phone: 16px there, 24px from ~530px up. */
 .pt-card-pad { padding: clamp(var(--pt-space-4), 4.5vw, var(--pt-space-6)); }
@@ -324,17 +307,8 @@ details[open] > summary .pt-collapsible-icon { transform: rotate(90deg); }
 .pt-w-100 { width: 100%; }
 
 .pt-flex { display: flex; }
-.pt-items-center { align-items: center; }
 .pt-wrap { flex-wrap: wrap; }
 .pt-gap-2 { gap: var(--pt-space-2); }
-.pt-gap-3 { gap: var(--pt-space-3); }
-.pt-gap-4 { gap: var(--pt-space-4); }
-.pt-mr-3 { margin-right: var(--pt-space-3); }
-
-/* Vertical rhythm for a stack of sections — one rule instead of a margin class
-   on every child, and it cannot leave a trailing margin at the end of a card. */
-.pt-stack > * + * { margin-top: var(--pt-space-4); }
-.pt-stack-lg > * + * { margin-top: var(--pt-space-6); }
 
 /* ═══════════════════════════════════════════════════════════════
    Navigation links — top bar and bottom bar.
@@ -705,28 +679,6 @@ details[open] > summary .pt-collapsible-icon { transform: rotate(90deg); }
    NavMenu.razor.css is the only definition. */
 
 /* ═══════════════════════════════════════════════
-   Collapsible raw data section (PollHistoryTable, which has no scoped sheet)
-═══════════════════════════════════════════════ */
-.pt-collapsible-header {
-    display: flex;
-    align-items: center;
-    gap: var(--pt-space-2);
-    cursor: pointer;
-    user-select: none;
-    padding: var(--pt-space-2) 0;
-    color: var(--pt-fg-muted);
-    font-size: var(--pt-text-sm);
-    font-weight: var(--pt-weight-medium);
-    border: none;
-    background: none;
-    font-family: inherit;
-}
-
-.pt-collapsible-header:hover {
-    color: var(--pt-fg-body);
-}
-
-/* ═══════════════════════════════════════════════
    Loading skeleton variants
 ═══════════════════════════════════════════════ */
 .pt-skeleton-stack {
@@ -801,11 +753,6 @@ details[open] > summary .pt-collapsible-icon { transform: rotate(90deg); }
     font-variant-numeric: tabular-nums;
 }
 
-.pt-chart-tip-flag {
-    color: var(--pt-color-danger);
-    font-weight: var(--pt-weight-semibold);
-}
-
 /* ═══════════════════════════════════════════════
    #6: Connectivity indicators. The polling base stands down while a tab is
    hidden or offline; these tell the user why the numbers stopped moving.
@@ -875,47 +822,6 @@ details[open] > summary .pt-collapsible-icon { transform: rotate(90deg); }
     color: var(--pt-fg-secondary);
     margin-bottom: var(--pt-space-6);
     max-width: 34rem;
-}
-
-/* #10 — the secondary "try a sample route" path, deliberately quieter than the
-   primary call to action next to it. */
-.pt-empty-state-alt {
-    border-top: 1px solid var(--pt-border-subtle);
-    margin-top: var(--pt-space-6);
-    padding-top: var(--pt-space-5);
-}
-
-.pt-empty-state-note {
-    color: var(--pt-fg-tertiary);
-    font-size: var(--pt-text-xs);
-    margin-top: var(--pt-space-2);
-    max-width: 26rem;
-}
-
-.pt-demo-banner {
-    align-items: center;
-    background: var(--pt-bg-tint);
-    border: 1px dashed var(--pt-color-info);
-    border-radius: var(--pt-radius-md);
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--pt-space-3);
-    padding: var(--pt-space-3) var(--pt-space-4);
-}
-
-.pt-demo-banner-tag {
-    color: var(--pt-color-info);
-    font-size: var(--pt-text-xs);
-    font-weight: var(--pt-weight-bold);
-    letter-spacing: 0.06em;
-    white-space: nowrap;
-}
-
-.pt-demo-banner-text {
-    color: var(--pt-fg-secondary);
-    flex: 1 1 18rem;
-    font-size: var(--pt-text-sm);
-    min-width: 0;
 }
 
 /* ── Section headings inside Cards
@@ -1105,51 +1011,12 @@ details[open] > summary .pt-collapsible-icon { transform: rotate(90deg); }
 }
 
 /* ═══════════════════════════════════════════════
-   FX layers — the canvases the effects draw into
+   FX layer — the canvas the map's flow draws into
    ═══════════════════════════════════════════════
 
-   All three are inert decoration: no pointer events, aria-hidden in markup, and
-   removed entirely when the motion level is "off". They are positioned rather
-   than laid out, so none of them can move a single pixel of real content. */
-
-/* The living gradient. Behind everything, including the page background, which is
-   why <body> must not paint an opaque colour over it — see the rule below. */
-.pt-ambient {
-    position: fixed;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    z-index: -1;
-    pointer-events: none;
-    /* Its own compositor layer: the shader repaints 30 times a second and must never
-       drag the page's paint along with it. */
-    will-change: opacity;
-    contain: strict;
-}
-
-/* Getting the wash BEHIND the page without losing the page colour.
-
-   A z-index:-1 child of <body> paints above the canvas background but below every
-   block background, so <body> must not paint one. It cannot simply be made
-   transparent though: with <html> also transparent the browser propagates body's
-   background up to the canvas, and "transparent" propagated is a white page in dark
-   mode. So the page colour moves to <html>, which stops the propagation and becomes
-   the ground the wash sits on. */
-:root:has(.pt-ambient) {
-    background: var(--pt-bg-page);
-}
-
-:root:has(.pt-ambient) body {
-    background: transparent;
-}
-
-/* Confetti. Above the page, below the toasts, and never in the way of a tap. */
-.pt-particles {
-    position: fixed;
-    inset: 0;
-    z-index: calc(var(--pt-z-toast) - 1);
-    pointer-events: none;
-}
+   Inert decoration: no pointer events, and removed entirely when the motion
+   level is "off". Positioned rather than laid out, so it cannot move a single
+   pixel of real content. */
 
 /* The flow particles on the map. Leaflet positions this inside its overlay pane;
    only the stacking and the pointer behaviour are ours. */
@@ -1162,9 +1029,7 @@ details[open] > summary .pt-collapsible-icon { transform: rotate(90deg); }
 }
 
 /* Motion off: nothing decorative renders at all. Belt and braces — the JS already
-   declines to create these — so a stale canvas from a previous setting cannot linger. */
-[data-motion="off"] .pt-ambient,
-[data-motion="off"] .pt-particles,
+   declines to create it — so a stale canvas from a previous setting cannot linger. */
 [data-motion="off"] .pt-flow-canvas {
     display: none;
 }

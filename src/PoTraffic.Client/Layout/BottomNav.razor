@@ -9,7 +9,7 @@
    branding + user chip per the L/C/R spatial contract.
 
    Previously: three hard-coded destinations (Commutes / Add / Account), and
-   the catch-all destinations (System status, Sign out) lived behind a hidden
+   the catch-all destinations (settings, Sign out) lived behind a hidden
    avatar menu on mobile — a long thumb-reach to the top-right corner and a
    tap-target change to dismiss it. They live in an action sheet now,
    reachable from the rightmost "Account" pill on the bar, which mirrors the
@@ -64,9 +64,6 @@ else if (_sheetOpen)
     <div class="pt-bottom-sheet" role="menu" aria-label="Menu">
         <a class="pt-bottom-sheet-item" href="/login" role="menuitem" @onclick="CloseSheet">
             <PtIcon Name="login" Size="sm" />Sign in
-        </a>
-        <a class="pt-bottom-sheet-item" href="/health" role="menuitem" @onclick="CloseSheet">
-            <PtIcon Name="health_and_safety" Size="sm" />System status
         </a>
     </div>
 }

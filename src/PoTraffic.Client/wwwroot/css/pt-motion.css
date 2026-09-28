@@ -8,12 +8,10 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* ── Keyframes ──────────────────────────────────────────────────────────── */
-@keyframes pt-fade-in     { from { opacity: 0; } to { opacity: 1; } }
 @keyframes pt-slide-up    { from { opacity: 0; transform: translate3d(0, 8px, 0); }
                             to   { opacity: 1; transform: translate3d(0, 0, 0); } }
 @keyframes pt-slide-down  { from { opacity: 0; transform: translate3d(0, -8px, 0); }
                             to   { opacity: 1; transform: translate3d(0, 0, 0); } }
-@keyframes pt-scale-press { from { transform: scale(1); } to { transform: scale(0.97); } }
 @keyframes pt-shimmer     { 0%   { background-position: -200% 0; }
                             100% { background-position:  200% 0; } }
 @keyframes pt-pulse       { 0%   { box-shadow: 0 0 0 0 rgb(16 185 129 / 0.5); }
@@ -25,12 +23,7 @@
                             100% { transform: scale(3.2); opacity: 0; } }
 
 
-/* ── Entrance utilities ─────────────────────────────────────────────────── */
-.pt-anim-fade { animation: pt-fade-in   var(--pt-dur-base) var(--pt-ease) both; }
-.pt-anim-up   { animation: pt-slide-up  var(--pt-dur-base) var(--pt-ease) both; }
-.pt-anim-down { animation: pt-slide-down var(--pt-dur-base) var(--pt-ease) both; }
-
-/* Stagger entrance.
+/* ── Stagger entrance ───────────────────────────────────────────────────────
 
    This read `animation-delay: calc(var(--pt-i, 0) * 50ms)` and was documented as
    "children accept style='--pt-i:N'". No child anywhere in the app ever set it,
@@ -66,19 +59,6 @@
 /* Default page entrance. */
 article.content { animation: pt-slide-up var(--pt-dur-base) var(--pt-ease); }
 
-/* ── Interactive press feedback ─────────────────────────────────────────── */
-.pt-press {
-    transition: background-color var(--pt-dur-fast) var(--pt-ease),
-                border-color var(--pt-dur-fast) var(--pt-ease),
-                box-shadow var(--pt-dur-fast) var(--pt-ease);
-}
-.pt-press:active { transform: translateY(1px); }
-
-.pt-press-glow { transition: box-shadow var(--pt-dur-fast) var(--pt-ease); }
-.pt-press-glow:active {
-    box-shadow: 0 0 0 3px color-mix(in oklab, var(--pt-color-brand-500) 35%, transparent);
-}
-
 /* ── Indeterminate progress line ────────────────────────────────────────── */
 .pt-progress-line {
     position: relative;
@@ -100,16 +80,6 @@ article.content { animation: pt-slide-up var(--pt-dur-base) var(--pt-ease); }
         transparent 100%);
     animation: pt-sweep 1.6s var(--pt-ease) infinite;
     will-change: transform;
-}
-
-/* ── Live status dot ────────────────────────────────────────────────────── */
-.pt-live-dot {
-    display: inline-block;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--pt-color-success);
-    animation: pt-pulse 2s infinite var(--pt-ease);
 }
 
 /* A scroll-driven reveal (`animation-timeline: view()`) used to live here and was
@@ -175,23 +145,10 @@ article.content { animation: pt-slide-up var(--pt-dur-base) var(--pt-ease); }
         scroll-behavior: auto !important;
     }
 
-    .pt-progress-line::after,
-    .pt-shimmer::after,
-    .pt-live-dot {
+    .pt-progress-line::after {
         animation: none;
         opacity: 0.7;
     }
-}
-
-/* ── Shimmer overlay ────────────────────────────────────────────────────── */
-.pt-shimmer { position: relative; overflow: hidden; }
-.pt-shimmer::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(90deg, transparent,
-                color-mix(in oklab, var(--pt-bg-surface) 60%, transparent), transparent);
-    animation: pt-sweep 1.4s linear infinite;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -250,9 +207,7 @@ article.content { animation: pt-slide-up var(--pt-dur-base) var(--pt-ease); }
        beneath them changes — which is what makes the transition read as "the page
        changed" rather than "everything blinked". */
     .app-header,
-    .pt-bottom-nav,
-    .pt-ambient,
-    .pt-particles {
+    .pt-bottom-nav {
         view-transition-name: none;
     }
 }

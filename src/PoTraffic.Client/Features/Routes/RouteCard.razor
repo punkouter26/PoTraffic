@@ -7,8 +7,8 @@
 @inject NotificationService NotificationService
 @inject DialogService DialogService
 @inject PendingDeletionService Pending
-@inject PtInterop Pt
-@implements IDisposable
+@inject IJSRuntime JS
+@implements IAsyncDisposable
 
 @* ──────────────────────────────────────────────────────────────────────
    Route card — one answer, one tap.
@@ -111,7 +111,8 @@
 
     private ElementReference _cardElement;
     private DotNetObjectReference<RouteCard>? _selfRef;
-    private IAsyncDisposable? _gestureCleanup;
+    private IJSObjectReference? _gestures;       // js/pt-gestures.js
+    private IJSObjectReference? _detachSwipe;    // the cleanup function attachSwipe returns
     private bool _pendingDelete;
 
     private string _originStreet = string.Empty;
@@ -156,8 +157,19 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender)
-            _gestureCleanup = await Pt.AttachSwipeAsync(_cardElement, _selfRef!, nameof(OnGestureAsync));
+        if (!firstRender)
+            return;
+
+        try
+        {
+            _gestures = await JS.InvokeAsync<IJSObjectReference>("import", "./js/pt-gestures.js");
+            _detachSwipe = await _gestures.InvokeAsync<IJSObjectReference>(
+                "attachSwipe", _cardElement, _selfRef, nameof(OnGestureAsync));
+        }
+        catch
+        {
+            // Gestures are shortcuts to the buttons; a card without them still works.
+        }
     }
 
     /// <summary>Swipe gestures are shortcuts to the buttons, never the only way to reach them.</summary>
@@ -187,10 +199,20 @@
         ScheduleDelete();
     }
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
         Pending.Changed -= OnPendingChanged;
-        _ = _gestureCleanup?.DisposeAsync();
+        try
+        {
+            if (_detachSwipe is not null)
+            {
+                await _detachSwipe.InvokeVoidAsync("call");
+                await _detachSwipe.DisposeAsync();
+            }
+            if (_gestures is not null)
+                await _gestures.DisposeAsync();
+        }
+        catch { /* page tearing down */ }
         _selfRef?.Dispose();
     }
 

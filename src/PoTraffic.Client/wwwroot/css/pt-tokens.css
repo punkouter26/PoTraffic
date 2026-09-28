@@ -79,7 +79,6 @@
     --pt-color-success-on-surface: light-dark(#047857, #6ee7b7);
     --pt-color-warning-on-surface: light-dark(#b45309, #fbbf24);
     --pt-color-danger-on-surface:  light-dark(#be123c, #fda4af);
-    --pt-color-info-on-surface:    light-dark(#4338ca, #a5b4fc);
 
     /* ── Surfaces ─────────────────────────────────────────────────────
        Light: page sits lowest, cards are white. Dark: page is darkest and
@@ -108,14 +107,6 @@
     --pt-border-subtle: light-dark(var(--pt-color-neutral-200), #26334d);
     --pt-border-strong: light-dark(var(--pt-color-neutral-300), var(--pt-color-neutral-600));
 
-    /* Semantic success surface — the "monitoring active" cards. Needs its own
-       tokens because a success tint cannot be derived from the neutral ramp. */
-    --pt-success-bg-from:   light-dark(#ecfdf5, #052e23);
-    --pt-success-bg-to:     light-dark(#d1fae5, #064e3b);
-    --pt-success-border:    light-dark(#6ee7b7, #047857);
-    --pt-success-fg:        light-dark(#065f46, #6ee7b7);
-    --pt-success-fg-strong: light-dark(#064e3b, #a7f3d0);
-
     /* Subtle tint surfaces (chips, sparkline wells) — an alpha wash over the
        page rather than a fixed grey, washing dark on light and light on dark. */
     --pt-bg-tint:        light-dark(rgb(15 23 42 / 0.07), rgb(255 255 255 / 0.07));
@@ -136,13 +127,6 @@
     --pt-traffic-heavy:   light-dark(#b91c1c, #f87171);
     --pt-traffic-unknown: light-dark(#64748b, #94a3b8);
 
-    /* ── Ambient wash (the living background) ──────────────────────────
-       Two poles the field mixes between, driven by the traffic mood. Kept
-       far apart in hue so the shift from "clear" to "jammed" is legible
-       peripherally, without ever being read as an alert. */
-    --pt-ambient-cool: light-dark(#2166d9, #1d4ed8);
-    --pt-ambient-hot:  light-dark(#d9384a, #b91c1c);
-
     /* Shadow base as raw channels so alpha can vary per use. A slate-tinted
        shadow is invisible on a slate page, so dark goes to pure black.
        Not a <color>, so this one pair cannot use light-dark(); see below. */
@@ -153,7 +137,6 @@
     --pt-radius-sm:  6px;
     --pt-radius-md:  10px;
     --pt-radius-lg:  14px;
-    --pt-radius-xl:  20px;
     --pt-radius-full: 9999px;
 
     /* ── Spacing (8px grid, scaled by density) ─────────────────────────
@@ -161,7 +144,6 @@
        below multiplies through it, so one attribute on <html> tightens or
        relaxes the whole app. */
     --pt-density: 1;
-    --pt-space-0: 0;
     --pt-space-1: calc(0.25rem * var(--pt-density));  /*  4 */
     --pt-space-2: calc(0.5rem  * var(--pt-density));  /*  8 */
     --pt-space-3: calc(0.75rem * var(--pt-density));  /* 12 */
@@ -195,15 +177,13 @@
 
     --pt-leading-tight: 1.25;
     --pt-leading-normal: 1.5;
-    --pt-leading-loose: 1.75;
 
     /* ── Measure (line length) ─────────────────────────────────────────
        Prose past about 75 characters is measurably harder to read: the eye
        loses its place on the return sweep. `ch` is the width of a "0" in the
        current font, so this tracks the type size instead of being a magic
        pixel count. */
-    --pt-measure:      68ch;
-    --pt-measure-wide: 88ch;
+    --pt-measure: 68ch;
 
     --pt-weight-regular: 400;
     --pt-weight-medium:  500;
@@ -222,17 +202,12 @@
     --pt-tap-min: 44px;
 
     /* ── Breakpoints ───────────────────────────────────────────────────
-       Custom properties cannot be used inside a media query, so these are
-       documentation rather than machinery — but they are the ONLY two widths
-       the app is allowed to break at. Anything narrower than sm is a phone;
-       anything past md gets the desktop treatment. Component-level reflow
-       belongs in a @container query, not here.
-
-         --pt-bp-sm: 640px
-         --pt-bp-md: 1024px */
+       Custom properties cannot be used inside a media query, so there are no
+       tokens here — but 640px (phone) and 1024px (desktop) are the ONLY two
+       widths the app is allowed to break at. Component-level reflow belongs
+       in a @container query. */
 
     /* ── Elevation ────────────────────────────────────────────────────── */
-    --pt-elev-0: none;
     --pt-elev-1: 0 1px 2px  light-dark(rgb(15 23 42 / 0.06), rgb(0 0 0 / 0.40));
     --pt-elev-2: 0 2px 8px  light-dark(rgb(15 23 42 / 0.08), rgb(0 0 0 / 0.45));
     --pt-elev-3: 0 8px 24px light-dark(rgb(15 23 42 / 0.12), rgb(0 0 0 / 0.50));
@@ -241,7 +216,6 @@
     /* ── Motion ───────────────────────────────────────────────────────── */
     --pt-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
     --pt-ease-out: cubic-bezier(0, 0, 0.2, 1);
-    --pt-dur-instant: 80ms;
     --pt-dur-fast:    150ms;
     --pt-dur-base:    220ms;
     --pt-dur-slow:    320ms;
@@ -249,9 +223,7 @@
     /* ── Z-index scale ─────────────────────────────────────────────────── */
     --pt-z-nav:   100;
     --pt-z-pop:   200;
-    --pt-z-modal: 300;
     --pt-z-toast: 400;
-    --pt-z-debug: 9999;
 
     /* ── Glass surface tokens ──────────────────────────────────────────
        Dark panes tint from the surface colour rather than from white. */
@@ -361,7 +333,7 @@
 }
 
 /* Some readers keep full colour but cannot cope with translucency. The app
-   leans on backdrop-filter in the status bar, empty states, palette and nav,
+   leans on backdrop-filter in the toasts, empty states and nav,
    so honour it independently of the contrast preference. */
 @media (prefers-reduced-transparency: reduce) {
     :root {

@@ -1,7 +1,4 @@
 ﻿@using PoTraffic.Client.Components
-@implements IDisposable
-@inject NavigationManager Nav
-@inject IJSRuntime JS
 
 <CascadingAuthenticationState>
     <AppErrorBoundary>
@@ -25,30 +22,3 @@
         </Router>
     </AppErrorBoundary>
 </CascadingAuthenticationState>
-
-@code {
-    // Fix #6 — One-time boot telemetry. Push the initial (baseUri, route, app
-    // version) tuple to console + JS so App Insights / Datadog can stitch
-    // sessions back to the boot. Also subscribe to Nav.LocationChanged to
-    // emit breadcrumb events for every subsequent navigation.
-    protected override void OnInitialized()
-    {
-        Nav.LocationChanged += OnLocationChanged;
-    }
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (!firstRender) return;
-        // Use un-awaited Task.Run-style fire-and-forget; exceptions are logged
-        // via the global error boundary, never propagated to the renderer.
-        _ = JS.InvokeVoidAsync("console.log",
-            $"[boot] href={Nav.BaseUri} uri={Nav.Uri} ts={DateTime.UtcNow:O}").AsTask();
-    }
-
-    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
-    {
-        _ = JS.InvokeVoidAsync("console.log", $"[nav] {e.Location}").AsTask();
-    }
-
-    public void Dispose() => Nav.LocationChanged -= OnLocationChanged;
-}

@@ -247,17 +247,3 @@
 .pt-trend-selection-clear:hover {
     color: var(--pt-fg-body);
 }
-
-/* The departure plan: leave-by headline over the arrive-by input. */
-.pt-answer-plan {
-    margin-top: var(--pt-space-3);
-    padding-top: var(--pt-space-3);
-    border-top: 1px solid var(--pt-border-subtle);
-}
-
-.pt-answer-plan-headline {
-    font-size: var(--pt-text-xl);
-    font-weight: var(--pt-weight-bold);
-    color: var(--pt-fg-primary);
-    font-variant-numeric: tabular-nums;
-}

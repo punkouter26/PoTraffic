@@ -4,23 +4,12 @@
 @inject NavigationManager Nav
 @inject AuthenticationStateProvider Auth
 
-<AuthorizeView>
-    <Authorizing>
-        <div class="pt-splash" role="status" aria-live="polite">Loading…</div>
-    </Authorizing>
-    <Authorized>
-        @{ Nav.NavigateTo("/dashboard", forceLoad: false); }
-    </Authorized>
-    <NotAuthorized>
-        @{ Nav.NavigateTo("/login", forceLoad: false); }
-    </NotAuthorized>
-</AuthorizeView>
+<div class="pt-splash" role="status" aria-live="polite">Loading…</div>
 
 @code {
-    // Fix #4 — Run the redirect in OnInitializedAsync (not during render) so it
-    // fires exactly once per component lifetime. The previous render-block
-    // Nav.NavigateTo could re-trigger mid-tree and cause a flicker between
-    // NotFound and the target page on first paint.
+    // The redirect runs here, not in the markup, so it fires exactly once per
+    // component lifetime. A NavigateTo inside AuthorizeView's render blocks fired
+    // on every render, on top of this one.
     protected override async Task OnInitializedAsync()
     {
         AuthenticationState state = await Auth.GetAuthenticationStateAsync();

@@ -1,74 +1,64 @@
 @using PoTraffic.Shared.DTOs.Alerts
-@using Microsoft.AspNetCore.Components.Authorization
 @implements IAsyncDisposable
 @inject HttpClient Http
 @inject NavigationManager Nav
-@inject AuthenticationStateProvider AuthState
 @inject PageActivityMonitor Activity
 @inject PoTraffic.Client.Infrastructure.PwaService Pwa
 
-<AuthorizeView>
-    <Authorized>
-        <div class="pt-bell">
-            <button class="pt-bell-btn" @onclick="Toggle" aria-label="Notifications" title="Notifications">
-                <PtIcon Name="notifications" Filled="@(_unreadCount > 0)" />
-                @if (_unreadCount > 0)
+@* Rendered only for a signed-in user — NavMenu gates it on the same auth state —
+   so there is no second auth check here. *@
+<div class="pt-bell">
+    <button class="pt-bell-btn" @onclick="Toggle" aria-label="Notifications" title="Notifications">
+        <PtIcon Name="notifications" Filled="@(_unreadCount > 0)" />
+        @if (_unreadCount > 0)
+        {
+            <span class="pt-bell-badge">@(_unreadCount > 9 ? "9+" : _unreadCount.ToString())</span>
+        }
+    </button>
+
+    @if (_open)
+    {
+        <div class="pt-bell-panel">
+            <div class="pt-bell-head">
+                <span>Notifications</span>
+                @if (_alerts.Any(a => !a.IsRead))
                 {
-                    <span class="pt-bell-badge">@(_unreadCount > 9 ? "9+" : _unreadCount.ToString())</span>
+                    <button class="pt-bell-link" @onclick="MarkAllReadAsync">Mark all read</button>
                 }
-            </button>
+            </div>
 
-            @if (_open)
+            @if (_alerts.Count == 0)
             {
-                <div class="pt-bell-panel">
-                    <div class="pt-bell-head">
-                        <span>Notifications</span>
-                        @if (_alerts.Any(a => !a.IsRead))
-                        {
-                            <button class="pt-bell-link" @onclick="MarkAllReadAsync">Mark all read</button>
-                        }
-                    </div>
-
-                    @if (_alerts.Count == 0)
+                <div class="pt-bell-empty">No alerts yet. We'll warn you when a commute runs heavy.</div>
+            }
+            else
+            {
+                <ul class="pt-bell-list">
+                    @foreach (AlertDto a in _alerts)
                     {
-                        <div class="pt-bell-empty">No alerts yet. We'll warn you when a commute runs heavy.</div>
+                        <li class="pt-bell-item @(a.IsRead ? "" : "pt-bell-unread")" @onclick="() => OpenAlertAsync(a)">
+                            <PtIcon Name="@(a.Kind switch { "Reroute" => "alt_route", "LeaveNow" => "schedule", "Digest" => "insights", _ => "directions_car" })"
+                                    Class="pt-bell-icon" />
+                            <span class="pt-bell-text">
+                                <span class="pt-bell-msg">@a.Message</span>
+                                <span class="pt-bell-time">@a.CreatedAt.ToLocalTime().ToString("MMM d, HH:mm")</span>
+                            </span>
+                        </li>
                     }
-                    else
-                    {
-                        <ul class="pt-bell-list">
-                            @foreach (AlertDto a in _alerts)
-                            {
-                                <li class="pt-bell-item @(a.IsRead ? "" : "pt-bell-unread")" @onclick="() => OpenAlertAsync(a)">
-                                    <PtIcon Name="@(a.Kind switch { "Reroute" => "alt_route", "LeaveNow" => "schedule", "Digest" => "insights", _ => "directions_car" })"
-                                            Class="pt-bell-icon" />
-                                    <span class="pt-bell-text">
-                                        <span class="pt-bell-msg">@a.Message</span>
-                                        <span class="pt-bell-time">@a.CreatedAt.ToLocalTime().ToString("MMM d, HH:mm")</span>
-                                    </span>
-                                </li>
-                            }
-                        </ul>
-                    }
-                </div>
+                </ul>
             }
         </div>
-    </Authorized>
-</AuthorizeView>
+    }
+</div>
 
 @code {
     private bool _open;
     private int _unreadCount;
     private List<AlertDto> _alerts = [];
     private System.Timers.Timer? _timer;
-    private bool _authenticated;
 
     protected override async Task OnInitializedAsync()
     {
-        AuthenticationState state = await AuthState.GetAuthenticationStateAsync();
-        _authenticated = state.User.Identity?.IsAuthenticated == true;
-        if (!_authenticated)
-            return;
-
         await Activity.EnsureStartedAsync();
         Activity.Resumed += OnResumedAsync;
 

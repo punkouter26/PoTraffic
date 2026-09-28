@@ -1,4 +1,4 @@
-// pt-gestures.js — small touch helper used by SwipeableRouteCard.
+// pt-gestures.js — small touch helper used by RouteCard.
 // No framework, no deps. Subscribes via element ref; cleans up on dispose.
 // Listens for horizontal swipe ≥ 96px, fire callback("left"/"right").
 // Also detects long-press ≥ 600ms with < 6px movement.

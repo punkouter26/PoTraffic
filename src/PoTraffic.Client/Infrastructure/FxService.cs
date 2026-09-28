@@ -47,9 +47,6 @@ public sealed class FxService : IAsyncDisposable
 
     public FxService(IJSRuntime js) => _js = js;
 
-    /// <summary>Raised after the setting changes, so open pages can re-render their controls.</summary>
-    public event Action? StateChanged;
-
     public MotionLevel Motion { get; private set; } = MotionLevel.Full;
 
     /// <summary>
@@ -83,7 +80,6 @@ public sealed class FxService : IAsyncDisposable
     {
         Motion = level;
         await Safe(() => _fx!.InvokeVoidAsync("setMotionLevel", Serialize(level)).AsTask());
-        StateChanged?.Invoke();
     }
 
     private async Task ReadAsync()

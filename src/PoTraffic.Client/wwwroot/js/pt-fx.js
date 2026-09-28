@@ -11,9 +11,8 @@
 //      single rAF loop that stops itself the moment nothing is registered.
 //   2. THE MOTION LEVEL. "full" | "reduced" | "off", from the user's own setting,
 //      with the OS prefers-reduced-motion preference as the floor.
-//   3. THE TRAFFIC MOOD. One number, 0 (clear) to 1 (jammed), that the background
-//      wash, the map flow and the ambient audio all read, so the app never says
-//      "calm" in one channel and "bad" in another.
+//   3. THE TRAFFIC MOOD. One number, 0 (clear) to 1 (jammed), that the map flow
+//      reads when a route carries no verdict of its own.
 
 const STORAGE_MOTION = "pt-motion-level";
 
@@ -28,8 +27,6 @@ let slowFrames = 0;
 
 /** Set when sustained frame times force a quality drop; effects read it to shed detail. */
 let degraded = false;
-
-const listeners = new Set();
 
 // ── Preferences ──────────────────────────────────────────────────────────────
 
@@ -65,7 +62,6 @@ export function motionLevel() {
 export function setMotionLevel(level) {
     write(STORAGE_MOTION, level);
     document.documentElement.setAttribute("data-motion", motionLevel());
-    emit();
 }
 
 /** True when decorative animation should run at all. */
@@ -73,23 +69,8 @@ export function animates() {
     return motionLevel() === "full";
 }
 
-/** True when an effect may draw, even if it must not move (static gradient, still glow). */
-export function draws() {
-    return motionLevel() !== "off";
-}
-
-export function onChange(fn) {
-    listeners.add(fn);
-    return () => listeners.delete(fn);
-}
-
-function emit() {
-    listeners.forEach((fn) => { try { fn(); } catch { /* listener's problem */ } });
-}
-
 reducedMedia.addEventListener("change", () => {
     document.documentElement.setAttribute("data-motion", motionLevel());
-    emit();
 });
 
 // Stamped on <html> so CSS can react without asking JS anything.
@@ -108,10 +89,7 @@ const MOOD_BY_LEVEL = { clear: 0.05, normal: 0.3, slow: 0.65, heavy: 0.95, unkno
  * to four different effects.
  */
 export function setMood(level) {
-    const next = MOOD_BY_LEVEL[level] ?? null;
-    if (next === mood) return;
-    mood = next;
-    emit();
+    mood = MOOD_BY_LEVEL[level] ?? null;
 }
 
 /** Current mood, or `fallback` while the app has no reading. */
@@ -130,10 +108,7 @@ function frame(now) {
     // Sustained slow frames mean this device cannot afford what we are asking for.
     // Rather than stutter, tell effects to shed detail — they read `isDegraded()`.
     if (dt * 1000 > SLOW_FRAME_MS) {
-        if (++slowFrames >= SLOW_FRAMES_BEFORE_DEGRADE && !degraded) {
-            degraded = true;
-            emit();
-        }
+        if (++slowFrames >= SLOW_FRAMES_BEFORE_DEGRADE) degraded = true;
     } else if (slowFrames > 0) {
         slowFrames--;
     }
@@ -178,10 +153,6 @@ export function register(key, step, options = {}) {
     return () => effects.delete(key);
 }
 
-export function unregister(key) {
-    effects.delete(key);
-}
-
 export function isDegraded() {
     return degraded;
 }
@@ -219,17 +190,6 @@ export function resolveRgb(host, expr, fallback = [0.23, 0.51, 0.96]) {
     const m = value.match(/-?[\d.]+/g);
     if (!m || m.length < 3) return fallback;
     return [m[0] / 255, m[1] / 255, m[2] / 255];
-}
-
-/** Same, but returns the browser-resolved CSS string for canvas2D use. */
-export function resolveCss(host, expr, fallback = "#3b82f6") {
-    const probe = document.createElement("span");
-    probe.style.cssText = "position:absolute;left:-9999px;top:0;width:0;height:0";
-    probe.style.color = expr;
-    (host ?? document.body).appendChild(probe);
-    const value = getComputedStyle(probe).color;
-    probe.remove();
-    return value || fallback;
 }
 
 /** Device pixel ratio, capped. Above 2 the cost squares and nobody can see it. */

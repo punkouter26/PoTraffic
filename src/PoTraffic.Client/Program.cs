@@ -33,11 +33,7 @@ builder.Services.AddAuthorizationCore();
 // Radzen component services (dialogs, tooltips, notifications, context menus)
 builder.Services.AddRadzenComponents();
 
-// PoTraffic native-browser interop (audio feedback, touch gestures)
-builder.Services.AddScoped<PtInterop>();
-
-// Last-known-good payloads, so the dashboard and the command palette paint before
-// the first round-trip completes.
+// Last-known-good payloads, so the dashboard paints before the first round-trip completes.
 builder.Services.AddScoped<ClientCache>();
 
 // One shared visibility/connectivity subscription driving every polling page.
@@ -51,8 +47,7 @@ builder.Services.AddScoped<PendingDeletionService>();
 // this is what holds it until Settings asks.
 builder.Services.AddScoped<PwaService>();
 
-// Visual effects and sound design: the background wash, the map's traffic flow, the
-// celebration burst and the synthesised cue set, plus the settings that govern them.
+// The motion setting that governs the map's traffic flow, the chart draw-in and the 3D heatmap.
 builder.Services.AddScoped<FxService>();
 
 await builder.Build().RunAsync();

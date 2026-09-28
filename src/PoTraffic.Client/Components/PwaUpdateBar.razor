@@ -32,9 +32,8 @@
             return;
 
         await Pwa.StartAsync();
-        // Mounts the background wash. Deliberately after the PWA registration: the
-        // service worker is functional, the wash is decoration, and on a slow device
-        // the order in which they contend for the first idle moment is visible.
+        // Reads the motion setting. Deliberately after the PWA registration: the
+        // service worker is functional, the effects are decoration.
         await Fx.StartAsync();
     }
 

@@ -20,19 +20,10 @@ public sealed class ClientCache
 {
     private const string KeyPrefix = "pt-cache";
 
-    /// <summary>
-    /// Service worker caches holding per-user API responses. Must match the names in
-    /// push-sw.js; the shell cache is deliberately excluded, as it holds only static assets.
-    /// </summary>
-    private static readonly string[] ServiceWorkerDataCaches = ["pt-data-v1"];
-
     private readonly IJSRuntime _js;
     private string _scope = "anon";
 
     public ClientCache(IJSRuntime js) => _js = js;
-
-    /// <summary>Raised after <see cref="SetAsync"/> so listeners can react to a fresh snapshot.</summary>
-    public event Action<string>? Written;
 
     /// <summary>
     /// Namespaces every subsequent read and write. Called once the authenticated
@@ -81,7 +72,6 @@ public sealed class ClientCache
             string payload =
                 $"{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}|{JsonSerializer.Serialize(value, typeInfo)}";
             await _js.InvokeVoidAsync("localStorage.setItem", Key(key), payload);
-            Written?.Invoke(key);
         }
         catch
         {
@@ -90,9 +80,9 @@ public sealed class ClientCache
     }
 
     /// <summary>
-    /// Drops every cached entry for every scope, and the service worker's cached API
-    /// responses with them. Called on sign-out: leaving either behind would let the next
-    /// account on a shared browser page through the previous one's data.
+    /// Drops every cached entry for every scope. Called on sign-out: leaving them behind
+    /// would let the next account on a shared browser page through the previous one's data.
+    /// The service worker never caches /api, so localStorage is the only copy.
     /// </summary>
     public async ValueTask ClearAllAsync()
     {
@@ -104,8 +94,7 @@ public sealed class ClientCache
                 await _js.InvokeAsync<IJSObjectReference>("import", "./js/pt-cache.js");
             await using (module.ConfigureAwait(false))
             {
-                await module.InvokeAsync<int>(
-                    "clearUserData", $"{KeyPrefix}:", ServiceWorkerDataCaches);
+                await module.InvokeAsync<int>("clearUserData", $"{KeyPrefix}:");
             }
         }
         catch
