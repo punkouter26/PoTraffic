@@ -24,6 +24,9 @@ public sealed class AlertEvaluator(TableStorageContext db, IPushNotifier push, I
         if (TryBuildCongestionAlert(route, record, session, out Alert? congestion))
             raised.Add(congestion!);
 
+        if (TryBuildLeaveNowAlert(route, record, session, out Alert? leave))
+            raised.Add(leave!);
+
         if (record.IsRerouted
             && !db.Alerts.Any(a => a.SessionId == session.Id && a.Kind == "Reroute"))
         {
@@ -52,11 +55,14 @@ public sealed class AlertEvaluator(TableStorageContext db, IPushNotifier push, I
         {
             try
             {
+                string title = a.Kind switch
+                {
+                    "Reroute" => "Route changed",
+                    LeaveNowKind => "Time to leave",
+                    _ => "Heavier traffic than usual",
+                };
                 await push.SendAsync(a.UserId, new PushPayload(
-                    a.Kind == "Reroute" ? "Route changed" : "Heavier traffic than usual",
-                    a.Message,
-                    $"/routes/{a.RouteId}",
-                    $"alert-{a.RouteId}"), AlertPushTtl, ct);
+                    title, a.Message, $"/routes/{a.RouteId}", $"{a.Kind}-{a.RouteId}"), AlertPushTtl, ct);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -100,6 +106,70 @@ public sealed class AlertEvaluator(TableStorageContext db, IPushNotifier push, I
             CreatedAt = record.PolledAt,
         };
         return true;
+    }
+
+    internal const string LeaveNowKind = "LeaveNow";
+
+    /// <summary>How long before the latest safe departure the nudge fires. The next sample can
+    /// be up to 15 minutes away (adaptive cadence), so a shorter lead could arrive too late.</summary>
+    internal static readonly TimeSpan LeaveNowLead = TimeSpan.FromMinutes(15);
+
+    /// <summary>Slack on top of the live trip time, so "leave now" isn't "arrive at the last second".</summary>
+    internal static readonly TimeSpan LeaveNowMargin = TimeSpan.FromMinutes(5);
+
+    /// <summary>
+    /// "Leave in 8 min" once per session for a route with an arrive-by target: the latest
+    /// safe departure is the target minus the trip time measured right now (plus a margin),
+    /// so a slow morning moves the nudge earlier and a clear one lets the user wait.
+    /// </summary>
+    private bool TryBuildLeaveNowAlert(EntityRoute route, PollRecord record, MonitoringSession session, out Alert? alert)
+    {
+        alert = null;
+        if (route.ArriveBy is not { } arriveBy
+            || db.Alerts.Any(a => a.SessionId == session.Id && a.Kind == LeaveNowKind))
+            return false;
+
+        DateTimeOffset nowLocal = record.PolledAt.ToLocal(db.ZoneFor(route.UserId));
+        string? message = LeaveNowMessage(nowLocal.DateTime, arriveBy, TimeSpan.FromSeconds(record.TravelDurationSeconds));
+        if (message is null)
+            return false;
+
+        alert = new Alert
+        {
+            Id = AlertId.New(),
+            UserId = route.UserId,
+            RouteId = route.Id,
+            SessionId = session.Id,
+            Kind = LeaveNowKind,
+            Message = message,
+            TravelSeconds = record.TravelDurationSeconds,
+            BaselineSeconds = 0,
+            CreatedAt = record.PolledAt,
+        };
+        return true;
+    }
+
+    /// <summary>The nudge text, or null when it is not yet time (or the target has passed).</summary>
+    internal static string? LeaveNowMessage(DateTime nowLocal, TimeOnly arriveBy, TimeSpan trip)
+    {
+        DateTime target = nowLocal.Date + arriveBy.ToTimeSpan();
+        if (nowLocal >= target)
+            return null;
+
+        DateTime leaveAt = target - trip - LeaveNowMargin;
+        TimeSpan untilLeave = leaveAt - nowLocal;
+        if (untilLeave > LeaveNowLead)
+            return null;
+
+        int tripMin = (int)Math.Round(trip.TotalMinutes);
+        string arrive = arriveBy.ToString("HH:mm");
+        if (untilLeave > TimeSpan.Zero)
+            return $"Leave in {(int)Math.Ceiling(untilLeave.TotalMinutes)} min to arrive by {arrive} — the drive is {tripMin} min right now.";
+
+        int lateMin = (int)Math.Round((nowLocal + trip - target).TotalMinutes);
+        return lateMin > 0
+            ? $"Leave now — at {tripMin} min you'd arrive about {lateMin} min after {arrive}."
+            : $"Leave now to arrive by {arrive} — the drive is {tripMin} min right now.";
     }
 
     internal static AlertDto ToDto(Alert a) =>

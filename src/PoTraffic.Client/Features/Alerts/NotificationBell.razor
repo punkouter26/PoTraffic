@@ -38,7 +38,7 @@
                             @foreach (AlertDto a in _alerts)
                             {
                                 <li class="pt-bell-item @(a.IsRead ? "" : "pt-bell-unread")" @onclick="() => OpenAlertAsync(a)">
-                                    <PtIcon Name="@(a.Kind == "Reroute" ? "alt_route" : "directions_car")"
+                                    <PtIcon Name="@(a.Kind switch { "Reroute" => "alt_route", "LeaveNow" => "schedule", _ => "directions_car" })"
                                             Class="pt-bell-icon" />
                                     <span class="pt-bell-text">
                                         <span class="pt-bell-msg">@a.Message</span>
