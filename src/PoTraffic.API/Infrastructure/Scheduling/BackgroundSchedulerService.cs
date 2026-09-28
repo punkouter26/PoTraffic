@@ -11,8 +11,9 @@ using PoTraffic.Shared.Enums;
 namespace PoTraffic.API.Infrastructure.Scheduling;
 
 /// <summary>
-/// BackgroundService that ticks every <see cref="TickInterval"/>, queries Azurite for due jobs,
-/// and executes them within a DI scope.
+/// BackgroundService that wakes when the next job it knows about is due (or every
+/// <see cref="TickInterval"/> at the latest), queries Azurite for due jobs, and executes them
+/// within a DI scope.
 /// </summary>
 public sealed class BackgroundSchedulerService : BackgroundService
 {
@@ -22,8 +23,9 @@ public sealed class BackgroundSchedulerService : BackgroundService
     private static readonly ActivitySource s_activitySource = new("PoTraffic.Scheduler");
 
     /// <summary>
-    /// How often due jobs are checked. Each tick issues Table Storage queries that are exported
-    /// as App Insights dependencies, so a short interval drives Log Analytics ingestion cost.
+    /// Longest the worker sleeps between checks for due jobs. Each tick issues Table Storage
+    /// queries that are exported as App Insights dependencies, so the worker never ticks on a
+    /// short fixed timer — it wakes early only when a job it scheduled is actually due.
     /// </summary>
     public static readonly TimeSpan TickInterval = TimeSpan.FromMinutes(15);
 
@@ -75,12 +77,28 @@ public sealed class BackgroundSchedulerService : BackgroundService
             }
         }
 
-        using PeriodicTimer timer = new(TickInterval);
+        // Tick once at startup (jobs may have come due while the process was down), then wake
+        // at the earlier of the next known job and the heartbeat. The heartbeat catches jobs
+        // this process did not schedule itself, e.g. ones persisted before a restart.
+        DateTimeOffset nextHeartbeat = DateTimeOffset.MinValue;
 
         try
         {
-            while (await timer.WaitForNextTickAsync(stoppingToken))
+            while (!stoppingToken.IsCancellationRequested)
             {
+                DateTimeOffset now = DateTimeOffset.UtcNow;
+                DateTimeOffset? nextJob = _tableScheduler?.NextKnownFireAt;
+                DateTimeOffset wakeAt = nextJob is { } due && due < nextHeartbeat ? due : nextHeartbeat;
+
+                if (now < wakeAt)
+                {
+                    if (_tableScheduler is null)
+                        await Task.Delay(wakeAt - now, stoppingToken);
+                    else
+                        await _tableScheduler.WaitForScheduleChangeAsync(wakeAt - now, stoppingToken);
+                    continue;
+                }
+
                 try
                 {
                     await ProcessJobs(stoppingToken);
@@ -91,6 +109,13 @@ public sealed class BackgroundSchedulerService : BackgroundService
                     LastTick = new SchedulerTickStatus(DateTimeOffset.UtcNow, Succeeded: false, Error: ex.Message);
                     _logger.LogWarning(ex, "BackgroundSchedulerService tick failed — will retry next tick");
                 }
+                finally
+                {
+                    // Even a failed tick forgets what was due, or the loop would spin on it;
+                    // the heartbeat retries anything left Pending.
+                    _tableScheduler?.ForgetFiredThrough(now);
+                }
+                nextHeartbeat = DateTimeOffset.UtcNow + TickInterval;
             }
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)

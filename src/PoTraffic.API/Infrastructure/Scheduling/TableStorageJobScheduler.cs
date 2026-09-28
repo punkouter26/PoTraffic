@@ -66,8 +66,45 @@ public sealed class TableStorageJobScheduler : IJobScheduler
         };
 
         _tableClient.UpsertEntity(entity);
+        NoteFireAt(entity.FireAt);
         return jobId;
     }
+
+    // Fire times of jobs this process scheduled and has not yet collected. The worker sleeps
+    // until the earliest one instead of querying the table on a short fixed timer, so a 5-minute
+    // poll chain really fires every 5 minutes while an idle app costs one query per heartbeat.
+    // Cancelled jobs are not removed — that only costs one empty query when their time comes.
+    private readonly SortedSet<DateTimeOffset> _knownFireTimes = [];
+    private readonly SemaphoreSlim _scheduleChanged = new(0);
+
+    private void NoteFireAt(DateTimeOffset fireAt)
+    {
+        bool earliest;
+        lock (_knownFireTimes)
+        {
+            earliest = _knownFireTimes.Count == 0 || fireAt < _knownFireTimes.Min;
+            _knownFireTimes.Add(fireAt);
+        }
+        if (earliest)
+            _scheduleChanged.Release();
+    }
+
+    /// <summary>Earliest fire time scheduled by this process and not yet collected, if any.</summary>
+    internal DateTimeOffset? NextKnownFireAt
+    {
+        get { lock (_knownFireTimes) return _knownFireTimes.Count == 0 ? null : _knownFireTimes.Min; }
+    }
+
+    /// <summary>Drops fire times a tick that started at <paramref name="tickStart"/> has collected.</summary>
+    internal void ForgetFiredThrough(DateTimeOffset tickStart)
+    {
+        lock (_knownFireTimes)
+            _knownFireTimes.RemoveWhere(t => t <= tickStart);
+    }
+
+    /// <summary>Waits up to <paramref name="timeout"/>, returning early when an earlier job is scheduled.</summary>
+    internal Task WaitForScheduleChangeAsync(TimeSpan timeout, CancellationToken ct) =>
+        _scheduleChanged.WaitAsync(timeout, ct);
 
     public void Cancel(string jobId) => CancelIn(OneShotPartition, jobId);
 
