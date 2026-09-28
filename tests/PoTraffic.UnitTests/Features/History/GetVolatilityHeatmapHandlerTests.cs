@@ -22,6 +22,8 @@ public sealed class GetVolatilityHeatmapHandlerTests
         RouteId routeId = RouteId.New();
         UserId userId = UserId.New();
 
+        // The grid buckets in the user's zone (UserTime.ZoneFor); the assertions below are in Eastern.
+        db.Add(new User { Id = userId, Email = "heatmap@test.dev", Locale = "en-US", TimeZoneId = "America/New_York", CreatedAt = DateTimeOffset.UtcNow });
         db.Add(new EntityRoute
         {
             Id = routeId,
