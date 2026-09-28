@@ -93,7 +93,8 @@ const LEVEL_TOKENS = {
  * @param {HTMLElement} container
  * @param {{encodedPolyline: string|null, originLat: number, originLng: number,
  *          destinationLat: number, destinationLng: number, trafficLevel: string,
- *          isApproximate: boolean, originLabel: string, destinationLabel: string}} data
+ *          isApproximate: boolean, originLabel: string, destinationLabel: string,
+ *          incident: {lat: number, lng: number, description: string}|null}} data
  */
 export async function render(container, data) {
     if (!container) return;
@@ -176,6 +177,10 @@ export async function render(container, data) {
     pin(origin, data.originLabel || "Start", "pt-map-pin-origin");
     pin(destination, data.destinationLabel || "End", "pt-map-pin-dest");
 
+    // Where the delay is. The rings are CSS, so reduced motion stills them for free.
+    const incident = data.incident ? [data.incident.lat, data.incident.lng] : null;
+    if (incident) pin(incident, data.incident.description, "pt-map-pin-incident");
+
     // The route's verdict becomes the app's mood, so the background wash and the
     // ambient audio agree with the line the user is looking at.
     fx.setMood(data.trafficLevel);
@@ -186,9 +191,9 @@ export async function render(container, data) {
         FlowLayer ??= createFlow(L);
         if (fx.animates()) {
             if (state.flow) {
-                state.flow.setPath(path, data.trafficLevel, expr);
+                state.flow.setPath(path, data.trafficLevel, expr, incident);
             } else {
-                state.flow = new FlowLayer({ latlngs: path, level: data.trafficLevel, colour: expr });
+                state.flow = new FlowLayer({ latlngs: path, level: data.trafficLevel, colour: expr, incident });
                 state.flow.addTo(map);
             }
         } else if (state.flow) {

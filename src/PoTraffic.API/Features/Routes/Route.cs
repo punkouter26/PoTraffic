@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using PoTraffic.API.Infrastructure.Providers;
 
 namespace PoTraffic.API.Features.Routes;
 
@@ -61,6 +62,13 @@ public sealed class Route
     /// The map draws a straight line in that case.
     /// </summary>
     public DateTimeOffset? PathUnavailableAt { get; set; }
+
+    /// <summary>
+    /// The worst incident found on the road shape the last time an alert fired, so the map
+    /// can mark where the delay is. Overwritten by the next finding, never cleared: the map
+    /// ignores it once it is older than <see cref="GetRoutePathQueryHandler.IncidentFreshFor"/>.
+    /// </summary>
+    public RouteIncident? LastIncident { get; set; }
 
     [JsonIgnore]
     public User User { get; set; } = null!;

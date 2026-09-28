@@ -28,6 +28,10 @@ public sealed class GetRoutePathQueryHandler(
     private const double NormalBelow = 1.10;
     private const double SlowBelow = 1.25;
 
+    /// <summary>How long a found incident stays on the map. TomTom only reports live
+    /// incidents, but nothing re-checks one until the next alert, so it has to age out.</summary>
+    internal static readonly TimeSpan IncidentFreshFor = TimeSpan.FromMinutes(45);
+
     public async Task<RoutePathDto?> Handle(GetRoutePathQuery q, CancellationToken ct)
     {
         EntityRoute? route = db.GetOwnedRoute(q.RouteId, q.UserId, excludeDeleted: true);
@@ -56,7 +60,10 @@ public sealed class GetRoutePathQueryHandler(
             latest,
             typical,
             latestAt,
-            IsApproximate: polyline is null);
+            IsApproximate: polyline is null,
+            Incident: route.LastIncident is { } i && DateTimeOffset.UtcNow - i.SeenAt < IncidentFreshFor
+                ? new RouteIncidentDto(i.Description, i.Lat, i.Lon, i.SeenAt)
+                : null);
     }
 
     /// <summary>

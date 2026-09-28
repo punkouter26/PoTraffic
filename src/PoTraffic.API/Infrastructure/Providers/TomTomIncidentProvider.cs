@@ -8,11 +8,18 @@ namespace PoTraffic.API.Infrastructure.Providers;
 public interface IIncidentProvider
 {
     /// <summary>
-    /// A one-line description ("Stationary traffic on I-5 near Exit 164, adding about 12 min"),
-    /// or null when there is nothing on the route, no API key, or the lookup failed.
+    /// The worst incident on the route, or null when there is nothing on it, no API key,
+    /// or the lookup failed.
     /// </summary>
-    Task<string?> DescribeWorstOnPathAsync(string encodedPolyline, CancellationToken ct = default);
+    Task<RouteIncident?> FindWorstOnPathAsync(string encodedPolyline, CancellationToken ct = default);
 }
+
+/// <summary>An incident on a route's road shape.</summary>
+/// <param name="Description">"Stationary traffic on I-5 near Exit 164, adding about 12 min".</param>
+/// <param name="Lat">The incident's point nearest the route.</param>
+/// <param name="Lon">The incident's point nearest the route.</param>
+/// <param name="SeenAt">When the lookup found it; the map stops showing it once it is stale.</param>
+public sealed record RouteIncident(string Description, double Lat, double Lon, DateTimeOffset SeenAt);
 
 /// <summary>
 /// TomTom Traffic Incident Details (v5). Needs <c>TomTom:ApiKey</c>; without one it is a
@@ -28,7 +35,7 @@ public sealed class TomTomIncidentProvider(HttpClient http, IConfiguration confi
     /// <summary>How far off the road shape an incident may sit and still count as on the route.</summary>
     internal const double OnRouteMetres = 150;
 
-    public async Task<string?> DescribeWorstOnPathAsync(string encodedPolyline, CancellationToken ct = default)
+    public async Task<RouteIncident?> FindWorstOnPathAsync(string encodedPolyline, CancellationToken ct = default)
     {
         string? key = config["TomTom:ApiKey"];
         List<(double Lat, double Lon)> path = DecodePolyline(encodedPolyline);
@@ -63,22 +70,31 @@ public sealed class TomTomIncidentProvider(HttpClient http, IConfiguration confi
     }
 
     /// <summary>The most severe incident within <see cref="OnRouteMetres"/> of the path, described.</summary>
-    internal static string? Worst(JsonElement root, List<(double Lat, double Lon)> path)
+    internal static RouteIncident? Worst(JsonElement root, List<(double Lat, double Lon)> path)
     {
         if (!root.TryGetProperty("incidents", out JsonElement incidents))
             return null;
 
         JsonElement? worst = null;
+        (double Lat, double Lon) worstAt = default;
         (int Magnitude, int Delay) worstRank = (-1, -1);
         foreach (JsonElement incident in incidents.EnumerateArray())
         {
-            if (!Coordinates(incident).Any(c => DistanceToPathMetres(c, path) <= OnRouteMetres))
+            (double Lat, double Lon) nearest = default;
+            double nearestMetres = double.MaxValue;
+            foreach ((double Lat, double Lon) c in Coordinates(incident))
+            {
+                double m = DistanceToPathMetres(c, path);
+                if (m < nearestMetres)
+                    (nearest, nearestMetres) = (c, m);
+            }
+            if (nearestMetres > OnRouteMetres)
                 continue;
 
             JsonElement props = incident.GetProperty("properties");
             (int, int) rank = (Int(props, "magnitudeOfDelay"), Int(props, "delay"));
             if (rank.CompareTo(worstRank) > 0)
-                (worst, worstRank) = (props, rank);
+                (worst, worstAt, worstRank) = (props, nearest, rank);
         }
 
         if (worst is not { } p)
@@ -94,7 +110,7 @@ public sealed class TomTomIncidentProvider(HttpClient http, IConfiguration confi
             ? $" near {f}" : "";
         int delayMin = (int)Math.Round(worstRank.Delay / 60.0);
         string delay = delayMin > 0 ? $", adding about {delayMin} min" : "";
-        return what + road + near + delay;
+        return new RouteIncident(what + road + near + delay, worstAt.Lat, worstAt.Lon, DateTimeOffset.UtcNow);
     }
 
     private static int Int(JsonElement props, string name) =>

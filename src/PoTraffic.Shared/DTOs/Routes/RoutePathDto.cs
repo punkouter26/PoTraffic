@@ -30,6 +30,10 @@ namespace PoTraffic.Shared.DTOs.Routes;
 /// Mean of prior samples for the same weekday and 15-minute slot, or null when
 /// too few exist to say anything.
 /// </param>
+/// <param name="Incident">
+/// The worst incident on the road shape from the last alert, while it is still recent;
+/// null otherwise. Only found when a congestion or reroute alert fires.
+/// </param>
 public sealed record RoutePathDto(
     RouteId RouteId,
     string? EncodedPolyline,
@@ -41,4 +45,8 @@ public sealed record RoutePathDto(
     int? LatestDurationSeconds,
     int? TypicalDurationSeconds,
     DateTimeOffset? LatestProbeAt,
-    bool IsApproximate);
+    bool IsApproximate,
+    RouteIncidentDto? Incident = null);
+
+/// <summary>A live incident on the route, at its point nearest the road shape.</summary>
+public sealed record RouteIncidentDto(string Description, double Lat, double Lng, DateTimeOffset SeenAt);

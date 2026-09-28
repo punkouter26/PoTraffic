@@ -64,6 +64,14 @@ const COUNT_DEGRADED = 16;
 const SPEED_CLEAR = 0.19;   // fraction of the path per second
 const SPEED_JAMMED = 0.035;
 
+/**
+ * The slow zone around an incident: how much of the path it spans (Gaussian width, as a
+ * fraction of the path) and the speed at its centre. Slower there means denser there —
+ * the particles bunch into a queue behind the incident without being told to.
+ */
+const INCIDENT_WIDTH = 0.045;
+const INCIDENT_SPEED = 0.18;
+
 export function createFlow(L) {
     /**
      * A Leaflet layer that owns one canvas in its own pane. Extending L.Layer rather
@@ -76,6 +84,7 @@ export function createFlow(L) {
             this._level = options?.level ?? "unknown";
             this._latlngs = options?.latlngs ?? [];
             this._colour = options?.colour ?? "#3b82f6";
+            this._incident = options?.incident ?? null;   // [lat, lng] or null
             this._particles = [];
             this._unregister = null;
         },
@@ -114,10 +123,11 @@ export function createFlow(L) {
         },
 
         /** Swaps the path and verdict without tearing the layer down. */
-        setPath(latlngs, level, colour) {
+        setPath(latlngs, level, colour, incident) {
             this._latlngs = latlngs;
             this._level = level;
             this._colour = colour;
+            this._incident = incident ?? null;
             this._seed();
             this._reset();
             this._start();
@@ -234,6 +244,7 @@ export function createFlow(L) {
                 this._lengths.push(total);
             }
             this._total = total;
+            this._incidentT = this._incident ? this._nearestT(map.latLngToContainerPoint(this._incident)) : null;
 
             this._gl?.viewport(0, 0, this._canvas.width, this._canvas.height);
             this._colourRgb = fx.resolveRgb(this._canvas.parentElement, this._colour, [0.23, 0.51, 0.96]);
@@ -269,6 +280,30 @@ export function createFlow(L) {
             return [a.x + (b.x - a.x) * f, a.y + (b.y - a.y) * f];
         },
 
+        /** Fraction along the path of the point nearest `pt`, in container px. */
+        _nearestT(pt) {
+            let best = Infinity, bestT = 0;
+            for (let i = 1; i < this._points.length; i++) {
+                const a = this._points[i - 1], b = this._points[i];
+                const dx = b.x - a.x, dy = b.y - a.y;
+                const lenSq = dx * dx + dy * dy;
+                const f = lenSq ? Math.max(0, Math.min(1, ((pt.x - a.x) * dx + (pt.y - a.y) * dy) / lenSq)) : 0;
+                const d = Math.hypot(a.x + dx * f - pt.x, a.y + dy * f - pt.y);
+                if (d < best) {
+                    best = d;
+                    bestT = this._total ? (this._lengths[i - 1] + (this._lengths[i] - this._lengths[i - 1]) * f) / this._total : 0;
+                }
+            }
+            return bestT;
+        },
+
+        /** Speed multiplier at t: 1 on open road, INCIDENT_SPEED at the incident itself. */
+        _slowAt(t) {
+            if (this._incidentT === null || this._incidentT === undefined) return 1;
+            const z = (t - this._incidentT) / INCIDENT_WIDTH;
+            return 1 - (1 - INCIDENT_SPEED) * Math.exp(-z * z);
+        },
+
         // ── Frame ────────────────────────────────────────────────────────────
 
         _start() {
@@ -295,7 +330,7 @@ export function createFlow(L) {
 
             for (let i = 0; i < this._particles.length; i++) {
                 const p = this._particles[i];
-                p.t += speed * p.rate * dt;
+                p.t += speed * p.rate * this._slowAt(p.t) * dt;
                 if (p.t > 1) p.t -= 1;
 
                 const [x, y] = this._at(p.t);

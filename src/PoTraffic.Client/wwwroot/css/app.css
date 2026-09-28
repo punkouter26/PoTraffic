@@ -1115,6 +1115,25 @@ details[open] > summary .pt-collapsible-icon { transform: rotate(90deg); }
 .pt-map-pin-origin .pt-map-pin-dot { background: var(--pt-fg-primary); }
 .pt-map-pin-dest .pt-map-pin-dot   { background: var(--pt-color-brand-500); }
 
+/* Incident: a danger dot sending out two staggered shockwave rings, so the eye finds
+   the cause of the delay before reading the legend line that names it. */
+.pt-map-pin-incident .pt-map-pin-dot { background: var(--pt-traffic-heavy); }
+.pt-map-pin-incident::before,
+.pt-map-pin-incident::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: var(--pt-radius-full);
+    border: 2px solid var(--pt-traffic-heavy);
+    animation: pt-shockwave 2.4s var(--pt-ease) infinite;
+    pointer-events: none;
+}
+.pt-map-pin-incident::after { animation-delay: 1.2s; }
+[data-motion="reduced"] .pt-map-pin-incident::before,
+[data-motion="reduced"] .pt-map-pin-incident::after,
+[data-motion="off"] .pt-map-pin-incident::before,
+[data-motion="off"] .pt-map-pin-incident::after { animation: none; opacity: 0; }
+
 /* Legend — the sentence that makes the colour mean something. */
 .pt-map-legend {
     display: flex;
@@ -1139,6 +1158,12 @@ details[open] > summary .pt-collapsible-icon { transform: rotate(90deg); }
 .pt-map-swatch-slow    { background: var(--pt-traffic-slow); }
 .pt-map-swatch-heavy   { background: var(--pt-traffic-heavy); }
 .pt-map-swatch-unknown { background: var(--pt-traffic-unknown); }
+.pt-map-swatch-incident {
+    width: 0.625rem;
+    height: 0.625rem;
+    background: var(--pt-traffic-heavy);
+}
+.pt-map-legend-incident { margin-top: 0.25rem; }
 
 .pt-map-legend-note {
     color: var(--pt-fg-muted);

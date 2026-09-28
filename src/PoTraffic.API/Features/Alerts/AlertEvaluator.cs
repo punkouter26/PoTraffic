@@ -57,10 +57,13 @@ public sealed class AlertEvaluator(
         {
             try
             {
-                if (await incidents.DescribeWorstOnPathAsync(route.PathPolyline, ct) is { } cause)
+                if (await incidents.FindWorstOnPathAsync(route.PathPolyline, ct) is { } cause)
                 {
                     foreach (Alert a in raised.Where(a => a.Kind != LeaveNowKind))
-                        a.Message += $" Likely cause: {cause}.";
+                        a.Message += $" Likely cause: {cause.Description}.";
+
+                    // Kept on the route so the map can show where it is. Saved below with the alerts.
+                    route.LastIncident = cause;
                 }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)

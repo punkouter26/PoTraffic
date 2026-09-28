@@ -1,4 +1,7 @@
 @using PoTraffic.Shared.DTOs.History
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject PoTraffic.Client.Infrastructure.FxService Fx
 
 @* ──────────────────────────────────────────────────────────────────────
    #5 — Day-of-week × quarter-hour congestion grid.
@@ -38,7 +41,33 @@ else
         <RadzenText TextStyle="TextStyle.Body2" class="pt-mb-3 pt-heatmap-summary">@_summary</RadzenText>
     }
 
-    <div class="pt-heatmap-scroll">
+    @* The 3D view is the same numbers as a landscape (js/pt-terrain.js). Hidden when
+       motion is off or WebGL2 turned out to be missing. *@
+    @if (!_terrainFailed && Fx.Motion != PoTraffic.Client.Infrastructure.MotionLevel.Off)
+    {
+        <RadzenSelectBar TValue="bool" Value="@_terrain" Change="@OnViewChanged"
+                         Size="ButtonSize.Small" class="pt-mb-3" aria-label="Heatmap view">
+            <Items>
+                <RadzenSelectBarItem Value="false" Text="Grid" Icon="grid_on" />
+                <RadzenSelectBarItem Value="true" Text="3D" Icon="landscape" />
+            </Items>
+        </RadzenSelectBar>
+    }
+
+    @if (_terrain)
+    {
+        <div class="pt-terrain" role="img"
+             aria-label="@($"Weekly pattern as a landscape: taller means slower than typical. {_summary}")">
+            <canvas class="pt-terrain-canvas" @ref="_canvas"></canvas>
+            <div class="pt-terrain-labels" @ref="_labels" aria-hidden="true"></div>
+        </div>
+        <div class="pt-heatmap-legend">
+            <span class="pt-heatmap-legend-label">Height and colour = how much slower than typical · shimmer = unpredictable · drag to turn</span>
+        </div>
+    }
+
+    @* In 3D the grid stays in the DOM, visually hidden, so screen readers keep every figure. *@
+    <div class="pt-heatmap-scroll @(_terrain ? "pt-visually-hidden" : "")">
         <table class="pt-heatmap">
             <caption class="pt-visually-hidden">
                 Mean travel time by day of week and quarter-hour, in @(Heatmap?.TimeZoneId ?? "the user's local time").
@@ -81,7 +110,7 @@ else
         </table>
     </div>
 
-    <div class="pt-heatmap-legend">
+    <div class="pt-heatmap-legend @(_terrain ? "pt-visually-hidden" : "")">
         <span class="pt-heatmap-legend-label">Typical</span>
         <span class="pt-heat pt-heat-l0" aria-hidden="true"></span>
         <span class="pt-heat pt-heat-l1" aria-hidden="true"></span>
@@ -118,6 +147,15 @@ else
         public int StartMinute => Quarter * 15;
     }
 
+    private bool _terrain;
+    private bool _terrainFailed;
+    private ElementReference _canvas;
+    private ElementReference _labels;
+    private IJSObjectReference? _module;
+
+    /// <summary>The heatmap last drawn in 3D; the page re-renders this on every refresh.</summary>
+    private VolatilityHeatmapDto? _drawn;
+
     private Dictionary<(string Day, int Hour, int Quarter), HeatmapCellDto> _byKey = [];
     private List<QuarterSlot> _slots = [];
     private string? _summary;
@@ -149,6 +187,62 @@ else
             .ToList();
 
         _summary = BuildSummary(Heatmap);
+    }
+
+    private void OnViewChanged(bool terrain)
+    {
+        _terrain = terrain;
+        _drawn = null;   // the canvas is a new element each time 3D is chosen
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_terrain || Heatmap is null || ReferenceEquals(Heatmap, _drawn))
+            return;
+        _drawn = Heatmap;
+
+        double median = Heatmap.MedianDurationSeconds;
+        var cells = Week.SelectMany(day => _slots.Select(slot => _byKey.GetValueOrDefault((day, slot.Hour, slot.Quarter))))
+            .ToList();
+
+        try
+        {
+            _module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/pt-terrain.js");
+            bool drawn = await _module.InvokeAsync<bool>("render", _canvas, _labels, new
+            {
+                cols = _slots.Select(SlotLabel).ToArray(),
+                rows = Week,
+                ratio = cells.Select(c => c is null || median <= 0 ? -1 : c.MeanDurationSeconds / median).ToArray(),
+                cv = cells.Select(c => c is { SampleCount: > 1, MeanDurationSeconds: > 0 }
+                    ? c.StdDevDurationSeconds / c.MeanDurationSeconds : 0).ToArray(),
+            });
+            if (!drawn)
+            {
+                (_terrain, _terrainFailed) = (false, true);
+                StateHasChanged();
+            }
+        }
+        catch (JSDisconnectedException) { /* page tearing down */ }
+        catch (ObjectDisposedException) { /* page tearing down */ }
+        catch (JSException)
+        {
+            (_terrain, _terrainFailed) = (false, true);
+            StateHasChanged();
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_module is null)
+            return;
+
+        try
+        {
+            await _module.InvokeVoidAsync("destroy", _canvas);
+            await _module.DisposeAsync();
+        }
+        catch (JSDisconnectedException) { /* page already gone */ }
+        catch (ObjectDisposedException) { /* page already gone */ }
     }
 
     /// <summary>"Tuesdays at 17:30 run 62% over your typical 23 min." Null until a cell

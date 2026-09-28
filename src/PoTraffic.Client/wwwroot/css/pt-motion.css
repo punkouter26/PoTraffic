@@ -21,6 +21,8 @@
                             100% { box-shadow: 0 0 0 0 rgb(16 185 129 / 0); } }
 @keyframes pt-sweep       { 0%   { transform: translate3d(-100%, 0, 0); }
                             100% { transform: translate3d(0%, 0, 0); } }
+@keyframes pt-shockwave   { 0%   { transform: scale(0.4); opacity: 0.85; }
+                            100% { transform: scale(3.2); opacity: 0; } }
 
 
 /* ── Entrance utilities ─────────────────────────────────────────────────── */

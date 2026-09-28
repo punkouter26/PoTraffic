@@ -31,6 +31,15 @@ else
             </span>
         }
     </div>
+
+    @if (Path.Incident is { } incident)
+    {
+        @* The pulsing marker on the map is the picture; this is the words. *@
+        <div class="pt-map-legend pt-map-legend-incident">
+            <span class="pt-map-legend-swatch pt-map-swatch-incident" aria-hidden="true"></span>
+            <span class="pt-map-legend-text">@incident.Description</span>
+        </div>
+    }
 }
 
 @code {
@@ -58,7 +67,7 @@ else
         if (Path is null)
             return;
 
-        string signature = $"{Path.EncodedPolyline?.Length}|{Path.TrafficLevel}|{Path.IsApproximate}";
+        string signature = $"{Path.EncodedPolyline?.Length}|{Path.TrafficLevel}|{Path.IsApproximate}|{Path.Incident?.SeenAt}";
         if (signature == _drawn)
             return;
 
@@ -76,6 +85,9 @@ else
                 isApproximate = Path.IsApproximate,
                 originLabel = OriginLabel,
                 destinationLabel = DestinationLabel,
+                incident = Path.Incident is { } i
+                    ? new { lat = i.Lat, lng = i.Lng, description = i.Description }
+                    : null,
             });
             _drawn = signature;
         }

@@ -156,6 +156,44 @@ td.pt-heat {
     color: var(--pt-fg-faint);
 }
 
+/* 3D view — js/pt-terrain.js draws the canvas; the labels are DOM it positions. */
+.pt-terrain {
+    position: relative;
+    height: 18rem;
+    border-radius: var(--pt-radius-md);
+    background: radial-gradient(ellipse at 50% 35%, var(--pt-bg-tint), transparent 70%);
+    overflow: hidden;
+}
+
+.pt-terrain-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    cursor: grab;
+    /* Horizontal drags turn the view; vertical swipes still scroll the page. */
+    touch-action: pan-y;
+}
+
+.pt-terrain-canvas:active { cursor: grabbing; }
+
+.pt-terrain-labels {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+/* Scoped CSS does not reach the spans pt-terrain.js creates, hence ::deep. */
+.pt-terrain-labels ::deep .pt-terrain-label {
+    position: absolute;
+    top: 0;
+    left: 0;
+    color: var(--pt-fg-tertiary);
+    font-size: var(--pt-text-xs);
+    font-variant-numeric: tabular-nums;
+    font-weight: var(--pt-weight-medium);
+    white-space: nowrap;
+}
+
 .pt-visually-hidden {
     border: 0;
     clip-path: inset(50%);

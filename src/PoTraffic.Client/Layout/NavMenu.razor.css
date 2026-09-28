@@ -35,6 +35,24 @@
     box-shadow: var(--pt-elev-2);
 }
 
+/* ── Liquid glass (Chromium only — see index.html) ──
+   The bar goes translucent and the content scrolling under it — the map, the
+   charts — bends at its rim through the #pt-liquid-glass lens. 72% of the bar
+   colour stays behind the text, which holds white-on-bar above 6:1 even over a
+   white card. Motion "off" means no decorative rendering, and anyone who asked
+   for more contrast or less transparency keeps the solid bar. */
+@media (forced-colors: none) and (prefers-reduced-transparency: no-preference) and (not (prefers-contrast: more)) {
+    :root[data-liquid-glass]:not([data-motion="off"]) .app-shell {
+        background: linear-gradient(180deg,
+            color-mix(in oklab, color-mix(in oklab, var(--pt-color-brand-900) 22%, var(--shell-bg)) 72%, transparent) 0%,
+            color-mix(in oklab, var(--shell-bg) 72%, transparent) 100%);
+        backdrop-filter: url(#pt-liquid-glass) blur(2px) saturate(160%);
+        box-shadow: var(--pt-elev-2),
+                    inset 0 1px 0 rgb(255 255 255 / 0.22),
+                    inset 0 -1px 0 rgb(255 255 255 / 0.08);
+    }
+}
+
 /* ── Brand (left) — wordmark with a small accent mark ── */
 
 .app-shell-brand {

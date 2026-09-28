@@ -37,7 +37,10 @@ public sealed class IncidentMatchingTests
         using JsonDocument doc = JsonDocument.Parse(json);
 
         // The road closure is ~2 km east of the route, so it must not be blamed.
-        TomTomIncidentProvider.Worst(doc.RootElement, Path)
-            .Should().Be("Stationary traffic on I-5 near Exit 164, adding about 12 min");
+        RouteIncident? worst = TomTomIncidentProvider.Worst(doc.RootElement, Path);
+        worst!.Description.Should().Be("Stationary traffic on I-5 near Exit 164, adding about 12 min");
+
+        // Located at the incident's own point nearest the road, not the bounding box.
+        (worst.Lat, worst.Lon).Should().Be((47.64, -122.3301));
     }
 }
