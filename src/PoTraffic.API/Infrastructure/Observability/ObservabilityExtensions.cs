@@ -1,5 +1,6 @@
 using Azure.Monitor.OpenTelemetry.AspNetCore;
 using System.Reflection;
+using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using PoTraffic.API.Platform;
@@ -44,10 +45,14 @@ internal static class ObservabilityExtensions
 
                 // Cost cap: drop the noisy ASP.NET HTTP client/hosting pre-aggregated meters
                 // (~70–80% of this app's Log Analytics ingestion). Reversible via config.
+                // OpenTelemetry has no "remove meter"; a view returning Drop discards every
+                // instrument of the meter, including ones the Azure Monitor distro adds itself.
                 if (!builder.Configuration.GetValue("ApplicationInsights:EnableAspNetCoreMeters", false))
                 {
-                    metrics.RemoveMeter("Microsoft.AspNetCore.Hosting");
-                    metrics.RemoveMeter("Microsoft.AspNetCore.HttpClient");
+                    metrics.AddView(instrument =>
+                        instrument.Meter.Name is "Microsoft.AspNetCore.Hosting" or "System.Net.Http"
+                            ? MetricStreamConfiguration.Drop
+                            : null);
                 }
             });
 
