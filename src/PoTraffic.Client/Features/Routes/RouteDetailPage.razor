@@ -96,9 +96,7 @@ else
 
     @* ── THE ANSWER ────────────────────────────────────────────────────
        Leads with "Leave by" whenever there is a plan, because that is the question the
-       app exists to answer; the day's range of durations is the supporting line. The
-       arrive-by input lives here, beside the answer it produces — in the settings card
-       below it was a field users had to find before the page would say anything useful. *@
+       app exists to answer; the day's range of durations is the supporting line. *@
     <section class="pt-answer" aria-label="Route summary">
         @* The title already reads "Origin → Destination" unless the route is named. *@
         @if (_route.Name is not null)
@@ -140,27 +138,10 @@ else
             </div>
         }
 
-        @if (_todayPolls.Count > 0)
+        @if (_todayPolls.Count > 0 && _plan is { LeaveBy: not null })
         {
-            <div class="pt-answer-meta">
-                @if (_plan is { LeaveBy: not null })
-                {
-                    <span>@_durationLabel ·</span>
-                }
-                @_confidenceNote
-                <a class="pt-answer-ics pt-tap" href="@_icsHref" download="departure.ics">Add to calendar</a>
-            </div>
+            <div class="pt-answer-meta">@_durationLabel</div>
         }
-
-        <label class="pt-answer-arrive">
-            <span class="pt-setting-label">Arrive by</span>
-            <input type="time" class="pt-setting-input" value="@_route.ArriveBy" @onchange="OnArriveByChangedAsync"
-                   aria-label="Time you need to arrive" />
-            @if (_plan is null)
-            {
-                <span class="pt-answer-arrive-hint">to get a leave-by time</span>
-            }
-        </label>
 
         @if (LatestPoll?.HolidayName is { } holiday)
         {
@@ -302,14 +283,12 @@ else
     private SessionDto? _activeSession;
     private MonitoringWindowDto? _activeWindow;
     private bool _creatingReturn;
-    private string _icsHref = string.Empty;
 
     // The answer, pre-formatted. Built once per load rather than in the markup,
     // which would recompute them on every one of the page's refreshes.
     private string _originStreet = string.Empty;
     private string _destStreet = string.Empty;
     private string _durationLabel = string.Empty;
-    private string _confidenceNote = string.Empty;
     private string _pendingDetail = string.Empty;
     /// <summary>
     /// Heading for the page. Two fallbacks: "Route" until the route lands so the
@@ -382,7 +361,6 @@ else
         // and the stale banner. Swallowing them here would report every refresh as a
         // success and keep hammering an endpoint that is down.
         string dayOfWeek = DateTime.Today.DayOfWeek.ToString();
-        _icsHref = $"/api/routes/{RouteId}/departure.ics?dayOfWeek={dayOfWeek}";
         string sinceUtc = Uri.EscapeDataString(DateTime.UtcNow.AddHours(-24).ToString("o"));
 
         // None of these reads depends on another's result, so they all go out at once.
@@ -486,21 +464,6 @@ else
         catch (HttpRequestException) { /* offline — the header keeps the saved name */ }
     }
 
-    /// <summary>Saves the arrive-by target (empty clears it) and reloads the plan.</summary>
-    private async Task OnArriveByChangedAsync(ChangeEventArgs e)
-    {
-        // Browsers hand back "HH:mm", or "HH:mm:ss" when a step below a minute is set.
-        string? value = e.Value is string { Length: >= 5 } s ? s[..5] : null;
-        try
-        {
-            HttpResponseMessage resp = await Http.PutAsJsonAsync($"/api/routes/{RouteId}/arrive-by",
-                new SetArriveByRequest(value), AppJsonContext.Default.SetArriveByRequest);
-            if (resp.IsSuccessStatusCode)
-                await RefreshAsync();
-        }
-        catch (HttpRequestException) { /* offline — the next refresh restores the saved value */ }
-    }
-
     /// <summary>
     /// Reads the departure recommendation, treating "there isn't one yet" as a value
     /// rather than an error.
@@ -579,7 +542,5 @@ else
         _durationLabel = bestMin == worstMin
             ? $"{bestMin} min today"
             : $"{bestMin}–{worstMin} min today";
-
-        _confidenceNote = $"{_todayPolls.Count} sample{(_todayPolls.Count == 1 ? "" : "s")} so far today.";
     }
 }

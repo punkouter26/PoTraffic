@@ -164,38 +164,6 @@
     color: var(--pt-fg-tertiary);
 }
 
-.pt-answer-ics {
-    color: var(--pt-color-brand-on-surface);
-    font-weight: var(--pt-weight-semibold);
-    text-decoration: none;
-    white-space: nowrap;
-    /* 17px of caption text is below the 24px minimum target; the padding makes up the rest. */
-    display: inline-block;
-    padding-block: var(--pt-space-1);
-}
-
-/* The arrive-by input, under the answer it drives. */
-.pt-answer-arrive {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: var(--pt-space-2) var(--pt-space-3);
-    margin-top: var(--pt-space-3);
-    padding-top: var(--pt-space-3);
-    border-top: 1px solid var(--pt-border-subtle);
-}
-
-.pt-answer-arrive .pt-setting-label {
-    min-width: 0;
-}
-
-.pt-answer-arrive-hint {
-    font-size: var(--pt-text-xs);
-    color: var(--pt-fg-tertiary);
-}
-
-.pt-answer-ics:hover { text-decoration: underline; }
-
 /* ── Sample clicked on the trend chart ──────────────────────────────────── */
 .pt-trend-selection {
     align-items: center;

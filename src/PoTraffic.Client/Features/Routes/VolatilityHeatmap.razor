@@ -12,9 +12,9 @@
    different problems: a reliably-40-minute slot can be planned around, a
    25-to-55-minute one can't.
 
-   Only the quarter-hour slots that actually carry samples are drawn. That
-   matters more at 15 minutes than it did at 30: a full day is 96 columns, and
-   a 07:00–09:00 commute occupies eight of them.
+   Portrait layout: one column per weekday, one row per quarter-hour for the
+   whole day (00:00–24:00, 96 rows), scrolling vertically inside the card. The
+   3D view still draws only the slots that carry samples.
 
    Rule 4: the markup hands CSS the level class only — the ramp itself is
    owned by .pt-heat-l0…l4 in app.css.
@@ -72,19 +72,19 @@ else
             </caption>
             <thead>
                 <tr>
-                    <th scope="col"><span class="pt-visually-hidden">Day</span></th>
-                    @foreach (QuarterSlot slot in _slots)
+                    <th scope="col" class="pt-heatmap-day"><span class="pt-visually-hidden">Time</span></th>
+                    @foreach (string day in Week)
                     {
-                        <th scope="col" class="pt-heatmap-hour @(slot.Quarter == 0 ? "pt-heatmap-hour-top" : "")"><span>@SlotLabel(slot)</span></th>
+                        <th scope="col" class="pt-heatmap-day">@day[..3]</th>
                     }
                 </tr>
             </thead>
             <tbody>
-                @foreach (string day in Week)
+                @foreach (QuarterSlot slot in AllSlots)
                 {
                     <tr>
-                        <th scope="row" class="pt-heatmap-day">@day[..3]</th>
-                        @foreach (QuarterSlot slot in _slots)
+                        <th scope="row" class="pt-heatmap-hour @(slot.Quarter == 0 ? "pt-heatmap-hour-top" : "")"><span>@SlotLabel(slot)</span></th>
+                        @foreach (string day in Week)
                         {
                             HeatmapCellDto? cell = _byKey.GetValueOrDefault((day, slot.Hour, slot.Quarter));
                             @if (cell is null)
@@ -120,7 +120,7 @@ else
         <span class="pt-heat pt-heat-l2 pt-heat-volatile" aria-hidden="true"></span>
         <span class="pt-heatmap-legend-label">dot = unpredictable</span>
         <span class="pt-heatmap-legend-sep">·</span>
-        <span class="pt-heatmap-legend-label">minutes, 15-minute slots in @(Heatmap?.TimeZoneId ?? "your local time") — only times you travel are shown</span>
+        <span class="pt-heatmap-legend-label">minutes, 15-minute slots in @(Heatmap?.TimeZoneId ?? "your local time")</span>
     </div>
 }
 
@@ -144,6 +144,10 @@ else
     {
         public int StartMinute => Quarter * 15;
     }
+
+    /// <summary>Every quarter-hour of the day — the grid's rows.</summary>
+    private static readonly QuarterSlot[] AllSlots =
+        [.. Enumerable.Range(0, 96).Select(static i => new QuarterSlot(i / 4, i % 4))];
 
     private bool _terrain;
     private bool _terrainFailed;
@@ -174,9 +178,8 @@ else
             .GroupBy(c => (c.DayOfWeek, c.Hour, c.Quarter))
             .ToDictionary(g => g.Key, g => g.Last());
 
-        // Only slots that actually carry a sample get a column. At 15-minute resolution
-        // a full day is 96 columns, so rendering a contiguous range would put dozens of
-        // empty ones between a morning block and an evening one.
+        // The 3D view's columns: only slots that actually carry a sample, so the
+        // landscape isn't mostly flat. The grid itself draws AllSlots.
         _slots = Heatmap.Cells
             .Select(c => new QuarterSlot(c.Hour, c.Quarter))
             .Distinct()

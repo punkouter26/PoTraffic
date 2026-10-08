@@ -20,28 +20,20 @@
 }
 
 .pt-heatmap-scroll {
-    /* 24 columns will not fit a phone. The grid scrolls inside its own card
-       rather than pushing the page sideways. */
-    overflow-x: auto;
-    padding-bottom: var(--pt-space-1);
-    overscroll-behavior-x: contain;
-
-    /* Query container for the grid inside: cells size themselves from the room
-       the card gives them, which is the only measurement that matters here —
-       the same heatmap has to work in a full-width card and in a narrow one. */
-    container-type: inline-size;
-    container-name: pt-heatmap;
+    /* 96 quarter-hour rows are several screens tall. The grid scrolls inside its
+       own card rather than burying everything below it. */
+    max-height: 70vh;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
 }
 
-/* Auto layout at full width: a short commute's eight columns share the card
-   instead of huddling in its left half, while a long window still falls back to
-   its columns' minimum widths and scrolls. */
+/* Fixed layout: seven equal day columns share whatever width the card has. */
 .pt-heatmap {
     border-collapse: separate;
-    border-spacing: 3px;
-    table-layout: auto;
+    border-spacing: 2px;
+    table-layout: fixed;
     width: 100%;
-    max-width: 60rem;
+    max-width: 40rem;
 }
 
 .pt-heatmap-hour,
@@ -52,26 +44,37 @@
     font-weight: var(--pt-weight-medium);
 }
 
-.pt-heatmap-hour {
-    text-align: center;
-    min-width: 2.25rem;
-}
-
 .pt-heatmap-day {
-    text-align: right;
-    padding-right: var(--pt-space-2);
-    white-space: nowrap;
-    /* Stays put when a long window scrolls sideways, so a row never loses its day. */
+    text-align: center;
+    /* Stays put while the day scrolls, so a column never loses its weekday. */
     position: sticky;
-    left: 0;
+    top: 0;
     z-index: 1;
     background: var(--pt-bg-surface);
 }
 
+.pt-heatmap-day:first-child { width: 3rem; }
+
+.pt-heatmap-hour {
+    text-align: right;
+    padding-right: var(--pt-space-2);
+    white-space: nowrap;
+    position: relative;
+}
+
+/* Only on-the-hour rows show their label; the quarter labels stay in the
+   accessibility tree. */
+.pt-heatmap-hour:not(.pt-heatmap-hour-top) > span {
+    position: absolute;
+    clip-path: inset(50%);
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+}
+
 .pt-heat {
     border-radius: var(--pt-radius-xs);
-    height: 1.75rem;
-    min-width: 2.25rem;
+    height: 1.25rem;
     position: relative;
     text-align: center;
     vertical-align: middle;
@@ -94,7 +97,7 @@ td.pt-heat {
     font-size: var(--pt-text-xs);
     font-variant-numeric: tabular-nums;
     font-weight: var(--pt-weight-semibold);
-    line-height: 1.75rem;
+    line-height: 1.25rem;
 }
 
 /* Congestion ramp — mean travel time relative to the route's median sample.
@@ -210,50 +213,4 @@ td.pt-heat {
     position: absolute;
     white-space: nowrap;
     width: 1px;
-}
-
-/* Tight card: drop the per-cell number and let colour carry the reading. The
-   tooltip and the visually-hidden text still hold the full figures.
-
-   Only on-the-hour labels show, positioned out of flow so they overhang the
-   quarter columns beside them. A "07:15" label in every column set the column's
-   minimum width, and nine of them clipped the last two columns off a phone. The
-   quarter labels stay in the accessibility tree.
-
-   Last in the file on purpose: these override the base .pt-heat and
-   .pt-heatmap-hour rules at equal specificity, and when this block sat above
-   them the base min-widths won and the narrow sizes never applied. */
-@container pt-heatmap (width < 26rem) {
-    .pt-heat-value { display: none; }
-
-    .pt-heat {
-        min-width: 1.5rem;
-        height: 1.4rem;
-    }
-
-    .pt-heatmap-hour {
-        position: relative;
-        min-width: 1.5rem;
-        height: 1.25rem;
-    }
-
-    .pt-heatmap-hour > span {
-        position: absolute;
-        left: 0;
-        top: 0;
-        white-space: nowrap;
-    }
-
-    /* The last column has no neighbour to overhang — anchor its label right. */
-    .pt-heatmap-hour:last-child > span {
-        left: auto;
-        right: 0;
-    }
-
-    .pt-heatmap-hour:not(.pt-heatmap-hour-top) > span {
-        clip-path: inset(50%);
-        width: 1px;
-        height: 1px;
-        overflow: hidden;
-    }
 }
